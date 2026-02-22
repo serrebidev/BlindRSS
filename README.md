@@ -32,3 +32,5 @@ If BlindRSS has helped you, feel free to submit pull requests with fixes or feat
 
 ## How to build
 [`build.md`](build.md).
+##Submit bugs in issues, or join my Telegram group!
+(https://t.me/SerrebiProjects)
