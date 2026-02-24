@@ -37,6 +37,10 @@ _SEEKABLE_EXTENSIONS = (
     ".mov",
 )
 
+# Prefer AAC/M4A for broader compatibility with older/bundled VLC builds.
+# Fall back to the previous bestaudio behavior when M4A is unavailable.
+_YTDLP_VLC_AUDIO_FORMAT = "bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio/best"
+
 
 def _should_reapply_seek(target_ms: int, current_ms: int, tolerance_ms: int, remaining_retries: int) -> bool:
     try:
@@ -276,6 +280,7 @@ class PlayerFrame(wx.Frame):
         self._last_vlc_url = None
         self._last_used_range_proxy = False
         self._last_range_proxy_headers = None
+        self._last_vlc_http_headers = None
         self._last_range_proxy_cache_dir = None
         self._last_range_proxy_prefetch_kb = None
         self._last_range_proxy_initial_burst_kb = None
@@ -1166,7 +1171,7 @@ class PlayerFrame(wx.Frame):
                     pass
                 new_url = proxy.proxify(self._last_orig_url, headers=self._last_range_proxy_headers or {})
                 self._last_vlc_url = new_url
-                self._load_vlc_url(new_url)
+                self._load_vlc_url(new_url, http_headers=self._last_vlc_http_headers)
                 return
             except Exception:
                 pass
@@ -1177,11 +1182,16 @@ class PlayerFrame(wx.Frame):
             try:
                 self._last_used_range_proxy = False
                 self._last_vlc_url = self._last_orig_url
-                self._load_vlc_url(self._last_orig_url)
+                self._load_vlc_url(self._last_orig_url, http_headers=self._last_vlc_http_headers)
             except Exception:
                 pass
 
-    def _load_vlc_url(self, final_url: str, load_seq: int | None = None) -> None:
+    def _load_vlc_url(
+        self,
+        final_url: str,
+        load_seq: int | None = None,
+        http_headers: dict | None = None,
+    ) -> None:
         log.debug("load_vlc_url: %s", final_url)
         try:
             if load_seq is None:
@@ -1194,8 +1204,26 @@ class PlayerFrame(wx.Frame):
             self.player.stop()
         except Exception:
             pass
+        try:
+            if http_headers is not None:
+                self._last_vlc_http_headers = dict(http_headers or {})
+        except Exception:
+            pass
         media = self.instance.media_new(final_url)
         try:
+            effective_headers = dict(getattr(self, "_last_vlc_http_headers", None) or {})
+            ua_value = (
+                str(effective_headers.get("User-Agent") or effective_headers.get("user-agent") or "").strip()
+                or "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+            )
+            referer_value = str(
+                effective_headers.get("Referer")
+                or effective_headers.get("referer")
+                or effective_headers.get("Referrer")
+                or effective_headers.get("referrer")
+                or ""
+            ).strip()
+            cookie_value = str(effective_headers.get("Cookie") or effective_headers.get("cookie") or "").strip()
             cache_ms = int(self.config_manager.get('vlc_network_caching_ms', 500))
             if cache_ms < 0: cache_ms = 0
 
@@ -1211,7 +1239,11 @@ class PlayerFrame(wx.Frame):
             media.add_option(f':network-caching={cache_ms}')
             media.add_option(f':file-caching={file_cache_ms}')
             media.add_option(':http-reconnect')
-            media.add_option(':http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36')
+            media.add_option(f':http-user-agent={ua_value}')
+            if referer_value:
+                media.add_option(f':http-referrer={referer_value}')
+            if cookie_value:
+                media.add_option(f':http-cookie={cookie_value}')
         except Exception:
             pass
         try:
@@ -2431,7 +2463,7 @@ class PlayerFrame(wx.Frame):
                         ytdlp_headers["Origin"] = origin
 
                     base_opts = {
-                        'format': 'bestaudio/best',
+                        'format': _YTDLP_VLC_AUDIO_FORMAT,
                         'quiet': True,
                         'no_warnings': True,
                         'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
@@ -2694,7 +2726,11 @@ class PlayerFrame(wx.Frame):
             self._last_load_title = self.current_title
             self._queue_silence_scan(final_url, int(getattr(self, "_active_load_seq", 0)), headers=ytdlp_headers)
             self._set_status("Buffering...")
-            self._load_vlc_url(final_url, load_seq=int(getattr(self, "_active_load_seq", 0)))
+            self._load_vlc_url(
+                final_url,
+                load_seq=int(getattr(self, "_active_load_seq", 0)),
+                http_headers=dict(ytdlp_headers or {}),
+            )
 
         if chapters:
             self.update_chapters(chapters)

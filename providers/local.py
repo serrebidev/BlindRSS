@@ -1575,8 +1575,8 @@ class LocalProvider(RSSProvider):
                                         return v
                                 return None
 
-                            text = get_attr('text') or get_attr('title')
-                            if not text: text = "Unknown Feed"
+                            imported_title = str(get_attr('text') or get_attr('title') or "").strip()
+                            text = imported_title or "Unknown Feed"
                             
                             xmlUrl = get_attr('xmlUrl')
                             
@@ -1591,8 +1591,14 @@ class LocalProvider(RSSProvider):
                                     if cat_to_use and cat_to_use != "Uncategorized":
                                         ensure_category(cat_to_use)
                                     
-                                    c.execute("INSERT INTO feeds (id, url, title, category, icon_url) VALUES (?, ?, ?, ?, ?)",
-                                            (feed_id, xmlUrl, text, cat_to_use, ""))
+                                    # Preserve OPML-provided labels as user-custom titles so refresh
+                                    # does not overwrite curated names imported from other readers.
+                                    title_is_custom = 1 if imported_title else 0
+                                    c.execute(
+                                        "INSERT INTO feeds (id, url, title, title_is_custom, category, icon_url) "
+                                        "VALUES (?, ?, ?, ?, ?, ?)",
+                                        (feed_id, xmlUrl, text, title_is_custom, cat_to_use, ""),
+                                    )
                             
                             # Recursion for children
                             # In BS4, children include newlines/NavigableString, so filtering for Tags is important

@@ -71,6 +71,19 @@ def _get_feed_row(feed_id: str):
         conn.close()
 
 
+def _get_feed_row_by_url(url: str):
+    conn = core.db.get_connection()
+    try:
+        c = conn.cursor()
+        c.execute(
+            "SELECT id, title, COALESCE(title_is_custom, 0) FROM feeds WHERE url = ?",
+            (url,),
+        )
+        return c.fetchone()
+    finally:
+        conn.close()
+
+
 def test_local_feed_custom_title_persists_after_refresh():
     with tempfile.TemporaryDirectory() as tmp:
         orig_db_file = core.db.DB_FILE
@@ -195,6 +208,59 @@ def test_local_feed_reset_title_restores_remote_title_on_refresh():
             title, title_is_custom = _get_feed_row(feed_id)
             assert title == "Remote Feed Title Reset"
             assert int(title_is_custom or 0) == 0
+        finally:
+            httpd.shutdown()
+            httpd.server_close()
+            thread.join(timeout=1)
+            core.db.DB_FILE = orig_db_file
+
+
+def test_opml_imported_feed_title_is_preserved_on_refresh():
+    with tempfile.TemporaryDirectory() as tmp:
+        orig_db_file = core.db.DB_FILE
+        core.db.DB_FILE = os.path.join(tmp, "rss.db")
+        httpd, thread, port = _start_server()
+        try:
+            provider = LocalProvider(
+                {
+                    "providers": {"local": {}},
+                    "feed_timeout_seconds": 2,
+                    "feed_retry_attempts": 0,
+                }
+            )
+
+            feed_url = f"http://127.0.0.1:{port}/feed1"
+            custom_title = "My OPML Custom Name"
+            opml_path = os.path.join(tmp, "feeds.opml")
+            with open(opml_path, "w", encoding="utf-8") as f:
+                f.write(
+                    f"""<?xml version="1.0" encoding="UTF-8"?>
+<opml version="1.0">
+  <body>
+    <outline text="Podcasts">
+      <outline text="{custom_title}" xmlUrl="{feed_url}" />
+    </outline>
+  </body>
+</opml>
+"""
+                )
+
+            assert provider.import_opml(opml_path) is True
+
+            row = _get_feed_row_by_url(feed_url)
+            assert row is not None
+            feed_id, title, title_is_custom = row
+            assert title == custom_title
+            assert int(title_is_custom or 0) == 1
+
+            _FeedHandler.titles["/feed1"] = "Remote Feed Title Changed"
+            assert provider.refresh_feed(feed_id) is True
+
+            row = _get_feed_row_by_url(feed_url)
+            assert row is not None
+            _feed_id2, title, title_is_custom = row
+            assert title == custom_title
+            assert int(title_is_custom or 0) == 1
         finally:
             httpd.shutdown()
             httpd.server_close()
