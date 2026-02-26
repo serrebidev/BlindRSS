@@ -1,5 +1,6 @@
 import wx
 import wx.adv
+import concurrent.futures
 import copy
 import queue
 import threading
@@ -11,6 +12,10 @@ from urllib.parse import urlparse
 from core.discovery import (
     discover_feed,
     is_ytdlp_supported,
+    get_ytdlp_searchable_sites,
+    resolve_quick_url_title,
+    resolve_ytdlp_url_enrichment,
+    search_ytdlp_site,
     search_youtube_feeds,
     search_mastodon_feeds,
     search_bluesky_feeds,
@@ -2189,6 +2194,1248 @@ class FeedSearchDialog(wx.Dialog):
         if idx != -1:
             return self.results_data[idx]["url"]
         return None
+
+
+class YtdlpGlobalSearchDialog(wx.Dialog):
+    _ALL_SITES_TOKEN = "__all__"
+    _SEARCH_CONCURRENCY = 4
+    _PER_SITE_LIMIT = 80
+    _LOAD_MORE_STEP = 80
+    _PER_SITE_TIMEOUT_S = 12
+    _TITLE_ENRICH_CONCURRENCY = 2
+    _TITLE_ENRICH_TIMEOUT_S = 10
+    _QUICK_TITLE_ENRICH_CONCURRENCY = 4
+    _QUICK_TITLE_ENRICH_TIMEOUT_S = 4
+    _RESULTS_REFRESH_THROTTLE_MS = 200
+    _RESULTS_REFRESH_THROTTLE_FOCUSED_MS = 500
+    _RESULTS_REFRESH_NAV_COOLDOWN_MS = 1200
+    _TITLE_ENRICH_WORKER_THREADS = 6
+    _TITLE_ENRICH_HEAVY_WORKER_THREADS = 2
+    _DEFAULT_SORT_COLUMN = None  # None => default (mainstream-first then arrival)
+    _DEFAULT_SORT_DESC = False
+    _MAINSTREAM_SITE_PRIORITY = {
+        "ytsearch": 0,
+        "youtube": 0,
+        "scsearch": 1,
+        "soundcloud": 1,
+        "gvsearch": 2,
+        "yvsearch": 2,
+        "bilisearch": 3,
+        "vimeosearch": 4,
+        "tiktoksearch": 4,
+        "nicosearch": 5,
+        "nicosearchdate": 5,
+    }
+
+    def __init__(self, parent):
+        super().__init__(parent, title="Video Search", size=(980, 680))
+
+        self._stop_event = threading.Event()
+        self._search_thread = None
+        self._search_running = False
+        self._site_rows = []
+        self._scope_values = [self._ALL_SITES_TOKEN]
+        self._filter_values = [self._ALL_SITES_TOKEN]
+        self._all_results = []
+        self._visible_results = []
+        self._seen_result_keys = set()
+        self._completed_sites = 0
+        self._total_sites = 0
+        self._search_generation = 0
+        self._result_arrival_counter = 0
+        self._title_enrich_pending = set()
+        self._title_enrich_heavy_pending = set()
+        self._title_enrich_lock = threading.Lock()
+        self._title_enrich_sem = threading.BoundedSemaphore(self._TITLE_ENRICH_CONCURRENCY)
+        self._quick_title_enrich_sem = threading.BoundedSemaphore(self._QUICK_TITLE_ENRICH_CONCURRENCY)
+        self._title_enrich_queue = queue.Queue()
+        self._title_enrich_heavy_queue = queue.Queue()
+        self._title_enrich_workers = []
+        self._title_enrich_heavy_workers = []
+        self._title_enrich_url_cache = {}
+        self._title_enrich_url_cache_lock = threading.Lock()
+        self._results_refresh_later = None
+        self._dialog_nav_ts = 0.0
+        self._results_list_nav_ts = 0.0
+        self._applying_results_refresh = False
+        self._last_search_term = ""
+        self._last_search_sites = []
+        self._last_search_per_site_limit = 0
+        self._sort_column = self._DEFAULT_SORT_COLUMN
+        self._sort_desc = self._DEFAULT_SORT_DESC
+
+        root = wx.BoxSizer(wx.VERTICAL)
+
+        query_row = wx.BoxSizer(wx.HORIZONTAL)
+        query_row.Add(wx.StaticText(self, label="Search:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        self.search_ctrl = wx.SearchCtrl(self, style=wx.TE_PROCESS_ENTER)
+        self.search_ctrl.ShowCancelButton(True)
+        query_row.Add(self.search_ctrl, 1, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        self.search_btn = wx.Button(self, label="Search")
+        query_row.Add(self.search_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        self.load_more_btn = wx.Button(self, label="Load More Results (+80/site)")
+        self.load_more_btn.Disable()
+        query_row.Add(self.load_more_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        root.Add(query_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.TOP, 5)
+
+        opts_row = wx.BoxSizer(wx.HORIZONTAL)
+        opts_row.Add(wx.StaticText(self, label="Search Sites:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        self.scope_choice = wx.Choice(self)
+        opts_row.Add(self.scope_choice, 1, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        opts_row.Add(wx.StaticText(self, label="Filter Results:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        self.filter_choice = wx.Choice(self)
+        opts_row.Add(self.filter_choice, 1, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        root.Add(opts_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 5)
+
+        self.status_lbl = wx.StaticText(
+            self,
+            label="Ready.",
+        )
+        try:
+            self.status_lbl.SetToolTip(
+                f"yt-dlp global search (max {self._SEARCH_CONCURRENCY} concurrent)"
+            )
+        except Exception:
+            pass
+
+        self.results_list = wx.ListCtrl(self, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
+        try:
+            self.results_list.SetName("Search results")
+        except Exception:
+            pass
+        self.results_list.InsertColumn(0, "Title", width=340)
+        self.results_list.InsertColumn(1, "Site", width=140)
+        self.results_list.InsertColumn(2, "Kind", width=90)
+        self.results_list.InsertColumn(3, "Plays", width=100)
+        self.results_list.InsertColumn(4, "Details", width=220)
+        self.results_list.InsertColumn(5, "URL", width=0)  # Hidden storage column
+        root.Add(self.results_list, 1, wx.EXPAND | wx.ALL, 5)
+
+        action_row = wx.BoxSizer(wx.HORIZONTAL)
+        self.play_btn = wx.Button(self, label="Play")
+        self.subscribe_btn = wx.Button(self, label="Subscribe")
+        self.copy_btn = wx.Button(self, label="Copy URL")
+        self.close_btn = wx.Button(self, wx.ID_CLOSE, "Close")
+        for btn in (self.play_btn, self.subscribe_btn, self.copy_btn):
+            action_row.Add(btn, 0, wx.ALL, 5)
+        action_row.AddStretchSpacer(1)
+        action_row.Add(self.close_btn, 0, wx.ALL, 5)
+        root.Add(action_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+        # Keep dynamic status after focusable controls so it doesn't become the
+        # accessible label for the results list while it updates during search.
+        root.Add(self.status_lbl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+
+        self.SetSizer(root)
+        self.Centre()
+        wx.CallAfter(self.search_ctrl.SetFocus)
+
+        self._refresh_site_choices()
+        self._update_action_buttons()
+        self._start_title_enrich_workers()
+
+        self.search_btn.Bind(wx.EVT_BUTTON, self.on_search)
+        self.load_more_btn.Bind(wx.EVT_BUTTON, self.on_load_more)
+        self.search_ctrl.Bind(wx.EVT_TEXT_ENTER, self.on_search)
+        self.search_ctrl.Bind(wx.EVT_SEARCHCTRL_SEARCH_BTN, self.on_search)
+        self.scope_choice.Bind(wx.EVT_CHOICE, self.on_scope_changed)
+        self.filter_choice.Bind(wx.EVT_CHOICE, self.on_filter_changed)
+        self.results_list.Bind(wx.EVT_LIST_COL_CLICK, self.on_results_col_click)
+        self.results_list.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_result_selected)
+        self.results_list.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_result_activated)
+        self.play_btn.Bind(wx.EVT_BUTTON, self.on_play_selected)
+        self.subscribe_btn.Bind(wx.EVT_BUTTON, self.on_subscribe_best)
+        self.copy_btn.Bind(wx.EVT_BUTTON, self.on_copy_selected_url)
+        self.close_btn.Bind(wx.EVT_BUTTON, lambda _e: self.Close())
+        self.Bind(wx.EVT_CHAR_HOOK, self.on_dialog_char_hook)
+        self.Bind(wx.EVT_CLOSE, self.on_close)
+
+    def on_close(self, event):
+        try:
+            self._stop_event.set()
+        except Exception:
+            pass
+        try:
+            if getattr(self, "_results_refresh_later", None):
+                self._results_refresh_later.Stop()
+        except Exception:
+            pass
+        event.Skip()
+
+    def on_dialog_char_hook(self, event):
+        try:
+            if bool(getattr(self, "_search_running", False)):
+                key = event.GetKeyCode()
+                nav_keys = {
+                    wx.WXK_TAB,
+                    wx.WXK_UP,
+                    wx.WXK_DOWN,
+                    wx.WXK_LEFT,
+                    wx.WXK_RIGHT,
+                    wx.WXK_PAGEUP,
+                    wx.WXK_PAGEDOWN,
+                    wx.WXK_HOME,
+                    wx.WXK_END,
+                }
+                if key in nav_keys:
+                    self._dialog_nav_ts = time.monotonic()
+        except Exception:
+            pass
+        try:
+            event.Skip()
+        except Exception:
+            pass
+
+    def _start_title_enrich_workers(self) -> None:
+        if getattr(self, "_title_enrich_workers", None):
+            return
+        workers = []
+        try:
+            count = max(1, int(self._TITLE_ENRICH_WORKER_THREADS))
+        except Exception:
+            count = 4
+        for i in range(count):
+            t = threading.Thread(
+                target=self._title_enrich_queue_worker_loop,
+                name=f"yt-title-enrich-{i+1}",
+                daemon=True,
+            )
+            t.start()
+            workers.append(t)
+        self._title_enrich_workers = workers
+
+        heavy_workers = []
+        try:
+            heavy_count = max(1, int(self._TITLE_ENRICH_HEAVY_WORKER_THREADS))
+        except Exception:
+            heavy_count = 2
+        for i in range(heavy_count):
+            t = threading.Thread(
+                target=self._title_enrich_heavy_queue_worker_loop,
+                name=f"yt-title-enrich-heavy-{i+1}",
+                daemon=True,
+            )
+            t.start()
+            heavy_workers.append(t)
+        self._title_enrich_heavy_workers = heavy_workers
+
+    def _title_enrich_queue_worker_loop(self) -> None:
+        while True:
+            try:
+                if getattr(self, "_stop_event", None) is not None and self._stop_event.is_set():
+                    return
+            except Exception:
+                pass
+            try:
+                job = self._title_enrich_queue.get(timeout=0.25)
+            except queue.Empty:
+                continue
+            try:
+                if not isinstance(job, tuple) or len(job) != 3:
+                    continue
+                key, url, generation = job
+                self._title_enrich_quick_stage(str(key or ""), str(url or ""), int(generation or 0))
+            except Exception:
+                pass
+            finally:
+                try:
+                    self._title_enrich_queue.task_done()
+                except Exception:
+                    pass
+
+    def _title_enrich_heavy_queue_worker_loop(self) -> None:
+        while True:
+            try:
+                if getattr(self, "_stop_event", None) is not None and self._stop_event.is_set():
+                    return
+            except Exception:
+                pass
+            try:
+                job = self._title_enrich_heavy_queue.get(timeout=0.25)
+            except queue.Empty:
+                continue
+            try:
+                if not isinstance(job, tuple) or len(job) != 3:
+                    continue
+                key, url, generation = job
+                self._title_enrich_heavy_stage(str(key or ""), str(url or ""), int(generation or 0))
+            except Exception:
+                pass
+            finally:
+                try:
+                    self._title_enrich_heavy_queue.task_done()
+                except Exception:
+                    pass
+
+    def _has_last_search(self) -> bool:
+        return bool(str(getattr(self, "_last_search_term", "") or "").strip() and list(getattr(self, "_last_search_sites", []) or []))
+
+    def _is_current_search_generation(self, generation: int) -> bool:
+        try:
+            return int(generation) == int(getattr(self, "_search_generation", 0) or 0)
+        except Exception:
+            return False
+
+    def _item_needs_heavy_enrichment(self, item: dict) -> bool:
+        if not isinstance(item, dict):
+            return False
+        if not str(item.get("url") or "").strip():
+            return False
+        if self._title_needs_enrichment(item):
+            return True
+        native = str(item.get("native_subscribe_url") or "").strip()
+        source = str(item.get("source_subscribe_url") or "").strip()
+        return not (native or source)
+
+    def _update_load_more_button(self) -> None:
+        try:
+            enabled = (not bool(getattr(self, "_search_running", False))) and self._has_last_search()
+            self.load_more_btn.Enable(bool(enabled))
+        except Exception:
+            pass
+
+    def _result_key_for_item(self, item: dict) -> str:
+        site_id = str(item.get("site_id") or "").strip()
+        url = str(item.get("url") or "").strip()
+        return f"{site_id}|{url}" if site_id else url
+
+    def _is_results_list_focused(self) -> bool:
+        try:
+            return wx.Window.FindFocus() == self.results_list
+        except Exception:
+            return False
+
+    def _find_visible_result_index_by_key(self, key: str) -> int:
+        if not key:
+            return -1
+        try:
+            for i, item in enumerate(self._visible_results or []):
+                if self._result_key_for_item(item) == key:
+                    return int(i)
+        except Exception:
+            return -1
+        return -1
+
+    def _update_visible_result_row_title(self, key: str) -> bool:
+        idx = self._find_visible_result_index_by_key(key)
+        if idx < 0:
+            return False
+        try:
+            if idx >= int(self.results_list.GetItemCount()):
+                return False
+        except Exception:
+            return False
+        try:
+            item = self._visible_results[idx]
+        except Exception:
+            return False
+        try:
+            self.results_list.SetItem(idx, 0, str(item.get("title") or ""))
+            return True
+        except Exception:
+            return False
+
+    def _title_needs_enrichment(self, item: dict) -> bool:
+        if not isinstance(item, dict):
+            return False
+        url = str(item.get("url") or "").strip()
+        title = str(item.get("title") or "").strip()
+        if bool(item.get("_title_is_fallback")):
+            return bool(url)
+        if not url:
+            return False
+        if not title:
+            return True
+        if title == url:
+            return True
+        low = title.lower()
+        if low.startswith(("http://", "https://")):
+            return True
+        return False
+
+    def _queue_title_enrichment(self, item: dict, generation: int) -> None:
+        if not self._title_needs_enrichment(item):
+            return
+        key = self._result_key_for_item(item)
+        if not key:
+            return
+        url = str(item.get("url") or "").strip()
+        if not url:
+            return
+
+        try:
+            with self._title_enrich_url_cache_lock:
+                cached = self._title_enrich_url_cache.get(url)
+        except Exception:
+            cached = None
+        if isinstance(cached, dict):
+            try:
+                wx.CallAfter(
+                    self._apply_enriched_result,
+                    key,
+                    str(cached.get("title") or ""),
+                    str(cached.get("native_subscribe_url") or ""),
+                    str(cached.get("source_subscribe_url") or ""),
+                    int(generation),
+                )
+            except Exception:
+                pass
+            # If we still need title enrichment and cache has no title, allow quick-stage retry.
+            if str(cached.get("title") or "").strip():
+                return
+
+        with self._title_enrich_lock:
+            if key in self._title_enrich_pending:
+                return
+            self._title_enrich_pending.add(key)
+        try:
+            self._title_enrich_queue.put((key, url, int(generation)))
+        except Exception:
+            with self._title_enrich_lock:
+                try:
+                    self._title_enrich_pending.discard(key)
+                except Exception:
+                    pass
+
+    def _title_enrich_quick_stage(self, key: str, url: str, generation: int) -> None:
+        quick_acquired = False
+        quick_title = ""
+        try:
+            if self._stop_event.is_set():
+                return
+            if not self._is_current_search_generation(generation):
+                return
+
+            # Fast path: get human-readable titles for common URL-only rows (especially
+            # YouTube wrappers like yvsearch) before the heavier yt-dlp enrichment runs.
+            try:
+                self._quick_title_enrich_sem.acquire()
+                quick_acquired = True
+                if not self._stop_event.is_set():
+                    quick_title = str(resolve_quick_url_title(url, timeout=self._QUICK_TITLE_ENRICH_TIMEOUT_S) or "").strip()
+                    if quick_title:
+                        try:
+                            with self._title_enrich_url_cache_lock:
+                                cached = dict(self._title_enrich_url_cache.get(url) or {})
+                                cached["title"] = quick_title
+                                self._title_enrich_url_cache[url] = cached
+                        except Exception:
+                            pass
+                        try:
+                            wx.CallAfter(self._apply_enriched_result, key, quick_title, "", "", int(generation))
+                        except Exception:
+                            pass
+            except Exception:
+                pass
+            finally:
+                if quick_acquired:
+                    try:
+                        self._quick_title_enrich_sem.release()
+                    except Exception:
+                        pass
+                    quick_acquired = False
+        finally:
+            with self._title_enrich_lock:
+                try:
+                    self._title_enrich_pending.discard(key)
+                except Exception:
+                    pass
+
+    def _queue_heavy_enrichment_for_item(self, item: dict, generation: int | None = None) -> None:
+        if not self._item_needs_heavy_enrichment(item):
+            return
+        key = self._result_key_for_item(item)
+        if not key:
+            return
+        url = str(item.get("url") or "").strip()
+        if not url:
+            return
+        try:
+            gen = int(self._search_generation if generation is None else generation)
+        except Exception:
+            gen = int(getattr(self, "_search_generation", 0) or 0)
+        if not self._is_current_search_generation(gen):
+            return
+
+        cache = None
+        try:
+            with self._title_enrich_url_cache_lock:
+                cache = dict(self._title_enrich_url_cache.get(url) or {})
+        except Exception:
+            cache = None
+        if isinstance(cache, dict) and cache:
+            try:
+                wx.CallAfter(
+                    self._apply_enriched_result,
+                    key,
+                    str(cache.get("title") or ""),
+                    str(cache.get("native_subscribe_url") or ""),
+                    str(cache.get("source_subscribe_url") or ""),
+                    int(gen),
+                )
+            except Exception:
+                pass
+            if bool(cache.get("_heavy_done")):
+                return
+
+        with self._title_enrich_lock:
+            if key in self._title_enrich_heavy_pending:
+                return
+            self._title_enrich_heavy_pending.add(key)
+        try:
+            self._title_enrich_heavy_queue.put((key, url, int(gen)))
+        except Exception:
+            with self._title_enrich_lock:
+                try:
+                    self._title_enrich_heavy_pending.discard(key)
+                except Exception:
+                    pass
+
+    def _title_enrich_heavy_stage(self, key: str, url: str, generation: int) -> None:
+        acquired = False
+        try:
+            if self._stop_event.is_set():
+                return
+            if not self._is_current_search_generation(generation):
+                return
+            self._title_enrich_sem.acquire()
+            acquired = True
+            if self._stop_event.is_set():
+                return
+            if not self._is_current_search_generation(generation):
+                return
+
+            enrich = resolve_ytdlp_url_enrichment(url, timeout=self._TITLE_ENRICH_TIMEOUT_S) or {}
+            title = str(enrich.get("title") or "").strip()
+            native_sub = str(enrich.get("native_subscribe_url") or "").strip()
+            source_sub = str(enrich.get("source_subscribe_url") or "").strip()
+            cached_title = ""
+            try:
+                with self._title_enrich_url_cache_lock:
+                    cached_prev = dict(self._title_enrich_url_cache.get(url) or {})
+                    cached_title = str(cached_prev.get("title") or "").strip()
+                    merged = {
+                        "title": title or cached_title or "",
+                        "native_subscribe_url": native_sub or str(cached_prev.get("native_subscribe_url") or ""),
+                        "source_subscribe_url": source_sub or str(cached_prev.get("source_subscribe_url") or ""),
+                        "_heavy_done": True,
+                    }
+                    self._title_enrich_url_cache[url] = merged
+            except Exception:
+                cached_title = ""
+            if not title:
+                title = cached_title
+
+            if not title and not native_sub and not source_sub:
+                return
+            try:
+                wx.CallAfter(self._apply_enriched_result, key, title, native_sub, source_sub, int(generation))
+            except Exception:
+                pass
+        finally:
+            with self._title_enrich_lock:
+                try:
+                    self._title_enrich_heavy_pending.discard(key)
+                except Exception:
+                    pass
+            if acquired:
+                try:
+                    self._title_enrich_sem.release()
+                except Exception:
+                    pass
+
+    def _apply_enriched_result(
+        self,
+        key: str,
+        title: str,
+        native_subscribe_url: str,
+        source_subscribe_url: str,
+        generation: int,
+    ) -> None:
+        if getattr(self, "_stop_event", None) is not None and self._stop_event.is_set():
+            return
+        try:
+            if int(generation) != int(getattr(self, "_search_generation", 0) or 0):
+                return
+        except Exception:
+            return
+
+        changed = False
+        title_changed = False
+        subscribe_changed = False
+        for item in (self._all_results or []):
+            if self._result_key_for_item(item) != key:
+                continue
+            cur_title = str(item.get("title") or "").strip()
+            if title:
+                if (
+                    not bool(item.get("_title_is_fallback"))
+                    and cur_title
+                    and cur_title != str(item.get("url") or "").strip()
+                    and not cur_title.lower().startswith(("http://", "https://"))
+                ):
+                    # Keep existing real title.
+                    pass
+                else:
+                    item["title"] = title
+                    item["_title_is_fallback"] = False
+                    changed = True
+                    title_changed = True
+            if native_subscribe_url and not str(item.get("native_subscribe_url") or "").strip():
+                item["native_subscribe_url"] = native_subscribe_url
+                changed = True
+                subscribe_changed = True
+            if source_subscribe_url and not str(item.get("source_subscribe_url") or "").strip():
+                item["source_subscribe_url"] = source_subscribe_url
+                changed = True
+                subscribe_changed = True
+            break
+
+        if not changed:
+            return
+
+        # Title enrichment usually doesn't affect filtering or row order unless sorting by title.
+        # Update in-place to avoid rebuilding the entire list (which is slow with NVDA), but
+        # avoid spamming row accessibility updates while a search is still streaming in.
+        if (
+            title_changed
+            and not bool(getattr(self, "_search_running", False))
+            and int(getattr(self, "_sort_column", -1) if getattr(self, "_sort_column", None) is not None else -1) != 0
+        ):
+            if self._update_visible_result_row_title(key):
+                if subscribe_changed:
+                    self._update_action_buttons()
+                return
+
+        if subscribe_changed and not title_changed:
+            self._update_action_buttons()
+            return
+
+        self._schedule_results_refresh()
+
+    def _schedule_results_refresh(self, delay_ms: int | None = None, immediate: bool = False) -> None:
+        if getattr(self, "_stop_event", None) is not None and self._stop_event.is_set():
+            return
+        if immediate:
+            delay_ms = 0
+        if delay_ms is None:
+            delay_ms = int(self._RESULTS_REFRESH_THROTTLE_MS)
+        try:
+            delay_ms = max(0, int(delay_ms))
+        except Exception:
+            delay_ms = int(self._RESULTS_REFRESH_THROTTLE_MS)
+
+        if delay_ms > 0:
+            try:
+                if bool(getattr(self, "_search_running", False)):
+                    nav_ts = float(getattr(self, "_dialog_nav_ts", 0.0) or 0.0)
+                    if nav_ts > 0.0:
+                        elapsed_ms = int(max(0.0, (time.monotonic() - nav_ts) * 1000.0))
+                        remaining_ms = int(self._RESULTS_REFRESH_NAV_COOLDOWN_MS) - elapsed_ms
+                        if remaining_ms > 0:
+                            delay_ms = max(delay_ms, remaining_ms)
+                if self._is_results_list_focused():
+                    if bool(getattr(self, "_search_running", False)):
+                        delay_ms = max(delay_ms, int(self._RESULTS_REFRESH_THROTTLE_FOCUSED_MS))
+                    nav_ts = float(getattr(self, "_results_list_nav_ts", 0.0) or 0.0)
+                    if nav_ts > 0.0:
+                        elapsed_ms = int(max(0.0, (time.monotonic() - nav_ts) * 1000.0))
+                        remaining_ms = int(self._RESULTS_REFRESH_NAV_COOLDOWN_MS) - elapsed_ms
+                        if remaining_ms > 0:
+                            delay_ms = max(delay_ms, remaining_ms)
+            except Exception:
+                pass
+
+        try:
+            later = getattr(self, "_results_refresh_later", None)
+            if delay_ms <= 0:
+                if later is not None:
+                    try:
+                        later.Stop()
+                    except Exception:
+                        pass
+                    self._results_refresh_later = None
+                self._apply_result_filter()
+                return
+
+            if later is not None:
+                try:
+                    if bool(later.IsRunning()):
+                        return
+                except Exception:
+                    pass
+            self._results_refresh_later = wx.CallLater(delay_ms, self._flush_scheduled_results_refresh)
+        except Exception:
+            self._apply_result_filter()
+
+    def _flush_scheduled_results_refresh(self) -> None:
+        self._results_refresh_later = None
+        if getattr(self, "_stop_event", None) is not None and self._stop_event.is_set():
+            return
+        self._apply_result_filter()
+
+    def _refresh_site_choices(self) -> None:
+        prev_scope = self._get_choice_value(self.scope_choice, self._scope_values)
+        prev_filter = self._get_choice_value(self.filter_choice, self._filter_values)
+
+        try:
+            sites = list(get_ytdlp_searchable_sites(include_adult=False) or [])
+        except Exception:
+            sites = []
+        self._site_rows = sites
+
+        self._scope_values = [self._ALL_SITES_TOKEN] + [str(s.get("id") or "") for s in sites]
+        self._filter_values = [self._ALL_SITES_TOKEN] + [str(s.get("id") or "") for s in sites]
+        scope_labels = ["All searchable sites"] + [str(s.get("label") or s.get("id") or "") for s in sites]
+        filter_labels = ["All sites"] + [str(s.get("label") or s.get("id") or "") for s in sites]
+
+        self.scope_choice.Clear()
+        self.filter_choice.Clear()
+        for label in scope_labels:
+            self.scope_choice.Append(label)
+        for label in filter_labels:
+            self.filter_choice.Append(label)
+
+        self._set_choice_value(self.scope_choice, self._scope_values, prev_scope)
+        self._set_choice_value(self.filter_choice, self._filter_values, prev_filter)
+        self._schedule_results_refresh(immediate=True)
+
+    def _get_choice_value(self, choice, values):
+        try:
+            idx = int(choice.GetSelection())
+        except Exception:
+            idx = wx.NOT_FOUND
+        if idx == wx.NOT_FOUND or idx < 0 or idx >= len(values or []):
+            return self._ALL_SITES_TOKEN
+        return values[idx]
+
+    def _set_choice_value(self, choice, values, target_value):
+        target = str(target_value or self._ALL_SITES_TOKEN)
+        idx = 0
+        for i, val in enumerate(values or []):
+            if str(val or "") == target:
+                idx = i
+                break
+        try:
+            choice.SetSelection(idx)
+        except Exception:
+            pass
+
+    def _get_scope_sites(self) -> list[dict]:
+        selected = self._get_choice_value(self.scope_choice, self._scope_values)
+        if selected == self._ALL_SITES_TOKEN:
+            return list(self._site_rows or [])
+        return [s for s in (self._site_rows or []) if str(s.get("id") or "") == selected]
+
+    def _get_result_filter_site_id(self) -> str:
+        return str(self._get_choice_value(self.filter_choice, self._filter_values) or self._ALL_SITES_TOKEN)
+
+    def _passes_result_filter(self, item: dict) -> bool:
+        site_filter = self._get_result_filter_site_id()
+        if site_filter == self._ALL_SITES_TOKEN:
+            return True
+        return str(item.get("site_id") or "") == site_filter
+
+    def _format_play_count(self, value) -> str:
+        if value is None:
+            return ""
+        try:
+            return f"{int(value):,}"
+        except Exception:
+            return str(value or "")
+
+    def _mainstream_priority_for_result(self, item: dict) -> int:
+        site_id = str(item.get("site_id") or "").strip().lower()
+        best = int(self._MAINSTREAM_SITE_PRIORITY.get(site_id, 999))
+        try:
+            parsed = urlparse(str(item.get("url") or "").strip())
+            host = (parsed.netloc or "").lower()
+        except Exception:
+            host = ""
+        host = host[4:] if host.startswith("www.") else host
+
+        # URL host can be more useful than wrapper site IDs (e.g. Yahoo Video -> YouTube URL).
+        host_priority = (
+            0 if ("youtube.com" in host or "youtu.be" in host) else
+            1 if "soundcloud.com" in host else
+            2 if "googlevideo.com" in host else
+            3 if "bilibili.com" in host else
+            4 if ("vimeo.com" in host or "tiktok.com" in host) else
+            5 if ("facebook.com" in host or "instagram.com" in host or "x.com" in host or "twitter.com" in host) else
+            6 if ("twitch.tv" in host or "rumble.com" in host or "odysee.com" in host) else
+            999
+        )
+        return min(best, host_priority)
+
+    def _default_result_sort_key(self, item: dict):
+        return (
+            int(self._mainstream_priority_for_result(item)),
+            int(item.get("_arrival_order") or 0),
+        )
+
+    def _sorted_results(self, items: list[dict]) -> list[dict]:
+        rows = list(items or [])
+        col = getattr(self, "_sort_column", self._DEFAULT_SORT_COLUMN)
+        desc = bool(getattr(self, "_sort_desc", self._DEFAULT_SORT_DESC))
+
+        if col is None:
+            rows.sort(key=self._default_result_sort_key)
+            return rows
+
+        if int(col) == 3:
+            # Numeric plays/views sort; keep unknown counts at the end.
+            def _plays_key(it: dict):
+                raw = it.get("play_count")
+                try:
+                    val = int(raw)
+                    missing = 0
+                except Exception:
+                    val = 0
+                    missing = 1
+                # Encode direction in key so "missing last" is preserved for both asc/desc.
+                ord_val = -val if desc else val
+                return (missing, ord_val, int(it.get("_arrival_order") or 0))
+
+            rows.sort(key=_plays_key)
+            return rows
+
+        if int(col) == 0:
+            def _s(it): return str(it.get("title") or "").lower()
+        elif int(col) == 1:
+            def _s(it): return str(it.get("site") or "").lower()
+        elif int(col) == 2:
+            def _s(it): return str(it.get("kind") or "").lower()
+        elif int(col) == 4:
+            def _s(it): return str(it.get("detail") or "").lower()
+        else:
+            def _s(it): return str(it.get("title") or "").lower()
+
+        rows.sort(key=lambda it: (_s(it), int(it.get("_arrival_order") or 0)), reverse=desc)
+        return rows
+
+    def on_results_col_click(self, event):
+        try:
+            col = int(event.GetColumn())
+        except Exception:
+            col = -1
+        # Ignore hidden URL column
+        if col < 0 or col >= 5:
+            try:
+                event.Skip()
+            except Exception:
+                pass
+            return
+
+        cur_col = getattr(self, "_sort_column", self._DEFAULT_SORT_COLUMN)
+        cur_desc = bool(getattr(self, "_sort_desc", self._DEFAULT_SORT_DESC))
+
+        if cur_col == col:
+            self._sort_desc = (not cur_desc)
+        else:
+            self._sort_column = col
+            # Plays is most useful descending by default.
+            self._sort_desc = bool(col == 3)
+
+        self._schedule_results_refresh(immediate=True)
+        try:
+            event.Skip()
+        except Exception:
+            pass
+
+    def _apply_result_filter(self) -> None:
+        self._applying_results_refresh = True
+        try:
+            selected = self._get_selected_result()
+            selected_url = str(selected.get("url") or "") if selected else ""
+        except Exception:
+            selected_url = ""
+
+        filtered = [it for it in (self._all_results or []) if self._passes_result_filter(it)]
+        self._visible_results = self._sorted_results(filtered)
+        try:
+            self.results_list.Freeze()
+        except Exception:
+            pass
+        try:
+            self.results_list.DeleteAllItems()
+            for i, item in enumerate(self._visible_results):
+                idx = self.results_list.InsertItem(i, str(item.get("title") or ""))
+                self.results_list.SetItem(idx, 1, str(item.get("site") or ""))
+                self.results_list.SetItem(idx, 2, str(item.get("kind") or ""))
+                self.results_list.SetItem(idx, 3, self._format_play_count(item.get("play_count")))
+                self.results_list.SetItem(idx, 4, str(item.get("detail") or ""))
+                self.results_list.SetItem(idx, 5, str(item.get("url") or ""))
+        except Exception:
+            return
+        finally:
+            try:
+                self.results_list.Thaw()
+            except Exception:
+                pass
+            self._applying_results_refresh = False
+
+        if selected_url:
+            for i, item in enumerate(self._visible_results):
+                if str(item.get("url") or "") == selected_url:
+                    try:
+                        self.results_list.Select(i)
+                        self.results_list.Focus(i)
+                    except Exception:
+                        pass
+                    break
+
+        self._update_action_buttons()
+
+    def on_scope_changed(self, event):
+        # Scope change affects the next search run; keep current results visible.
+        event.Skip()
+
+    def on_filter_changed(self, event):
+        self._schedule_results_refresh(immediate=True)
+        event.Skip()
+
+    def on_search(self, event):
+        if self._search_running:
+            return
+
+        term = str(self.search_ctrl.GetValue() or "").strip()
+        if not term:
+            return
+
+        sites = self._get_scope_sites()
+        if not sites:
+            self.status_lbl.SetLabel("No searchable sites.")
+            return
+        self._last_search_term = term
+        self._last_search_sites = list(sites or [])
+        self._last_search_per_site_limit = int(self._PER_SITE_LIMIT)
+        self._start_search_run(reset=True, term=term, sites=self._last_search_sites, per_site_limit=self._last_search_per_site_limit)
+
+    def on_load_more(self, event):
+        if self._search_running:
+            return
+        if not self._has_last_search():
+            return
+        try:
+            self._last_search_per_site_limit = max(
+                int(self._PER_SITE_LIMIT),
+                int(self._last_search_per_site_limit or self._PER_SITE_LIMIT) + int(self._LOAD_MORE_STEP),
+            )
+        except Exception:
+            self._last_search_per_site_limit = int(self._PER_SITE_LIMIT) + int(self._LOAD_MORE_STEP)
+        self._start_search_run(
+            reset=False,
+            term=str(self._last_search_term or "").strip(),
+            sites=list(self._last_search_sites or []),
+            per_site_limit=int(self._last_search_per_site_limit or self._PER_SITE_LIMIT),
+        )
+
+    def _start_search_run(self, *, reset: bool, term: str, sites: list[dict], per_site_limit: int) -> None:
+        if self._search_running:
+            return
+        if not term or not sites:
+            return
+
+        try:
+            per_site_limit = max(1, int(per_site_limit or self._PER_SITE_LIMIT))
+        except Exception:
+            per_site_limit = int(self._PER_SITE_LIMIT)
+
+        if reset:
+            self._all_results = []
+            self._visible_results = []
+            self._seen_result_keys = set()
+            self._search_generation = int(getattr(self, "_search_generation", 0) or 0) + 1
+            self._result_arrival_counter = 0
+            try:
+                if getattr(self, "_results_refresh_later", None):
+                    self._results_refresh_later.Stop()
+            except Exception:
+                pass
+            self._results_refresh_later = None
+            with self._title_enrich_lock:
+                self._title_enrich_pending.clear()
+                self._title_enrich_heavy_pending.clear()
+            self.results_list.DeleteAllItems()
+            self._update_action_buttons()
+        self._completed_sites = 0
+        self._total_sites = len(sites)
+        self._stop_event.clear()
+        self._search_running = True
+
+        self.search_ctrl.Disable()
+        self.search_btn.Disable()
+        self.load_more_btn.Disable()
+        self.scope_choice.Disable()
+        action = "Searching" if reset else "Loading more"
+        self.status_lbl.SetLabel(f"{action} {self._total_sites} sites...")
+
+        self._search_thread = threading.Thread(
+            target=self._search_manager,
+            args=(term, list(sites), int(per_site_limit), bool(not reset)),
+            daemon=True,
+        )
+        self._search_thread.start()
+
+    def _search_manager(self, term: str, sites: list[dict], per_site_limit: int, append_mode: bool = False) -> None:
+        total = len(sites or [])
+        completed = 0
+        cancelled = False
+
+        max_workers = max(1, min(self._SEARCH_CONCURRENCY, total or 1))
+        try:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+                future_map = {}
+                for site in (sites or []):
+                    if self._stop_event.is_set():
+                        cancelled = True
+                        break
+                    fut = pool.submit(
+                        search_ytdlp_site,
+                        term,
+                        site,
+                        int(per_site_limit),
+                        self._PER_SITE_TIMEOUT_S,
+                    )
+                    future_map[fut] = site
+
+                for fut in concurrent.futures.as_completed(list(future_map.keys())):
+                    site = future_map.get(fut) or {}
+                    completed += 1
+                    if self._stop_event.is_set():
+                        cancelled = True
+                    items = []
+                    error_msg = ""
+                    try:
+                        items = list(fut.result() or [])
+                    except Exception as e:
+                        error_msg = str(e) or type(e).__name__
+                    try:
+                        wx.CallAfter(self._on_site_search_results, site, items, completed, total, error_msg)
+                    except Exception:
+                        pass
+                    if cancelled:
+                        break
+        finally:
+            try:
+                wx.CallAfter(self._on_search_finished, completed, total, cancelled, bool(append_mode), int(per_site_limit))
+            except Exception:
+                pass
+
+    def _on_site_search_results(self, site: dict, items: list[dict], completed: int, total: int, error_msg: str = ""):
+        if getattr(self, "_stop_event", None) is not None and self._stop_event.is_set():
+            return
+
+        try:
+            self._completed_sites = max(int(self._completed_sites or 0), int(completed or 0))
+        except Exception:
+            self._completed_sites = completed
+        try:
+            self._total_sites = max(int(self._total_sites or 0), int(total or 0))
+        except Exception:
+            self._total_sites = total
+
+        new_count = 0
+        for item in (items or []):
+            if not isinstance(item, dict):
+                continue
+            url = str(item.get("url") or "").strip()
+            site_id = str(item.get("site_id") or (site or {}).get("id") or "").strip()
+            key = f"{site_id}|{url}" if site_id else url
+            if not url or key in self._seen_result_keys:
+                continue
+            self._seen_result_keys.add(key)
+            try:
+                self._result_arrival_counter = int(self._result_arrival_counter or 0) + 1
+            except Exception:
+                self._result_arrival_counter = 1
+            item["_arrival_order"] = int(self._result_arrival_counter or 0)
+            self._all_results.append(item)
+            new_count += 1
+            self._queue_title_enrichment(item, self._search_generation)
+
+        self._schedule_results_refresh()
+
+        site_label = str((site or {}).get("label") or (site or {}).get("id") or "site")
+        if error_msg:
+            self.status_lbl.SetLabel(
+                f"{self._completed_sites}/{self._total_sites} sites, {len(self._all_results)} results. {site_label}: error"
+            )
+            return
+
+        self.status_lbl.SetLabel(
+            f"{self._completed_sites}/{self._total_sites} sites, {len(self._all_results)} results. {site_label} +{new_count}"
+        )
+
+    def _on_search_finished(
+        self,
+        completed: int,
+        total: int,
+        cancelled: bool,
+        append_mode: bool = False,
+        per_site_limit: int = 0,
+    ) -> None:
+        self._search_running = False
+        if getattr(self, "_stop_event", None) is not None and self._stop_event.is_set():
+            return
+
+        try:
+            self.search_ctrl.Enable()
+            self.search_btn.Enable()
+            self.scope_choice.Enable()
+            self._update_load_more_button()
+            self.search_ctrl.SetFocus()
+        except Exception:
+            return
+
+        try:
+            self._completed_sites = max(int(self._completed_sites or 0), int(completed or 0))
+            self._total_sites = max(int(self._total_sites or 0), int(total or 0))
+        except Exception:
+            pass
+
+        if cancelled:
+            self.status_lbl.SetLabel(f"Stopped. {len(self._all_results)} results.")
+        else:
+            if append_mode:
+                self.status_lbl.SetLabel(f"Loaded more. {len(self._all_results)} results.")
+            else:
+                self.status_lbl.SetLabel(f"{len(self._all_results)} results.")
+        self._schedule_results_refresh(immediate=True)
+
+    def _get_selected_result(self):
+        idx = wx.NOT_FOUND
+        try:
+            idx = self.results_list.GetFirstSelected()
+        except Exception:
+            idx = wx.NOT_FOUND
+        if idx == wx.NOT_FOUND:
+            return None
+        try:
+            if 0 <= idx < len(self._visible_results):
+                return self._visible_results[idx]
+        except Exception:
+            return None
+        return None
+
+    def _update_action_buttons(self) -> None:
+        item = self._get_selected_result()
+        play_ok = bool(item and str(item.get("url") or "").strip())
+        native_ok = bool(item and str(item.get("native_subscribe_url") or "").strip())
+        source_ok = bool(item and str(item.get("source_subscribe_url") or "").strip())
+        subscribe_ok = bool(native_ok or source_ok)
+        copy_ok = play_ok
+        for btn, enabled in (
+            (getattr(self, "play_btn", None), play_ok),
+            (getattr(self, "subscribe_btn", None), subscribe_ok),
+            (getattr(self, "copy_btn", None), copy_ok),
+        ):
+            try:
+                if btn:
+                    btn.Enable(bool(enabled))
+            except Exception:
+                pass
+
+    def on_result_selected(self, event):
+        try:
+            if not bool(getattr(self, "_applying_results_refresh", False)) and self._is_results_list_focused():
+                self._results_list_nav_ts = time.monotonic()
+        except Exception:
+            pass
+        try:
+            item = self._get_selected_result()
+            if item:
+                self._queue_heavy_enrichment_for_item(item)
+        except Exception:
+            pass
+        self._update_action_buttons()
+        event.Skip()
+
+    def on_result_activated(self, event):
+        self.on_play_selected(event)
+
+    def _get_parent_mainframe(self):
+        try:
+            return self.GetParent()
+        except Exception:
+            return None
+
+    def on_play_selected(self, event):
+        item = self._get_selected_result()
+        if not item:
+            return
+        try:
+            self._queue_heavy_enrichment_for_item(item)
+        except Exception:
+            pass
+        parent = self._get_parent_mainframe()
+        url = str(item.get("url") or "").strip()
+        title = str(item.get("title") or "").strip() or url
+        if not url:
+            return
+        if parent and hasattr(parent, "play_ytdlp_search_result"):
+            try:
+                parent.play_ytdlp_search_result(url, title=title)
+            except Exception as e:
+                wx.MessageBox(f"Could not start playback: {e}", "Playback Error", wx.ICON_ERROR)
+                return
+            self.status_lbl.SetLabel(f"Playing: {title}")
+        else:
+            webbrowser.open(url)
+
+    def _subscribe_selected(self, key: str, label: str) -> None:
+        item = self._get_selected_result()
+        if not item:
+            return
+        url = str(item.get(key) or "").strip()
+        if not url:
+            return
+        parent = self._get_parent_mainframe()
+        if not parent or not hasattr(parent, "add_feed_from_url_prompt"):
+            wx.MessageBox("Parent window does not support subscribing from this dialog.", "Subscribe", wx.ICON_ERROR)
+            return
+        try:
+            parent.add_feed_from_url_prompt(url)
+            self.status_lbl.SetLabel(f"{label}: {url}")
+        except Exception as e:
+            wx.MessageBox(f"Could not subscribe: {e}", "Subscribe Error", wx.ICON_ERROR)
+
+    def on_subscribe_best(self, event):
+        item = self._get_selected_result()
+        if not item:
+            return
+        try:
+            self._queue_heavy_enrichment_for_item(item)
+        except Exception:
+            pass
+        native = str(item.get("native_subscribe_url") or "").strip()
+        source = str(item.get("source_subscribe_url") or "").strip()
+        if native:
+            self._subscribe_selected("native_subscribe_url", "Subscribed")
+            return
+        if source:
+            self._subscribe_selected("source_subscribe_url", "Subscribed")
+
+    def on_subscribe_native(self, event):
+        self._subscribe_selected("native_subscribe_url", "Subscribed (native)")
+
+    def on_subscribe_source(self, event):
+        self._subscribe_selected("source_subscribe_url", "Subscribed (source)")
+
+    def on_copy_selected_url(self, event):
+        item = self._get_selected_result()
+        if not item:
+            return
+        url = str(item.get("url") or "").strip()
+        if not url:
+            return
+        try:
+            if wx.TheClipboard.Open():
+                wx.TheClipboard.SetData(wx.TextDataObject(url))
+                wx.TheClipboard.Flush()
+                wx.TheClipboard.Close()
+                self.status_lbl.SetLabel("Copied URL.")
+        except Exception:
+            pass
 
 
 class PersistentSearchDialog(wx.Dialog):

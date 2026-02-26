@@ -42,6 +42,20 @@ _SEEKABLE_EXTENSIONS = (
 _YTDLP_VLC_AUDIO_FORMAT = "bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio/best"
 
 
+def _is_ytdlp_cookie_load_error(exc_or_msg) -> bool:
+    text = str(exc_or_msg or "").lower()
+    if not text:
+        return False
+    return "failed to load cookies" in text or "cookieloaderror" in text
+
+
+def _is_ytdlp_dpapi_cookie_error(exc_or_msg) -> bool:
+    text = str(exc_or_msg or "").lower()
+    if not text:
+        return False
+    return "dpapi" in text or "failed to decrypt with dpapi" in text
+
+
 def _should_reapply_seek(target_ms: int, current_ms: int, tolerance_ms: int, remaining_retries: int) -> bool:
     try:
         if remaining_retries <= 0:
@@ -2484,8 +2498,22 @@ class PlayerFrame(wx.Frame):
 
                     info = None
                     last_err = None
+                    base_err = None
+                    dpapi_cookie_err = None
+                    skip_cookie_attempts = False
                     tried_cookie_sources = []
                     cookie_sources = list(discovery.get_ytdlp_cookie_sources(url) or [])
+                    if bool(getattr(self, "_ytdlp_browser_cookies_dpapi_unavailable", False)):
+                        if cookie_sources and not bool(getattr(self, "_ytdlp_browser_cookies_dpapi_notice_shown", False)):
+                            try:
+                                _log("yt-dlp browser cookies disabled for this session after a Windows DPAPI cookie decryption failure")
+                            except Exception:
+                                pass
+                            try:
+                                self._ytdlp_browser_cookies_dpapi_notice_shown = True
+                            except Exception:
+                                pass
+                        cookie_sources = []
                     prefer_cookies = False
                     try:
                         if parsed_url and parsed_url.netloc:
@@ -2504,6 +2532,8 @@ class PlayerFrame(wx.Frame):
                             attempts.append(("cookies", source))
 
                     for kind, source in attempts:
+                        if kind == "cookies" and skip_cookie_attempts:
+                            continue
                         opts = dict(base_opts)
                         if kind == "cookies" and source:
                             if source in tried_cookie_sources:
@@ -2517,10 +2547,75 @@ class PlayerFrame(wx.Frame):
                             break
                         except Exception as e:
                             last_err = e
+                            if kind == "base":
+                                base_err = e
                             if kind == "cookies" and source:
-                                _log(f"yt-dlp cookies failed ({source[0]})")
+                                if _is_ytdlp_dpapi_cookie_error(e):
+                                    dpapi_cookie_err = e
+                                    skip_cookie_attempts = True
+                                    try:
+                                        self._ytdlp_browser_cookies_dpapi_unavailable = True
+                                        self._ytdlp_browser_cookies_dpapi_notice_shown = True
+                                    except Exception:
+                                        pass
+                                    try:
+                                        _log(
+                                            f"yt-dlp cookies failed ({source[0]}): Windows DPAPI decryption unavailable; "
+                                            "skipping remaining browser cookie attempts this session"
+                                        )
+                                    except Exception:
+                                        pass
+                                elif _is_ytdlp_cookie_load_error(e):
+                                    _log(f"yt-dlp cookies failed ({source[0]}): cookie loading failed")
+                                else:
+                                    _log(f"yt-dlp cookies failed ({source[0]})")
 
                     if info is None:
+                        rokfin_probe = None
+                        is_rokfin_url = False
+                        try:
+                            if parsed_url and parsed_url.netloc:
+                                is_rokfin_url = "rokfin.com" in parsed_url.netloc.lower()
+                        except Exception:
+                            is_rokfin_url = False
+
+                        if is_rokfin_url:
+                            try:
+                                rokfin_probe = discovery.probe_rokfin_public_playback(url, timeout=12)
+                            except Exception:
+                                rokfin_probe = None
+                            if isinstance(rokfin_probe, dict) and bool(rokfin_probe.get("ok")):
+                                rk_media_url = str(rokfin_probe.get("media_url") or "").strip()
+                                if rk_media_url:
+                                    info = {
+                                        "url": rk_media_url,
+                                        "http_headers": dict(rokfin_probe.get("http_headers") or {}),
+                                        "title": str(rokfin_probe.get("title") or title or "Media Stream"),
+                                    }
+                                    try:
+                                        _log("Rokfin playback resolved via public API fallback")
+                                    except Exception:
+                                        pass
+
+                        if info is None and isinstance(rokfin_probe, dict):
+                            rk_reason = str(rokfin_probe.get("reason") or "").strip().lower()
+                            if rk_reason == "auth_required":
+                                raise RuntimeError(
+                                    "Rokfin playback requires a Rokfin login/cookies for this post"
+                                )
+                            if rk_reason == "invalid_playback_id":
+                                raise RuntimeError(
+                                    "Rokfin playback is broken on the source site (invalid playback ID)"
+                                )
+                            if rk_reason == "no_content_url":
+                                raise RuntimeError(
+                                    "Rokfin did not provide a playable stream URL for this post"
+                                )
+
+                        if dpapi_cookie_err is not None and base_err is not None:
+                            raise RuntimeError(
+                                f"{base_err} (browser cookies unavailable on this Windows session: DPAPI decryption failed)"
+                            )
                         raise last_err or RuntimeError("yt-dlp extraction failed")
 
                     # Handle playlists/multi-video pages
@@ -2536,8 +2631,32 @@ class PlayerFrame(wx.Frame):
                     ytdlp_headers = info.get('http_headers', {})
                     resolved_title = info.get('title', title or 'Media Stream')
                 except Exception as e:
-                    log.exception("yt-dlp resolve failed")
-                    wx.CallAfter(self._handle_media_load_error, int(load_seq), url, f"yt-dlp resolve failed: {e}", True)
+                    err_text = str(e or "")
+                    err_lower = err_text.lower()
+                    if "rokfin playback is broken on the source site" in err_lower or "rokfin playback requires a rokfin login/cookies" in err_lower:
+                        log.warning("yt-dlp resolve failed (Rokfin): %s", err_text)
+                    elif _is_ytdlp_dpapi_cookie_error(err_text) or "browser cookies unavailable on this windows session" in err_lower:
+                        log.warning("yt-dlp resolve failed (browser cookies/DPAPI): %s", err_text)
+                    else:
+                        log.exception("yt-dlp resolve failed")
+                    ui_msg = f"yt-dlp resolve failed: {e}"
+                    if "rokfin playback is broken on the source site" in err_lower:
+                        ui_msg = (
+                            "Rokfin post is listed but not streamable right now: Rokfin returned an invalid "
+                            "playback ID for this post."
+                        )
+                    elif "rokfin playback requires a rokfin login/cookies" in err_lower:
+                        ui_msg = (
+                            "Rokfin post is not anonymously streamable right now. Rokfin requires a login/cookies "
+                            "to play this post."
+                        )
+                    elif "browser cookies unavailable on this windows session" in err_lower:
+                        ui_msg = (
+                            "yt-dlp resolve failed: this media may require a login, but browser cookies could not be "
+                            "loaded on this Windows session (DPAPI). Try running BlindRSS as your normal Windows user "
+                            "and restart the app."
+                        )
+                    wx.CallAfter(self._handle_media_load_error, int(load_seq), url, ui_msg, True)
                     return
         else:
             resolved_title = title or "Playing Audio..."

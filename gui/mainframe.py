@@ -1297,6 +1297,11 @@ class MainFrame(wx.Frame):
             "Find a &Podcast or RSS Feed...\tCtrl+Shift+F",
             "Find and add a podcast or RSS feed",
         )
+        ytdlp_global_search_item = tools_menu.Append(
+            wx.ID_ANY,
+            "&Video Search...",
+            "Search all yt-dlp query-search sites",
+        )
         tools_menu.AppendSeparator()
         settings_item = tools_menu.Append(wx.ID_PREFERENCES, "&Settings...", "Configure application")
         
@@ -1334,6 +1339,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_check_updates, check_updates_item)
         self.Bind(wx.EVT_MENU, self.on_exit, exit_item)
         self.Bind(wx.EVT_MENU, self.on_find_feed, find_feed_item)
+        self.Bind(wx.EVT_MENU, self.on_ytdlp_global_search, ytdlp_global_search_item)
         self.Bind(wx.EVT_MENU, self.on_about, about_item)
         self.Bind(wx.EVT_MENU_OPEN, self.on_menu_open)
         self._refresh_player_chapters_submenu()
@@ -1387,14 +1393,26 @@ class MainFrame(wx.Frame):
                     except Exception:
                         log.exception("Error activating article on space press")
 
-        if key == wx.WXK_DELETE:
+        delete_keys = {
+            getattr(wx, "WXK_DELETE", None),
+            getattr(wx, "WXK_NUMPAD_DELETE", None),
+            getattr(wx, "WXK_NUMPAD_DECIMAL", None),
+        }
+        if key in delete_keys:
             focus = self._get_focused_window()
-            if focus == self.list_ctrl:
-                self.on_delete_article()
-                return
             if focus == self.tree:
-                self.on_remove_feed(None)
-                return
+                try:
+                    item = self.tree.GetSelection()
+                    if item and item.IsOk():
+                        data = self.tree.GetItemData(item)
+                        if data and data.get("type") == "category":
+                            self.on_remove_category(None)
+                            return
+                        if data and data.get("type") == "feed":
+                            self.on_remove_feed(None)
+                            return
+                except Exception:
+                    log.exception("Error handling tree delete shortcut")
 
         if key == wx.WXK_F2 and not event.ControlDown() and not event.ShiftDown() and not event.AltDown() and not event.MetaDown():
             focus = self._get_focused_window()
@@ -5969,6 +5987,45 @@ class MainFrame(wx.Frame):
     def on_exit(self, event):
         self.real_close()
 
+    def add_feed_from_url_prompt(self, url: str) -> None:
+        url = str(url or "").strip()
+        if not url:
+            return
+
+        cats = self.provider.get_categories()
+        if not cats:
+            cats = ["Uncategorized"]
+        cat_dlg = wx.SingleChoiceDialog(self, "Choose category:", "Add Feed", cats)
+        cat = "Uncategorized"
+        if cat_dlg.ShowModal() == wx.ID_OK:
+            cat = cat_dlg.GetStringSelection()
+        cat_dlg.Destroy()
+
+        self.SetTitle(f"BlindRSS - Adding feed {url}...")
+        threading.Thread(target=self._add_feed_thread, args=(url, cat), daemon=True).start()
+
+    def play_ytdlp_search_result(self, url: str, title: str | None = None) -> None:
+        url = str(url or "").strip()
+        if not url:
+            return
+
+        pw = self._ensure_player_window()
+        if not pw:
+            return
+
+        pw.load_media(
+            url,
+            use_ytdlp=True,
+            chapters=None,
+            title=(str(title or "").strip() or None),
+            article_id=None,
+        )
+
+        if bool(self.config_manager.get("show_player_on_play", True)):
+            self.toggle_player_visibility(force_show=True)
+        else:
+            self.toggle_player_visibility(force_show=False)
+
     def on_find_feed(self, event):
         from gui.dialogs import FeedSearchDialog
         dlg = FeedSearchDialog(self)
@@ -5980,16 +6037,16 @@ class MainFrame(wx.Frame):
             dlg.Destroy()
 
         if url:
-            cats = self.provider.get_categories()
-            if not cats: cats = ["Uncategorized"]
-            cat_dlg = wx.SingleChoiceDialog(self, "Choose category:", "Add Feed", cats)
-            cat = "Uncategorized"
-            if cat_dlg.ShowModal() == wx.ID_OK:
-                cat = cat_dlg.GetStringSelection()
-            cat_dlg.Destroy()
+            self.add_feed_from_url_prompt(url)
 
-            self.SetTitle(f"BlindRSS - Adding feed {url}...")
-            threading.Thread(target=self._add_feed_thread, args=(url, cat), daemon=True).start()
+    def on_ytdlp_global_search(self, event):
+        from gui.dialogs import YtdlpGlobalSearchDialog
+
+        dlg = YtdlpGlobalSearchDialog(self)
+        try:
+            dlg.ShowModal()
+        finally:
+            dlg.Destroy()
 
     def real_close(self):
         # Standardize shutdown path
