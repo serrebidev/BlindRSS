@@ -6,7 +6,7 @@ import re
 import threading
 from functools import lru_cache
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse, parse_qs, quote_plus
+from urllib.parse import urljoin, urlparse, parse_qs, quote_plus, quote
 from core import utils
 
 
@@ -503,6 +503,529 @@ def search_youtube_feeds(term: str, limit: int = 12, timeout: int = 15) -> list[
     return out
 
 
+def _mastodon_account_url_to_rss(url: str) -> str:
+    """Convert a Mastodon account profile URL to its RSS URL."""
+    if not url:
+        return ""
+    try:
+        parsed = urlparse(str(url).strip())
+    except Exception:
+        return ""
+    if (parsed.scheme or "").lower() not in ("http", "https") or not parsed.netloc:
+        return ""
+    path = str(parsed.path or "").rstrip("/")
+    if not path:
+        return ""
+    low = path.lower()
+    if low.endswith(".rss"):
+        return f"{parsed.scheme}://{parsed.netloc}{path}"
+    if low.startswith("/@") or low.startswith("/users/"):
+        return f"{parsed.scheme}://{parsed.netloc}{path}.rss"
+    return ""
+
+
+def _mastodon_tag_url_to_rss(url: str) -> str:
+    """Convert a Mastodon hashtag page URL to its RSS URL."""
+    if not url:
+        return ""
+    try:
+        parsed = urlparse(str(url).strip())
+    except Exception:
+        return ""
+    if (parsed.scheme or "").lower() not in ("http", "https") or not parsed.netloc:
+        return ""
+    path = str(parsed.path or "").rstrip("/")
+    if not path:
+        return ""
+    low = path.lower()
+    if low.endswith(".rss"):
+        return f"{parsed.scheme}://{parsed.netloc}{path}"
+    if low.startswith("/tags/"):
+        return f"{parsed.scheme}://{parsed.netloc}{path}.rss"
+    return ""
+
+
+def _mastodon_search_response_to_feeds(data, instance_base: str, limit: int = 12) -> list[dict]:
+    """Normalize Mastodon /api/v2/search results into feed search dialog items."""
+    out: list[dict] = []
+    seen_urls: set[str] = set()
+    try:
+        limit = max(1, min(50, int(limit or 12)))
+    except Exception:
+        limit = 12
+
+    base = str(instance_base or "").rstrip("/")
+    if not isinstance(data, dict):
+        return out
+
+    def _add(item: dict) -> None:
+        url = str(item.get("url") or "").strip()
+        if not url or url in seen_urls:
+            return
+        seen_urls.add(url)
+        out.append(item)
+
+    for acct in (data.get("accounts") or []):
+        if not isinstance(acct, dict):
+            continue
+        profile_url = str(acct.get("url") or "").strip()
+        rss_url = _mastodon_account_url_to_rss(profile_url)
+        if not rss_url:
+            continue
+        acct_name = str(acct.get("acct") or "").strip()
+        display_name = str(acct.get("display_name") or "").strip()
+        followers = acct.get("followers_count")
+        detail = "Mastodon user"
+        if acct_name:
+            detail = f"{detail} (@{acct_name})"
+        try:
+            if followers is not None:
+                detail = f"{detail} ({int(followers)} followers)"
+        except Exception:
+            pass
+        _add(
+            {
+                "title": display_name or (f"@{acct_name}" if acct_name else profile_url),
+                "detail": detail,
+                "url": rss_url,
+            }
+        )
+        if len(out) >= limit:
+            return out
+
+    for tag in (data.get("hashtags") or []):
+        if not isinstance(tag, dict):
+            continue
+        tag_name = str(tag.get("name") or "").strip().lstrip("#")
+        tag_url = str(tag.get("url") or "").strip()
+        rss_url = _mastodon_tag_url_to_rss(tag_url)
+        if not rss_url and base and tag_name:
+            rss_url = f"{base}/tags/{quote(tag_name, safe='')}.rss"
+        if not rss_url:
+            continue
+
+        uses_latest = None
+        try:
+            history = tag.get("history") or []
+            if history and isinstance(history[0], dict):
+                uses_latest = int(history[0].get("uses", 0) or 0)
+        except Exception:
+            uses_latest = None
+
+        detail = "Mastodon tag"
+        if uses_latest is not None:
+            detail = f"{detail} ({uses_latest} recent uses)"
+        _add(
+            {
+                "title": f"#{tag_name}" if tag_name else (tag_url or "Mastodon tag"),
+                "detail": detail,
+                "url": rss_url,
+            }
+        )
+        if len(out) >= limit:
+            return out
+
+    return out
+
+
+def search_mastodon_feeds(
+    term: str,
+    limit: int = 12,
+    timeout: int = 15,
+    instance_url: str = "https://mastodon.social",
+) -> list[dict]:
+    """Search Mastodon accounts/hashtags and return RSS feed candidates."""
+    query = str(term or "").strip()
+    if not query:
+        return []
+
+    try:
+        limit = max(1, min(20, int(limit or 12)))
+    except Exception:
+        limit = 12
+    try:
+        timeout = max(5, min(60, int(timeout or 15)))
+    except Exception:
+        timeout = 15
+
+    base = str(instance_url or "https://mastodon.social").strip().rstrip("/")
+    if not base.startswith(("http://", "https://")):
+        base = "https://mastodon.social"
+
+    params = {
+        "q": query,
+        "limit": limit,
+    }
+    # Ask Mastodon to resolve remote accounts when a handle/domain is provided.
+    if "@" in query and "." in query:
+        params["resolve"] = "true"
+
+    try:
+        resp = utils.safe_requests_get(f"{base}/api/v2/search", params=params, timeout=timeout)
+        if getattr(resp, "status_code", None) != 200:
+            return []
+        data = resp.json()
+        return _mastodon_search_response_to_feeds(data, base, limit=limit)
+    except Exception:
+        return []
+
+
+def _bluesky_profile_url_to_rss(url: str) -> str:
+    """Convert a Bluesky profile URL to its RSS URL."""
+    if not url:
+        return ""
+    try:
+        parsed = urlparse(str(url).strip())
+    except Exception:
+        return ""
+    scheme = (parsed.scheme or "").lower()
+    domain = (parsed.netloc or "").lower()
+    if scheme not in ("http", "https") or "bsky.app" not in domain:
+        return ""
+    path = str(parsed.path or "").strip("/")
+    if not path:
+        return ""
+    parts = path.split("/")
+    if len(parts) >= 3 and parts[0] == "profile" and parts[2] == "rss":
+        ident = parts[1].strip()
+        if ident:
+            return f"{parsed.scheme}://{parsed.netloc}/profile/{quote(ident, safe=':@._-')}/rss"
+        return ""
+    if len(parts) >= 2 and parts[0] == "profile":
+        ident = parts[1].strip()
+        if ident:
+            return f"{parsed.scheme}://{parsed.netloc}/profile/{quote(ident, safe=':@._-')}/rss"
+    return ""
+
+
+def _normalize_tag_candidate(term: str) -> str:
+    q = str(term or "").strip()
+    if not q:
+        return ""
+    if q.startswith("#"):
+        q = q[1:].strip()
+    # Bluesky/Mastodon hashtag-like token; avoid generating multi-word fake tag feeds.
+    if not q or len(q) > 64 or not re.fullmatch(r"[A-Za-z0-9._-]+", q):
+        return ""
+    return q
+
+
+def _bluesky_openrss_tag_url(tag: str) -> str:
+    tag_name = _normalize_tag_candidate(tag)
+    if not tag_name:
+        return ""
+    # OpenRSS wrapper (best-effort). Bluesky has native profile RSS, but not a stable native hashtag RSS route.
+    return f"https://openrss.org/https://bsky.app/search?q=%23{quote(tag_name, safe='')}"
+
+
+def _bluesky_search_response_to_feeds(data, query: str = "", limit: int = 12) -> list[dict]:
+    """Normalize Bluesky actor search results into feed search dialog items."""
+    out: list[dict] = []
+    seen_urls: set[str] = set()
+    try:
+        limit = max(1, min(50, int(limit or 12)))
+    except Exception:
+        limit = 12
+
+    def _add(item: dict) -> None:
+        url = str(item.get("url") or "").strip()
+        if not url or url in seen_urls:
+            return
+        seen_urls.add(url)
+        out.append(item)
+
+    if isinstance(data, dict):
+        for actor in (data.get("actors") or []):
+            if not isinstance(actor, dict):
+                continue
+            handle = str(actor.get("handle") or "").strip()
+            if not handle:
+                continue
+            rss_url = _bluesky_profile_url_to_rss(f"https://bsky.app/profile/{handle}")
+            if not rss_url:
+                continue
+            display_name = str(actor.get("displayName") or "").strip()
+            did = str(actor.get("did") or "").strip()
+            detail = f"Bluesky user (@{handle})"
+            if did:
+                detail = f"{detail} ({did})"
+            _add(
+                {
+                    "title": display_name or f"@{handle}",
+                    "detail": detail,
+                    "url": rss_url,
+                }
+            )
+            if len(out) >= limit:
+                return out
+
+    # Best-effort hashtag result using OpenRSS wrapper.
+    tag_name = _normalize_tag_candidate(query)
+    if tag_name and len(out) < limit:
+        rss_url = _bluesky_openrss_tag_url(tag_name)
+        if rss_url:
+            _add(
+                {
+                    "title": f"#{tag_name}",
+                    "detail": "Bluesky tag (OpenRSS, third-party)",
+                    "url": rss_url,
+                }
+            )
+
+    return out
+
+
+def search_bluesky_feeds(term: str, limit: int = 12, timeout: int = 15) -> list[dict]:
+    """Search Bluesky users and return RSS feed candidates (plus tag fallback URLs)."""
+    query = str(term or "").strip()
+    if not query:
+        return []
+    try:
+        limit = max(1, min(20, int(limit or 12)))
+    except Exception:
+        limit = 12
+    try:
+        timeout = max(5, min(60, int(timeout or 15)))
+    except Exception:
+        timeout = 15
+
+    try:
+        resp = utils.safe_requests_get(
+            "https://public.api.bsky.app/xrpc/app.bsky.actor.searchActorsTypeahead",
+            params={"q": query, "limit": max(1, min(limit, 10))},
+            timeout=timeout,
+        )
+        data = resp.json() if getattr(resp, "status_code", None) == 200 else {}
+    except Exception:
+        data = {}
+    return _bluesky_search_response_to_feeds(data, query=query, limit=limit)
+
+
+def _federated_actor_url_to_feed_url(actor_url: str, *, source: str = "") -> str:
+    """Convert common fediverse actor/community URLs to RSS feed URLs."""
+    if not actor_url:
+        return ""
+    u = str(actor_url).strip()
+
+    # Mastodon account/tag pages
+    mastodon_url = _mastodon_account_url_to_rss(u) or _mastodon_tag_url_to_rss(u)
+    if mastodon_url:
+        return mastodon_url
+
+    # Bluesky profiles
+    bsky_url = _bluesky_profile_url_to_rss(u)
+    if bsky_url:
+        return bsky_url
+
+    try:
+        parsed = urlparse(u)
+    except Exception:
+        return ""
+    scheme = (parsed.scheme or "").lower()
+    host = (parsed.netloc or "").lower()
+    path = str(parsed.path or "").rstrip("/")
+    if scheme not in ("http", "https") or not host or not path:
+        return ""
+
+    source_l = str(source or "").lower()
+
+    # PieFed local routes use /community/<name>/feed and /u/<name>/feed.
+    if source_l == "piefed" and host and host.endswith("piefed.social"):
+        if path.startswith("/c/"):
+            name = path.split("/c/", 1)[1].split("/", 1)[0]
+            if name:
+                return f"{parsed.scheme}://{parsed.netloc}/community/{quote(name, safe='@._-')}/feed"
+        if path.startswith("/u/"):
+            name = path.split("/u/", 1)[1].split("/", 1)[0]
+            if name:
+                return f"{parsed.scheme}://{parsed.netloc}/u/{quote(name, safe='@._-')}/feed"
+
+    # Lemmy communities
+    if path.startswith("/c/"):
+        comm_name = path.split("/c/", 1)[1]
+        if comm_name:
+            return f"{parsed.scheme}://{parsed.netloc}/feeds/c/{comm_name}.xml"
+
+    # Kbin/Mbin magazines
+    if path.startswith("/m/"):
+        return f"{parsed.scheme}://{parsed.netloc}{path}/rss"
+
+    # Lemmy users
+    if path.startswith("/u/"):
+        user_name = path.split("/u/", 1)[1]
+        if user_name:
+            return f"{parsed.scheme}://{parsed.netloc}/feeds/u/{user_name}.xml"
+
+    return ""
+
+
+def _piefed_search_response_to_feeds(data, limit: int = 12) -> list[dict]:
+    """Normalize PieFed search API responses into RSS feed candidates."""
+    out: list[dict] = []
+    seen_urls: set[str] = set()
+    try:
+        limit = max(1, min(50, int(limit or 12)))
+    except Exception:
+        limit = 12
+
+    def _add(item: dict) -> None:
+        url = str(item.get("url") or "").strip()
+        if not url or url in seen_urls:
+            return
+        seen_urls.add(url)
+        out.append(item)
+
+    if not isinstance(data, dict):
+        return out
+
+    for row in (data.get("communities") or []):
+        if not isinstance(row, dict):
+            continue
+        comm = row.get("community") or {}
+        counts = row.get("counts") or {}
+        actor_id = str(comm.get("actor_id") or "").strip()
+        rss_url = _federated_actor_url_to_feed_url(actor_id, source="piefed")
+        if not rss_url:
+            continue
+        title = str(comm.get("title") or comm.get("name") or actor_id).strip()
+        name = str(comm.get("name") or "").strip()
+        subs = counts.get("subscriptions_count") or counts.get("total_subscriptions_count")
+        ap_domain = str(comm.get("ap_domain") or "").strip()
+        detail = "PieFed community"
+        if name:
+            detail = f"{detail} ({name})"
+        if ap_domain:
+            detail = f"{detail} - {ap_domain}"
+        try:
+            if subs is not None:
+                detail = f"{detail} ({int(subs)} subs)"
+        except Exception:
+            pass
+        _add({"title": title, "detail": detail, "url": rss_url})
+        if len(out) >= limit:
+            return out
+
+    for row in (data.get("users") or []):
+        if not isinstance(row, dict):
+            continue
+        person = row.get("person") or {}
+        counts = row.get("counts") or {}
+        actor_id = str(person.get("actor_id") or "").strip()
+        rss_url = _federated_actor_url_to_feed_url(actor_id, source="piefed")
+        if not rss_url:
+            continue
+        title = str(person.get("title") or person.get("user_name") or actor_id).strip()
+        user_name = str(person.get("user_name") or "").strip()
+        detail = "Fediverse user (via PieFed)"
+        if user_name:
+            detail = f"{detail} (@{user_name})"
+        try:
+            post_count = counts.get("post_count")
+            comment_count = counts.get("comment_count")
+            if post_count is not None or comment_count is not None:
+                detail = f"{detail} ({int(post_count or 0)} posts, {int(comment_count or 0)} comments)"
+        except Exception:
+            pass
+        _add({"title": title, "detail": detail, "url": rss_url})
+        if len(out) >= limit:
+            return out
+
+    return out
+
+
+def search_piefed_feeds(term: str, limit: int = 12, timeout: int = 15, instance_url: str = "https://piefed.social") -> list[dict]:
+    """Search PieFed communities/users and return RSS feed candidates."""
+    query = str(term or "").strip()
+    if not query:
+        return []
+    try:
+        limit = max(1, min(20, int(limit or 12)))
+    except Exception:
+        limit = 12
+    try:
+        timeout = max(5, min(60, int(timeout or 15)))
+    except Exception:
+        timeout = 15
+
+    base = str(instance_url or "https://piefed.social").strip().rstrip("/")
+    if not base.startswith(("http://", "https://")):
+        base = "https://piefed.social"
+    endpoint = f"{base}/api/alpha/search"
+
+    out: list[dict] = []
+    seen_urls: set[str] = set()
+
+    def _merge(items: list[dict]) -> None:
+        for item in items or []:
+            if not isinstance(item, dict):
+                continue
+            url = str(item.get("url") or "").strip()
+            if not url or url in seen_urls:
+                continue
+            seen_urls.add(url)
+            out.append(item)
+            if len(out) >= limit:
+                break
+
+    for search_type in ("Communities", "Users"):
+        if len(out) >= limit:
+            break
+        try:
+            resp = utils.safe_requests_get(
+                endpoint,
+                params={"q": query, "type_": search_type, "limit": max(3, min(limit, 10))},
+                timeout=timeout,
+            )
+            if getattr(resp, "status_code", None) != 200:
+                continue
+            data = resp.json()
+            _merge(_piefed_search_response_to_feeds(data, limit=limit))
+        except Exception:
+            continue
+
+    return out
+
+
+def get_social_feed_url(url: str) -> str | None:
+    """Convert known social profile/tag/community URLs to RSS feed URLs when possible."""
+    if not url:
+        return None
+
+    for conv in (
+        _mastodon_account_url_to_rss,
+        _mastodon_tag_url_to_rss,
+        _bluesky_profile_url_to_rss,
+    ):
+        try:
+            out = conv(url)
+            if out:
+                return out
+        except Exception:
+            continue
+
+    # PieFed direct pages (local instance route patterns)
+    try:
+        parsed = urlparse(str(url).strip())
+        if (parsed.scheme or "").lower() in ("http", "https") and (parsed.netloc or "").lower().endswith("piefed.social"):
+            p = str(parsed.path or "").rstrip("/")
+            if p.startswith("/u/"):
+                name = p.split("/u/", 1)[1].split("/", 1)[0]
+                if name:
+                    return f"{parsed.scheme}://{parsed.netloc}/u/{quote(name, safe='@._-')}/feed"
+            if p.startswith("/community/"):
+                name = p.split("/community/", 1)[1].split("/", 1)[0]
+                if name:
+                    return f"{parsed.scheme}://{parsed.netloc}/community/{quote(name, safe='@._-')}/feed"
+            if p.startswith("/c/"):
+                name = p.split("/c/", 1)[1].split("/", 1)[0]
+                if name:
+                    return f"{parsed.scheme}://{parsed.netloc}/community/{quote(name, safe='@._-')}/feed"
+    except Exception:
+        pass
+
+    return None
+
+
 def get_ytdlp_feed_url(url: str) -> str:
     """Try to get a native RSS feed for a yt-dlp supported URL (e.g. YouTube)."""
     if not url:
@@ -592,6 +1115,13 @@ def discover_feed(url: str) -> str:
             return media_feed
     except Exception:
         pass
+
+    try:
+        social_feed = get_social_feed_url(url)
+        if social_feed:
+            return social_feed
+    except Exception:
+        pass
         
     try:
         resp = utils.safe_requests_get(url, timeout=10)
@@ -647,6 +1177,13 @@ def discover_feeds(url: str) -> list[str]:
         media_feed = get_ytdlp_feed_url(url)
         if media_feed:
             return [media_feed]
+    except Exception:
+        pass
+
+    try:
+        social_feed = get_social_feed_url(url)
+        if social_feed:
+            return [social_feed]
     except Exception:
         pass
 

@@ -8,7 +8,14 @@ import time
 import logging
 import sys
 from urllib.parse import urlparse
-from core.discovery import discover_feed, is_ytdlp_supported, search_youtube_feeds
+from core.discovery import (
+    discover_feed,
+    is_ytdlp_supported,
+    search_youtube_feeds,
+    search_mastodon_feeds,
+    search_bluesky_feeds,
+    search_piefed_feeds,
+)
 from core import utils
 from core.casting import CastingManager
 from core import inoreader_oauth
@@ -1738,7 +1745,7 @@ class FeedSearchDialog(wx.Dialog):
 
         # Attribution / Help
         help_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        help_sizer.Add(wx.StaticText(self, label="Sources: iTunes, gPodder, YouTube, Feedly, Feedsearch, NewsBlur, Reddit, Fediverse"), 0, wx.ALL, 5)
+        help_sizer.Add(wx.StaticText(self, label="Sources: iTunes, gPodder, YouTube, Feedly, Feedsearch, NewsBlur, Reddit, Fediverse (Lemmy/Kbin/Mastodon/Bluesky/PieFed)"), 0, wx.ALL, 5)
         sizer.Add(help_sizer, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
         
         # Buttons
@@ -1993,6 +2000,32 @@ class FeedSearchDialog(wx.Dialog):
             pass
 
     def _search_fediverse(self, term, queue):
+        all_results = []
+        seen_urls = set()
+
+        def _extend(items):
+            for item in (items or []):
+                if not isinstance(item, dict):
+                    continue
+                url = str(item.get("url") or "").strip()
+                if not url or url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                all_results.append(item)
+
+        try:
+            _extend(search_mastodon_feeds(term, limit=12, timeout=15))
+        except Exception:
+            pass
+        try:
+            _extend(search_bluesky_feeds(term, limit=12, timeout=15))
+        except Exception:
+            pass
+        try:
+            _extend(search_piefed_feeds(term, limit=12, timeout=15))
+        except Exception:
+            pass
+
         try:
             import urllib.parse
             # Query lemmy.world as a gateway to the Fediverse
@@ -2049,9 +2082,12 @@ class FeedSearchDialog(wx.Dialog):
                         "detail": f"{provider_label} - {desc}",
                         "url": rss_url
                     })
-                queue.put(("Fediverse", results))
+                _extend(results)
         except Exception:
             pass
+
+        if all_results:
+            queue.put(("Fediverse", all_results))
 
     def _search_feedsearch(self, term, queue):
         try:
