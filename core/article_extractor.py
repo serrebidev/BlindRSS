@@ -588,6 +588,74 @@ def _strip_bloomberg_boilerplate(text: str) -> str:
     return cleaned or original
 
 
+_NING_ACTIVITY_ACTION_PATTERNS: List[re.Pattern] = [
+    re.compile(r"(?i)^posted\s+a\s+\w[\w -]*$"),
+    re.compile(r"(?i)^posted\s+blog\s+posts?$"),
+    re.compile(r"(?i)^updated\s+their$"),
+    re.compile(r"(?i)^replied(?:\s+to)?$"),
+    re.compile(r"(?i)^commented(?:\s+on)?$"),
+    re.compile(r"(?i)^liked$"),
+    re.compile(r"(?i)^shared$"),
+]
+
+
+def _strip_ning_activity_noise(text: str) -> str:
+    """Trim wrapper text emitted by Ning activity feed HTML fragments.
+
+    Keep the real story title / excerpt / reply text, but drop small action wrappers
+    like "posted a video" and "1 more…".
+    """
+    original = _normalize_whitespace(text or "")
+    paras = _split_paragraphs(original)
+    if not paras:
+        return ""
+
+    def _is_more_link_line(p: str) -> bool:
+        s = (p or "").strip()
+        if not s:
+            return True
+        if re.fullmatch(r"(?i)see\s+more", s):
+            return True
+        if re.fullmatch(r"(?i)\d+\s+more(?:\.{3}|…)?", s):
+            return True
+        return False
+
+    def _is_action_line(p: str) -> bool:
+        s = (p or "").strip()
+        return any(rx.fullmatch(s) for rx in _NING_ACTIVITY_ACTION_PATTERNS)
+
+    def _looks_like_actor_name(p: str) -> bool:
+        s = (p or "").strip()
+        if not s or len(s) > 120:
+            return False
+        low = s.lower()
+        # Avoid matching actual content/excerpts.
+        if any(tok in low for tok in ("http://", "https://", "posted ", "replied", "commented", "updated ")):
+            return False
+        # Mostly name-ish text: letters/numbers/basic punctuation.
+        return bool(re.fullmatch(r"[\w .,'’()&+\-†]+", s))
+
+    cleaned = [p for p in paras if not _is_more_link_line(p)]
+
+    # Remove a common Ning wrapper prefix:
+    #   <actor name>
+    #   posted a video / posted blog posts / updated their / ...
+    # only when there is meaningful content after it.
+    if len(cleaned) >= 4 and _looks_like_actor_name(cleaned[0]) and _is_action_line(cleaned[1]):
+        # For profile updates with no real excerpt, keep the small text.
+        tail = cleaned[2:]
+        meaningful_tail = [p for p in tail if len((p or "").strip()) >= 12]
+        if len(meaningful_tail) >= 2 or any(len((p or "").strip()) >= 40 for p in meaningful_tail):
+            cleaned = tail
+
+    # If the resulting first line is just "profile" and there is other content, drop it.
+    if len(cleaned) > 1 and str(cleaned[0] or "").strip().lower() == "profile":
+        cleaned = cleaned[1:]
+
+    out = "\n\n".join(cleaned).strip()
+    return out or original
+
+
 def _postprocess_extracted_text(text: str, url: str) -> str:
     t = _normalize_whitespace(text or "")
     if not t:
@@ -617,6 +685,8 @@ def _postprocess_extracted_text(text: str, url: str) -> str:
         t = _strip_castanet_boilerplate(t)
     elif "bloomberg.com" in netloc:
         t = _strip_bloomberg_boilerplate(t)
+    elif netloc.endswith(".ning.com") or netloc == "ning.com":
+        t = _strip_ning_activity_noise(t)
 
     return _normalize_whitespace(t)
 
@@ -1050,6 +1120,46 @@ def _should_prefer_feed_content(url: str, html: str) -> bool:
     low = html.lower()
     if "unable to retrieve full-text content" in low:
         return False
+
+    # Ning activity feeds often contain the only useful human-readable description/excerpt
+    # (e.g. "posted a video", discussion reply text, etc.). Scraping the target page can
+    # return generic profile/site boilerplate instead, especially for profile activity items.
+    try:
+        host = urlsplit(url).hostname or ""
+        host = host.lower()
+        if host.endswith(".ning.com") or host == "ning.com":
+            # Most Ning RSS activity entries are HTML fragments (not full pages) containing
+            # the only useful summary/reply text. If we scrape the linked page instead, we may
+            # get profile/site boilerplate and lose the activity description entirely.
+            if "<html" not in low and "<body" not in low:
+                if low.count("<a ") >= 1 and any(
+                    marker in low
+                    for marker in (
+                        "/forum/topics/",
+                        "/xn/detail/",
+                        "/members/",
+                        "posted a ",
+                        "posted blog posts",
+                        "replied",
+                        "updated their",
+                        "commentid=",
+                        "xg_source=activity",
+                    )
+                ):
+                    return True
+            if any(
+                marker in low
+                for marker in (
+                    "xg_source=activity",
+                    "feed-string",
+                    "feed-story-title",
+                    "feed-more",
+                    "rich-excerpt",
+                )
+            ):
+                return True
+    except Exception:
+        pass
     
     # 1. Known sites where scraping is slow/blocked but feed is good
     try:
