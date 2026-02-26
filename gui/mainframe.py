@@ -5320,6 +5320,15 @@ class MainFrame(wx.Frame):
     def _add_feed_thread(self, url, cat):
         success = False
         refresh_ran = False
+        pre_feed_ids = set()
+        try:
+            feeds_before = self.provider.get_feeds() if self.provider else []
+            for f in (feeds_before or []):
+                fid = str(getattr(f, "id", "") or "").strip()
+                if fid:
+                    pre_feed_ids.add(fid)
+        except Exception:
+            pre_feed_ids = set()
         try:
             success = self.provider.add_feed(url, cat)
             if success:
@@ -5329,8 +5338,12 @@ class MainFrame(wx.Frame):
                 # with fully_loaded=True, causing the feed to appear permanently empty.
                 # _run_refresh() calls refresh_feeds() after articles are fetched.
                 try:
-                    # Force a refresh so the newly added feed has content immediately.
-                    refresh_ran = bool(self._run_refresh(block=True, force=True))
+                    # Prefer a targeted single-feed refresh so adding one feed does not
+                    # block on a full refresh of every feed in the library.
+                    refresh_ran = bool(self._refresh_newly_added_feed_after_add(url, pre_feed_ids))
+                    if not refresh_ran:
+                        # Fallback: force a full refresh so the newly added feed has content immediately.
+                        refresh_ran = bool(self._run_refresh(block=True, force=True))
                 except Exception:
                     log.exception("Failed to refresh feeds after add")
                     refresh_ran = False
@@ -5339,6 +5352,75 @@ class MainFrame(wx.Frame):
             success = False
             refresh_ran = False
         wx.CallAfter(self._post_add_feed, success, refresh_ran)
+
+    def _refresh_newly_added_feed_after_add(self, requested_url: str, pre_feed_ids: set[str] | None = None) -> bool:
+        """Refresh only the newly added feed when the provider supports it."""
+        refresh_one = getattr(self.provider, "refresh_feed", None)
+        if not callable(refresh_one):
+            return False
+
+        before_ids = set(pre_feed_ids or set())
+        try:
+            feeds_after = list(self.provider.get_feeds() or [])
+        except Exception:
+            return False
+
+        new_feeds = []
+        for feed in feeds_after:
+            fid = str(getattr(feed, "id", "") or "").strip()
+            if not fid or fid in before_ids:
+                continue
+            new_feeds.append(feed)
+        if not new_feeds:
+            # Some providers (e.g., Miniflux) return "already exists" for duplicate adds.
+            # In that case there may be no new feed row, but the add should still be treated
+            # as success and should not trigger a full refresh fallback.
+            add_result = getattr(self.provider, "_last_add_feed_result", None)
+            if isinstance(add_result, dict) and bool(add_result.get("duplicate")):
+                # The feed is already present; don't trigger another refresh request here.
+                # Some providers (e.g., Miniflux) may have flaky targeted refresh endpoints,
+                # and a duplicate add should still return quickly as success.
+                wx.CallAfter(self.refresh_feeds)
+                return True
+            return False
+
+        # Prefer the feed whose stored URL matches the requested URL (or its YouTube RSS conversion).
+        candidate_urls = set()
+        try:
+            req = str(requested_url or "").strip()
+            if req:
+                candidate_urls.add(req)
+                yt_feed = core.discovery.get_ytdlp_feed_url(req)
+                if yt_feed:
+                    candidate_urls.add(str(yt_feed).strip())
+        except Exception:
+            pass
+
+        selected = None
+        if candidate_urls:
+            for feed in new_feeds:
+                furl = str(getattr(feed, "url", "") or "").strip()
+                if furl in candidate_urls:
+                    selected = feed
+                    break
+        if selected is None and len(new_feeds) == 1:
+            selected = new_feeds[0]
+        if selected is None:
+            return False
+
+        feed_id = str(getattr(selected, "id", "") or "").strip()
+        if not feed_id:
+            return False
+
+        try:
+            ok = bool(refresh_one(feed_id))
+        except Exception:
+            log.exception("Single-feed refresh after add failed for %s", feed_id)
+            return False
+
+        if ok:
+            wx.CallAfter(self.refresh_feeds)
+        return ok
 
     def _post_add_feed(self, success, refresh_ran: bool = False):
         self.SetTitle("BlindRSS")

@@ -6,7 +6,7 @@ import re
 import threading
 from functools import lru_cache
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse, parse_qs
+from urllib.parse import urljoin, urlparse, parse_qs, quote_plus
 from core import utils
 
 
@@ -202,6 +202,26 @@ def get_ytdlp_cookie_sources(url: str | None = None) -> list[tuple]:
     return _build_cookie_sources()
 
 
+def _youtube_playlist_id_from_url(url: str) -> str:
+    """Extract a YouTube playlist ID from any YouTube URL with a list param."""
+    if not url:
+        return ""
+    try:
+        parsed = urlparse(url)
+        domain = (parsed.netloc or "").lower()
+        if "youtube.com" not in domain and "youtu.be" not in domain:
+            return ""
+        playlist_id = str((parse_qs(parsed.query).get("list") or [""])[0] or "").strip()
+        if not playlist_id:
+            return ""
+        # Preserve simple YouTube playlist IDs; ignore obviously malformed values.
+        if any(ch.isspace() for ch in playlist_id):
+            return ""
+        return playlist_id
+    except Exception:
+        return ""
+
+
 def _youtube_search_entries_to_channel_feeds(entries, limit: int = 10) -> list[dict]:
     """Convert yt-dlp ytsearch entries into unique YouTube channel RSS feed results."""
     out: list[dict] = []
@@ -257,6 +277,62 @@ def _youtube_search_entries_to_channel_feeds(entries, limit: int = 10) -> list[d
         detail = "YouTube channel"
         if handle:
             detail = f"{detail} ({handle})"
+
+        out.append(
+            {
+                "title": title,
+                "detail": detail,
+                "url": feed_url,
+            }
+        )
+        if len(out) >= limit:
+            break
+
+    return out
+
+
+def _youtube_search_entries_to_playlist_feeds(entries, limit: int = 10) -> list[dict]:
+    """Convert yt-dlp playlist-search entries into YouTube playlist RSS results."""
+    out: list[dict] = []
+    seen: set[str] = set()
+    try:
+        limit = max(1, min(50, int(limit or 10)))
+    except Exception:
+        limit = 10
+
+    for entry in (entries or []):
+        if not isinstance(entry, dict):
+            continue
+
+        entry_url = str(entry.get("url") or entry.get("webpage_url") or "").strip()
+        playlist_id = (
+            str(entry.get("playlist_id") or "").strip()
+            or _youtube_playlist_id_from_url(entry_url)
+        )
+        if not playlist_id:
+            entry_id = str(entry.get("id") or "").strip()
+            if entry_id and not entry_id.startswith("UC"):
+                playlist_id = entry_id
+        if not playlist_id:
+            continue
+
+        feed_url = f"https://www.youtube.com/feeds/videos.xml?playlist_id={playlist_id}"
+        if playlist_id in seen:
+            continue
+        seen.add(playlist_id)
+
+        title = (
+            str(entry.get("title") or "").strip()
+            or playlist_id
+        )
+        owner = (
+            str(entry.get("channel") or "").strip()
+            or str(entry.get("uploader") or "").strip()
+            or str(entry.get("playlist_uploader") or "").strip()
+        )
+        detail = "YouTube playlist"
+        if owner:
+            detail = f"{detail} ({owner})"
 
         out.append(
             {
@@ -328,6 +404,105 @@ def search_youtube_channels(term: str, limit: int = 10, timeout: int = 15) -> li
         return []
 
 
+def _search_youtube_playlists(term: str, limit: int = 10, timeout: int = 15) -> list[dict]:
+    """Search YouTube playlists via yt-dlp and return playlist RSS feed candidates."""
+    query = str(term or "").strip()
+    if not query:
+        return []
+
+    try:
+        limit = max(1, min(20, int(limit or 10)))
+    except Exception:
+        limit = 10
+    try:
+        timeout = max(5, min(60, int(timeout or 15)))
+    except Exception:
+        timeout = 15
+
+    try:
+        from core.dependency_check import _get_startup_info
+
+        creationflags = 0
+        if platform.system().lower() == "windows":
+            creationflags = 0x08000000
+
+        # YouTube search filter (sp) for "Playlists".
+        playlist_filter_sp = "EgIQAw%253D%253D"
+        search_url = (
+            "https://www.youtube.com/results"
+            f"?search_query={quote_plus(query)}&sp={playlist_filter_sp}"
+        )
+        cmd = [
+            "yt-dlp",
+            "--dump-single-json",
+            "--flat-playlist",
+            "--playlist-end",
+            str(limit),
+            search_url,
+        ]
+
+        res = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            creationflags=creationflags,
+            startupinfo=_get_startup_info(),
+            timeout=timeout,
+        )
+        rc = getattr(res, "returncode", None)
+        if rc is None or int(rc) != 0 or not getattr(res, "stdout", None):
+            return []
+
+        data = json.loads(res.stdout)
+        entries = data.get("entries") if isinstance(data, dict) else []
+        return _youtube_search_entries_to_playlist_feeds(entries, limit=limit)
+    except Exception:
+        return []
+
+
+def search_youtube_feeds(term: str, limit: int = 12, timeout: int = 15) -> list[dict]:
+    """Search YouTube for channel and playlist RSS feed candidates."""
+    query = str(term or "").strip()
+    if not query:
+        return []
+
+    try:
+        limit = max(1, min(30, int(limit or 12)))
+    except Exception:
+        limit = 12
+    try:
+        timeout = max(5, min(60, int(timeout or 15)))
+    except Exception:
+        timeout = 15
+
+    channel_limit = max(1, min(limit, (limit * 2) // 3 or 1))
+    playlist_limit = max(1, min(limit, max(2, limit // 2)))
+
+    out: list[dict] = []
+    seen_urls: set[str] = set()
+
+    for item in (search_youtube_channels(query, limit=channel_limit, timeout=timeout) or []):
+        url = str(item.get("url") or "").strip()
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        out.append(item)
+        if len(out) >= limit:
+            return out
+
+    for item in (_search_youtube_playlists(query, limit=playlist_limit, timeout=timeout) or []):
+        url = str(item.get("url") or "").strip()
+        if not url or url in seen_urls:
+            continue
+        seen_urls.add(url)
+        out.append(item)
+        if len(out) >= limit:
+            break
+
+    return out
+
+
 def get_ytdlp_feed_url(url: str) -> str:
     """Try to get a native RSS feed for a yt-dlp supported URL (e.g. YouTube)."""
     if not url:
@@ -338,6 +513,10 @@ def get_ytdlp_feed_url(url: str) -> str:
     
     # 1. YouTube specific logic (fastest)
     if "youtube.com" in domain or "youtu.be" in domain:
+        playlist_id = _youtube_playlist_id_from_url(url)
+        if playlist_id:
+            return f"https://www.youtube.com/feeds/videos.xml?playlist_id={playlist_id}"
+
         # Check for channel_id or user in URL
         if "/channel/" in url:
             channel_id = url.split("/channel/")[1].split("/")[0].split("?")[0]
@@ -345,11 +524,6 @@ def get_ytdlp_feed_url(url: str) -> str:
         if "/user/" in url:
             user = url.split("/user/")[1].split("/")[0].split("?")[0]
             return f"https://www.youtube.com/feeds/videos.xml?user={user}"
-        if "/playlist?list=" in url:
-            qs = parse_qs(parsed.query)
-            playlist_id = qs.get("list", [None])[0]
-            if playlist_id:
-                return f"https://www.youtube.com/feeds/videos.xml?playlist_id={playlist_id}"
         if "/@" in url:
             # Handle @handle URLs by using yt-dlp to get the channel ID
             pass
@@ -410,6 +584,14 @@ def discover_feed(url: str) -> str:
     # If it looks like a feed already
     if url.endswith(".xml") or url.endswith(".rss") or url.endswith(".atom") or "feed" in url:
         return url
+
+    # Native feed conversion for supported media URLs (e.g., YouTube channel/playlist URLs).
+    try:
+        media_feed = get_ytdlp_feed_url(url)
+        if media_feed:
+            return media_feed
+    except Exception:
+        pass
         
     try:
         resp = utils.safe_requests_get(url, timeout=10)
@@ -460,6 +642,13 @@ def discover_feeds(url: str) -> list[str]:
     low = str(url).lower()
     if low.endswith(".xml") or low.endswith(".rss") or low.endswith(".atom") or "feed" in low:
         return [url]
+
+    try:
+        media_feed = get_ytdlp_feed_url(url)
+        if media_feed:
+            return [media_feed]
+    except Exception:
+        pass
 
     feeds: list[str] = []
 

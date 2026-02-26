@@ -8,7 +8,7 @@ import time
 import logging
 import sys
 from urllib.parse import urlparse
-from core.discovery import discover_feed, is_ytdlp_supported, search_youtube_channels
+from core.discovery import discover_feed, is_ytdlp_supported, search_youtube_feeds
 from core import utils
 from core.casting import CastingManager
 from core import inoreader_oauth
@@ -1800,7 +1800,7 @@ class FeedSearchDialog(wx.Dialog):
         # 3. Feedly (RSS/General)
         launch(self._search_feedly, "Feedly")
 
-        # 3.5. YouTube channel search (returns native YouTube RSS feed URLs)
+        # 3.5. YouTube channel/playlist search (returns native YouTube RSS feed URLs)
         launch(self._search_youtube_channels, "YouTube")
         
         # 4. NewsBlur (Autocomplete)
@@ -1914,7 +1914,7 @@ class FeedSearchDialog(wx.Dialog):
 
     def _search_youtube_channels(self, term, queue):
         try:
-            results = list(search_youtube_channels(term, limit=12, timeout=15) or [])
+            results = list(search_youtube_feeds(term, limit=12, timeout=15) or [])
             if results:
                 queue.put(("YouTube", results))
         except Exception:

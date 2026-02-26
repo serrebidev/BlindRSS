@@ -37,6 +37,13 @@ class MinifluxProvider(RSSProvider):
             "status_code": None,
             "endpoint": "",
             "method": "",
+            "error_body": None,
+        }
+        self._last_add_feed_result = {
+            "ok": False,
+            "duplicate": False,
+            "feed_id": None,
+            "feed_url": None,
         }
         # Backoff for repeatedly failing targeted per-feed refresh endpoints.
         # This avoids hammering a single broken feed refresh route and spamming logs.
@@ -199,6 +206,7 @@ class MinifluxProvider(RSSProvider):
                 "status_code": None,
                 "endpoint": str(endpoint or ""),
                 "method": str(method or "").upper(),
+                "error_body": None,
             }
             return None
         url = f"{self.base_url}{endpoint}"
@@ -253,6 +261,7 @@ class MinifluxProvider(RSSProvider):
                         "status_code": status_code,
                         "endpoint": str(endpoint or ""),
                         "method": method_upper,
+                        "error_body": None,
                     }
                     return None
 
@@ -264,12 +273,14 @@ class MinifluxProvider(RSSProvider):
                     "status_code": status_code,
                     "endpoint": str(endpoint or ""),
                     "method": method_upper,
+                    "error_body": None,
                 }
                 return payload
 
             except requests.HTTPError as e:
                 last_error = e
                 status_code = None
+                body_preview = ""
                 try:
                     status_code = int(getattr(getattr(e, "response", None), "status_code", 0) or 0)
                 except Exception:
@@ -293,7 +304,30 @@ class MinifluxProvider(RSSProvider):
                 if self._is_transient_status(status_code):
                     log.warning("Miniflux transient HTTP %s for %s %s: %s", status_code, method_upper, url, e)
                 else:
-                    log.error(f"Miniflux error for {url}: {e}")
+                    body_preview = ""
+                    try:
+                        resp_obj = getattr(e, "response", None)
+                        if resp_obj is not None:
+                            text = (getattr(resp_obj, "text", "") or "").strip()
+                            if text:
+                                text = " ".join(text.split())
+                                if len(text) > 500:
+                                    text = text[:497].rstrip() + "..."
+                                body_preview = text
+                    except Exception:
+                        body_preview = ""
+                    if body_preview:
+                        log.error("Miniflux error for %s: %s | response=%s", url, e, body_preview)
+                    else:
+                        log.error(f"Miniflux error for {url}: {e}")
+                self._last_request_info = {
+                    "ok": False,
+                    "used_cache": False,
+                    "status_code": status_code,
+                    "endpoint": str(endpoint or ""),
+                    "method": method_upper,
+                    "error_body": body_preview or None,
+                }
                 break
             except requests.Timeout as e:
                 last_error = e
@@ -312,6 +346,14 @@ class MinifluxProvider(RSSProvider):
                     time.sleep(delay)
                     continue
                 log.warning(f"Miniflux timeout for {url} (timeout={timeout_s}s): {e}")
+                self._last_request_info = {
+                    "ok": False,
+                    "used_cache": False,
+                    "status_code": last_status_code,
+                    "endpoint": str(endpoint or ""),
+                    "method": method_upper,
+                    "error_body": None,
+                }
                 break
             except requests.RequestException as e:
                 last_error = e
@@ -330,11 +372,27 @@ class MinifluxProvider(RSSProvider):
                     time.sleep(delay)
                     continue
                 log.error(f"Miniflux error for {url}: {e}")
+                self._last_request_info = {
+                    "ok": False,
+                    "used_cache": False,
+                    "status_code": last_status_code,
+                    "endpoint": str(endpoint or ""),
+                    "method": method_upper,
+                    "error_body": None,
+                }
                 break
             except Exception as e:
                 last_error = e
                 last_status_code = None
                 log.error(f"Miniflux error for {url}: {e}")
+                self._last_request_info = {
+                    "ok": False,
+                    "used_cache": False,
+                    "status_code": last_status_code,
+                    "endpoint": str(endpoint or ""),
+                    "method": method_upper,
+                    "error_body": None,
+                }
                 break
 
         if is_get:
@@ -347,6 +405,7 @@ class MinifluxProvider(RSSProvider):
                     "status_code": last_status_code,
                     "endpoint": str(endpoint or ""),
                     "method": method_upper,
+                    "error_body": None,
                 }
                 return cached
 
@@ -356,6 +415,7 @@ class MinifluxProvider(RSSProvider):
             "status_code": last_status_code,
             "endpoint": str(endpoint or ""),
             "method": method_upper,
+            "error_body": None if method_upper == "GET" else self._last_request_info.get("error_body"),
         }
         if last_error is not None:
             log.debug("Miniflux request failed with no fallback for %s %s", method_upper, url, exc_info=True)
@@ -642,6 +702,69 @@ class MinifluxProvider(RSSProvider):
 
         return True
 
+    def refresh_feed(self, feed_id: str, progress_cb=None) -> bool:
+        """Refresh a single Miniflux feed and emit one progress state for the UI."""
+        fid = str(feed_id or "").strip()
+        if not fid:
+            return False
+
+        # Trigger a targeted refresh on the Miniflux server.
+        self._req("PUT", f"/v1/feeds/{fid}/refresh")
+        info = dict(getattr(self, "_last_request_info", {}) or {})
+        if (
+            str(info.get("endpoint", "")) == f"/v1/feeds/{fid}/refresh"
+            and str(info.get("method", "")).upper() == "PUT"
+        ):
+            self._record_targeted_refresh_attempt_result(
+                fid,
+                bool(info.get("ok", False)),
+                info.get("status_code"),
+            )
+
+        # Whether the refresh call succeeded or timed out, try to fetch the latest metadata
+        # so the UI can stop showing "Adding feed..." and display current state.
+        feeds = self._req("GET", "/v1/feeds") or []
+        counters_data = self._req("GET", "/v1/feeds/counters") or {}
+        unread_map = counters_data.get("unreads", {}) if isinstance(counters_data, dict) else {}
+
+        target = None
+        for feed in (feeds or []):
+            if str(feed.get("id") or "") == fid:
+                target = feed
+                break
+
+        if target is None:
+            return False
+
+        now = datetime.now(timezone.utc)
+        stale_cutoff = now - timedelta(hours=3)
+        checked_dt = self._parse_checked_at(target.get("checked_at"))
+
+        status = "ok"
+        error_msg = None
+        if (target.get("parsing_error_count") or 0) > 0:
+            status = "error"
+            error_msg = target.get("parsing_error_message")
+        elif checked_dt and checked_dt < stale_cutoff:
+            status = "stale"
+
+        unread = unread_map.get(fid) or unread_map.get(int(target.get("id", 0) or 0), 0) or 0
+        category = (target.get("category") or {}).get("title", "Uncategorized")
+
+        self._emit_progress(
+            progress_cb,
+            {
+                "id": fid,
+                "title": target.get("title") or "",
+                "category": category,
+                "unread_count": unread,
+                "status": status,
+                "new_items": None,
+                "error": error_msg,
+            },
+        )
+        return True
+
     def get_feeds(self) -> List[Feed]:
         data = self._req("GET", "/v1/feeds")
         if not data: return []
@@ -914,6 +1037,12 @@ class MinifluxProvider(RSSProvider):
         from core.discovery import get_ytdlp_feed_url, discover_feed
         from core import odysee as odysee_mod
         from core import rumble as rumble_mod
+        self._last_add_feed_result = {
+            "ok": False,
+            "duplicate": False,
+            "feed_id": None,
+            "feed_url": None,
+        }
         
         # Try to get native feed URL for media sites (e.g. YouTube)
         # Miniflux can sometimes fail to discover these natively, leading to 500 errors.
@@ -938,12 +1067,49 @@ class MinifluxProvider(RSSProvider):
         
         data = {"feed_url": real_url, "category_id": category_id}
         res = self._req("POST", "/v1/feeds", json=data)
+        post_info = dict(getattr(self, "_last_request_info", {}) or {})
+        if isinstance(res, dict):
+            self._last_add_feed_result = {
+                "ok": True,
+                "duplicate": False,
+                "feed_id": str(res.get("feed_id") or res.get("id") or "") or None,
+                "feed_url": real_url,
+            }
+            return True
+
+        # Miniflux returns HTTP 400 when the feed already exists. Treat that as success
+        # so BlindRSS doesn't show a misleading add failure for existing subscriptions.
+        if (
+            str(post_info.get("endpoint", "")) == "/v1/feeds"
+            and str(post_info.get("method", "")).upper() == "POST"
+            and int(post_info.get("status_code", 0) or 0) == 400
+        ):
+            error_body = str(post_info.get("error_body") or "")
+            looks_duplicate = "already exists" in error_body.lower()
+            existing_feed_id = None
+            feeds = self._req("GET", "/v1/feeds") or []
+            for f in (feeds or []):
+                f_feed_url = str(f.get("feed_url") or "").strip()
+                f_site_url = str(f.get("site_url") or "").strip()
+                if real_url and real_url in (f_feed_url, f_site_url):
+                    existing_feed_id = str(f.get("id") or "").strip() or None
+                    looks_duplicate = True
+                    break
+            if looks_duplicate:
+                self._last_add_feed_result = {
+                    "ok": True,
+                    "duplicate": True,
+                    "feed_id": existing_feed_id,
+                    "feed_url": real_url,
+                }
+                log.info("Miniflux feed already exists; treating add as success: %s", real_url)
+                return True
         
         # If Miniflux fails (likely on Rumble), warn the user but don't crash.
         if res is None and rumble_mod.is_rumble_url(real_url):
             log.warning(f"Miniflux failed to add Rumble feed: {real_url}. Miniflux server may be blocked by Rumble.")
-            
-        return res is not None
+        
+        return False
 
     def remove_feed(self, feed_id: str) -> bool:
         self._req("DELETE", f"/v1/feeds/{feed_id}")
