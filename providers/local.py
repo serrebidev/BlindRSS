@@ -643,7 +643,8 @@ class LocalProvider(RSSProvider):
                     scoped_id = f"{feed_id}:{base_id}"
                     article_id = base_id
 
-                    title = entry.get('title', '')
+                    url = entry.get('link', '')
+                    title = utils.enhance_activity_entry_title(entry.get('title', ''), url, content)
                     if not title or title.strip() == "No Title":
                          # Fallback: create title from content snippet (e.g. Bluesky/Mastodon)
                          snippet = content or ""
@@ -656,8 +657,6 @@ class LocalProvider(RSSProvider):
                          if len(snippet) > 80:
                              snippet = snippet[:80] + "..."
                          title = snippet or "No Title"
-
-                    url = entry.get('link', '')
                     author = entry.get('author', 'Unknown')
                     
                     # BlueSky/Microblog fallback: if author is unknown, try to use feed title

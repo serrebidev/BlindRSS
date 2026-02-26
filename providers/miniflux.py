@@ -541,6 +541,9 @@ class MinifluxProvider(RSSProvider):
                 continue
             media_url = None
             media_type = None
+            entry_url = entry.get("url") or ""
+            entry_content = entry.get("content") or entry.get("summary") or ""
+            display_title = utils.enhance_activity_entry_title(entry.get("title") or "", entry_url, entry_content) or "Untitled"
 
             enclosures = entry.get("enclosures", []) or []
             if enclosures:
@@ -549,9 +552,9 @@ class MinifluxProvider(RSSProvider):
 
             date = utils.normalize_date(
                 entry.get("published_at") or entry.get("published"),
-                entry.get("title") or "",
-                entry.get("content") or entry.get("summary") or "",
-                entry.get("url") or "",
+                display_title,
+                entry_content,
+                entry_url,
             )
 
             article_id = str(entry.get("id"))
@@ -562,9 +565,9 @@ class MinifluxProvider(RSSProvider):
             articles.append(Article(
                 id=article_id,
                 feed_id=feed_id,
-                title=entry.get("title") or "Untitled",
-                url=entry.get("url") or "",
-                content=entry.get("content") or entry.get("summary") or "",
+                title=display_title,
+                url=entry_url,
+                content=entry_content,
                 date=date,
                 author=entry.get("author") or "",
                 is_read=(entry.get("status") == "read"),

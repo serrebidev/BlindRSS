@@ -315,11 +315,13 @@ class BazQuxProvider(RSSProvider):
                 article_id = item["id"]
                 article_feed_id = self._resolve_item_feed_id(item, fallback_feed_id)
                 cache_id = self._build_item_cache_id(item, fallback_feed_id)
+                article_url = item.get("alternate", [{}])[0].get("href", "")
+                display_title = utils.enhance_activity_entry_title(item.get("title", ""), article_url, content) or item.get("title", "No Title")
                 date = utils.normalize_date(
                     str(item.get("published", "")),
-                    item.get("title", ""),
+                    display_title,
                     content,
-                    item.get("alternate", [{}])[0].get("href", ""),
+                    article_url,
                 )
                 
                 chapters = chapters_map.get(article_id, [])
@@ -344,8 +346,8 @@ class BazQuxProvider(RSSProvider):
                 articles.append(Article(
                     id=article_id,
                     feed_id=article_feed_id,
-                    title=item.get("title", "No Title"),
-                    url=item.get("alternate", [{}])[0].get("href", ""),
+                    title=display_title,
+                    url=article_url,
                     content=content,
                     date=date,
                     author=item.get("author", "Unknown"),

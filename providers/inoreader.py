@@ -434,10 +434,11 @@ class InoreaderProvider(RSSProvider):
                 article_url = first_alt.get("href", "")
             except Exception:
                 article_url = ""
+            display_title = utils.enhance_activity_entry_title(item.get("title", ""), article_url, content) or item.get("title", "No Title")
 
             date = utils.normalize_date(
                 str(item.get("published", "")),
-                item.get("title", ""),
+                display_title,
                 content,
                 article_url,
             )
@@ -455,7 +456,7 @@ class InoreaderProvider(RSSProvider):
             articles.append(Article(
                 id=article_id,
                 feed_id=article_feed_id,
-                title=item.get("title", "No Title"),
+                title=display_title,
                 url=article_url,
                 content=content,
                 date=date,

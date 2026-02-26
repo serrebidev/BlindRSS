@@ -297,6 +297,8 @@ class TheOldReaderProvider(RSSProvider):
                 article_id = item["id"]
                 article_feed_id = self._resolve_item_feed_id(item, fallback_feed_id)
                 cache_id = self._build_item_cache_id(item, fallback_feed_id)
+                article_url = item.get("alternate", [{}])[0].get("href", "")
+                display_title = utils.enhance_activity_entry_title(item.get("title", ""), article_url, content) or item.get("title", "No Title")
                 pub_timestamp = item.get("published")
                 date = "0001-01-01 00:00:00"
                 if pub_timestamp:
@@ -308,19 +310,19 @@ class TheOldReaderProvider(RSSProvider):
                         log.debug(f"TheOldReader: Date parsing error for {pub_timestamp}: {date_e}. Falling back to normalize_date.")
                         date = utils.normalize_date(
                             str(pub_timestamp),
-                            item.get("title", ""),
+                            display_title,
                             content,
-                            item.get("alternate", [{}])[0].get("href", "")
+                            article_url
                         )
                 else:
                     log.debug("TheOldReader: 'published' field missing. Falling back to normalize_date.")
                     date = utils.normalize_date(
                         "",
-                        item.get("title", ""),
+                        display_title,
                         content,
-                        item.get("alternate", [{}])[0].get("href", "")
+                        article_url
                     )
-                log.debug(f"TheOldReader: Final article date for '{item.get('title', 'N/A')[:30]}...': {date}")
+                log.debug(f"TheOldReader: Final article date for '{display_title[:30]}...': {date}")
                 
                 chapters = chapters_map.get(article_id, [])
 
@@ -335,8 +337,8 @@ class TheOldReaderProvider(RSSProvider):
                 articles.append(Article(
                     id=article_id,
                     feed_id=article_feed_id,
-                    title=item.get("title", "No Title"),
-                    url=item.get("alternate", [{}])[0].get("href", ""),
+                    title=display_title,
+                    url=article_url,
                     content=content,
                     date=date,
                     author=item.get("author", "Unknown"),

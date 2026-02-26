@@ -29,6 +29,17 @@ _FLAC_MIME_ALIASES = {
     "application/x-flac",
 }
 
+_ACTIVITY_TITLE_GENERIC_TEXTS = {
+    "see more",
+    "more",
+    "profile",
+    "replied",
+    "reply",
+    "commented",
+    "comment",
+    "liked",
+}
+
 
 def add_revalidation_headers(headers: dict | None = None) -> dict:
     """Return headers with cache-bypass directives for proxy/CDN revalidation."""
@@ -53,6 +64,143 @@ def media_type_is_audio_video_or_podcast(media_type: str | None) -> bool:
     if not mt:
         return False
     return mt.startswith(("audio/", "video/")) or "podcast" in mt
+
+
+def _activity_title_norm_space(text: str) -> str:
+    return re.sub(r"\s+", " ", str(text or "")).strip()
+
+
+def _activity_title_norm_link(url: str) -> str:
+    try:
+        p = urllib.parse.urlsplit(str(url or "").strip())
+    except Exception:
+        return ""
+    host = (p.netloc or "").lower()
+    if host.startswith("www."):
+        host = host[4:]
+    path = urllib.parse.unquote((p.path or "").rstrip("/"))
+    # Ignore tracking-style params so activity links can match canonical content links.
+    try:
+        q = urllib.parse.parse_qsl(p.query or "", keep_blank_values=True)
+        q = [(k, v) for (k, v) in q if str(k).lower() not in {"xg_source", "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content"}]
+        q.sort()
+        query = urllib.parse.urlencode(q, doseq=True)
+    except Exception:
+        query = ""
+    return urllib.parse.urlunsplit((p.scheme.lower(), host, path, query, ""))
+
+
+def _activity_title_anchor_has_ancestor(a, tag_names: tuple[str, ...] = (), class_names: tuple[str, ...] = ()) -> bool:
+    try:
+        for parent in getattr(a, "parents", []) or []:
+            if parent is None:
+                continue
+            if tag_names and str(getattr(parent, "name", "") or "").lower() in tag_names:
+                return True
+            if class_names:
+                classes = [str(c or "").lower() for c in (parent.get("class") or [])]
+                if any(cls in classes for cls in class_names):
+                    return True
+    except Exception:
+        return False
+    return False
+
+
+def _looks_like_generic_activity_link_text(text: str) -> bool:
+    t = _activity_title_norm_space(text).lower().strip(" .:;!-")
+    if not t:
+        return True
+    if t in _ACTIVITY_TITLE_GENERIC_TEXTS:
+        return True
+    if re.fullmatch(r"\d+\s+more(?:…|\.\.\.)?", t):
+        return True
+    if "more" in t and len(t) <= 10:
+        return True
+    return False
+
+
+def _looks_like_profile_activity_link(href: str) -> bool:
+    href_low = str(href or "").lower()
+    return "/profile/" in href_low or "/members/" in href_low
+
+
+def enhance_activity_entry_title(title: str | None, url: str | None, content: str | None) -> str:
+    """Derive a better title from activity-feed HTML when the real story title is embedded.
+
+    This is intentionally conservative and primarily targets Ning-style activity feeds where
+    generic titles like "X posted a video" hide the actual content title in the description HTML.
+    """
+    cur_title = _activity_title_norm_space(title or "")
+    html = str(content or "")
+    if not html or "<" not in html or ">" not in html:
+        return cur_title
+
+    low_html = html.lower()
+    # Markers commonly seen in Ning activity feeds and similar "activity log" HTML.
+    if not any(m in low_html for m in ("feed-story-title", "xg_source=activity", "feed-more", "<strong><a", "</strong><a")):
+        return cur_title
+
+    try:
+        soup = BS(html, "html.parser")
+    except Exception:
+        return cur_title
+
+    target_url = _activity_title_norm_link(url or "")
+    candidates: list[tuple[int, int, str]] = []
+
+    for idx, a in enumerate(soup.find_all("a", href=True)):
+        try:
+            text = _activity_title_norm_space(a.get_text(" ", strip=True))
+        except Exception:
+            text = ""
+        href = str(a.get("href") or "").strip()
+        if not text or not href:
+            continue
+
+        score = 0
+        if _looks_like_generic_activity_link_text(text):
+            score -= 8
+        else:
+            score += 1
+
+        if _looks_like_profile_activity_link(href):
+            score -= 4
+
+        # Prefer explicit story-title wrappers and strong heading-style links.
+        classes = [str(c or "").lower() for c in (a.get("class") or [])]
+        if "feed-story-title" in classes:
+            score += 8
+        if _activity_title_anchor_has_ancestor(a, class_names=("feed-story-title",)):
+            score += 8
+        if _activity_title_anchor_has_ancestor(a, tag_names=("h1", "h2", "h3", "h4", "h5", "h6")):
+            score += 6
+        if _activity_title_anchor_has_ancestor(a, tag_names=("strong",)):
+            score += 5
+        if _activity_title_anchor_has_ancestor(a, class_names=("feed-more",)):
+            score -= 10
+
+        href_norm = _activity_title_norm_link(href)
+        if target_url and href_norm and href_norm == target_url:
+            score += 7
+        elif target_url and href_norm and urllib.parse.urlsplit(href_norm).path == urllib.parse.urlsplit(target_url).path:
+            score += 4
+
+        # Prefer meaningful longer titles over action words.
+        score += min(6, max(0, len(text) // 20))
+
+        candidates.append((score, -idx, text))
+
+    if not candidates:
+        return cur_title
+
+    candidates.sort(reverse=True)
+    best_score, _neg_idx, best_text = candidates[0]
+    if best_score < 6:
+        return cur_title
+    if _looks_like_generic_activity_link_text(best_text):
+        return cur_title
+
+    return best_text or cur_title
 
 # Common timezone abbreviations mapping for dateutil
 TZINFOS = {
