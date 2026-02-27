@@ -14,6 +14,7 @@ from core import playback_state
 from core.casting import CastingManager
 from urllib.parse import urlparse
 from core.range_cache_proxy import get_range_cache_proxy
+from core.stream_proxy import get_proxy as get_stream_proxy
 from core.audio_silence import merge_ranges, merge_ranges_with_gap, scan_audio_for_silence
 from core.dependency_check import _log
 from .hotkeys import HoldRepeatHotkeys
@@ -42,6 +43,17 @@ _SEEKABLE_EXTENSIONS = (
 # Prefer AAC/M4A for broader compatibility with older/bundled VLC builds.
 # Fall back to the previous bestaudio behavior when M4A is unavailable.
 _YTDLP_VLC_AUDIO_FORMAT = "bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio/best"
+
+
+def _is_googlevideo_url(url: str | None) -> bool:
+    try:
+        raw = str(url or "").strip()
+        if not raw:
+            return False
+        host = str(urlparse(raw).hostname or "").strip().lower()
+        return bool(host) and host.endswith("googlevideo.com")
+    except Exception:
+        return False
 
 
 def _is_ytdlp_cookie_load_error(exc_or_msg) -> bool:
@@ -419,6 +431,9 @@ class PlayerFrame(wx.Frame):
         self._last_range_proxy_initial_inline_kb = None
         self._range_proxy_retry_count = 0
         self._range_proxy_last_stall_recover_ts = 0.0
+        self._last_used_stream_proxy = False
+        self._stream_proxy_retry_count = 0
+        self._stream_proxy_last_stall_recover_ts = 0.0
         self._last_load_chapters = None
         self._last_load_title = None
 
@@ -1362,6 +1377,91 @@ class PlayerFrame(wx.Frame):
                 int(cur_ms),
             )
             self._handle_vlc_error()
+        except Exception:
+            pass
+
+    def _maybe_stream_proxy_url(self, url: str, headers: dict | None = None) -> str:
+        try:
+            target = str(url or "").strip()
+            if not target:
+                return target
+            low = target.lower()
+            if not (low.startswith("http://") or low.startswith("https://")):
+                return target
+            host_name = ""
+            try:
+                host_name = str(urlparse(target).hostname or "").strip().lower()
+            except Exception:
+                host_name = ""
+            if host_name in ("127.0.0.1", "localhost"):
+                return target
+
+            proxy = get_stream_proxy()
+            if proxy is None:
+                return target
+            proxied = str(proxy.get_proxied_url(target, headers=dict(headers or {}), device_ip=None) or "").strip()
+            if proxied and proxied != target:
+                self._last_used_stream_proxy = True
+                self._last_used_range_proxy = False
+                self._last_vlc_url = proxied
+                return proxied
+        except Exception as e:
+            log.debug("Local stream proxy fallback unavailable: %s", e)
+        return url
+
+    def _maybe_recover_stalled_direct_playback(self, state, playing_now: bool, cur_ms: int) -> None:
+        """Fallback for direct YouTube media URLs that stall at startup."""
+        try:
+            if self.is_casting:
+                return
+            if bool(getattr(self, "_last_used_range_proxy", False)):
+                return
+            if bool(getattr(self, "_last_used_stream_proxy", False)):
+                return
+            orig_url = str(getattr(self, "_last_orig_url", "") or "").strip()
+            if not _is_googlevideo_url(orig_url):
+                return
+            if bool(playing_now) or int(cur_ms) > 0:
+                return
+            if int(getattr(self, "_stream_proxy_retry_count", 0) or 0) >= 1:
+                return
+            load_started = float(getattr(self, "_load_start_ts", 0.0) or 0.0)
+            if load_started <= 0.0:
+                return
+            now_mono = float(time.monotonic())
+            if (now_mono - load_started) < 6.0:
+                return
+            try:
+                import vlc as _vlc_mod
+                stalled_states = (
+                    _vlc_mod.State.NothingSpecial,
+                    _vlc_mod.State.Opening,
+                    _vlc_mod.State.Buffering,
+                    _vlc_mod.State.Stopped,
+                    _vlc_mod.State.Error,
+                )
+            except Exception:
+                stalled_states = ()
+            if stalled_states and state not in stalled_states:
+                return
+            last_recover = float(getattr(self, "_stream_proxy_last_stall_recover_ts", 0.0) or 0.0)
+            if (now_mono - last_recover) < 6.0:
+                return
+
+            proxied = self._maybe_stream_proxy_url(orig_url, headers=getattr(self, "_last_vlc_http_headers", None))
+            if not proxied or proxied == orig_url:
+                return
+
+            self._stream_proxy_retry_count = 1
+            self._stream_proxy_last_stall_recover_ts = now_mono
+            self._load_start_ts = now_mono
+            log.warning(
+                "Detected stalled direct YouTube playback after %.1fs (state=%s, pos=%sms); retrying via local stream proxy",
+                max(0.0, now_mono - load_started),
+                state,
+                int(cur_ms),
+            )
+            self._load_vlc_url(proxied, http_headers=self._last_vlc_http_headers)
         except Exception:
             pass
 
@@ -2433,6 +2533,7 @@ class PlayerFrame(wx.Frame):
                 return url
             self._last_orig_url = url
             self._last_used_range_proxy = False
+            self._last_used_stream_proxy = False
             self._last_range_proxy_headers = headers or {}
             self._last_range_proxy_cache_dir = None
             self._last_range_proxy_prefetch_kb = None
@@ -2440,6 +2541,7 @@ class PlayerFrame(wx.Frame):
             self._last_range_proxy_initial_inline_kb = None
             self._last_vlc_url = url
             self._range_proxy_retry_count = 0
+            self._stream_proxy_retry_count = 0
             low = url.lower()
             if not (low.startswith('http://') or low.startswith('https://')):
                 return url
@@ -2454,7 +2556,7 @@ class PlayerFrame(wx.Frame):
                 return url
             # YouTube direct media URLs (googlevideo CDN) can be sensitive to
             # proxying in packaged builds; prefer direct VLC playback.
-            if host_name.endswith("googlevideo.com"):
+            if _is_googlevideo_url(url):
                 return url
             # HLS playlists often contain relative segment URLs; proxying them through
             # the range cache breaks resolution and also isn't helpful for caching.
@@ -3347,6 +3449,10 @@ class PlayerFrame(wx.Frame):
             vlc_cur = 0
         if vlc_cur < 0:
             vlc_cur = 0
+        try:
+            self._maybe_recover_stalled_direct_playback(state, bool(playing_now), int(vlc_cur))
+        except Exception:
+            pass
         try:
             self._maybe_recover_stalled_proxy_playback(state, bool(playing_now), int(vlc_cur))
         except Exception:
