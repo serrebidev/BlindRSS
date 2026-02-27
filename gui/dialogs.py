@@ -1010,7 +1010,7 @@ class SettingsDialog(wx.Dialog):
         notifications_panel.SetSizer(notifications_sizer)
         notebook.AddPage(notifications_panel, "Notifications")
 
-        # Translate Tab (automatic article translation via Grok/OpenAI/OpenRouter/Gemini/Qwen)
+        # Translate Tab (automatic article translation via Grok/Groq/OpenAI/OpenRouter/Gemini/Qwen)
         translate_panel = wx.Panel(notebook)
         translate_sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -1029,7 +1029,7 @@ class SettingsDialog(wx.Dialog):
 
         provider_row = wx.BoxSizer(wx.HORIZONTAL)
         provider_row.Add(wx.StaticText(translate_panel, label="Provider:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
-        self.translation_provider_ctrl = wx.Choice(translate_panel, choices=["grok", "openai", "openrouter", "gemini", "qwen"])
+        self.translation_provider_ctrl = wx.Choice(translate_panel, choices=["grok", "groq", "openai", "openrouter", "gemini", "qwen"])
         if not self.translation_provider_ctrl.SetStringSelection(str(config.get("translation_provider", "grok") or "grok")):
             self.translation_provider_ctrl.SetSelection(0)
         provider_row.Add(self.translation_provider_ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -1075,7 +1075,7 @@ class SettingsDialog(wx.Dialog):
 
         model_row = wx.BoxSizer(wx.HORIZONTAL)
         model_row.Add(
-            wx.StaticText(translate_panel, label="Grok model (optional):"),
+            wx.StaticText(translate_panel, label="Grok (xAI) model (optional):"),
             0,
             wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
             8,
@@ -1095,7 +1095,7 @@ class SettingsDialog(wx.Dialog):
         translate_sizer.Add(model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
         self.translation_grok_model_hint_lbl = wx.StaticText(
             translate_panel,
-            label="Pick a common model or type a custom one. Leave blank for auto fallback order.",
+            label="Use xAI Grok models here. For Groq keys/models, select provider 'groq'.",
         )
         translate_sizer.Add(
             self.translation_grok_model_hint_lbl,
@@ -1105,7 +1105,7 @@ class SettingsDialog(wx.Dialog):
         )
 
         api_key_row = wx.BoxSizer(wx.HORIZONTAL)
-        api_key_row.Add(wx.StaticText(translate_panel, label="Grok API key:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        api_key_row.Add(wx.StaticText(translate_panel, label="Grok (xAI) API key:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
         self.translation_grok_api_key_ctrl = wx.TextCtrl(
             translate_panel,
             value=str(config.get("translation_grok_api_key", "") or ""),
@@ -1113,6 +1113,42 @@ class SettingsDialog(wx.Dialog):
         )
         api_key_row.Add(self.translation_grok_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        groq_model_row = wx.BoxSizer(wx.HORIZONTAL)
+        groq_model_row.Add(
+            wx.StaticText(translate_panel, label="Groq model (optional):"),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        groq_model_choices = [
+            str(m)
+            for m in getattr(translation_mod, "_DEFAULT_GROQ_MODEL_CANDIDATES", ())
+            if str(m or "").strip()
+        ]
+        self.translation_groq_model_ctrl = wx.ComboBox(
+            translate_panel,
+            choices=list(dict.fromkeys(groq_model_choices)),
+            style=wx.CB_DROPDOWN,
+        )
+        self.translation_groq_model_ctrl.SetValue(str(config.get("translation_groq_model", "") or ""))
+        groq_model_row.Add(self.translation_groq_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(groq_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        groq_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
+        groq_api_key_row.Add(
+            wx.StaticText(translate_panel, label="Groq API key:"),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        self.translation_groq_api_key_ctrl = wx.TextCtrl(
+            translate_panel,
+            value=str(config.get("translation_groq_api_key", "") or ""),
+            style=wx.TE_PASSWORD,
+        )
+        groq_api_key_row.Add(self.translation_groq_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(groq_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
         openai_model_row = wx.BoxSizer(wx.HORIZONTAL)
         openai_model_row.Add(
@@ -1272,6 +1308,7 @@ class SettingsDialog(wx.Dialog):
         self._translation_layout_sizer = translate_sizer
         self._translation_provider_rows = {
             "grok": [model_row, self.translation_grok_model_hint_lbl, api_key_row],
+            "groq": [groq_model_row, groq_api_key_row],
             "openai": [openai_model_row, openai_api_key_row],
             "openrouter": [openrouter_model_row, openrouter_api_key_row, openrouter_tools_row],
             "gemini": [gemini_model_row, gemini_api_key_row],
@@ -1403,7 +1440,7 @@ class SettingsDialog(wx.Dialog):
             provider = str(self.translation_provider_ctrl.GetStringSelection() or "grok").strip().lower()
         except Exception:
             provider = "grok"
-        if provider not in ("grok", "openai", "openrouter", "gemini", "qwen"):
+        if provider not in ("grok", "groq", "openai", "openrouter", "gemini", "qwen"):
             provider = "grok"
 
         rows_map = getattr(self, "_translation_provider_rows", {}) or {}
@@ -1927,6 +1964,8 @@ class SettingsDialog(wx.Dialog):
             "translation_target_language": self._translation_language_code_from_ui(),
             "translation_grok_model": (self.translation_grok_model_ctrl.GetValue() or "").strip(),
             "translation_grok_api_key": (self.translation_grok_api_key_ctrl.GetValue() or "").strip(),
+            "translation_groq_model": (self.translation_groq_model_ctrl.GetValue() or "").strip(),
+            "translation_groq_api_key": (self.translation_groq_api_key_ctrl.GetValue() or "").strip(),
             "translation_openai_model": (self.translation_openai_model_ctrl.GetValue() or "").strip(),
             "translation_openai_api_key": (self.translation_openai_api_key_ctrl.GetValue() or "").strip(),
             "translation_openrouter_model": (self.translation_openrouter_model_ctrl.GetValue() or "").strip(),

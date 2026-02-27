@@ -1,6 +1,8 @@
 import os
 import sys
 
+import pytest
+
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
@@ -173,3 +175,34 @@ def test_default_grok_model_candidates_include_fast_non_reasoning_variants():
     candidates = tuple(getattr(tr, "_DEFAULT_MODEL_CANDIDATES", ()))
     assert "grok-4-fast-non-reasoning" in candidates
     assert "grok-4-1-fast-non-reasoning" in candidates
+
+
+def test_translate_text_grok_routes_groq_keys_to_groq_endpoint(monkeypatch):
+    seen = {}
+
+    def _fake_post(url, headers=None, json=None, timeout=None):
+        seen["url"] = str(url)
+        seen["auth"] = (headers or {}).get("Authorization")
+        seen["model"] = (json or {}).get("model")
+        return _Resp(
+            200,
+            payload={
+                "choices": [
+                    {"message": {"content": "Hola"}}
+                ]
+            },
+        )
+
+    monkeypatch.setattr(tr.requests, "post", _fake_post)
+
+    out = tr.translate_text_grok(
+        "Hello",
+        api_key="gsk_test_secret",
+        target_language="es",
+        timeout_s=12,
+        chunk_chars=1000,
+    )
+
+    assert out == "Hola"
+    assert str(seen.get("url") or "").startswith("https://api.groq.com/openai/v1/chat/completions")
+    assert seen.get("auth") == "Bearer gsk_test_secret"

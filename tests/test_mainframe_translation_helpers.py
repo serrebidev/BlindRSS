@@ -174,6 +174,40 @@ def test_translation_runtime_config_uses_openrouter_provider_specific_api_key_an
     assert cfg.get("model") == "openrouter/free"
 
 
+def test_translation_runtime_config_uses_groq_provider_specific_api_key_and_model():
+    host = _DummyMain(
+        {
+            "translation_enabled": True,
+            "translation_provider": "groq",
+            "translation_target_language": "it",
+            "translation_groq_model": "llama-3.1-8b-instant",
+            "translation_groq_api_key": "gsk-secret",
+            "translation_grok_api_key": "xai-secret",
+        }
+    )
+    cfg = host._translation_runtime_config()
+    assert isinstance(cfg, dict)
+    assert cfg.get("provider") == "groq"
+    assert cfg.get("api_key") == "gsk-secret"
+    assert cfg.get("model") == "llama-3.1-8b-instant"
+
+
+def test_fulltext_cache_key_includes_groq_model_when_configured():
+    host = _DummyMain(
+        {
+            "translation_enabled": True,
+            "translation_provider": "groq",
+            "translation_target_language": "ru",
+            "translation_groq_model": "llama-3.1-8b-instant",
+            "translation_groq_api_key": "gsk-secret",
+        }
+    )
+    article = SimpleNamespace(url="https://example.com/a", id="a1")
+    cache_key, _url, _aid = host._fulltext_cache_key_for_article(article, 0)
+
+    assert cache_key.endswith("::tr[groq:ru:llama-3.1-8b-instant]")
+
+
 def test_fulltext_cache_key_includes_openrouter_model_when_configured():
     host = _DummyMain(
         {

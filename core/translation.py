@@ -9,6 +9,7 @@ from core import utils
 log = logging.getLogger(__name__)
 
 _XAI_CHAT_COMPLETIONS_URL = "https://api.x.ai/v1/chat/completions"
+_GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 _OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
 _OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 _OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
@@ -45,6 +46,11 @@ _DEFAULT_OPENAI_MODEL_CANDIDATES = (
     "gpt-4.1-mini",
     "gpt-4o-mini",
     "gpt-4.1-nano",
+)
+_DEFAULT_GROQ_MODEL_CANDIDATES = (
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768",
 )
 _DEFAULT_OPENROUTER_MODEL_CANDIDATES = (
     # Start with free routing for zero-cost testing, then fall back to auto routing.
@@ -313,6 +319,11 @@ def _openrouter_extra_headers() -> dict:
     return extra
 
 
+def _looks_like_groq_key(api_key: str | None) -> bool:
+    key = str(api_key or "").strip().lower()
+    return bool(key.startswith("gsk_"))
+
+
 def list_openrouter_models(api_key: str | None = None, timeout_s: int = 20) -> list[str]:
     headers = dict(utils.HEADERS)
     headers["Accept"] = "application/json"
@@ -510,6 +521,17 @@ def _translate_chunk_grok(
     timeout_s: int = _DEFAULT_TIMEOUT_S,
     endpoint: str = _XAI_CHAT_COMPLETIONS_URL,
 ) -> str:
+    if _looks_like_groq_key(api_key):
+        # Compatibility fallback: users often confuse Groq and Grok keys.
+        # If a Groq key is entered while Grok is selected, route it to Groq.
+        return _translate_chunk_groq(
+            chunk,
+            api_key=api_key,
+            target_language=target_language,
+            model=model,
+            model_candidates=model_candidates,
+            timeout_s=timeout_s,
+        )
     return _translate_chunk_chat_completions(
         chunk,
         api_key=api_key,
@@ -520,6 +542,29 @@ def _translate_chunk_grok(
         timeout_s=timeout_s,
         endpoint=endpoint,
         provider_label="Grok",
+    )
+
+
+def _translate_chunk_groq(
+    chunk: str,
+    *,
+    api_key: str,
+    target_language: str,
+    model: str | None = None,
+    model_candidates: Iterable[str] | None = None,
+    timeout_s: int = _DEFAULT_TIMEOUT_S,
+    endpoint: str = _GROQ_CHAT_COMPLETIONS_URL,
+) -> str:
+    return _translate_chunk_chat_completions(
+        chunk,
+        api_key=api_key,
+        target_language=target_language,
+        model=model,
+        model_candidates=model_candidates,
+        default_candidates=_DEFAULT_GROQ_MODEL_CANDIDATES,
+        timeout_s=timeout_s,
+        endpoint=endpoint,
+        provider_label="Groq",
     )
 
 
@@ -764,6 +809,39 @@ def translate_text_openai(
     return "".join(translated_chunks)
 
 
+def translate_text_groq(
+    text: str,
+    *,
+    api_key: str,
+    target_language: str,
+    model: str | None = None,
+    model_candidates: Iterable[str] | None = None,
+    timeout_s: int = _DEFAULT_TIMEOUT_S,
+    chunk_chars: int = _DEFAULT_CHUNK_CHARS,
+    endpoint: str = _GROQ_CHAT_COMPLETIONS_URL,
+) -> str:
+    raw = str(text or "")
+    if not raw.strip():
+        return raw
+    if len(raw) > _MAX_TOTAL_CHARS:
+        raw = raw[:_MAX_TOTAL_CHARS]
+
+    translated_chunks: List[str] = []
+    for chunk in _iter_text_chunks(raw, max_chars=chunk_chars):
+        translated_chunks.append(
+            _translate_chunk_groq(
+                chunk,
+                api_key=api_key,
+                target_language=target_language,
+                model=model,
+                model_candidates=model_candidates,
+                timeout_s=timeout_s,
+                endpoint=endpoint,
+            )
+        )
+    return "".join(translated_chunks)
+
+
 def translate_text_gemini(
     text: str,
     *,
@@ -872,6 +950,7 @@ def translate_text(
     api_key: str,
     target_language: str,
     grok_model: str | None = None,
+    groq_model: str | None = None,
     openai_model: str | None = None,
     openrouter_model: str | None = None,
     gemini_model: str | None = None,
@@ -886,6 +965,15 @@ def translate_text(
             api_key=api_key,
             target_language=target_language,
             model=grok_model,
+            timeout_s=timeout_s,
+            chunk_chars=chunk_chars,
+        )
+    if prov == "groq":
+        return translate_text_groq(
+            text,
+            api_key=api_key,
+            target_language=target_language,
+            model=groq_model,
             timeout_s=timeout_s,
             chunk_chars=chunk_chars,
         )

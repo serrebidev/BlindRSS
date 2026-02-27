@@ -14,6 +14,8 @@ def test_default_sort_and_notification_settings():
     assert str(DEFAULT_CONFIG.get("translation_target_language", "")) == "en"
     assert str(DEFAULT_CONFIG.get("translation_grok_model", "x")) == ""
     assert str(DEFAULT_CONFIG.get("translation_grok_api_key", "x")) == ""
+    assert str(DEFAULT_CONFIG.get("translation_groq_model", "x")) == ""
+    assert str(DEFAULT_CONFIG.get("translation_groq_api_key", "x")) == ""
     assert str(DEFAULT_CONFIG.get("translation_openai_model", "x")) == ""
     assert str(DEFAULT_CONFIG.get("translation_openai_api_key", "x")) == ""
     assert str(DEFAULT_CONFIG.get("translation_openrouter_model", "x")) == ""

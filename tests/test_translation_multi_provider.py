@@ -169,6 +169,69 @@ def test_translate_text_dispatches_to_openai(monkeypatch):
     assert seen["kwargs"]["model"] == "gpt-4o-mini"
 
 
+def test_translate_text_groq_retries_on_missing_model(monkeypatch):
+    calls = []
+
+    def _fake_post(url, headers=None, json=None, timeout=None):
+        calls.append(
+            {
+                "url": url,
+                "auth": (headers or {}).get("Authorization"),
+                "model": (json or {}).get("model"),
+                "timeout": timeout,
+            }
+        )
+        if len(calls) == 1:
+            return _Resp(
+                400,
+                payload={"error": {"message": "model not found"}},
+                text='{"error":{"message":"model not found"}}',
+            )
+        return _Resp(
+            200,
+            payload={
+                "choices": [
+                    {"message": {"content": "Bonjour"}},
+                ]
+            },
+        )
+
+    monkeypatch.setattr(tr.requests, "post", _fake_post)
+
+    out = tr.translate_text_groq(
+        "Hello",
+        api_key="gsk-secret",
+        target_language="fr",
+        model_candidates=["missing-groq-model", "llama-3.1-8b-instant"],
+        timeout_s=9,
+        chunk_chars=1000,
+    )
+    assert out == "Bonjour"
+    assert calls[0]["model"] == "missing-groq-model"
+    assert calls[1]["model"] == "llama-3.1-8b-instant"
+    assert calls[0]["auth"] == "Bearer gsk-secret"
+    assert str(calls[0]["url"] or "").startswith("https://api.groq.com/openai/v1/chat/completions")
+
+
+def test_translate_text_dispatches_to_groq(monkeypatch):
+    seen = {}
+
+    def _fake_translate_text_groq(*args, **kwargs):
+        seen["kwargs"] = dict(kwargs)
+        return "Translated"
+
+    monkeypatch.setattr(tr, "translate_text_groq", _fake_translate_text_groq)
+    out = tr.translate_text(
+        "Hello",
+        provider="groq",
+        api_key="k",
+        target_language="de",
+        groq_model="llama-3.1-8b-instant",
+    )
+    assert out == "Translated"
+    assert seen["kwargs"]["model"] == "llama-3.1-8b-instant"
+
+
 def test_translate_text_dispatches_to_gemini(monkeypatch):
     seen = {}
 
@@ -361,11 +424,13 @@ def test_translate_text_qwen_retries_across_region_endpoints(monkeypatch):
 
 def test_default_provider_model_candidates_include_current_recommended_options():
     openai_candidates = tuple(getattr(tr, "_DEFAULT_OPENAI_MODEL_CANDIDATES", ()))
+    groq_candidates = tuple(getattr(tr, "_DEFAULT_GROQ_MODEL_CANDIDATES", ()))
     openrouter_candidates = tuple(getattr(tr, "_DEFAULT_OPENROUTER_MODEL_CANDIDATES", ()))
     gemini_candidates = tuple(getattr(tr, "_DEFAULT_GEMINI_MODEL_CANDIDATES", ()))
     qwen_candidates = tuple(getattr(tr, "_DEFAULT_QWEN_MODEL_CANDIDATES", ()))
 
     assert "gpt-5-mini" in openai_candidates
+    assert "llama-3.1-8b-instant" in groq_candidates
     assert "openrouter/free" in openrouter_candidates
     assert "gemini-3-flash-preview" in gemini_candidates
     assert "qwen-mt-plus" in qwen_candidates

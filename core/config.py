@@ -96,6 +96,8 @@ DEFAULT_CONFIG = {
     "translation_target_language": "en",
     "translation_grok_model": "",
     "translation_grok_api_key": "",
+    "translation_groq_model": "",
+    "translation_groq_api_key": "",
     "translation_openai_model": "",
     "translation_openai_api_key": "",
     "translation_openrouter_model": "",
