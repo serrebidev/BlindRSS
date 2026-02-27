@@ -2783,6 +2783,10 @@ class YtdlpGlobalSearchDialog(wx.Dialog):
                 self._results_refresh_later.Stop()
         except Exception:
             pass
+        try:
+            self._unregister_player_status_callback()
+        except Exception:
+            pass
         event.Skip()
 
     def on_dialog_char_hook(self, event):
@@ -3834,6 +3838,72 @@ class YtdlpGlobalSearchDialog(wx.Dialog):
         except Exception:
             return None
 
+    def _register_player_status_callback(self, parent, title: str) -> None:
+        """Register a callback so the player status updates this dialog's label."""
+        try:
+            pw = getattr(parent, "player_window", None)
+            if pw is None:
+                return
+            cbs = getattr(pw, "_status_change_callbacks", None)
+            if cbs is None:
+                return
+
+            # Remove any previous callback we registered
+            prev = getattr(self, "_player_status_cb", None)
+            if prev is not None:
+                try:
+                    cbs.remove(prev)
+                except ValueError:
+                    pass
+
+            title_str = str(title or "").strip()
+
+            def _on_player_status(status_text: str) -> None:
+                try:
+                    lbl = getattr(self, "status_lbl", None)
+                    if lbl is None:
+                        return
+                    st = str(status_text or "").strip()
+                    if st.lower() in ("playing",):
+                        lbl.SetLabel(f"Playing: {title_str}" if title_str else "Playing")
+                    elif st.lower() in ("paused",):
+                        lbl.SetLabel(f"Paused: {title_str}" if title_str else "Paused")
+                    elif st.lower() in ("stopped",):
+                        lbl.SetLabel("Ready.")
+                    elif st.lower().startswith("buffering"):
+                        lbl.SetLabel(f"Buffering: {title_str}" if title_str else "Buffering...")
+                    elif st.lower().startswith("connecting"):
+                        lbl.SetLabel(f"Connecting: {title_str}" if title_str else "Connecting...")
+                except Exception:
+                    pass
+
+            self._player_status_cb = _on_player_status
+            cbs.append(_on_player_status)
+        except Exception:
+            pass
+
+    def _unregister_player_status_callback(self) -> None:
+        """Remove our callback from the player, if any."""
+        try:
+            cb = getattr(self, "_player_status_cb", None)
+            if cb is None:
+                return
+            parent = self._get_parent_mainframe()
+            if parent is None:
+                return
+            pw = getattr(parent, "player_window", None)
+            if pw is None:
+                return
+            cbs = getattr(pw, "_status_change_callbacks", None)
+            if cbs is not None:
+                try:
+                    cbs.remove(cb)
+                except ValueError:
+                    pass
+            self._player_status_cb = None
+        except Exception:
+            pass
+
     def on_play_selected(self, event):
         item = self._get_selected_result()
         if not item:
@@ -3854,6 +3924,7 @@ class YtdlpGlobalSearchDialog(wx.Dialog):
                 wx.MessageBox(f"Could not start playback: {e}", "Playback Error", wx.ICON_ERROR)
                 return
             self.status_lbl.SetLabel(f"Playing: {title}")
+            self._register_player_status_callback(parent, title)
         else:
             webbrowser.open(url)
 

@@ -447,6 +447,9 @@ class PlayerFrame(wx.Frame):
         self._last_load_chapters = None
         self._last_load_title = None
 
+        # External status change listeners (e.g. search dialog)
+        self._status_change_callbacks = []
+
         # Silence skip
         self._silence_scan_thread = None
         self._silence_scan_abort = None
@@ -617,6 +620,14 @@ class PlayerFrame(wx.Frame):
             try:
                 self._status_text = new_text
                 self._last_status_update_ts = float(time.monotonic())
+            except Exception:
+                pass
+            try:
+                for cb in list(getattr(self, "_status_change_callbacks", ())):
+                    try:
+                        cb(new_text)
+                    except Exception:
+                        pass
             except Exception:
                 pass
 
@@ -5033,6 +5044,10 @@ class PlayerFrame(wx.Frame):
             self.shutdown()
         except Exception:
             log.exception("Error during player shutdown")
+        try:
+            self._set_status("Stopped")
+        except Exception:
+            pass
         try:
             self.Hide()
         except Exception:
