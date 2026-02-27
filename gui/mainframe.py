@@ -1678,7 +1678,7 @@ class MainFrame(wx.Frame):
         try:
             self._player_chapters_prev_item = submenu.Append(
                 wx.ID_ANY,
-                "Previous Chapter\tCtrl+Shift+Left",
+                "Previous Chapter (Ctrl+Shift+Left)",
                 "Jump to previous chapter",
             )
             self.Bind(wx.EVT_MENU, self.on_player_prev_chapter, self._player_chapters_prev_item)
@@ -1689,7 +1689,7 @@ class MainFrame(wx.Frame):
         try:
             self._player_chapters_next_item = submenu.Append(
                 wx.ID_ANY,
-                "Next Chapter\tCtrl+Shift+Right",
+                "Next Chapter (Ctrl+Shift+Right)",
                 "Jump to next chapter",
             )
             self.Bind(wx.EVT_MENU, self.on_player_next_chapter, self._player_chapters_next_item)
