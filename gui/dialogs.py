@@ -1010,7 +1010,7 @@ class SettingsDialog(wx.Dialog):
         notifications_panel.SetSizer(notifications_sizer)
         notebook.AddPage(notifications_panel, "Notifications")
 
-        # Translate Tab (automatic article translation via Grok/xAI)
+        # Translate Tab (automatic article translation via Grok/OpenAI/Gemini)
         translate_panel = wx.Panel(notebook)
         translate_sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -1029,7 +1029,7 @@ class SettingsDialog(wx.Dialog):
 
         provider_row = wx.BoxSizer(wx.HORIZONTAL)
         provider_row.Add(wx.StaticText(translate_panel, label="Provider:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
-        self.translation_provider_ctrl = wx.Choice(translate_panel, choices=["grok"])
+        self.translation_provider_ctrl = wx.Choice(translate_panel, choices=["grok", "openai", "gemini", "qwen"])
         if not self.translation_provider_ctrl.SetStringSelection(str(config.get("translation_provider", "grok") or "grok")):
             self.translation_provider_ctrl.SetSelection(0)
         provider_row.Add(self.translation_provider_ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
@@ -1093,11 +1093,12 @@ class SettingsDialog(wx.Dialog):
         self.translation_grok_model_ctrl.SetValue(str(config.get("translation_grok_model", "") or ""))
         model_row.Add(self.translation_grok_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+        self.translation_grok_model_hint_lbl = wx.StaticText(
+            translate_panel,
+            label="Pick a common model or type a custom one. Leave blank for auto fallback order.",
+        )
         translate_sizer.Add(
-            wx.StaticText(
-                translate_panel,
-                label="Pick a common model or type a custom one. Leave blank for auto fallback order.",
-            ),
+            self.translation_grok_model_hint_lbl,
             0,
             wx.LEFT | wx.RIGHT | wx.BOTTOM,
             8,
@@ -1112,6 +1113,125 @@ class SettingsDialog(wx.Dialog):
         )
         api_key_row.Add(self.translation_grok_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        openai_model_row = wx.BoxSizer(wx.HORIZONTAL)
+        openai_model_row.Add(
+            wx.StaticText(translate_panel, label="OpenAI model (optional):"),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        openai_model_choices = [
+            str(m)
+            for m in getattr(translation_mod, "_DEFAULT_OPENAI_MODEL_CANDIDATES", ())
+            if str(m or "").strip()
+        ]
+        self.translation_openai_model_ctrl = wx.ComboBox(
+            translate_panel,
+            choices=list(dict.fromkeys(openai_model_choices)),
+            style=wx.CB_DROPDOWN,
+        )
+        self.translation_openai_model_ctrl.SetValue(str(config.get("translation_openai_model", "") or ""))
+        openai_model_row.Add(self.translation_openai_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(openai_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        openai_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
+        openai_api_key_row.Add(
+            wx.StaticText(translate_panel, label="OpenAI API key:"),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        self.translation_openai_api_key_ctrl = wx.TextCtrl(
+            translate_panel,
+            value=str(config.get("translation_openai_api_key", "") or ""),
+            style=wx.TE_PASSWORD,
+        )
+        openai_api_key_row.Add(self.translation_openai_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(openai_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        gemini_model_row = wx.BoxSizer(wx.HORIZONTAL)
+        gemini_model_row.Add(
+            wx.StaticText(translate_panel, label="Gemini model (optional):"),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        gemini_model_choices = [
+            str(m)
+            for m in getattr(translation_mod, "_DEFAULT_GEMINI_MODEL_CANDIDATES", ())
+            if str(m or "").strip()
+        ]
+        self.translation_gemini_model_ctrl = wx.ComboBox(
+            translate_panel,
+            choices=list(dict.fromkeys(gemini_model_choices)),
+            style=wx.CB_DROPDOWN,
+        )
+        self.translation_gemini_model_ctrl.SetValue(str(config.get("translation_gemini_model", "") or ""))
+        gemini_model_row.Add(self.translation_gemini_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(gemini_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        gemini_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
+        gemini_api_key_row.Add(
+            wx.StaticText(translate_panel, label="Gemini API key:"),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        self.translation_gemini_api_key_ctrl = wx.TextCtrl(
+            translate_panel,
+            value=str(config.get("translation_gemini_api_key", "") or ""),
+            style=wx.TE_PASSWORD,
+        )
+        gemini_api_key_row.Add(self.translation_gemini_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(gemini_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        qwen_model_row = wx.BoxSizer(wx.HORIZONTAL)
+        qwen_model_row.Add(
+            wx.StaticText(translate_panel, label="Qwen model (optional):"),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        qwen_model_choices = [
+            str(m)
+            for m in getattr(translation_mod, "_DEFAULT_QWEN_MODEL_CANDIDATES", ())
+            if str(m or "").strip()
+        ]
+        self.translation_qwen_model_ctrl = wx.ComboBox(
+            translate_panel,
+            choices=list(dict.fromkeys(qwen_model_choices)),
+            style=wx.CB_DROPDOWN,
+        )
+        self.translation_qwen_model_ctrl.SetValue(str(config.get("translation_qwen_model", "") or ""))
+        qwen_model_row.Add(self.translation_qwen_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(qwen_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        qwen_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
+        qwen_api_key_row.Add(
+            wx.StaticText(translate_panel, label="Qwen API key:"),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        self.translation_qwen_api_key_ctrl = wx.TextCtrl(
+            translate_panel,
+            value=str(config.get("translation_qwen_api_key", "") or ""),
+            style=wx.TE_PASSWORD,
+        )
+        qwen_api_key_row.Add(self.translation_qwen_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(qwen_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        self._translation_layout_panel = translate_panel
+        self._translation_layout_sizer = translate_sizer
+        self._translation_provider_rows = {
+            "grok": [model_row, self.translation_grok_model_hint_lbl, api_key_row],
+            "openai": [openai_model_row, openai_api_key_row],
+            "gemini": [gemini_model_row, gemini_api_key_row],
+            "qwen": [qwen_model_row, qwen_api_key_row],
+        }
+        self.translation_provider_ctrl.Bind(wx.EVT_CHOICE, self.on_translation_provider_choice)
+        self._update_translation_provider_controls()
 
         translate_panel.SetSizer(translate_sizer)
         notebook.AddPage(translate_panel, "Translate")
@@ -1130,6 +1250,42 @@ class SettingsDialog(wx.Dialog):
 
     def on_provider_choice(self, event):
         self._update_provider_panels()
+
+    def on_translation_provider_choice(self, event):
+        self._update_translation_provider_controls()
+        try:
+            event.Skip()
+        except Exception:
+            pass
+
+    def _update_translation_provider_controls(self):
+        try:
+            provider = str(self.translation_provider_ctrl.GetStringSelection() or "grok").strip().lower()
+        except Exception:
+            provider = "grok"
+        if provider not in ("grok", "openai", "gemini", "qwen"):
+            provider = "grok"
+
+        rows_map = getattr(self, "_translation_provider_rows", {}) or {}
+        layout_sizer = getattr(self, "_translation_layout_sizer", None)
+        layout_panel = getattr(self, "_translation_layout_panel", None)
+        if not layout_sizer:
+            return
+
+        for name, rows in rows_map.items():
+            show = bool(name == provider)
+            for row in (rows or []):
+                try:
+                    layout_sizer.Show(row, show, recursive=True)
+                except Exception:
+                    pass
+
+        try:
+            if layout_panel:
+                layout_panel.Layout()
+                layout_panel.Refresh()
+        except Exception:
+            pass
 
     def _on_toggle_windows_notifications(self, event):
         self._update_notification_controls()
@@ -1631,6 +1787,12 @@ class SettingsDialog(wx.Dialog):
             "translation_target_language": self._translation_language_code_from_ui(),
             "translation_grok_model": (self.translation_grok_model_ctrl.GetValue() or "").strip(),
             "translation_grok_api_key": (self.translation_grok_api_key_ctrl.GetValue() or "").strip(),
+            "translation_openai_model": (self.translation_openai_model_ctrl.GetValue() or "").strip(),
+            "translation_openai_api_key": (self.translation_openai_api_key_ctrl.GetValue() or "").strip(),
+            "translation_gemini_model": (self.translation_gemini_model_ctrl.GetValue() or "").strip(),
+            "translation_gemini_api_key": (self.translation_gemini_api_key_ctrl.GetValue() or "").strip(),
+            "translation_qwen_model": (self.translation_qwen_model_ctrl.GetValue() or "").strip(),
+            "translation_qwen_api_key": (self.translation_qwen_api_key_ctrl.GetValue() or "").strip(),
             "active_provider": self.provider_choice.GetStringSelection(),
             "providers": providers,
         }

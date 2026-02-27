@@ -104,6 +104,58 @@ def test_translate_rendered_text_passes_grok_model(monkeypatch):
     assert seen["kwargs"]["grok_model"] == "grok-3"
 
 
+def test_translation_runtime_config_uses_openai_provider_specific_api_key_and_model():
+    host = _DummyMain(
+        {
+            "translation_enabled": True,
+            "translation_provider": "openai",
+            "translation_target_language": "es",
+            "translation_openai_model": "gpt-4o-mini",
+            "translation_openai_api_key": "openai-secret",
+            "translation_grok_api_key": "grok-secret",
+        }
+    )
+    cfg = host._translation_runtime_config()
+    assert isinstance(cfg, dict)
+    assert cfg.get("provider") == "openai"
+    assert cfg.get("api_key") == "openai-secret"
+    assert cfg.get("model") == "gpt-4o-mini"
+
+
+def test_fulltext_cache_key_includes_openai_model_when_configured():
+    host = _DummyMain(
+        {
+            "translation_enabled": True,
+            "translation_provider": "openai",
+            "translation_target_language": "ru",
+            "translation_openai_model": "gpt-4.1-mini",
+            "translation_openai_api_key": "secret",
+        }
+    )
+    article = SimpleNamespace(url="https://example.com/a", id="a1")
+    cache_key, _url, _aid = host._fulltext_cache_key_for_article(article, 0)
+
+    assert cache_key.endswith("::tr[openai:ru:gpt-4.1-mini]")
+
+
+def test_translation_runtime_config_uses_qwen_provider_specific_api_key_and_model():
+    host = _DummyMain(
+        {
+            "translation_enabled": True,
+            "translation_provider": "qwen",
+            "translation_target_language": "de",
+            "translation_qwen_model": "qwen-plus",
+            "translation_qwen_api_key": "qwen-secret",
+            "translation_openai_api_key": "openai-secret",
+        }
+    )
+    cfg = host._translation_runtime_config()
+    assert isinstance(cfg, dict)
+    assert cfg.get("provider") == "qwen"
+    assert cfg.get("api_key") == "qwen-secret"
+    assert cfg.get("model") == "qwen-plus"
+
+
 def test_should_prefer_feed_fulltext_for_ning_forum_comment_link_is_false():
     host = _DummyMain()
     html = """

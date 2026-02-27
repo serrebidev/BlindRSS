@@ -96,6 +96,12 @@ DEFAULT_CONFIG = {
     "translation_target_language": "en",
     "translation_grok_model": "",
     "translation_grok_api_key": "",
+    "translation_openai_model": "",
+    "translation_openai_api_key": "",
+    "translation_gemini_model": "",
+    "translation_gemini_api_key": "",
+    "translation_qwen_model": "",
+    "translation_qwen_api_key": "",
     "article_sort_by": "date",
     "article_sort_ascending": False,
     "providers": {

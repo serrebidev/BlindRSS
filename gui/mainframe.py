@@ -4125,13 +4125,30 @@ class MainFrame(wx.Frame):
             provider = str(self.config_manager.get("translation_provider", "grok") or "grok").strip().lower()
         except Exception:
             provider = "grok"
-        if not provider:
+        if provider not in ("grok", "openai", "gemini", "qwen"):
             provider = "grok"
 
-        try:
-            api_key = str(self.config_manager.get("translation_grok_api_key", "") or "").strip()
-        except Exception:
-            api_key = ""
+        api_key = ""
+        if provider == "openai":
+            try:
+                api_key = str(self.config_manager.get("translation_openai_api_key", "") or "").strip()
+            except Exception:
+                api_key = ""
+        elif provider == "gemini":
+            try:
+                api_key = str(self.config_manager.get("translation_gemini_api_key", "") or "").strip()
+            except Exception:
+                api_key = ""
+        elif provider == "qwen":
+            try:
+                api_key = str(self.config_manager.get("translation_qwen_api_key", "") or "").strip()
+            except Exception:
+                api_key = ""
+        else:
+            try:
+                api_key = str(self.config_manager.get("translation_grok_api_key", "") or "").strip()
+            except Exception:
+                api_key = ""
         if not api_key:
             return None
 
@@ -4146,6 +4163,28 @@ class MainFrame(wx.Frame):
             grok_model = str(self.config_manager.get("translation_grok_model", "") or "").strip()
         except Exception:
             grok_model = ""
+        try:
+            openai_model = str(self.config_manager.get("translation_openai_model", "") or "").strip()
+        except Exception:
+            openai_model = ""
+        try:
+            gemini_model = str(self.config_manager.get("translation_gemini_model", "") or "").strip()
+        except Exception:
+            gemini_model = ""
+        try:
+            qwen_model = str(self.config_manager.get("translation_qwen_model", "") or "").strip()
+        except Exception:
+            qwen_model = ""
+
+        model = ""
+        if provider == "openai":
+            model = openai_model
+        elif provider == "gemini":
+            model = gemini_model
+        elif provider == "qwen":
+            model = qwen_model
+        else:
+            model = grok_model
 
         try:
             timeout_s = int(self.config_manager.get("translation_timeout_seconds", 45) or 45)
@@ -4163,7 +4202,11 @@ class MainFrame(wx.Frame):
             "provider": provider,
             "api_key": api_key,
             "target_language": target_language,
+            "model": model,
             "grok_model": grok_model,
+            "openai_model": openai_model,
+            "gemini_model": gemini_model,
+            "qwen_model": qwen_model,
             "timeout_s": timeout_s,
             "chunk_chars": chunk_chars,
         }
@@ -4174,7 +4217,7 @@ class MainFrame(wx.Frame):
             return ""
         provider = str(cfg.get("provider") or "grok").strip().lower() or "grok"
         lang = str(cfg.get("target_language") or "en").strip().lower() or "en"
-        model = str(cfg.get("grok_model") or "").strip().lower()
+        model = str(cfg.get("model") or "").strip().lower()
         if model:
             return f"::tr[{provider}:{lang}:{model}]"
         return f"::tr[{provider}:{lang}]"
@@ -4193,6 +4236,9 @@ class MainFrame(wx.Frame):
                 api_key=str(cfg.get("api_key") or ""),
                 target_language=str(cfg.get("target_language") or "en"),
                 grok_model=str(cfg.get("grok_model") or ""),
+                openai_model=str(cfg.get("openai_model") or ""),
+                gemini_model=str(cfg.get("gemini_model") or ""),
+                qwen_model=str(cfg.get("qwen_model") or ""),
                 timeout_s=int(cfg.get("timeout_s") or 45),
                 chunk_chars=int(cfg.get("chunk_chars") or 3500),
             )
