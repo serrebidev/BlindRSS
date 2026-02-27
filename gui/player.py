@@ -8,6 +8,7 @@ import logging
 import webbrowser
 import json
 import subprocess
+import sys
 from core import utils
 from core import discovery
 from core import playback_state
@@ -56,6 +57,13 @@ def _is_googlevideo_url(url: str | None) -> bool:
         return False
 
 
+def _should_force_local_stream_proxy(url: str | None, *, is_frozen: bool) -> bool:
+    try:
+        return bool(is_frozen) and _is_googlevideo_url(url)
+    except Exception:
+        return False
+
+
 def _is_ytdlp_cookie_load_error(exc_or_msg) -> bool:
     text = str(exc_or_msg or "").lower()
     if not text:
@@ -95,6 +103,8 @@ def _extract_ytdlp_info_via_cli(
         "--no-playlist",
         "--format",
         _YTDLP_VLC_AUDIO_FORMAT,
+        "--extractor-args",
+        "youtube:player_client=android_vr,android",
         "--quiet",
         "--no-warnings",
         "--no-progress",
@@ -2758,6 +2768,11 @@ class PlayerFrame(wx.Frame):
                         'logger': ytdlp_logger,
                         'http_headers': ytdlp_headers,
                         'geo_bypass': True,
+                        'extractor_args': {
+                            'youtube': {
+                                'player_client': ['android_vr', 'android'],
+                            }
+                        },
                     }
                     if platform.system().lower() == "windows":
                         # Hide internal yt-dlp subprocess windows (ffmpeg/ffprobe)
@@ -3176,8 +3191,25 @@ class PlayerFrame(wx.Frame):
                 pass
             final_url = self._maybe_range_cache_url(final_url, headers=ytdlp_headers, url_is_resolved=url_is_resolved)
             try:
-                proxied = bool(self._last_used_range_proxy)
-                log.info("VLC URL: %s proxied=%s", final_url, proxied)
+                # Frozen Windows builds can fail on direct HTTPS googlevideo URLs
+                # with certain bundled VLC/libvlc combinations. Route through the
+                # local HTTP stream proxy up-front for these URLs.
+                if _should_force_local_stream_proxy(
+                    final_url,
+                    is_frozen=bool(getattr(sys, "frozen", False)),
+                ):
+                    final_url = self._maybe_stream_proxy_url(final_url, headers=ytdlp_headers)
+            except Exception:
+                pass
+            try:
+                proxied = bool(self._last_used_range_proxy or self._last_used_stream_proxy)
+                log.info(
+                    "VLC URL: %s proxied=%s range_proxy=%s stream_proxy=%s",
+                    final_url,
+                    proxied,
+                    bool(self._last_used_range_proxy),
+                    bool(self._last_used_stream_proxy),
+                )
             except Exception:
                 pass
             self._last_load_chapters = chapters

@@ -9,7 +9,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 pytest.importorskip("wx")
 pytest.importorskip("vlc")
 
-from gui.player import _extract_ytdlp_info_via_cli, _is_googlevideo_url
+from gui.player import _extract_ytdlp_info_via_cli, _is_googlevideo_url, _should_force_local_stream_proxy
 
 
 class _FakeCompletedProcess:
@@ -71,3 +71,17 @@ def test_is_googlevideo_url_true_for_youtube_media_host():
 def test_is_googlevideo_url_false_for_non_googlevideo_hosts():
     assert _is_googlevideo_url("https://www.youtube.com/watch?v=abc123") is False
     assert _is_googlevideo_url("https://example.com/audio.mp3") is False
+
+
+def test_should_force_local_stream_proxy_for_googlevideo_when_frozen():
+    assert _should_force_local_stream_proxy(
+        "https://rr1---sn-uxa0n-t8ge7.googlevideo.com/videoplayback?itag=140",
+        is_frozen=True,
+    ) is True
+
+
+def test_should_not_force_local_stream_proxy_when_not_frozen():
+    assert _should_force_local_stream_proxy(
+        "https://rr1---sn-uxa0n-t8ge7.googlevideo.com/videoplayback?itag=140",
+        is_frozen=False,
+    ) is False
