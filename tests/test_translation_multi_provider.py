@@ -1,6 +1,8 @@
 import os
 import sys
 
+import pytest
+
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
@@ -118,8 +120,34 @@ def test_translate_text_gemini_retries_on_missing_model(monkeypatch):
     assert out == "Hola"
     assert "missing-gemini-model" in calls[0]["url"]
     assert "gemini-2.0-flash" in calls[1]["url"]
+    assert "key=gemini-secret" in calls[0]["url"]
+    assert "key=gemini-secret" in calls[1]["url"]
     assert calls[0]["api_key"] == "gemini-secret"
     assert "Target language: es" in calls[1]["parts"]
+
+
+def test_translate_text_gemini_surfaces_error_detail(monkeypatch):
+    def _fake_post(url, headers=None, json=None, timeout=None):
+        return _Resp(
+            401,
+            payload={"error": {"message": "API key not valid. Please pass a valid API key."}},
+            text='{"error":{"message":"API key not valid. Please pass a valid API key."}}',
+        )
+
+    monkeypatch.setattr(tr.requests, "post", _fake_post)
+
+    with pytest.raises(RuntimeError) as exc:
+        tr.translate_text_gemini(
+            "Hello",
+            api_key="gemini-secret",
+            target_language="es",
+            model="gemini-2.0-flash",
+            timeout_s=7,
+            chunk_chars=1000,
+        )
+
+    msg = str(exc.value)
+    assert "api key not valid" in msg.lower()
 
 
 def test_translate_text_dispatches_to_openai(monkeypatch):

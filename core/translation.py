@@ -1,5 +1,6 @@
 import logging
 from typing import Iterable, List
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import requests
 
@@ -213,6 +214,78 @@ def _resolve_model_candidates(
     return candidates
 
 
+def _append_query_param(url: str, name: str, value: str) -> str:
+    raw_url = str(url or "").strip()
+    if not raw_url or not name:
+        return raw_url
+    parts = urlsplit(raw_url)
+    query_pairs = []
+    try:
+        query_pairs = parse_qsl(parts.query, keep_blank_values=True)
+    except Exception:
+        query_pairs = []
+    key_lower = str(name).lower()
+    query_pairs = [(k, v) for (k, v) in query_pairs if str(k).lower() != key_lower]
+    query_pairs.append((str(name), str(value or "")))
+    new_query = urlencode(query_pairs, doseq=True)
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, new_query, parts.fragment))
+
+
+def _response_error_detail(resp: requests.Response | None) -> str:
+    if resp is None:
+        return ""
+    code = 0
+    try:
+        code = int(getattr(resp, "status_code", 0) or 0)
+    except Exception:
+        code = 0
+
+    msg = ""
+    try:
+        msg = _error_message_text(resp.json())
+    except Exception:
+        msg = ""
+    if not msg:
+        try:
+            msg = str(resp.text or "").strip()
+        except Exception:
+            msg = ""
+    if msg:
+        msg = " ".join(str(msg).split())
+        if len(msg) > 260:
+            msg = msg[:257].rstrip() + "..."
+
+    if code and msg:
+        return f"HTTP {code}: {msg}"
+    if code:
+        return f"HTTP {code}"
+    return msg
+
+
+def _gemini_empty_response_reason(payload: dict) -> str:
+    if not isinstance(payload, dict):
+        return ""
+    try:
+        prompt_feedback = payload.get("promptFeedback")
+    except Exception:
+        prompt_feedback = None
+    detail = _error_message_text(prompt_feedback)
+    if detail:
+        return detail
+    try:
+        candidates = payload.get("candidates") or []
+        first = candidates[0] if candidates else {}
+    except Exception:
+        first = {}
+    detail = _error_message_text(first.get("finishReason"))
+    if detail:
+        return detail
+    detail = _error_message_text(first.get("safetyRatings"))
+    if detail:
+        return detail
+    return ""
+
+
 def _translate_chunk_chat_completions(
     chunk: str,
     *,
@@ -274,10 +347,10 @@ def _translate_chunk_chat_completions(
                 if _retryable_model_error(resp, err_text):
                     last_err = RuntimeError(f"{provider_label} model '{model_name}' unavailable")
                     continue
-                try:
-                    resp.raise_for_status()
-                except Exception as e:
-                    raise RuntimeError(str(e) or "Translation request failed") from e
+                detail = _response_error_detail(resp)
+                if detail:
+                    raise RuntimeError(f"{provider_label} request failed ({detail})")
+                raise RuntimeError(f"{provider_label} request failed")
 
             data = resp.json() if resp is not None else {}
             translated = _extract_chat_completion_text(data)
@@ -398,6 +471,7 @@ def _translate_chunk_gemini(
     for model_name in candidates:
         try:
             endpoint = str(endpoint_template or _GEMINI_GENERATE_CONTENT_URL_TEMPLATE).format(model=model_name)
+            endpoint = _append_query_param(endpoint, "key", api_key)
             resp = requests.post(
                 endpoint,
                 headers=headers,
@@ -423,15 +497,18 @@ def _translate_chunk_gemini(
                 if _retryable_model_error(resp, err_text):
                     last_err = RuntimeError(f"Gemini model '{model_name}' unavailable")
                     continue
-                try:
-                    resp.raise_for_status()
-                except Exception as e:
-                    raise RuntimeError(str(e) or "Translation request failed") from e
+                detail = _response_error_detail(resp)
+                if detail:
+                    raise RuntimeError(f"Gemini request failed ({detail})")
+                raise RuntimeError("Gemini request failed")
 
             data = resp.json() if resp is not None else {}
             translated = _extract_gemini_completion_text(data)
             if translated:
                 return translated
+            empty_reason = _gemini_empty_response_reason(data)
+            if empty_reason:
+                raise RuntimeError(f"Gemini returned an empty translation response ({empty_reason})")
             raise RuntimeError("Gemini returned an empty translation response.")
         except Exception as e:
             last_err = e

@@ -4244,6 +4244,14 @@ class MainFrame(wx.Frame):
             )
         except Exception as e:
             log.warning("Translation failed; showing original text: %s", e)
+            try:
+                msg = " ".join(str(e or "").split()).strip()
+                if msg:
+                    if len(msg) > 180:
+                        msg = msg[:177].rstrip() + "..."
+                    self.SetStatusText(f"Translation failed: {msg}")
+            except Exception:
+                pass
             return text
 
     def _fulltext_prefetch_enabled(self) -> bool:
