@@ -34,6 +34,7 @@ You are a python expert skilled in yt-dlp, ffmpeg, and rss.
     - Serves local/remote media to external devices.
     - Supports header forwarding and HLS remuxing via ffmpeg for compatibility.
   - `article_extractor.py`: Full-text extraction (trafilatura primary, BeautifulSoup fallback), pagination merge, boilerplate cleanup.
+    - Ning handling: avoid pagination-follow on `*.ning.com`; prefer web full-text for forum/topic/article links, and prefer feed fragments only for profile-style activity links.
   - `casting.py`: Unified casting manager for Chromecast, DLNA/UPnP, and AirPlay.
   - `discovery.py`: Feed/media discovery and yt-dlp URL support checks.
     - Supports direct handling/discovery logic for YouTube, Rumble, and Odysee.

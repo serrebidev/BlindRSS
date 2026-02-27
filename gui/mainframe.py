@@ -4196,6 +4196,38 @@ class MainFrame(wx.Frame):
         except Exception:
             return False
 
+    def _should_prefer_feed_fulltext(self, url: str, fallback_html: str) -> bool:
+        if not url or not fallback_html:
+            return False
+        try:
+            parts = urlsplit(url)
+            host = (parts.hostname or "").lower()
+            path = (parts.path or "").lower()
+            query = (parts.query or "").lower()
+        except Exception:
+            return False
+        if not host or not (host == "ning.com" or host.endswith(".ning.com")):
+            return False
+
+        # Ning member/profile activity entries often have no meaningful article page.
+        # Keep the feed fragment for these, but allow full web extraction for real topics/posts.
+        if "/members/" in path or path.startswith("/profile/"):
+            return True
+
+        if "xg_source=activity" in query:
+            if not any(
+                marker in path
+                for marker in (
+                    "/forum/topics/",
+                    "/xn/detail/",
+                    "/profiles/blog/show",
+                    "/blog/",
+                )
+            ):
+                return True
+
+        return False
+
     def _cached_fulltext_is_fallback(self, text: str) -> bool:
         if not text:
             return False
@@ -4545,6 +4577,7 @@ class MainFrame(wx.Frame):
 
             is_web_eligible = bool(url) and not looks_like_media
             render_source = None
+            prefer_feed_first = False
 
             if is_prefetch:
                 # Background prefetch uses provider-side fetch only (avoids hammering sites).
@@ -4567,17 +4600,20 @@ class MainFrame(wx.Frame):
                         if not err: err = str(e) or "Unknown error"
                         rendered = None
             else:
+                if is_web_eligible:
+                    prefer_feed_first = self._should_prefer_feed_fulltext(url, fallback_html)
+
                 # Try web extraction first (no fallback HTML so we can tell if it really worked).
                 if not rendered and is_web_eligible:
                     try:
                         rendered = article_extractor.render_full_article(
                             url,
-                            fallback_html="",
+                            fallback_html=fallback_html if prefer_feed_first else "",
                             fallback_title=fallback_title,
                             fallback_author=fallback_author,
-                            prefer_feed_content=False,
+                            prefer_feed_content=prefer_feed_first,
                         )
-                        render_source = "web"
+                        render_source = "feed_preferred" if prefer_feed_first else "web"
                     except Exception as e:
                         err = str(e) or "Unknown error"
                         rendered = None

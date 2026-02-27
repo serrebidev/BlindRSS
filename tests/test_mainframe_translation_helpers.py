@@ -19,6 +19,7 @@ class _DummyMain:
     _translation_runtime_config = mainframe.MainFrame._translation_runtime_config
     _translation_fulltext_cache_suffix = mainframe.MainFrame._translation_fulltext_cache_suffix
     _fulltext_cache_key_for_article = mainframe.MainFrame._fulltext_cache_key_for_article
+    _should_prefer_feed_fulltext = mainframe.MainFrame._should_prefer_feed_fulltext
     _translate_rendered_text_if_enabled = mainframe.MainFrame._translate_rendered_text_if_enabled
 
     def __init__(self, config_values=None):
@@ -101,3 +102,32 @@ def test_translate_rendered_text_passes_grok_model(monkeypatch):
     assert out == "Translated content"
     assert seen["text"] == "Original content"
     assert seen["kwargs"]["grok_model"] == "grok-3"
+
+
+def test_should_prefer_feed_fulltext_for_ning_forum_comment_link_is_false():
+    host = _DummyMain()
+    html = """
+    <div><a href="https://creators.ning.com/members/ScottBishop">Scott Bishop</a>
+    <a href="https://creators.ning.com/forum/topics/foo?commentId=6651893%3AComment%3A2107942">replied</a>
+    to <a href="https://creators.ning.com/members/Alex">Alex</a>'s discussion</div>
+    <div><div>Reply excerpt text.</div></div>
+    """
+    assert host._should_prefer_feed_fulltext(
+        "https://creators.ning.com/forum/topics/foo?commentId=6651893%3AComment%3A2107942",
+        html,
+    ) is False
+
+
+def test_should_prefer_feed_fulltext_for_ning_profile_link_is_true():
+    host = _DummyMain()
+    html = "<div>Kathleen (SunKat) updated their <a href='https://creators.ning.com/members/Kathleen_aka_SunKat'>profile</a></div>"
+    assert host._should_prefer_feed_fulltext(
+        "https://creators.ning.com/members/Kathleen_aka_SunKat",
+        html,
+    ) is True
+
+
+def test_should_prefer_feed_fulltext_ignores_placeholder_content():
+    host = _DummyMain()
+    html = "unable to retrieve full-text content" + ("x" * 4000)
+    assert host._should_prefer_feed_fulltext("https://www.techrepublic.com/article/test/", html) is False

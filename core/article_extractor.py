@@ -893,6 +893,10 @@ def _find_next_page(html: str, base_url: str) -> Optional[str]:
             host = urlsplit(base_url).hostname
             if host and (host == "wired.com" or host.endswith(".wired.com")):
                 return None
+            if host and (host == "ning.com" or host.endswith(".ning.com")):
+                # Ning "next/older" controls frequently navigate activity/thread listings
+                # rather than paginated continuation of a single article.
+                return None
         except Exception:
             pass
 

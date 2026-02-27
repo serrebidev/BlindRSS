@@ -57,5 +57,20 @@ class TestExtractionOptimizations(unittest.TestCase):
         next_url = article_extractor._find_next_page(html_story, "https://example.com/story")
         self.assertIsNone(next_url)
 
+    def test_ning_pagination_prevention(self):
+        html = """
+        <html>
+        <body>
+            <a href="/forum/topics/another-topic" class="next">Next</a>
+            <a href="/activity/log/list" class="older">Older</a>
+        </body>
+        </html>
+        """
+        next_url = article_extractor._find_next_page(
+            html,
+            "https://creators.ning.com/forum/topics/current-topic",
+        )
+        self.assertIsNone(next_url)
+
 if __name__ == '__main__':
     unittest.main()
