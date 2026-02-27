@@ -15,7 +15,9 @@ except Exception:  # pragma: no cover - non-Windows envs
 log = logging.getLogger(__name__)
 
 APP_NAME = "BlindRSS"
+APP_USER_MODEL_ID = "BlindRSS.App"
 _RUN_KEY = r"Software\Microsoft\Windows\CurrentVersion\Run"
+_AUMID_KEY_ROOT = r"Software\Classes\AppUserModelId"
 
 
 def is_windows() -> bool:
@@ -82,6 +84,103 @@ def set_startup_enabled(enabled: bool, app_name: str = APP_NAME) -> tuple[bool, 
     except Exception as e:
         log.exception("Failed to update Windows startup setting")
         return False, f"Could not update Windows startup setting: {e}"
+
+
+def _start_menu_programs_dir() -> str:
+    return os.path.join(os.path.expandvars("%APPDATA%"), "Microsoft", "Windows", "Start Menu", "Programs")
+
+
+def get_start_menu_shortcut_path(app_name: str = APP_NAME) -> str:
+    resolved_name = str(app_name or APP_NAME).strip() or APP_NAME
+    return os.path.join(_start_menu_programs_dir(), f"{resolved_name}.lnk")
+
+
+def set_process_app_user_model_id(app_user_model_id: str = APP_USER_MODEL_ID) -> tuple[bool, str]:
+    if not is_windows():
+        return False, "AppUserModelID is only available on Windows."
+
+    app_id = str(app_user_model_id or "").strip()
+    if not app_id:
+        return False, "AppUserModelID cannot be empty."
+
+    try:
+        import ctypes
+
+        fn = ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID
+        fn.argtypes = [ctypes.c_wchar_p]
+        fn.restype = ctypes.c_long
+        hr = int(fn(str(app_id)))
+        if hr != 0:
+            return False, f"SetCurrentProcessExplicitAppUserModelID failed (HRESULT 0x{(hr & 0xFFFFFFFF):08X})."
+        return True, f"Process AppUserModelID set: {app_id}"
+    except Exception as e:
+        log.exception("Failed to set process AppUserModelID")
+        return False, f"Could not set process AppUserModelID: {e}"
+
+
+def register_app_user_model_id(
+    app_user_model_id: str = APP_USER_MODEL_ID,
+    app_name: str = APP_NAME,
+) -> tuple[bool, str]:
+    if not is_windows() or winreg is None:
+        return False, "AppUserModelID registration is only available on Windows."
+
+    app_id = str(app_user_model_id or "").strip()
+    if not app_id:
+        return False, "AppUserModelID cannot be empty."
+
+    try:
+        key_path = rf"{_AUMID_KEY_ROOT}\{app_id}"
+        with winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path) as key:
+            winreg.SetValueEx(key, "DisplayName", 0, winreg.REG_SZ, str(app_name or APP_NAME))
+            try:
+                _target, _args, _working_dir, icon_path = get_launch_parts()
+                if icon_path:
+                    winreg.SetValueEx(key, "IconUri", 0, winreg.REG_SZ, str(icon_path))
+            except Exception:
+                pass
+        return True, f"Registered AppUserModelID: {app_id}"
+    except Exception as e:
+        log.exception("Failed to register AppUserModelID")
+        return False, f"Could not register AppUserModelID: {e}"
+
+
+def ensure_notification_prerequisites(
+    *,
+    app_name: str = APP_NAME,
+    app_user_model_id: str = APP_USER_MODEL_ID,
+    ensure_start_menu_shortcut: bool = True,
+) -> tuple[bool, str]:
+    if not is_windows():
+        return False, "Notification prerequisites are only available on Windows."
+
+    messages: list[str] = []
+    ok_all = True
+
+    ok_appid, msg_appid = set_process_app_user_model_id(app_user_model_id)
+    messages.append(msg_appid)
+    if not ok_appid:
+        ok_all = False
+
+    ok_reg, msg_reg = register_app_user_model_id(app_user_model_id=app_user_model_id, app_name=app_name)
+    messages.append(msg_reg)
+    if not ok_reg:
+        ok_all = False
+
+    if ensure_start_menu_shortcut:
+        start_lnk = get_start_menu_shortcut_path(app_name=app_name)
+        if os.path.exists(start_lnk):
+            messages.append(f"Start Menu shortcut already exists: {start_lnk}")
+        else:
+            target, args, working_dir, icon_path = get_launch_parts()
+            made, msg = _create_shortcut(start_lnk, target, args, working_dir, icon_path)
+            if made:
+                messages.append(f"Start Menu shortcut created: {start_lnk}")
+            else:
+                ok_all = False
+                messages.append(f"Start Menu shortcut creation failed: {msg}")
+
+    return ok_all, " | ".join([m for m in messages if m])
 
 
 def _run_powershell(script: str, timeout_s: int = 30) -> tuple[bool, str]:
@@ -233,8 +332,7 @@ def create_shortcuts(
         results["desktop"] = _create_shortcut(desktop_lnk, target, args, working_dir, icon_path)
 
     if start_menu:
-        start_dir = os.path.join(os.path.expandvars("%APPDATA%"), "Microsoft", "Windows", "Start Menu", "Programs")
-        start_lnk = os.path.join(start_dir, lnk_name)
+        start_lnk = get_start_menu_shortcut_path(app_name=app_name)
         results["start_menu"] = _create_shortcut(start_lnk, target, args, working_dir, icon_path)
 
     if taskbar:

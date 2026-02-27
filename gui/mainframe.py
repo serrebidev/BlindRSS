@@ -5913,6 +5913,22 @@ class MainFrame(wx.Frame):
                         pass
                     wx.MessageBox(msg or "Could not update startup registration.", "Settings", wx.ICON_WARNING)
 
+            if sys.platform.startswith("win"):
+                try:
+                    notifications_enabled = bool(self.config_manager.get("windows_notifications_enabled", False))
+                except Exception:
+                    notifications_enabled = False
+                if notifications_enabled:
+                    ok, msg = windows_integration.ensure_notification_prerequisites(
+                        ensure_start_menu_shortcut=True
+                    )
+                    if not ok:
+                        wx.MessageBox(
+                            msg or "Windows notification prerequisites could not be fully configured.",
+                            "Notifications",
+                            wx.ICON_WARNING,
+                        )
+
             try:
                 new_cache_full_text = bool(self.config_manager.get("cache_full_text", False))
             except Exception:

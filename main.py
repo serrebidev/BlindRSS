@@ -46,6 +46,7 @@ import wx
 from core.config import ConfigManager
 from core.factory import get_provider
 from core import updater as app_updater
+from core import windows_integration
 from gui.mainframe import MainFrame
 from core.stream_proxy import get_proxy
 from core.range_cache_proxy import get_range_cache_proxy
@@ -119,6 +120,15 @@ class RSSApp(wx.App):
 
         self.config_manager = ConfigManager()
         _enable_debug_console(self.config_manager)
+        if sys.platform.startswith("win"):
+            try:
+                ok, msg = windows_integration.ensure_notification_prerequisites(
+                    ensure_start_menu_shortcut=True
+                )
+                if not ok:
+                    log.warning("Windows notification prerequisites are incomplete: %s", msg)
+            except Exception:
+                log.exception("Failed to enforce Windows notification prerequisites")
         try:
             app_updater.cleanup_update_artifacts()
         except Exception as e:
