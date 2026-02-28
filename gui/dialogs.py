@@ -1027,10 +1027,26 @@ class SettingsDialog(wx.Dialog):
         self.translation_enabled_chk.SetValue(bool(config.get("translation_enabled", False)))
         translate_sizer.Add(self.translation_enabled_chk, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
+        # Display name → internal config key mapping for translation providers.
+        self._translation_provider_display_to_key = {
+            "Grok (xAI)": "grok",
+            "Groq (LLaMA, Mistral)": "groq",
+            "OpenAI (GPT)": "openai",
+            "OpenRouter": "openrouter",
+            "Gemini (Google)": "gemini",
+            "Qwen (Alibaba)": "qwen",
+        }
+        self._translation_provider_key_to_display = {
+            v: k for k, v in self._translation_provider_display_to_key.items()
+        }
+        _provider_display_names = list(self._translation_provider_display_to_key.keys())
+
         provider_row = wx.BoxSizer(wx.HORIZONTAL)
         provider_row.Add(wx.StaticText(translate_panel, label="Provider:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
-        self.translation_provider_ctrl = wx.Choice(translate_panel, choices=["grok", "groq", "openai", "openrouter", "gemini", "qwen"])
-        if not self.translation_provider_ctrl.SetStringSelection(str(config.get("translation_provider", "grok") or "grok")):
+        self.translation_provider_ctrl = wx.Choice(translate_panel, choices=_provider_display_names)
+        _saved_provider = str(config.get("translation_provider", "grok") or "grok").strip().lower()
+        _saved_display = self._translation_provider_key_to_display.get(_saved_provider, _provider_display_names[0])
+        if not self.translation_provider_ctrl.SetStringSelection(_saved_display):
             self.translation_provider_ctrl.SetSelection(0)
         provider_row.Add(self.translation_provider_ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(provider_row, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
@@ -1095,7 +1111,7 @@ class SettingsDialog(wx.Dialog):
         translate_sizer.Add(model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
         self.translation_grok_model_hint_lbl = wx.StaticText(
             translate_panel,
-            label="Use xAI Grok models here. For Groq keys/models, select provider 'groq'.",
+            label="Grok is by xAI. Get a key at console.x.ai. For Groq (LLaMA/Mistral), select 'Groq (LLaMA, Mistral)' instead.",
         )
         translate_sizer.Add(
             self.translation_grok_model_hint_lbl,
@@ -1105,7 +1121,7 @@ class SettingsDialog(wx.Dialog):
         )
 
         api_key_row = wx.BoxSizer(wx.HORIZONTAL)
-        api_key_row.Add(wx.StaticText(translate_panel, label="Grok (xAI) API key:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        api_key_row.Add(wx.StaticText(translate_panel, label="Grok (xAI) API key (starts with xai-):"), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
         self.translation_grok_api_key_ctrl = wx.TextCtrl(
             translate_panel,
             value=str(config.get("translation_grok_api_key", "") or ""),
@@ -1116,7 +1132,7 @@ class SettingsDialog(wx.Dialog):
 
         groq_model_row = wx.BoxSizer(wx.HORIZONTAL)
         groq_model_row.Add(
-            wx.StaticText(translate_panel, label="Groq model (optional):"),
+            wx.StaticText(translate_panel, label="Groq model (optional) - hosts LLaMA and Mistral:"),
             0,
             wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
             8,
@@ -1137,7 +1153,7 @@ class SettingsDialog(wx.Dialog):
 
         groq_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
         groq_api_key_row.Add(
-            wx.StaticText(translate_panel, label="Groq API key:"),
+            wx.StaticText(translate_panel, label="Groq API key (starts with gsk_):"),
             0,
             wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
             8,
@@ -1149,6 +1165,16 @@ class SettingsDialog(wx.Dialog):
         )
         groq_api_key_row.Add(self.translation_groq_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(groq_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+        self.translation_groq_hint_lbl = wx.StaticText(
+            translate_panel,
+            label="Groq is NOT Grok. Get a free Groq key at console.groq.com/keys (runs LLaMA and Mistral models).",
+        )
+        translate_sizer.Add(
+            self.translation_groq_hint_lbl,
+            0,
+            wx.LEFT | wx.RIGHT | wx.BOTTOM,
+            8,
+        )
 
         openai_model_row = wx.BoxSizer(wx.HORIZONTAL)
         openai_model_row.Add(
@@ -1308,7 +1334,7 @@ class SettingsDialog(wx.Dialog):
         self._translation_layout_sizer = translate_sizer
         self._translation_provider_rows = {
             "grok": [model_row, self.translation_grok_model_hint_lbl, api_key_row],
-            "groq": [groq_model_row, groq_api_key_row],
+            "groq": [groq_model_row, groq_api_key_row, self.translation_groq_hint_lbl],
             "openai": [openai_model_row, openai_api_key_row],
             "openrouter": [openrouter_model_row, openrouter_api_key_row, openrouter_tools_row],
             "gemini": [gemini_model_row, gemini_api_key_row],
@@ -1435,13 +1461,20 @@ class SettingsDialog(wx.Dialog):
         except Exception:
             pass
 
-    def _update_translation_provider_controls(self):
+    def _translation_provider_key_from_ui(self) -> str:
+        """Return the internal provider key (e.g. 'grok') from the UI display name."""
         try:
-            provider = str(self.translation_provider_ctrl.GetStringSelection() or "grok").strip().lower()
+            display = str(self.translation_provider_ctrl.GetStringSelection() or "").strip()
         except Exception:
-            provider = "grok"
+            display = ""
+        mapping = getattr(self, "_translation_provider_display_to_key", {}) or {}
+        provider = mapping.get(display, display.lower())
         if provider not in ("grok", "groq", "openai", "openrouter", "gemini", "qwen"):
             provider = "grok"
+        return provider
+
+    def _update_translation_provider_controls(self):
+        provider = self._translation_provider_key_from_ui()
 
         rows_map = getattr(self, "_translation_provider_rows", {}) or {}
         layout_sizer = getattr(self, "_translation_layout_sizer", None)
@@ -1960,7 +1993,7 @@ class SettingsDialog(wx.Dialog):
             "windows_notifications_show_summary_when_capped": self.windows_notifications_summary_chk.GetValue(),
             "windows_notifications_excluded_feeds": sorted(self._notification_excluded_feed_ids),
             "translation_enabled": self.translation_enabled_chk.GetValue(),
-            "translation_provider": self.translation_provider_ctrl.GetStringSelection() or "grok",
+            "translation_provider": self._translation_provider_key_from_ui(),
             "translation_target_language": self._translation_language_code_from_ui(),
             "translation_grok_model": (self.translation_grok_model_ctrl.GetValue() or "").strip(),
             "translation_grok_api_key": (self.translation_grok_api_key_ctrl.GetValue() or "").strip(),
