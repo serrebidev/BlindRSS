@@ -22,9 +22,9 @@ DEFAULT_CONFIG = {
     "auto_download_podcasts": False,
     "auto_download_period": "unlimited",
     "refresh_interval": 300,  # seconds
-    # Keep refresh concurrency conservative to avoid starving the GUI thread on large feed lists.
-    "max_concurrent_refreshes": 10,
-    "per_host_max_connections": 4,
+    # Keep refresh concurrency low by default so older CPUs remain responsive during refresh.
+    "max_concurrent_refreshes": 3,
+    "per_host_max_connections": 1,
     "feed_timeout_seconds": 15,
     "feed_retry_attempts": 5,
     "playback_resolve_timeout_s": 4.0,
@@ -208,6 +208,21 @@ class ConfigManager:
                 changed = True
         except (TypeError, ValueError):
             log.warning("Could not migrate 'resume_min_ms' due to invalid value in config.json; leaving it as is.")
+
+        # v1.63.x: lower refresh concurrency defaults to reduce lag on older hardware.
+        # Only migrate when both values still match the previous untouched defaults.
+        try:
+            max_concurrent = cfg.get("max_concurrent_refreshes", None)
+            per_host = cfg.get("per_host_max_connections", None)
+            if max_concurrent is not None and per_host is not None:
+                if int(max_concurrent) == 10 and int(per_host) == 4:
+                    cfg["max_concurrent_refreshes"] = int(DEFAULT_CONFIG["max_concurrent_refreshes"])
+                    cfg["per_host_max_connections"] = int(DEFAULT_CONFIG["per_host_max_connections"])
+                    changed = True
+        except (TypeError, ValueError):
+            log.warning(
+                "Could not migrate refresh concurrency defaults due to invalid values in config.json; leaving them as is."
+            )
 
         return bool(changed)
 

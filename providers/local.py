@@ -26,11 +26,11 @@ warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
 
 log = logging.getLogger(__name__)
 
-_REFRESH_WORKERS_MIN_CAP = 4
-_REFRESH_WORKERS_MAX_CAP = 16
-_REFRESH_WORKERS_PER_CPU_MULTIPLIER = 2
-_REFRESH_PER_HOST_MIN_CAP = 2
-_REFRESH_PER_HOST_MAX_CAP = 8
+_REFRESH_WORKERS_CPU_1_2 = 1
+_REFRESH_WORKERS_CPU_3_4 = 2
+_REFRESH_WORKERS_CPU_5_PLUS = 3
+_REFRESH_PER_HOST_LOW_CPU = 1
+_REFRESH_PER_HOST_NORMAL = 2
 
 _REMOVE_FEED_BUSY_TIMEOUT_MS = 5000
 
@@ -73,6 +73,28 @@ def _rollback_and_abort_on_foreign_key(conn: sqlite3.Connection, error: Exceptio
     except Exception:
         pass
     return True
+
+
+def _adaptive_refresh_worker_cap(cpu_count: Optional[int] = None) -> int:
+    cpu = max(1, int(cpu_count if cpu_count is not None else (os.cpu_count() or 1)))
+    if cpu <= 2:
+        return _REFRESH_WORKERS_CPU_1_2
+    if cpu <= 4:
+        return _REFRESH_WORKERS_CPU_3_4
+    return _REFRESH_WORKERS_CPU_5_PLUS
+
+
+def _compute_refresh_limits(
+    configured_workers: int,
+    configured_per_host: int,
+    feed_count: int,
+    cpu_count: Optional[int] = None,
+) -> Tuple[int, int, int]:
+    adaptive_cap = _adaptive_refresh_worker_cap(cpu_count)
+    max_workers = max(1, min(int(configured_workers), adaptive_cap, max(1, int(feed_count))))
+    per_host_cap = _REFRESH_PER_HOST_LOW_CPU if adaptive_cap <= 2 else _REFRESH_PER_HOST_NORMAL
+    per_host_limit = max(1, min(int(configured_per_host), per_host_cap, max_workers))
+    return max_workers, per_host_limit, adaptive_cap
 
 
 class LocalProvider(RSSProvider):
@@ -129,23 +151,30 @@ class LocalProvider(RSSProvider):
         configured_workers = max(1, int(self.config.get("max_concurrent_refreshes", 5) or 1))
         configured_per_host = max(1, int(self.config.get("per_host_max_connections", 3) or 1))
 
-        # Refresh is a mix of network I/O and CPU-heavy parsing (feedparser/BeautifulSoup).
-        # Unbounded concurrency quickly starves the GUI thread due to GIL contention and DB churn.
-        cpu_count = os.cpu_count() or 4
-        hard_workers_cap = max(
-            _REFRESH_WORKERS_MIN_CAP,
-            min(_REFRESH_WORKERS_MAX_CAP, int(cpu_count) * _REFRESH_WORKERS_PER_CPU_MULTIPLIER),
+        cpu_count = max(1, int(os.cpu_count() or 1))
+        max_workers, per_host_limit, adaptive_cap = _compute_refresh_limits(
+            configured_workers,
+            configured_per_host,
+            len(feeds),
+            cpu_count=cpu_count,
         )
-        max_workers = min(configured_workers, hard_workers_cap, len(feeds))
-
-        # Per-host concurrency beyond a small number rarely helps and can trigger rate limiting.
-        hard_per_host_cap = max(_REFRESH_PER_HOST_MIN_CAP, min(_REFRESH_PER_HOST_MAX_CAP, max_workers))
-        per_host_limit = min(configured_per_host, hard_per_host_cap)
 
         if configured_workers != max_workers:
-            log.info("Clamping max_concurrent_refreshes from %s to %s for responsiveness", configured_workers, max_workers)
+            log.info(
+                "Clamping max_concurrent_refreshes from %s to %s for responsiveness (cpu=%s, adaptive_cap=%s)",
+                configured_workers,
+                max_workers,
+                cpu_count,
+                adaptive_cap,
+            )
         if configured_per_host != per_host_limit:
-            log.info("Clamping per_host_max_connections from %s to %s", configured_per_host, per_host_limit)
+            log.info(
+                "Clamping per_host_max_connections from %s to %s (cpu=%s, adaptive_cap=%s)",
+                configured_per_host,
+                per_host_limit,
+                cpu_count,
+                adaptive_cap,
+            )
         feed_timeout = max(1, int(self.config.get("feed_timeout_seconds", 15) or 15))
         retries = max(0, int(self.config.get("feed_retry_attempts", 1) or 0))
 
@@ -556,32 +585,39 @@ class LocalProvider(RSSProvider):
                 except Exception:
                     pass
             
-            # Build chapter map
+            # Build chapter map only when the feed payload hints chapter tags exist.
+            # Most feeds have no embedded chapter pointers; skipping a second full XML parse saves CPU.
             chapter_map = {}
-            try:
-                # Prefer XML parser if available (lxml), otherwise fall back to built-in HTML parser
+            xml_text_l = str(xml_text or "").lower()
+            has_embedded_chapter_tags = any(
+                marker in xml_text_l
+                for marker in ("podcast:chapters", "psc:chapters", "<chapters")
+            )
+            if has_embedded_chapter_tags:
                 try:
-                    soup = BS(xml_text, "xml")
-                except Exception as parser_exc:
-                    log.debug(f"XML parser unavailable for chapter map on {feed_url}; falling back to html.parser ({parser_exc})")
-                    soup = BS(xml_text, "html.parser")
+                    # Prefer XML parser if available (lxml), otherwise fall back to built-in HTML parser
+                    try:
+                        soup = BS(xml_text, "xml")
+                    except Exception as parser_exc:
+                        log.debug(f"XML parser unavailable for chapter map on {feed_url}; falling back to html.parser ({parser_exc})")
+                        soup = BS(xml_text, "html.parser")
 
-                for item in soup.find_all("item"):
-                    chap = item.find(["podcast:chapters", "psc:chapters", "chapters"])
-                    if chap:
-                        chap_url = chap.get("url") or chap.get("href") or chap.get("src") or chap.get("link")
-                        if chap_url:
-                            guid = item.find("guid")
-                            link = item.find("link")
-                            key = None
-                            if guid and guid.text:
-                                key = guid.text.strip()
-                            elif link and link.text:
-                                key = link.text.strip()
-                            if key:
-                                chapter_map[key] = chap_url
-            except Exception as e:
-                log.warning(f"Chapter map build failed for {feed_url}: {e}")
+                    for item in soup.find_all("item"):
+                        chap = item.find(["podcast:chapters", "psc:chapters", "chapters"])
+                        if chap:
+                            chap_url = chap.get("url") or chap.get("href") or chap.get("src") or chap.get("link")
+                            if chap_url:
+                                guid = item.find("guid")
+                                link = item.find("link")
+                                key = None
+                                if guid and guid.text:
+                                    key = guid.text.strip()
+                                elif link and link.text:
+                                    key = link.text.strip()
+                                if key:
+                                    chapter_map[key] = chap_url
+                except Exception as e:
+                    log.warning(f"Chapter map build failed for {feed_url}: {e}")
 
             conn = get_connection()
             try:
@@ -604,8 +640,12 @@ class LocalProvider(RSSProvider):
                 entry_ids = []
                 for entry in d.entries:
                     base_id = entry.get('id') or entry.get('link')
-                    if base_id:
-                        entry_ids.append(base_id)
+                    if not base_id:
+                        continue
+                    scoped_id = f"{feed_id}:{base_id}"
+                    if base_id in existing_articles or scoped_id in existing_articles:
+                        continue
+                    entry_ids.append(base_id)
                 entry_ids = list(dict.fromkeys(entry_ids))
                 conflicting_ids = set()
                 if entry_ids:
@@ -826,7 +866,15 @@ class LocalProvider(RSSProvider):
                         if key and key in chapter_map:
                             chapter_url = chapter_map[key]
 
-                    utils.fetch_and_store_chapters(article_id, media_url, media_type, chapter_url, allow_id3=False, cursor=c)
+                    if chapter_url:
+                        utils.fetch_and_store_chapters(
+                            article_id,
+                            media_url,
+                            media_type,
+                            chapter_url,
+                            allow_id3=False,
+                            cursor=c,
+                        )
 
                 # Commit once at the end
                 conn.commit()

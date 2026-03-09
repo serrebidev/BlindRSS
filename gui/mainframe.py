@@ -5818,17 +5818,98 @@ class MainFrame(wx.Frame):
             threading.Thread(target=self._import_opml_thread, args=(path, target_category), daemon=True).start()
         dlg.Destroy()
 
-    def _import_opml_thread(self, path, target_category):
+    def _snapshot_feed_ids(self) -> set[str]:
         try:
-            success = self.provider.import_opml(path, target_category)
-            wx.CallAfter(self._post_import_opml, success)
+            feeds = list(self.provider.get_feeds() or [])
+        except Exception:
+            return set()
+        out = set()
+        for feed in feeds:
+            fid = str(getattr(feed, "id", "") or "").strip()
+            if fid:
+                out.add(fid)
+        return out
+
+    def _import_opml_thread(self, path, target_category):
+        success = False
+        new_feed_ids: list[str] = []
+        try:
+            before_ids = self._snapshot_feed_ids()
+            success = bool(self.provider.import_opml(path, target_category))
+            after_ids = self._snapshot_feed_ids()
+            if success and after_ids:
+                new_feed_ids = sorted(fid for fid in after_ids if fid not in before_ids)
         except Exception as e:
             import traceback
             traceback.print_exc()
+            log.exception("OPML import failed for path=%s: %s", path, e)
+            success = False
+            new_feed_ids = []
+        wx.CallAfter(self._post_import_opml, success, new_feed_ids)
 
-    def _post_import_opml(self, success):
+    def _refresh_imported_feed_ids_thread(self, feed_ids: list[str]) -> None:
+        if not feed_ids:
+            return
+        refresh_one = getattr(self.provider, "refresh_feed", None)
+        if not callable(refresh_one):
+            return
+
+        ordered_ids: list[str] = []
+        seen = set()
+        for raw_id in feed_ids:
+            fid = str(raw_id or "").strip()
+            if not fid or fid in seen:
+                continue
+            seen.add(fid)
+            ordered_ids.append(fid)
+        if not ordered_ids:
+            return
+
+        acquired = False
+        try:
+            acquired = self._refresh_guard.acquire(blocking=True)
+        except Exception:
+            acquired = False
+        if not acquired:
+            return
+
+        try:
+            def progress_cb(state):
+                self._on_feed_refresh_progress(state)
+
+            for feed_id in ordered_ids:
+                try:
+                    refresh_one(feed_id, progress_cb=progress_cb)
+                except Exception:
+                    log.exception("Failed OPML post-import refresh for feed %s", feed_id)
+        finally:
+            try:
+                self._refresh_guard.release()
+            except Exception:
+                pass
+
+        wx.CallAfter(self._flush_feed_refresh_progress)
+        wx.CallAfter(self.refresh_feeds)
+
+    def _post_import_opml(self, success, new_feed_ids=None):
         self.SetTitle("BlindRSS")
         self.refresh_feeds()
+        normalized_new_ids = []
+        for raw_id in list(new_feed_ids or []):
+            fid = str(raw_id or "").strip()
+            if fid:
+                normalized_new_ids.append(fid)
+
+        if success and normalized_new_ids:
+            refresh_one = getattr(self.provider, "refresh_feed", None)
+            if callable(refresh_one):
+                threading.Thread(
+                    target=self._refresh_imported_feed_ids_thread,
+                    args=(normalized_new_ids,),
+                    daemon=True,
+                ).start()
+            else:
+                threading.Thread(target=self._manual_refresh_thread, daemon=True).start()
         if success:
             wx.MessageBox("Import successful.")
         else:

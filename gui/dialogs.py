@@ -586,13 +586,13 @@ class SettingsDialog(wx.Dialog):
         
         concurrency_sizer = wx.BoxSizer(wx.HORIZONTAL)
         concurrency_sizer.Add(wx.StaticText(general_panel, label="Max Concurrent Refreshes:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
-        self.concurrent_ctrl = wx.SpinCtrl(general_panel, min=1, max=50, initial=int(config.get("max_concurrent_refreshes", 5)))
+        self.concurrent_ctrl = wx.SpinCtrl(general_panel, min=1, max=50, initial=int(config.get("max_concurrent_refreshes", 3)))
         concurrency_sizer.Add(self.concurrent_ctrl, 0, wx.ALL, 5)
         general_sizer.Add(concurrency_sizer, 0, wx.EXPAND | wx.ALL, 5)
         
         per_host_sizer = wx.BoxSizer(wx.HORIZONTAL)
         per_host_sizer.Add(wx.StaticText(general_panel, label="Max Connections Per Host:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
-        self.per_host_ctrl = wx.SpinCtrl(general_panel, min=1, max=10, initial=int(config.get("per_host_max_connections", 3)))
+        self.per_host_ctrl = wx.SpinCtrl(general_panel, min=1, max=10, initial=int(config.get("per_host_max_connections", 1)))
         per_host_sizer.Add(self.per_host_ctrl, 0, wx.ALL, 5)
         general_sizer.Add(per_host_sizer, 0, wx.EXPAND | wx.ALL, 5)
         

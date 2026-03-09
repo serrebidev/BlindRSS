@@ -1,12 +1,16 @@
 
 import pytest
-import sqlite3
 import time
 import os
+import sys
 from unittest.mock import MagicMock, patch
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if REPO_ROOT not in sys.path:
+    sys.path.insert(0, REPO_ROOT)
+
 from providers.local import LocalProvider
 from core.db import init_db, get_connection
-from core.models import Feed
 
 # Mock feedparser response
 class MockDict(dict):
@@ -16,20 +20,34 @@ class MockDict(dict):
         raise AttributeError(name)
 
 class MockEntry(MockDict):
-    def __init__(self, i):
+    def __init__(self, i, chapter_url=None):
         self['id'] = f"item-{i}"
         self['title'] = f"Title {i}"
         self['link'] = f"http://example.com/item-{i}"
         self['published'] = "2023-01-01 12:00:00"
         self['content'] = [MockDict({"value": "Content"})]
         self['enclosures'] = []
+        if chapter_url:
+            self["podcast_chapters"] = MockDict({"href": chapter_url})
         # No need to manually set attributes due to __getattr__
 
 class MockFeed:
-    def __init__(self):
-        self.entries = [MockEntry(i) for i in range(100)]
+    def __init__(self, count=100, chapter_url=None):
+        self.entries = [MockEntry(i, chapter_url=chapter_url if i == 0 else None) for i in range(count)]
         self.feed = {"title": "Mock Feed"}
         self.bozo = False
+
+
+def _add_test_feed(provider):
+    provider.add_feed("http://example.com/feed.xml")
+    conn = get_connection()
+    c = conn.cursor()
+    c.execute("SELECT id FROM feeds")
+    feed_id = c.fetchone()[0]
+    c.execute("UPDATE feeds SET url = ? WHERE id = ?", ("http://example.com/feed.xml", feed_id))
+    conn.commit()
+    conn.close()
+    return feed_id
 
 @pytest.fixture
 def provider(tmp_path):
@@ -43,15 +61,7 @@ def provider(tmp_path):
         yield p
 
 def test_refresh_performance(provider):
-    # Add a feed
-    provider.add_feed("http://example.com/feed.xml")
-    conn = get_connection()
-    c = conn.cursor()
-    c.execute("SELECT id FROM feeds")
-    feed_id = c.fetchone()[0]
-    c.execute("UPDATE feeds SET url = ? WHERE id = ?", ("http://example.com/feed.xml", feed_id))
-    conn.commit()
-    conn.close()
+    feed_id = _add_test_feed(provider)
 
     # Mock fetching
     with patch("core.utils.safe_requests_get") as mock_get, \
@@ -83,11 +93,31 @@ def test_refresh_performance(provider):
         
         assert count == 100
         
-        # Verify fetch_and_store_chapters called with cursor
-        assert mock_chapters.call_count == 100
-        # Check that cursor was passed (keyword argument)
+        # No chapter URL in the mock feed => chapter fetch path should be skipped.
+        assert mock_chapters.call_count == 0
+
+
+def test_refresh_fetches_chapters_when_chapter_url_present(provider):
+    feed_id = _add_test_feed(provider)
+
+    with patch("core.utils.safe_requests_get") as mock_get, \
+         patch("feedparser.parse") as mock_parse, \
+         patch("core.utils.fetch_and_store_chapters") as mock_chapters:
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.content = b"xml"
+        mock_resp.text = "<rss><channel><item><podcast:chapters href='https://example.com/chapters.json'/></item></channel></rss>"
+        mock_resp.headers = {}
+        mock_get.return_value = mock_resp
+
+        chapter_url = "https://example.com/chapters.json"
+        mock_parse.return_value = MockFeed(count=5, chapter_url=chapter_url)
+
+        provider.refresh_feed(feed_id)
+
+        assert mock_chapters.call_count == 1
         args, kwargs = mock_chapters.call_args
-        assert "cursor" in kwargs
+        assert args[3] == chapter_url
         assert kwargs["cursor"] is not None
 
 if __name__ == "__main__":
