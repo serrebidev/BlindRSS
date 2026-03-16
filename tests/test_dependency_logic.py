@@ -11,12 +11,22 @@ import core.dependency_check as dep_check
 class TestDependencyLogic(unittest.TestCase):
     def setUp(self):
         dep_check._log = MagicMock()
-        self.mock_winreg = sys.modules['winreg']
+        # Create a fresh MagicMock for winreg each test and patch it into
+        # dep_check directly.  When the full suite runs, other test files may
+        # import core.dependency_check before our sys.modules override takes
+        # effect, leaving dep_check.winreg bound to the real module.  Patching
+        # the attribute ensures the function under test always sees our mock.
+        self.mock_winreg = MagicMock()
         self.mock_winreg.HKEY_CURRENT_USER = 1
         self.mock_winreg.KEY_READ = 1
         self.mock_winreg.KEY_SET_VALUE = 2
         self.mock_winreg.REG_EXPAND_SZ = 3
         self.mock_winreg.REG_SZ = 4
+        self._winreg_patcher = patch.object(dep_check, 'winreg', self.mock_winreg)
+        self._winreg_patcher.start()
+
+    def tearDown(self):
+        self._winreg_patcher.stop()
     
     @patch('core.dependency_check.platform.system', return_value='windows')
     def test_add_bin_to_user_path_append(self, mock_platform):

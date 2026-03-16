@@ -700,21 +700,17 @@ class SettingsDialog(wx.Dialog):
         media_panel = wx.Panel(notebook)
         media_sizer = wx.BoxSizer(wx.VERTICAL)
 
-        # Preferred soundcard
+        # Preferred soundcard (enumerated in background to avoid blocking dialog open)
         soundcard_sizer = wx.BoxSizer(wx.HORIZONTAL)
         soundcard_sizer.Add(wx.StaticText(media_panel, label="Preferred Soundcard:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
-        current_soundcard = str(config.get("preferred_soundcard", "") or "")
-        self._soundcard_choices = self._build_soundcard_choices(current_soundcard)
-        self._soundcard_labels = [label for label, _device_id in self._soundcard_choices]
+        self._current_soundcard = str(config.get("preferred_soundcard", "") or "")
+        self._soundcard_choices = [("System Default", "")]
+        self._soundcard_labels = ["Loading soundcards..."]
         self.soundcard_ctrl = wx.Choice(media_panel, choices=self._soundcard_labels)
-        sel_idx = 0
-        for i, (_label, device_id) in enumerate(self._soundcard_choices):
-            if str(device_id or "") == current_soundcard:
-                sel_idx = i
-                break
-        self.soundcard_ctrl.SetSelection(sel_idx)
+        self.soundcard_ctrl.SetSelection(0)
         soundcard_sizer.Add(self.soundcard_ctrl, 1, wx.ALL, 5)
         media_sizer.Add(soundcard_sizer, 0, wx.EXPAND | wx.ALL, 5)
+        threading.Thread(target=self._load_soundcards_async, daemon=True).start()
 
         self.skip_silence_chk = wx.CheckBox(media_panel, label="Skip Silence (Experimental)")
         self.skip_silence_chk.SetValue(config.get("skip_silence", False))
@@ -1860,6 +1856,23 @@ class SettingsDialog(wx.Dialog):
             if maybe:
                 return maybe
         return raw
+
+    def _load_soundcards_async(self):
+        """Background thread: enumerate VLC soundcards, then update the UI."""
+        choices = self._build_soundcard_choices(self._current_soundcard)
+        wx.CallAfter(self._populate_soundcard_ctrl, choices)
+
+    def _populate_soundcard_ctrl(self, choices):
+        """Called on main thread to fill the soundcard dropdown."""
+        self._soundcard_choices = choices
+        self._soundcard_labels = [label for label, _device_id in choices]
+        self.soundcard_ctrl.Set(self._soundcard_labels)
+        sel_idx = 0
+        for i, (_label, device_id) in enumerate(choices):
+            if str(device_id or "") == self._current_soundcard:
+                sel_idx = i
+                break
+        self.soundcard_ctrl.SetSelection(sel_idx)
 
     def _build_soundcard_choices(self, selected_device_id: str) -> list[tuple[str, str]]:
         choices: list[tuple[str, str]] = [("System Default", "")]

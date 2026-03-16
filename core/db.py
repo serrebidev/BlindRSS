@@ -1,6 +1,7 @@
 import sqlite3
 import os
 import logging
+import uuid
 from core.config import APP_DIR
 
 log = logging.getLogger(__name__)
@@ -301,7 +302,13 @@ def init_db():
             c.execute("ALTER TABLE feeds ADD COLUMN title_is_custom INTEGER DEFAULT 0")
         except sqlite3.OperationalError:
             pass
-            
+
+        # Migration: add parent_id to categories for subcategory support
+        try:
+            c.execute("ALTER TABLE categories ADD COLUMN parent_id TEXT")
+        except sqlite3.OperationalError:
+            pass
+
         # Seed categories from existing feeds if empty
         c.execute("SELECT count(*) FROM categories")
         if c.fetchone()[0] == 0:
@@ -380,3 +387,100 @@ def get_connection():
     except Exception as e:
         log.warning(f"Failed to set PRAGMAs on connection: {e}")
     return conn
+
+
+def sync_categories(category_titles):
+    """Ensure all category titles exist in the local categories table.
+
+    This is used to mirror remote provider categories into the local DB
+    so that subcategory hierarchy can be stored locally for any provider.
+    """
+    if not category_titles:
+        return
+    conn = get_connection()
+    try:
+        c = conn.cursor()
+        for title in category_titles:
+            if not title:
+                continue
+            c.execute(
+                "INSERT OR IGNORE INTO categories (id, title) VALUES (?, ?)",
+                (str(uuid.uuid4()), title),
+            )
+        conn.commit()
+    except Exception as e:
+        log.error(f"Error syncing categories: {e}")
+    finally:
+        conn.close()
+
+
+def get_category_hierarchy():
+    """Return a dict mapping category title -> parent category title (or None for top-level)."""
+    conn = get_connection()
+    try:
+        c = conn.cursor()
+        c.execute("SELECT c.title, p.title FROM categories c LEFT JOIN categories p ON c.parent_id = p.id")
+        rows = c.fetchall()
+        return {row[0]: row[1] for row in rows}
+    except Exception as e:
+        log.error(f"Error getting category hierarchy: {e}")
+        return {}
+    finally:
+        conn.close()
+
+
+def set_category_parent(title, parent_title):
+    """Set the parent of a category by title. Pass parent_title=None for top-level."""
+    conn = get_connection()
+    try:
+        c = conn.cursor()
+        if parent_title:
+            c.execute("SELECT id FROM categories WHERE title = ?", (parent_title,))
+            row = c.fetchone()
+            parent_id = row[0] if row else None
+        else:
+            parent_id = None
+        c.execute("UPDATE categories SET parent_id = ? WHERE title = ?", (parent_id, title))
+        conn.commit()
+        return c.rowcount > 0
+    except Exception as e:
+        log.error(f"Error setting category parent: {e}")
+        return False
+    finally:
+        conn.close()
+
+
+def get_subcategory_titles(category_title):
+    """Return all descendant category titles (recursive) for the given category."""
+    conn = get_connection()
+    try:
+        c = conn.cursor()
+        # Build parent_id -> title map and title -> id map
+        c.execute("SELECT id, title, parent_id FROM categories")
+        rows = c.fetchall()
+        id_to_title = {r[0]: r[1] for r in rows}
+        title_to_id = {r[1]: r[0] for r in rows}
+        children_of = {}  # parent_id -> [child_titles]
+        for r in rows:
+            pid = r[2]
+            if pid:
+                children_of.setdefault(pid, []).append(r[1])
+
+        result = []
+        cat_id = title_to_id.get(category_title)
+        if not cat_id:
+            return result
+        stack = [cat_id]
+        while stack:
+            pid = stack.pop()
+            for child_title in children_of.get(pid, []):
+                result.append(child_title)
+                child_id = title_to_id.get(child_title)
+                if child_id:
+                    stack.append(child_id)
+        return result
+    except Exception as e:
+        log.error(f"Error getting subcategory titles: {e}")
+        return []
+    finally:
+        conn.close()

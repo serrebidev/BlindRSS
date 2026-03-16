@@ -899,8 +899,12 @@ class InoreaderProvider(RSSProvider):
             log.error(f"Inoreader Get Categories Error: {e}")
             raise
 
-    def add_category(self, title: str) -> bool:
+    def add_category(self, title: str, parent_title: str = None) -> bool:
         self._mark_cache_dirty()
+        if parent_title:
+            from core.db import sync_categories, set_category_parent
+            sync_categories([title])
+            set_category_parent(title, parent_title)
         return True
 
     def rename_category(self, old_title: str, new_title: str) -> bool:

@@ -543,7 +543,11 @@ class TheOldReaderProvider(RSSProvider):
             log.exception(f"TheOldReader Get Categories Error: {e}")
             return []
 
-    def add_category(self, title: str) -> bool:
+    def add_category(self, title: str, parent_title: str = None) -> bool:
+        if parent_title:
+            from core.db import sync_categories, set_category_parent
+            sync_categories([title])
+            set_category_parent(title, parent_title)
         return True
 
     def rename_category(self, old_title: str, new_title: str) -> bool:

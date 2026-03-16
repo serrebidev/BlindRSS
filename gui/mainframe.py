@@ -2439,6 +2439,10 @@ class MainFrame(wx.Frame):
         
         if data["type"] == "category":
             cat_title = data["id"]
+
+            add_sub_item = menu.Append(wx.ID_ANY, "Add Subcategory")
+            self.Bind(wx.EVT_MENU, lambda e, ct=cat_title: self.on_add_subcategory(ct), add_sub_item)
+
             if cat_title != "Uncategorized":
                 rename_item = menu.Append(wx.ID_ANY, "Rename Category")
                 self.Bind(wx.EVT_MENU, lambda e: self.on_rename_category(cat_title), rename_item)
@@ -2448,7 +2452,7 @@ class MainFrame(wx.Frame):
 
                 delete_with_feeds_item = menu.Append(wx.ID_ANY, "Delete Category and Feeds")
                 self.Bind(wx.EVT_MENU, self.on_delete_category_with_feeds, delete_with_feeds_item)
-            
+
             import_item = menu.Append(wx.ID_ANY, "Import OPML Here...")
             self.Bind(wx.EVT_MENU, lambda e: self.on_import_opml(e, target_category=cat_title), import_item)
 
@@ -2941,15 +2945,56 @@ class MainFrame(wx.Frame):
         dlg.Destroy()
 
     def on_add_category(self, event):
-        dlg = wx.TextEntryDialog(self, "Enter category name:", "Add Category")
+        cats = self.provider.get_categories()
+        choices = ["(None - Top Level)"] + sorted(cats)
+        dlg = wx.Dialog(self, title="Add Category", size=(400, 220))
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        sizer.Add(wx.StaticText(dlg, label="Category name:"), 0, wx.ALL, 5)
+        name_ctrl = wx.TextCtrl(dlg)
+        sizer.Add(name_ctrl, 0, wx.EXPAND | wx.ALL, 5)
+
+        sizer.Add(wx.StaticText(dlg, label="Parent category:"), 0, wx.ALL, 5)
+        parent_ctrl = wx.ComboBox(dlg, choices=choices, style=wx.CB_READONLY)
+        parent_ctrl.SetSelection(0)
+        sizer.Add(parent_ctrl, 0, wx.EXPAND | wx.ALL, 5)
+
+        btn_sizer = dlg.CreateButtonSizer(wx.OK | wx.CANCEL)
+        sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+        dlg.SetSizer(sizer)
+        dlg.Centre()
+        wx.CallAfter(name_ctrl.SetFocus)
+
         if dlg.ShowModal() == wx.ID_OK:
-            name = dlg.GetValue()
+            name = name_ctrl.GetValue().strip()
+            parent_sel = parent_ctrl.GetSelection()
+            parent_title = None if parent_sel <= 0 else parent_ctrl.GetString(parent_sel)
             if name:
-                if self.provider.add_category(name):
+                if self.provider.add_category(name, parent_title=parent_title):
                     self.refresh_feeds()
                 else:
                     wx.MessageBox("Could not add category.", "Error", wx.ICON_ERROR)
         dlg.Destroy()
+
+    def on_add_subcategory(self, parent_cat_title):
+        dlg = wx.TextEntryDialog(self, f"Enter subcategory name (under '{parent_cat_title}'):", "Add Subcategory")
+        if dlg.ShowModal() == wx.ID_OK:
+            name = dlg.GetValue().strip()
+            if name:
+                if self.provider.add_category(name, parent_title=parent_cat_title):
+                    self.refresh_feeds()
+                else:
+                    wx.MessageBox("Could not add subcategory.", "Error", wx.ICON_ERROR)
+        dlg.Destroy()
+
+    def _get_parent_category_hint(self, cat_title):
+        """Return a selection hint pointing to the parent category, or All Articles if top-level."""
+        from core.db import get_category_hierarchy
+        hierarchy = get_category_hierarchy()
+        parent = hierarchy.get(cat_title)
+        if parent:
+            return {"type": "category", "id": parent}
+        return {"type": "all", "id": "all"}
 
     def on_remove_category(self, event):
         item = self.tree.GetSelection()
@@ -2957,7 +3002,7 @@ class MainFrame(wx.Frame):
             data = self.tree.GetItemData(item)
             if data and data["type"] == "category":
                 if wx.MessageBox(f"Remove category '{self.tree.GetItemText(item)}'? Feeds will be moved to Uncategorized.", "Confirm", wx.YES_NO) == wx.YES:
-                    self._selection_hint = {"type": "all", "id": "all"}
+                    self._selection_hint = self._get_parent_category_hint(data["id"])
                     if self.provider.delete_category(data["id"]):
                         self.refresh_feeds()
                     else:
@@ -2981,21 +3026,25 @@ class MainFrame(wx.Frame):
 
         feed_ids = []
         try:
+            from core.db import get_subcategory_titles
+            sub_cats = get_subcategory_titles(cat_title)
+            all_cats_to_delete = {cat_title} | set(sub_cats)
             for fid, feed in (self.feed_map or {}).items():
-                if (feed.category or "Uncategorized") == cat_title:
+                if (feed.category or "Uncategorized") in all_cats_to_delete:
                     feed_ids.append(fid)
         except Exception:
             feed_ids = []
 
         count = len(feed_ids)
+        sub_note = f" (including subcategories)" if len(sub_cats) > 0 else ""
         prompt = (
-            f"Delete category '{cat_title}' and its {count} feed(s)?\n\n"
+            f"Delete category '{cat_title}'{sub_note} and its {count} feed(s)?\n\n"
             "This will remove the feeds and their articles."
         )
         if wx.MessageBox(prompt, "Confirm", wx.YES_NO | wx.ICON_WARNING) != wx.YES:
             return
 
-        self._selection_hint = {"type": "all", "id": "all"}
+        self._selection_hint = self._get_parent_category_hint(cat_title)
         self._start_critical_worker(
             self._delete_category_with_feeds_thread,
             args=(cat_title, feed_ids),
@@ -3015,6 +3064,14 @@ class MainFrame(wx.Frame):
                     # The provider logs the detailed error.
                     failed.append(fid)
             try:
+                # Delete subcategories first (leaves before parent)
+                from core.db import get_subcategory_titles
+                sub_cats = get_subcategory_titles(cat_title)
+                for sub in reversed(sub_cats):
+                    try:
+                        self.provider.delete_category(sub)
+                    except Exception:
+                        log.exception("Failed to delete subcategory '%s'", sub)
                 category_deleted = bool(self.provider.delete_category(cat_title))
             except Exception as e:
                 category_deleted = False
@@ -3087,7 +3144,11 @@ class MainFrame(wx.Frame):
             # deletion of articles that were just marked as read.
             feeds = self.provider.get_feeds()
             all_cats = self.provider.get_categories()
-            wx.CallAfter(self._update_tree, feeds, all_cats)
+            # Sync categories to local DB so hierarchy is available for all providers
+            from core.db import sync_categories
+            sync_categories(all_cats)
+            hierarchy = self.provider.get_category_hierarchy()
+            wx.CallAfter(self._update_tree, feeds, all_cats, hierarchy)
         except Exception as e:
             wx.MessageBox(f"Error fetching feeds: {e}", "Error", wx.ICON_ERROR)
 
@@ -3173,7 +3234,7 @@ class MainFrame(wx.Frame):
         self._article_refresh_pending = False
         self._reload_selected_articles()
 
-    def _update_tree(self, feeds, all_cats):
+    def _update_tree(self, feeds, all_cats, hierarchy=None):
         # Save selection to restore it later
         selected_item = self.tree.GetSelection()
         selected_data = None
@@ -3255,30 +3316,45 @@ class MainFrame(wx.Frame):
             except Exception:
                 self.favorites_node = None
             
-            # Group by category
-            categories = {c: [] for c in all_cats} # Initialize with all known categories
-            
+            # Group feeds by category
+            cat_feeds_map = {c: [] for c in all_cats}
+
             for feed in feeds:
                 cat = feed.category or "Uncategorized"
-                if cat not in categories:
-                    categories[cat] = []
-                categories[cat].append(feed)
-                
-            # Sort categories alphabetically
-            sorted_cats = sorted(categories.keys())
-            
-            item_to_select = None
+                if cat not in cat_feeds_map:
+                    cat_feeds_map[cat] = []
+                cat_feeds_map[cat].append(feed)
 
-            for cat in sorted_cats:
-                cat_feeds = categories[cat]
-                # Sort feeds alphabetically by title
+            # Build hierarchy: determine which categories are top-level vs children
+            hierarchy = hierarchy if hierarchy else {}
+            # children_of[parent_title] = [child_titles...]
+            children_of = {}
+            top_level_cats = []
+            all_cat_set = set(cat_feeds_map.keys())
+            for cat in all_cat_set:
+                parent = hierarchy.get(cat)
+                if parent and parent in all_cat_set:
+                    children_of.setdefault(parent, []).append(cat)
+                else:
+                    top_level_cats.append(cat)
+
+            top_level_cats.sort(key=lambda s: s.lower())
+            for k in children_of:
+                children_of[k].sort(key=lambda s: s.lower())
+
+            item_to_select = None
+            cat_node_map = {}  # cat_title -> tree node
+
+            def _add_category_node(cat, parent_node):
+                nonlocal item_to_select
+                cat_feeds = cat_feeds_map.get(cat, [])
                 cat_feeds.sort(key=lambda f: (f.title or "").lower())
-                
-                cat_node = self.tree.AppendItem(self.root, cat)
+
+                cat_node = self.tree.AppendItem(parent_node, cat)
                 cat_data = {"type": "category", "id": cat}
                 self.tree.SetItemData(cat_node, cat_data)
-                
-                # Check if this category was selected
+                cat_node_map[cat] = cat_node
+
                 if selected_data and selected_data["type"] == "category" and selected_data["id"] == cat:
                     item_to_select = cat_node
 
@@ -3288,10 +3364,16 @@ class MainFrame(wx.Frame):
                     feed_data = {"type": "feed", "id": feed.id}
                     self.tree.SetItemData(node, feed_data)
                     self.feed_nodes[feed.id] = node
-                    
-                    # Check if this feed was selected
+
                     if selected_data and selected_data["type"] == "feed" and selected_data["id"] == feed.id:
                         item_to_select = node
+
+                # Recursively add subcategories
+                for child_cat in children_of.get(cat, []):
+                    _add_category_node(child_cat, cat_node)
+
+            for cat in top_level_cats:
+                _add_category_node(cat, self.root)
 
             self.tree.ExpandAll()
 
@@ -5936,11 +6018,15 @@ class MainFrame(wx.Frame):
     def _collect_category_feeds_for_export(self, category_title: str | None):
         target_cat = self._normalize_category_title_for_export(category_title)
         target_key = target_cat.casefold()
+        # Include subcategory feeds
+        from core.db import get_subcategory_titles
+        sub_cats = get_subcategory_titles(target_cat)
+        all_keys = {target_key} | {s.casefold() for s in sub_cats}
         feeds = list((self.provider.get_feeds() if self.provider else []) or [])
         out = []
         for feed in feeds:
             feed_cat = str(getattr(feed, "category", "") or "").strip() or "Uncategorized"
-            if feed_cat.casefold() == target_key:
+            if feed_cat.casefold() in all_keys:
                 out.append(feed)
         return out
 

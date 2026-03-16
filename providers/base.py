@@ -137,7 +137,7 @@ class RSSProvider(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def add_category(self, title: str) -> bool:
+    def add_category(self, title: str, parent_title: str = None) -> bool:
         pass
 
     @abc.abstractmethod
@@ -147,6 +147,11 @@ class RSSProvider(abc.ABC):
     @abc.abstractmethod
     def delete_category(self, title: str) -> bool:
         pass
+
+    def get_category_hierarchy(self) -> dict:
+        """Return {category_title: parent_title} mapping. Uses local DB by default."""
+        from core.db import get_category_hierarchy
+        return get_category_hierarchy()
 
     # Optional: providers that offer server-side "fetch original content" can override this.
     def fetch_full_content(self, article_id: str, url: str = ""):

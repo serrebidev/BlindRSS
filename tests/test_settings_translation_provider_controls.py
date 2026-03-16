@@ -36,11 +36,13 @@ class _PanelStub:
 
 class _Host:
     _update_translation_provider_controls = dialogs.SettingsDialog._update_translation_provider_controls
+    _translation_provider_key_from_ui = dialogs.SettingsDialog._translation_provider_key_from_ui
 
     def __init__(self, provider):
         self.translation_provider_ctrl = _ChoiceStub(provider)
         self._translation_layout_sizer = _SizerStub()
         self._translation_layout_panel = _PanelStub()
+        self._translation_provider_display_to_key = {}
         self._translation_provider_rows = {
             "grok": ["grok_model", "grok_api"],
             "groq": ["groq_model", "groq_api"],

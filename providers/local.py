@@ -998,17 +998,21 @@ class LocalProvider(RSSProvider):
             is_category = real_feed_id.startswith("category:")
             if is_category:
                 cat_name = real_feed_id.split(":", 1)[1]
+                from core.db import get_subcategory_titles
+                sub_cats = get_subcategory_titles(cat_name)
+                cat_names = [cat_name] + sub_cats
                 sql_parts = ["""
                     SELECT a.id, a.feed_id, a.title, a.url, a.content, a.date, a.author, a.is_read, a.is_favorite, a.media_url, a.media_type
                     FROM articles a
                     JOIN feeds f ON a.feed_id = f.id
                 """]
-                where_clauses.append("f.category = ?")
-                params.append(cat_name)
+                placeholders = ",".join("?" for _ in cat_names)
+                where_clauses.append(f"f.category IN ({placeholders})")
+                params.extend(cat_names)
             elif real_feed_id != "all":
                 where_clauses.append("feed_id = ?")
                 params.append(real_feed_id)
-            
+
             if filter_read is not None:
                 # If we are in category mode, we use 'a.is_read', otherwise just 'is_read'
                 col = "a.is_read" if is_category else "is_read"
@@ -1079,12 +1083,18 @@ class LocalProvider(RSSProvider):
             count_params = []
             
             is_category = real_feed_id.startswith("category:")
-            
+            cat_names = []
+
             if is_category:
                 cat_name = real_feed_id.split(":", 1)[1]
+                # Include subcategories
+                from core.db import get_subcategory_titles
+                sub_cats = get_subcategory_titles(cat_name)
+                cat_names = [cat_name] + sub_cats
                 count_sql_parts = ["SELECT COUNT(*) FROM articles a JOIN feeds f ON a.feed_id = f.id"]
-                count_where.append("f.category = ?")
-                count_params.append(cat_name)
+                placeholders = ",".join("?" for _ in cat_names)
+                count_where.append(f"f.category IN ({placeholders})")
+                count_params.extend(cat_names)
             elif real_feed_id == "all":
                 count_sql_parts = ["SELECT COUNT(*) FROM articles"]
             else:
@@ -1116,16 +1126,16 @@ class LocalProvider(RSSProvider):
             sql_parts = ["SELECT id, feed_id, title, url, content, date, author, is_read, is_favorite, media_url, media_type FROM articles"]
             where_clauses = []
             params = []
-            
+
             if is_category:
-                cat_name = real_feed_id.split(":", 1)[1]
                 sql_parts = ["""
                     SELECT a.id, a.feed_id, a.title, a.url, a.content, a.date, a.author, a.is_read, a.is_favorite, a.media_url, a.media_type
                     FROM articles a
                     JOIN feeds f ON a.feed_id = f.id
                 """]
-                where_clauses.append("f.category = ?")
-                params.append(cat_name)
+                placeholders = ",".join("?" for _ in cat_names)
+                where_clauses.append(f"f.category IN ({placeholders})")
+                params.extend(cat_names)
             elif real_feed_id != "all":
                 where_clauses.append("feed_id = ?")
                 params.append(real_feed_id)
@@ -1271,8 +1281,12 @@ class LocalProvider(RSSProvider):
 
             if real_feed_id.startswith("category:"):
                 cat_name = real_feed_id.split(":", 1)[1]
-                where_clauses.append("feed_id IN (SELECT id FROM feeds WHERE category = ?)")
-                params.append(cat_name)
+                from core.db import get_subcategory_titles
+                sub_cats = get_subcategory_titles(cat_name)
+                all_cats = [cat_name] + sub_cats
+                placeholders = ",".join("?" for _ in all_cats)
+                where_clauses.append(f"feed_id IN (SELECT id FROM feeds WHERE category IN ({placeholders}))")
+                params.extend(all_cats)
             elif real_feed_id != "all":
                 where_clauses.append("feed_id = ?")
                 params.append(real_feed_id)
@@ -1724,11 +1738,16 @@ class LocalProvider(RSSProvider):
         finally:
             conn.close()
 
-    def add_category(self, title: str) -> bool:
+    def add_category(self, title: str, parent_title: str = None) -> bool:
         conn = get_connection()
         c = conn.cursor()
         try:
-            c.execute("INSERT INTO categories (id, title) VALUES (?, ?)", (str(uuid.uuid4()), title))
+            parent_id = None
+            if parent_title:
+                c.execute("SELECT id FROM categories WHERE title = ?", (parent_title,))
+                row = c.fetchone()
+                parent_id = row[0] if row else None
+            c.execute("INSERT INTO categories (id, title, parent_id) VALUES (?, ?, ?)", (str(uuid.uuid4()), title, parent_id))
             conn.commit()
             return True
         except sqlite3.IntegrityError:
@@ -1740,7 +1759,7 @@ class LocalProvider(RSSProvider):
         conn = get_connection()
         c = conn.cursor()
         try:
-            # Update categories table
+            # Update categories table (parent_id references are by id, not title, so no cascade needed)
             c.execute("UPDATE categories SET title = ? WHERE title = ?", (new_title, old_title))
             # Update feeds
             c.execute("UPDATE feeds SET category = ? WHERE category = ?", (new_title, old_title))
@@ -1757,9 +1776,17 @@ class LocalProvider(RSSProvider):
         conn = get_connection()
         try:
             c = conn.cursor()
-            # Move feeds to Uncategorized? Or delete them? usually move.
+            # Find the category being deleted and its parent
+            c.execute("SELECT id, parent_id FROM categories WHERE title = ?", (title,))
+            row = c.fetchone()
+            if not row:
+                return False
+            cat_id, cat_parent_id = row
+            # Move child categories to deleted category's parent (or top-level)
+            c.execute("UPDATE categories SET parent_id = ? WHERE parent_id = ?", (cat_parent_id, cat_id))
+            # Move feeds to Uncategorized
             c.execute("UPDATE feeds SET category = 'Uncategorized' WHERE category = ?", (title,))
-            c.execute("DELETE FROM categories WHERE title = ?", (title,))
+            c.execute("DELETE FROM categories WHERE id = ?", (cat_id,))
             conn.commit()
             return True
         finally:

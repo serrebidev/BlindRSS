@@ -121,8 +121,8 @@ def test_refresh_player_chapters_submenu_populates_dynamic_entries():
     assert ordered_labels[0].startswith("00:00")
     assert ordered_labels[1].startswith("[Current] 00:15")
     assert "Show Chapters..." in ordered_labels
-    assert "Previous Chapter\tCtrl+Shift+Left" in ordered_labels
-    assert "Next Chapter\tCtrl+Shift+Right" in ordered_labels
+    assert "Previous Chapter (Ctrl+Shift+Left)" in ordered_labels
+    assert "Next Chapter (Ctrl+Shift+Right)" in ordered_labels
 
 
 def test_refresh_player_chapters_submenu_shows_empty_state_when_no_chapters():
