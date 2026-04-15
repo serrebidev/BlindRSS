@@ -48,8 +48,9 @@ case "$UNAME_S" in
 esac
 
 if [[ "$MODE" == "release" ]]; then
-  echo "[X] Official releases must still use .\\build.bat release on Windows."
-  echo "[X] ./build.sh is for local macOS/Linux packaging and for GitHub runner builds."
+  echo "[X] ./build.sh does not publish releases directly."
+  echo "[X] Use it for local macOS/Linux packaging and GitHub runner builds."
+  echo "[X] Windows updater assets still require .\\build.bat release when producing the Windows release package."
   exit 1
 fi
 
