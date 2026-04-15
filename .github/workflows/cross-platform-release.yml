@@ -86,7 +86,7 @@ jobs:
         run: gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-macos-*.zip --clobber
 
   linux:
-    name: Build Linux AppImage
+    name: Build Linux Packages
     runs-on: ubuntu-22.04
     steps:
       - name: Check out release tag
@@ -115,11 +115,11 @@ jobs:
             libsm-dev \
             libglib2.0-dev \
             libwebkit2gtk-4.1-dev \
-            patchelf \
             desktop-file-utils \
+            rpm \
             unzip
 
-      - name: Build Linux AppImage
+      - name: Build Linux packages
         run: |
           chmod +x build.sh
           ./build.sh build
@@ -128,10 +128,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: BlindRSS-linux-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
-          path: dist/BlindRSS-linux-*.AppImage
+          path: |
+            dist/BlindRSS-linux-*.deb
+            dist/BlindRSS-linux-*.rpm
 
       - name: Upload release asset
         if: ${{ github.event_name == 'workflow_dispatch' }}
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-linux-*.AppImage --clobber
+        run: gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-linux-*.deb dist/BlindRSS-linux-*.rpm --clobber

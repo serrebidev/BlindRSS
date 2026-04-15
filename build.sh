@@ -33,8 +33,8 @@ case "$UNAME_S" in
     PLATFORM="linux"
     YTDLP_URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
     case "$UNAME_M" in
-      x86_64) DENO_ASSET="deno-x86_64-unknown-linux-gnu.zip"; APPIMAGE_ASSET="appimagetool-x86_64.AppImage" ;;
-      aarch64|arm64) DENO_ASSET="deno-aarch64-unknown-linux-gnu.zip"; APPIMAGE_ASSET="appimagetool-aarch64.AppImage" ;;
+      x86_64) DENO_ASSET="deno-x86_64-unknown-linux-gnu.zip" ;;
+      aarch64|arm64) DENO_ASSET="deno-aarch64-unknown-linux-gnu.zip" ;;
       *)
         echo "[X] Unsupported Linux architecture: $UNAME_M"
         exit 1
@@ -231,77 +231,14 @@ package_macos() {
   /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
 }
 
-ensure_appimagetool() {
-  ensure_bin_dir
-  APPIMAGETOOL_PATH="$SCRIPT_DIR/bin/appimagetool.AppImage"
-  echo "[BlindRSS Build] Ensuring appimagetool is present..."
-  download_file "https://github.com/AppImage/appimagetool/releases/download/continuous/$APPIMAGE_ASSET" "$APPIMAGETOOL_PATH"
-  chmod +x "$APPIMAGETOOL_PATH"
-}
-
-package_linux_appimage() {
-  ensure_appimagetool
-  local appdir out desktop_path root_desktop root_icon
-  appdir="$SCRIPT_DIR/dist/AppDir"
-  out="$SCRIPT_DIR/dist/BlindRSS-linux-${UNAME_M}-v${VERSION_NO_V}.AppImage"
-  desktop_path="$appdir/usr/share/applications/BlindRSS.desktop"
-  root_desktop="$appdir/BlindRSS.desktop"
-  root_icon="$appdir/BlindRSS.svg"
-
-  rm -rf "$appdir"
-  mkdir -p \
-    "$appdir/usr/opt" \
-    "$appdir/usr/share/applications" \
-    "$appdir/usr/share/icons/hicolor/scalable/apps"
-
-  cp -a "$SCRIPT_DIR/dist/BlindRSS" "$appdir/usr/opt/BlindRSS"
-
-  cat > "$appdir/AppRun" <<'EOF'
-#!/bin/sh
-HERE="$(dirname "$(readlink -f "$0")")"
-APP_ROOT="$HERE/usr/opt/BlindRSS"
-VLC_LIB_DIR="$APP_ROOT/vlc/lib"
-VLC_PLUGIN_DIR="$APP_ROOT/vlc/plugins"
-VLC_LIB_PATH=""
-
-if [ -d "$VLC_LIB_DIR" ]; then
-  for candidate in "$VLC_LIB_DIR"/libvlc.so*; do
-    if [ -f "$candidate" ]; then
-      VLC_LIB_PATH="$candidate"
-      break
-    fi
-  done
-fi
-
-export PATH="$APP_ROOT/bin:$PATH"
-export LD_LIBRARY_PATH="$VLC_LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-if [ -n "$VLC_LIB_PATH" ]; then
-  export PYTHON_VLC_LIB_PATH="$VLC_LIB_PATH"
-fi
-if [ -d "$VLC_PLUGIN_DIR" ]; then
-  export PYTHON_VLC_MODULE_PATH="$VLC_PLUGIN_DIR"
-fi
-exec "$APP_ROOT/BlindRSS" "$@"
-EOF
-  chmod +x "$appdir/AppRun"
-
-  cat > "$desktop_path" <<'EOF'
-[Desktop Entry]
-Type=Application
-Name=BlindRSS
-Comment=BlindRSS feed reader and audio player
-Exec=BlindRSS
-Icon=BlindRSS
-Terminal=false
-Categories=AudioVideo;News;
-EOF
-  cp "$desktop_path" "$root_desktop"
-
-  cp "$SCRIPT_DIR/assets/blindrss.svg" "$appdir/usr/share/icons/hicolor/scalable/apps/BlindRSS.svg"
-  cp "$SCRIPT_DIR/assets/blindrss.svg" "$root_icon"
-
-  echo "[BlindRSS Build] Creating AppImage..."
-  APPIMAGE_EXTRACT_AND_RUN=1 "$APPIMAGETOOL_PATH" "$appdir" "$out"
+package_linux_native() {
+  echo "[BlindRSS Build] Creating Linux .deb and .rpm packages..."
+  "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/tools/linux_packaging.py" \
+    --bundle-dir "$SCRIPT_DIR/dist/BlindRSS" \
+    --output-dir "$SCRIPT_DIR/dist" \
+    --version "$VERSION_NO_V" \
+    --machine "$UNAME_M" \
+    --icon-source "$SCRIPT_DIR/assets/blindrss.svg"
 }
 
 if [[ "$MODE" == "dry-run" ]]; then
@@ -312,7 +249,7 @@ if [[ "$MODE" == "dry-run" ]]; then
   if [[ "$PLATFORM" == "macos" ]]; then
     echo "[Dry Run] Would ad-hoc sign dist/BlindRSS.app and zip it to dist/BlindRSS-macos-v<version>.zip"
   else
-    echo "[Dry Run] Would build dist/BlindRSS, stage an AppDir, and create dist/BlindRSS-linux-${UNAME_M}-v<version>.AppImage"
+    echo "[Dry Run] Would build dist/BlindRSS and create dist/BlindRSS-linux-${UNAME_M}-v<version>.deb plus dist/BlindRSS-linux-${UNAME_M}-v<version>.rpm"
   fi
   exit 0
 fi
@@ -333,7 +270,7 @@ build_pyinstaller
 if [[ "$PLATFORM" == "macos" ]]; then
   package_macos
 else
-  package_linux_appimage
+  package_linux_native
 fi
 
 echo "[BlindRSS Build] Done."

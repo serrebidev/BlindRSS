@@ -33,7 +33,7 @@ if /I "%MODE%"=="dry-run" (
     if errorlevel 1 exit /b 1
     echo [Dry Run] Latest tag: !LATEST_TAG!
     echo [Dry Run] Next version: v!NEXT_VERSION! [!BUMP! bump]
-    echo [Dry Run] Would bump core/version.py, build, sign with "%SIGNTOOL_EXE%", zip, generate manifest, tag, push, create a GitHub release, and dispatch GitHub Actions builds for macOS and Linux/AppImage assets.
+    echo [Dry Run] Would bump core/version.py, build, sign with "%SIGNTOOL_EXE%", zip, generate manifest, tag, push, create a GitHub release, and dispatch GitHub Actions builds for macOS plus Linux .deb/.rpm assets.
     goto :done
 )
 

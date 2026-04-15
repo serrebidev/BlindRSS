@@ -20,7 +20,7 @@ Do not publish manually from GitHub UI/CLI without running this script first. Th
 - Computes the release ZIP SHA-256 hash.
 - Signs `BlindRSS.exe` when `signtool.exe` is available.
 - Bumps `core/version.py`, tags Git, pushes, and creates the GitHub release.
-- Dispatches GitHub Actions builds for macOS and Linux/AppImage release assets after the Windows release is created.
+- Dispatches GitHub Actions builds for macOS plus Linux `.deb`/`.rpm` release assets after the Windows release is created.
 - Pushes to `main` also trigger GitHub Actions workflow builds for Windows, macOS, and Linux as workflow artifacts so you can validate cross-platform packaging from macOS without publishing a release.
 
 ## Windows Release Prerequisites
@@ -41,7 +41,7 @@ Do not publish manually from GitHub UI/CLI without running this script first. Th
 - macOS: VLC installed at `/Applications/VLC.app`, or set `BLINDRSS_VLC_APP`.
 - macOS: the generated `.app` is ad-hoc signed by default with the free local `codesign` identity (`-`). This is not notarization.
 - Linux: VLC/libvlc installed so the script can bundle `libvlc` and the VLC plugins directory.
-- Linux AppImage packaging: `build.sh` downloads `appimagetool` automatically.
+- Linux native packaging: `dpkg-deb` and `rpmbuild` must be available on PATH.
 
 ## What Each Mode Does
 
@@ -67,7 +67,7 @@ Do not publish manually from GitHub UI/CLI without running this script first. Th
   - `dist\BlindRSS-vX.Y.Z.zip`
   - `dist\BlindRSS-update.json`
   - `dist\release-notes-vX.Y.Z.md`
-- Commits version bump, tags, pushes, creates GitHub release assets (ZIP + manifest), and dispatches the `cross-platform-release.yml` GitHub Actions workflow to attach macOS and Linux/AppImage assets to the same release.
+- Commits version bump, tags, pushes, creates GitHub release assets (ZIP + manifest), and dispatches the `cross-platform-release.yml` GitHub Actions workflow to attach macOS plus Linux `.deb`/`.rpm` assets to the same release.
 
 ### `dry-run`
 
@@ -91,9 +91,10 @@ Do not publish manually from GitHub UI/CLI without running this script first. Th
   - Installs Python dependencies.
   - Bundles `yt-dlp`, `deno`, `ffmpeg`, and VLC runtime files.
   - Runs PyInstaller via `portable.spec`.
-  - Stages an AppDir and creates:
+  - Creates native Linux packages:
     - `dist/BlindRSS/`
-    - `dist/BlindRSS-linux-<arch>-vX.Y.Z.AppImage`
+    - `dist/BlindRSS-linux-<arch>-vX.Y.Z.deb`
+    - `dist/BlindRSS-linux-<arch>-vX.Y.Z.rpm`
 
 ### `build.sh release`
 
