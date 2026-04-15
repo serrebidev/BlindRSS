@@ -31,6 +31,8 @@ def test_extract_ytdlp_info_via_cli_returns_first_playlist_entry_and_uses_browse
         )
 
     with patch("gui.player.subprocess.run", side_effect=_fake_run), patch(
+        "gui.player.discovery._resolve_ytdlp_cli_path", return_value="/tmp/BlindRSS/bin/yt-dlp"
+    ), patch(
         "gui.player.platform.system", return_value="Windows"
     ), patch("core.dependency_check._get_startup_info", return_value=None):
         info = _extract_ytdlp_info_via_cli(
@@ -44,6 +46,7 @@ def test_extract_ytdlp_info_via_cli_returns_first_playlist_entry_and_uses_browse
     assert info["title"] == "Example"
 
     cmd = captured_cmd["cmd"]
+    assert cmd[0] == "/tmp/BlindRSS/bin/yt-dlp"
     assert "--cookies-from-browser" in cmd
     assert "edge" in cmd
     assert r"C:\Users\alice\AppData\Local\Microsoft\Edge\User Data" not in cmd

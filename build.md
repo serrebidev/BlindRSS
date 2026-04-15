@@ -8,6 +8,7 @@ This is the only approved workflow for packaging and publishing BlindRSS.
 - Official Windows release build: `.\build.bat release`
 - No-change preview: `.\build.bat dry-run`
 - Local macOS package build: `./build.sh build`
+- macOS release-asset publish: `./build.sh release vX.Y.Z`
 - Local macOS preview: `./build.sh dry-run`
 
 ## Mandatory Release Rule
@@ -22,6 +23,8 @@ GitHub release publication may happen from any OS after the required artifacts a
 - Bumps `core/version.py`, tags Git, pushes, and creates the GitHub release.
 - Dispatches the GitHub Actions macOS release-asset build after the Windows release is created.
 - Pushes to `main` also trigger GitHub Actions workflow builds for Windows and macOS as workflow artifacts so you can validate packaging from macOS without publishing a release.
+
+On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZIP to an already-created GitHub release tag. It does not replace the Windows release flow and does not create updater metadata.
 
 ## Windows Release Prerequisites
 
@@ -86,9 +89,10 @@ GitHub release publication may happen from any OS after the required artifacts a
 
 ### `build.sh release`
 
-- `build.sh` does not create a release directly.
-- Non-Windows publication is allowed, but use GitHub CLI/workflows after artifacts are built and validated.
-- Windows updater assets still require the Windows `.\build.bat release` flow.
+- Requires an existing GitHub release tag created by the approved Windows release flow.
+- Uses GitHub CLI to dispatch `cross-platform-release.yml` with `release_tag=<tag>`.
+- GitHub Actions builds the macOS ZIP on a macOS runner and uploads it to the existing GitHub release.
+- Does not bump versions, create a new release, or generate Windows updater metadata.
 
 ## Optional Environment Variables
 

@@ -96,6 +96,18 @@ _ALTERNATE_FEED_TYPES = {
 }
 
 
+def _resolve_ytdlp_cli_path() -> str:
+    try:
+        from core.dependency_check import _find_executable_path
+
+        cli_path = _find_executable_path("yt-dlp")
+        if cli_path:
+            return str(cli_path)
+    except Exception:
+        pass
+    return "yt-dlp"
+
+
 def _load_ytdlp_extractors():
     """Load yt-dlp extractors in background. Called once at startup."""
     global _ytdlp_extractors, _ytdlp_extractors_loading
@@ -1742,7 +1754,7 @@ def _run_ytdlp_query_search(search_key: str, term: str, limit: int = 10, timeout
             creationflags = 0x08000000
 
         cmd = [
-            "yt-dlp",
+            _resolve_ytdlp_cli_path(),
             "--dump-single-json",
             "--flat-playlist",
             "--playlist-end",
@@ -2173,7 +2185,7 @@ def search_youtube_channels(term: str, limit: int = 10, timeout: int = 15) -> li
             creationflags = 0x08000000
 
         cmd = [
-            "yt-dlp",
+            _resolve_ytdlp_cli_path(),
             "--dump-single-json",
             "--flat-playlist",
             "--playlist-end",
@@ -2230,7 +2242,7 @@ def _search_youtube_playlists(term: str, limit: int = 10, timeout: int = 15) -> 
             f"?search_query={quote_plus(query)}&sp={playlist_filter_sp}"
         )
         cmd = [
-            "yt-dlp",
+            _resolve_ytdlp_cli_path(),
             "--dump-single-json",
             "--flat-playlist",
             "--playlist-end",
@@ -2954,7 +2966,7 @@ def get_ytdlp_feed_url(url: str) -> str:
                 
             # extract_flat gives us channel info without downloading every video info
             # Use cookies to avoid "Sign in to confirm you’re not a bot" errors
-            cmd = ["yt-dlp", "--dump-json", "--playlist-items", "0", url]
+            cmd = [_resolve_ytdlp_cli_path(), "--dump-json", "--playlist-items", "0", url]
             
             # Add cookies if available
             cookies = get_ytdlp_cookie_sources(url)
@@ -3173,7 +3185,7 @@ def detect_media(url: str, timeout: int = 20) -> tuple[str | None, str | None]:
         if platform.system().lower() == "windows":
             creationflags = 0x08000000
 
-        cmd = ["yt-dlp", "--dump-json", "--no-playlist", url]
+        cmd = [_resolve_ytdlp_cli_path(), "--dump-json", "--no-playlist", url]
         
         # Add cookies if available
         cookies = get_ytdlp_cookie_sources(url)

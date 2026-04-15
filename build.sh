@@ -5,10 +5,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 MODE="${1:-build}"
+RELEASE_TAG="${2:-${BLINDRSS_RELEASE_TAG:-}}"
 case "$MODE" in
   build|dry-run|release) ;;
   *)
-    echo "Usage: ./build.sh <build|dry-run|release>"
+    echo "Usage: ./build.sh <build|dry-run|release> [release-tag]"
     exit 1
     ;;
 esac
@@ -33,13 +34,6 @@ case "$UNAME_S" in
     exit 1
     ;;
 esac
-
-if [[ "$MODE" == "release" ]]; then
-  echo "[X] ./build.sh does not publish releases directly."
-  echo "[X] Use it for local macOS packaging and GitHub runner builds."
-  echo "[X] Windows updater assets still require .\\build.bat release when producing the Windows release package."
-  exit 1
-fi
 
 detect_python() {
   if command -v python3 >/dev/null 2>&1; then
@@ -142,6 +136,32 @@ ensure_vlc_macos() {
   export BLINDRSS_VLC_APP="$vlc_app"
 }
 
+dispatch_macos_release_workflow() {
+  local release_tag="$1"
+  if [[ -z "$release_tag" ]]; then
+    echo "[X] ./build.sh release requires an existing GitHub release tag."
+    echo "[X] Usage: ./build.sh release vX.Y.Z"
+    exit 1
+  fi
+  if ! command -v gh >/dev/null 2>&1; then
+    echo "[X] GitHub CLI (gh) not found on PATH."
+    exit 1
+  fi
+  if ! gh auth status >/dev/null 2>&1; then
+    echo "[X] gh is not authenticated."
+    exit 1
+  fi
+  if ! gh release view "$release_tag" >/dev/null 2>&1; then
+    echo "[X] GitHub release $release_tag was not found in this repository."
+    echo "[X] Create the Windows release first with .\\build.bat release."
+    exit 1
+  fi
+  echo "[BlindRSS Build] Dispatching GitHub macOS release workflow for $release_tag..."
+  gh workflow run cross-platform-release.yml -f release_tag="$release_tag"
+  echo "[BlindRSS Build] Workflow dispatched."
+  echo "[BlindRSS Build] GitHub Actions will build the macOS ZIP and upload it to release $release_tag."
+}
+
 read_version() {
   VERSION_NO_V="$("$SCRIPT_DIR/.venv/bin/python" - <<'PY'
 from core.version import APP_VERSION
@@ -183,6 +203,12 @@ if [[ "$MODE" == "dry-run" ]]; then
   echo "[Dry Run] Python: $PYTHON_EXE"
   echo "[Dry Run] Would prepare .venv, install dependencies, bundle yt-dlp, deno, ffmpeg, and macOS VLC assets."
   echo "[Dry Run] Would ad-hoc sign dist/BlindRSS.app and zip it to dist/BlindRSS-macos-v<version>.zip"
+  echo "[Dry Run] ./build.sh release <tag> would dispatch the macOS GitHub Actions build to upload a ZIP to an existing GitHub release."
+  exit 0
+fi
+
+if [[ "$MODE" == "release" ]]; then
+  dispatch_macos_release_workflow "$RELEASE_TAG"
   exit 0
 fi
 

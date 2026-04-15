@@ -98,7 +98,7 @@ def _extract_ytdlp_info_via_cli(
     referer = target_url
 
     cmd = [
-        "yt-dlp",
+        discovery._resolve_ytdlp_cli_path(),
         "--dump-single-json",
         "--no-playlist",
         "--format",

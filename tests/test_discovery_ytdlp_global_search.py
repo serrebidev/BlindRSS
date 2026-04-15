@@ -289,6 +289,28 @@ def test_run_ytdlp_query_search_accepts_zero_returncode():
     assert out[0]["url"] == "https://example.com/x"
 
 
+def test_run_ytdlp_query_search_uses_resolved_cli_path():
+    captured = {}
+
+    class _FakeProc:
+        returncode = 0
+        stdout = b'{"entries":[]}'
+        stderr = b""
+
+    def _fake_run(cmd, **_kwargs):
+        captured["cmd"] = list(cmd)
+        return _FakeProc()
+
+    with patch("core.discovery.subprocess.run", side_effect=_fake_run), patch(
+        "core.discovery._resolve_ytdlp_cli_path", return_value="/Applications/BlindRSS.app/Contents/Frameworks/bin/yt-dlp"
+    ), patch("core.discovery.platform.system", return_value="Darwin"), patch(
+        "core.dependency_check._get_startup_info", return_value=None
+    ):
+        discovery._run_ytdlp_query_search("ytsearch", "coffee crisp", limit=3, timeout=10)
+
+    assert captured["cmd"][0] == "/Applications/BlindRSS.app/Contents/Frameworks/bin/yt-dlp"
+
+
 def test_resolve_ytdlp_url_title_prefers_ytdlp_title():
     class _FakeYDL:
         def __init__(self, _opts):
