@@ -7,8 +7,8 @@ This is the only approved workflow for packaging and publishing BlindRSS.
 - Iterative local build: `.\build.bat build`
 - Official Windows release build: `.\build.bat release`
 - No-change preview: `.\build.bat dry-run`
-- Local macOS/Linux package build: `./build.sh build`
-- Local macOS/Linux preview: `./build.sh dry-run`
+- Local macOS package build: `./build.sh build`
+- Local macOS preview: `./build.sh dry-run`
 
 ## Mandatory Release Rule
 
@@ -20,8 +20,8 @@ GitHub release publication may happen from any OS after the required artifacts a
 - Computes the release ZIP SHA-256 hash.
 - Signs `BlindRSS.exe` when `signtool.exe` is available.
 - Bumps `core/version.py`, tags Git, pushes, and creates the GitHub release.
-- Dispatches GitHub Actions builds for macOS plus Linux `.deb`/`.rpm` release assets after the Windows release is created.
-- Pushes to `main` also trigger GitHub Actions workflow builds for Windows, macOS, and Linux as workflow artifacts so you can validate cross-platform packaging from macOS without publishing a release.
+- Dispatches the GitHub Actions macOS release-asset build after the Windows release is created.
+- Pushes to `main` also trigger GitHub Actions workflow builds for Windows and macOS as workflow artifacts so you can validate packaging from macOS without publishing a release.
 
 ## Windows Release Prerequisites
 
@@ -31,7 +31,7 @@ GitHub release publication may happen from any OS after the required artifacts a
 - Windows SDK `signtool.exe` for signed builds/releases.
 - Network access (the script installs deps and can download `yt-dlp.exe` and `deno.exe`).
 
-## macOS/Linux Local Build Prerequisites
+## macOS Local Build Prerequisites
 
 - Python 3.12+ (`python3` preferred).
 - `curl` and `unzip`.
@@ -40,8 +40,6 @@ GitHub release publication may happen from any OS after the required artifacts a
 - `ffmpeg` available on PATH.
 - macOS: VLC installed at `/Applications/VLC.app`, or set `BLINDRSS_VLC_APP`.
 - macOS: the generated `.app` is ad-hoc signed by default with the free local `codesign` identity (`-`). This is not notarization.
-- Linux: VLC/libvlc installed so the script can bundle `libvlc` and the VLC plugins directory.
-- Linux native packaging: `dpkg-deb` and `rpmbuild` must be available on PATH.
 
 ## What Each Mode Does
 
@@ -67,7 +65,7 @@ GitHub release publication may happen from any OS after the required artifacts a
   - `dist\BlindRSS-vX.Y.Z.zip`
   - `dist\BlindRSS-update.json`
   - `dist\release-notes-vX.Y.Z.md`
-- Commits version bump, tags, pushes, creates GitHub release assets (ZIP + manifest), and dispatches the `cross-platform-release.yml` GitHub Actions workflow to attach macOS plus Linux `.deb`/`.rpm` assets to the same release.
+- Commits version bump, tags, pushes, creates GitHub release assets (ZIP + manifest), and dispatches the `cross-platform-release.yml` GitHub Actions workflow to attach the macOS asset to the same release.
 
 ### `dry-run`
 
@@ -86,16 +84,6 @@ GitHub release publication may happen from any OS after the required artifacts a
     - `dist/BlindRSS.app`
     - `dist/BlindRSS-macos-vX.Y.Z.zip`
 
-- On Linux:
-  - Creates/uses `.venv`.
-  - Installs Python dependencies.
-  - Bundles `yt-dlp`, `deno`, `ffmpeg`, and VLC runtime files.
-  - Runs PyInstaller via `portable.spec`.
-  - Creates native Linux packages:
-    - `dist/BlindRSS/`
-    - `dist/BlindRSS-linux-<arch>-vX.Y.Z.deb`
-    - `dist/BlindRSS-linux-<arch>-vX.Y.Z.rpm`
-
 ### `build.sh release`
 
 - `build.sh` does not create a release directly.
@@ -110,8 +98,6 @@ GitHub release publication may happen from any OS after the required artifacts a
 - `BLINDRSS_VLC_APP`: override the macOS VLC app bundle path for `build.sh`.
 - `BLINDRSS_CODESIGN_IDENTITY`: override the macOS `codesign` identity used by `build.sh`. Default is `-` (ad-hoc signing).
 - `BLINDRSS_SKIP_MACOS_CODESIGN=1`: skip ad-hoc signing in `build.sh`.
-- `BLINDRSS_VLC_LIB_DIR`: override the Linux libvlc directory for `build.sh`.
-- `BLINDRSS_VLC_PLUGINS`: override the Linux VLC plugins directory for `build.sh`.
 
 ## Typical Usage
 

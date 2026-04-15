@@ -18,7 +18,6 @@ UNAME_M="$(uname -m)"
 
 case "$UNAME_S" in
   Darwin)
-    PLATFORM="macos"
     YTDLP_URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
     case "$UNAME_M" in
       arm64|aarch64) DENO_ASSET="deno-aarch64-apple-darwin.zip" ;;
@@ -29,27 +28,15 @@ case "$UNAME_S" in
         ;;
     esac
     ;;
-  Linux)
-    PLATFORM="linux"
-    YTDLP_URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
-    case "$UNAME_M" in
-      x86_64) DENO_ASSET="deno-x86_64-unknown-linux-gnu.zip" ;;
-      aarch64|arm64) DENO_ASSET="deno-aarch64-unknown-linux-gnu.zip" ;;
-      *)
-        echo "[X] Unsupported Linux architecture: $UNAME_M"
-        exit 1
-        ;;
-    esac
-    ;;
   *)
-    echo "[X] Unsupported platform: $UNAME_S"
+    echo "[X] build.sh currently supports macOS only. Unsupported platform: $UNAME_S"
     exit 1
     ;;
 esac
 
 if [[ "$MODE" == "release" ]]; then
   echo "[X] ./build.sh does not publish releases directly."
-  echo "[X] Use it for local macOS/Linux packaging and GitHub runner builds."
+  echo "[X] Use it for local macOS packaging and GitHub runner builds."
   echo "[X] Windows updater assets still require .\\build.bat release when producing the Windows release package."
   exit 1
 fi
@@ -132,7 +119,7 @@ ensure_ffmpeg() {
   local ffmpeg_path
   local dest="$SCRIPT_DIR/bin/ffmpeg"
   ffmpeg_path="$(command -v ffmpeg || true)"
-  if [[ -z "$ffmpeg_path" && "$PLATFORM" == "macos" && -x "$(command -v brew || true)" ]]; then
+  if [[ -z "$ffmpeg_path" && -x "$(command -v brew || true)" ]]; then
     echo "[BlindRSS Build] ffmpeg missing. Installing with Homebrew..."
     brew install ffmpeg
     ffmpeg_path="$(command -v ffmpeg || true)"
@@ -153,48 +140,6 @@ ensure_vlc_macos() {
     exit 1
   fi
   export BLINDRSS_VLC_APP="$vlc_app"
-}
-
-ensure_vlc_linux() {
-  local plugin_dir lib_dir
-  plugin_dir="${BLINDRSS_VLC_PLUGINS:-}"
-  lib_dir="${BLINDRSS_VLC_LIB_DIR:-}"
-
-  if [[ -z "$plugin_dir" ]]; then
-    for candidate in \
-      /usr/lib/x86_64-linux-gnu/vlc/plugins \
-      /usr/lib/aarch64-linux-gnu/vlc/plugins \
-      /usr/lib/vlc/plugins
-    do
-      if [[ -d "$candidate" ]]; then
-        plugin_dir="$candidate"
-        break
-      fi
-    done
-  fi
-
-  if [[ -z "$lib_dir" ]]; then
-    for candidate in \
-      /usr/lib/x86_64-linux-gnu \
-      /usr/lib/aarch64-linux-gnu \
-      /usr/lib64 \
-      /usr/lib
-    do
-      if compgen -G "$candidate/libvlc.so*" >/dev/null; then
-        lib_dir="$candidate"
-        break
-      fi
-    done
-  fi
-
-  if [[ -z "$plugin_dir" || -z "$lib_dir" ]]; then
-    echo "[X] Linux VLC runtime files were not found."
-    echo "[X] Install VLC/libvlc and/or set BLINDRSS_VLC_PLUGINS and BLINDRSS_VLC_LIB_DIR."
-    exit 1
-  fi
-
-  export BLINDRSS_VLC_PLUGINS="$plugin_dir"
-  export BLINDRSS_VLC_LIB_DIR="$lib_dir"
 }
 
 read_version() {
@@ -232,26 +177,12 @@ package_macos() {
   /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$app_path" "$zip_path"
 }
 
-package_linux_native() {
-  echo "[BlindRSS Build] Creating Linux .deb and .rpm packages..."
-  "$SCRIPT_DIR/.venv/bin/python" "$SCRIPT_DIR/tools/linux_packaging.py" \
-    --bundle-dir "$SCRIPT_DIR/dist/BlindRSS" \
-    --output-dir "$SCRIPT_DIR/dist" \
-    --version "$VERSION_NO_V" \
-    --machine "$UNAME_M" \
-    --icon-source "$SCRIPT_DIR/assets/blindrss.svg"
-}
-
 if [[ "$MODE" == "dry-run" ]]; then
   detect_python
-  echo "[Dry Run] Platform: $PLATFORM ($UNAME_M)"
+  echo "[Dry Run] Platform: macos ($UNAME_M)"
   echo "[Dry Run] Python: $PYTHON_EXE"
-  echo "[Dry Run] Would prepare .venv, install dependencies, bundle yt-dlp, deno, ffmpeg, and platform VLC assets."
-  if [[ "$PLATFORM" == "macos" ]]; then
-    echo "[Dry Run] Would ad-hoc sign dist/BlindRSS.app and zip it to dist/BlindRSS-macos-v<version>.zip"
-  else
-    echo "[Dry Run] Would build dist/BlindRSS and create dist/BlindRSS-linux-${UNAME_M}-v<version>.deb plus dist/BlindRSS-linux-${UNAME_M}-v<version>.rpm"
-  fi
+  echo "[Dry Run] Would prepare .venv, install dependencies, bundle yt-dlp, deno, ffmpeg, and macOS VLC assets."
+  echo "[Dry Run] Would ad-hoc sign dist/BlindRSS.app and zip it to dist/BlindRSS-macos-v<version>.zip"
   exit 0
 fi
 
@@ -259,19 +190,9 @@ setup_venv
 ensure_yt_dlp
 ensure_deno
 ensure_ffmpeg
-
-if [[ "$PLATFORM" == "macos" ]]; then
-  ensure_vlc_macos
-else
-  ensure_vlc_linux
-fi
+ensure_vlc_macos
 
 build_pyinstaller
-
-if [[ "$PLATFORM" == "macos" ]]; then
-  package_macos
-else
-  package_linux_native
-fi
+package_macos
 
 echo "[BlindRSS Build] Done."
