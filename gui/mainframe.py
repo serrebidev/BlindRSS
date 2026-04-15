@@ -188,17 +188,24 @@ class MainFrame(wx.Frame):
                     msg += "- FFmpeg (required for some podcasts)\n"
                 if missing_ytdlp:
                     msg += "- yt-dlp (required for YouTube and many media sources)\n"
-                msg += "\nWould you like to install them automatically (via winget/Ninite) and add them to PATH?"
-                msg += "\n\nTip: You can disable this prompt in Settings > General."
-                
-                if wx.MessageBox(msg, "Install Dependencies", wx.YES_NO | wx.ICON_QUESTION) == wx.YES:
-                    self.SetStatusText("Installing dependencies...")
-                    # Run in thread to avoid freezing
-                    threading.Thread(
-                        target=self._install_dependencies_thread,
-                        args=(missing_vlc, missing_ffmpeg, missing_ytdlp),
-                        daemon=True,
-                    ).start()
+                if sys.platform.startswith("win"):
+                    msg += "\nWould you like to install them automatically (via winget/Ninite) and add them to PATH?"
+                    msg += "\n\nTip: You can disable this prompt in Settings > General."
+
+                    if wx.MessageBox(msg, "Install Dependencies", wx.YES_NO | wx.ICON_QUESTION) == wx.YES:
+                        self.SetStatusText("Installing dependencies...")
+                        # Run in thread to avoid freezing
+                        threading.Thread(
+                            target=self._install_dependencies_thread,
+                            args=(missing_vlc, missing_ffmpeg, missing_ytdlp),
+                            daemon=True,
+                        ).start()
+                else:
+                    log_path = dependency_check.get_dependency_log_path()
+                    msg += "\n\nThis macOS/Linux build should already bundle these tools."
+                    msg += f"\nIf they still appear missing, see the log: {log_path}"
+                    msg += "\n\nTip: You can disable this prompt in Settings > General."
+                    wx.MessageBox(msg, "Missing Dependencies", wx.OK | wx.ICON_WARNING)
         except Exception as e:
             log.error(f"Dependency check failed: {e}")
 

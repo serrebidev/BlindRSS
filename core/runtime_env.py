@@ -24,32 +24,63 @@ def _first_existing(paths):
     return None
 
 
+def _runtime_roots(base_dir: Path):
+    roots = [base_dir]
+    if sys.platform.startswith("darwin"):
+        roots.append(base_dir.parent / "Frameworks")
+
+    meipass = getattr(sys, "_MEIPASS", None)
+    if meipass:
+        roots.append(Path(meipass))
+
+    unique = []
+    seen = set()
+    for root in roots:
+        try:
+            resolved = Path(root).resolve()
+        except Exception:
+            resolved = Path(root)
+        key = str(resolved)
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(resolved)
+    return unique
+
+
 def _candidate_vlc_plugin_dir(base_dir: Path):
-    return _first_existing(
-        [
-            base_dir / "vlc" / "plugins",
-            base_dir / "vlc" / "modules",
-        ]
-    )
+    candidates = []
+    for root in _runtime_roots(base_dir):
+        candidates.extend(
+            [
+                root / "vlc" / "plugins",
+                root / "vlc" / "modules",
+            ]
+        )
+    return _first_existing(candidates)
 
 
 def _candidate_vlc_lib_path(base_dir: Path):
-    if sys.platform.startswith("darwin"):
-        candidates = [
-            base_dir / "vlc" / "lib" / "libvlc.dylib",
-        ]
-    elif sys.platform.startswith("linux"):
-        lib_dir = base_dir / "vlc" / "lib"
-        candidates = [
-            lib_dir / "libvlc.so.5",
-            lib_dir / "libvlc.so",
-            *sorted(lib_dir.glob("libvlc.so*")),
-        ]
-    else:
-        candidates = [
-            base_dir / "vlc" / "libvlc.dll",
-            base_dir / "libvlc.dll",
-        ]
+    candidates = []
+    for root in _runtime_roots(base_dir):
+        if sys.platform.startswith("darwin"):
+            candidates.append(root / "vlc" / "lib" / "libvlc.dylib")
+        elif sys.platform.startswith("linux"):
+            lib_dir = root / "vlc" / "lib"
+            candidates.extend(
+                [
+                    lib_dir / "libvlc.so.5",
+                    lib_dir / "libvlc.so",
+                    *sorted(lib_dir.glob("libvlc.so*")),
+                ]
+            )
+        else:
+            candidates.extend(
+                [
+                    root / "vlc" / "libvlc.dll",
+                    root / "libvlc.dll",
+                ]
+            )
     return _first_existing(candidates)
 
 
@@ -62,9 +93,10 @@ def configure_runtime_environment() -> None:
     except Exception:
         return
 
-    bin_dir = base_dir / "bin"
-    if bin_dir.is_dir():
-        _prepend_env_path("PATH", str(bin_dir))
+    for root in _runtime_roots(base_dir):
+        bin_dir = root / "bin"
+        if bin_dir.is_dir():
+            _prepend_env_path("PATH", str(bin_dir))
 
     lib_path = _candidate_vlc_lib_path(base_dir)
     plugin_dir = _candidate_vlc_plugin_dir(base_dir)

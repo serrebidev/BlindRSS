@@ -5,22 +5,24 @@ from core import runtime_env
 
 def test_configure_runtime_environment_adds_frozen_bin_dir(monkeypatch, tmp_path):
     app_dir = tmp_path / "BlindRSS.app" / "Contents" / "MacOS"
-    bin_dir = app_dir / "bin"
-    bin_dir.mkdir(parents=True)
+    frameworks_bin_dir = tmp_path / "BlindRSS.app" / "Contents" / "Frameworks" / "bin"
+    frameworks_bin_dir.mkdir(parents=True)
 
+    monkeypatch.setattr(runtime_env.sys, "platform", "darwin", raising=False)
     monkeypatch.setattr(runtime_env.sys, "frozen", True, raising=False)
     monkeypatch.setattr(runtime_env.sys, "executable", str(app_dir / "BlindRSS"), raising=False)
     monkeypatch.setenv("PATH", "/usr/bin")
 
     runtime_env.configure_runtime_environment()
 
-    assert os.environ["PATH"].split(os.pathsep)[0] == str(bin_dir)
+    assert os.environ["PATH"].split(os.pathsep)[0] == str(frameworks_bin_dir)
 
 
 def test_configure_runtime_environment_sets_macos_vlc_vars(monkeypatch, tmp_path):
     app_dir = tmp_path / "BlindRSS.app" / "Contents" / "MacOS"
-    lib_dir = app_dir / "vlc" / "lib"
-    plugin_dir = app_dir / "vlc" / "plugins"
+    frameworks_dir = tmp_path / "BlindRSS.app" / "Contents" / "Frameworks"
+    lib_dir = frameworks_dir / "vlc" / "lib"
+    plugin_dir = frameworks_dir / "vlc" / "plugins"
     lib_dir.mkdir(parents=True)
     plugin_dir.mkdir(parents=True)
     (lib_dir / "libvlc.dylib").write_text("", encoding="utf-8")

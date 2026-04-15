@@ -8,6 +8,7 @@ import ctypes
 import time
 import tempfile
 import zipfile
+from pathlib import Path
 
 try:
     import winreg
@@ -119,6 +120,68 @@ def _broadcast_env_change():
         )
     except Exception as e:
         _log(f"Failed to broadcast env change: {e}")
+
+
+def _runtime_search_roots():
+    roots = []
+    if getattr(sys, "frozen", False):
+        try:
+            exe_dir = os.path.dirname(os.path.abspath(sys.executable))
+        except Exception:
+            exe_dir = ""
+        if exe_dir:
+            roots.append(exe_dir)
+            if platform.system().lower() == "darwin":
+                roots.append(os.path.join(os.path.dirname(exe_dir), "Frameworks"))
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            roots.append(meipass)
+    else:
+        roots.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+    unique = []
+    seen = set()
+    for root in roots:
+        if not root:
+            continue
+        norm = _normalize_path_entry(root)
+        if norm in seen:
+            continue
+        seen.add(norm)
+        unique.append(root)
+    return unique
+
+
+def _candidate_vlc_lib_paths():
+    system_name = platform.system().lower()
+    candidates = []
+    for root in _runtime_search_roots():
+        root_path = Path(root)
+        if system_name == "darwin":
+            candidates.extend(
+                [
+                    root_path / "vlc" / "lib" / "libvlc.dylib",
+                    Path("/Applications/VLC.app/Contents/MacOS/lib/libvlc.dylib"),
+                    Path.home() / "Applications" / "VLC.app" / "Contents" / "MacOS" / "lib" / "libvlc.dylib",
+                ]
+            )
+        elif system_name == "linux":
+            lib_dir = root_path / "vlc" / "lib"
+            candidates.extend(
+                [
+                    lib_dir / "libvlc.so.5",
+                    lib_dir / "libvlc.so",
+                    *sorted(lib_dir.glob("libvlc.so*")),
+                ]
+            )
+        else:
+            candidates.extend(
+                [
+                    root_path / "vlc" / "libvlc.dll",
+                    root_path / "libvlc.dll",
+                ]
+            )
+    return [str(path) for path in candidates if path and path.is_file()]
 
 def _maybe_add_windows_path():
     """Meticulously find VLC/ffmpeg/yt-dlp and add to PATH for this process."""
@@ -319,6 +382,7 @@ def _collect_tool_candidates(tool_name):
     tool = str(tool_name).lower().replace(".exe", "")
     dirs = set()
     search_roots = set()
+    runtime_roots = _runtime_search_roots()
     local_app_data = os.environ.get("LOCALAPPDATA", "")
     program_files = os.environ.get("ProgramFiles", "")
     program_files_x86 = os.environ.get("ProgramFiles(x86)", "")
@@ -332,6 +396,14 @@ def _collect_tool_candidates(tool_name):
             os.path.join(user_p, r"scoop\apps\ffmpeg\current\bin"),
             os.path.join(user_p, r"scoop\apps\vlc\current"),
         ])
+
+    for root in runtime_roots:
+        dirs.add(root)
+        dirs.add(os.path.join(root, "bin"))
+        if tool == "vlc":
+            dirs.add(os.path.join(root, "vlc"))
+            dirs.add(os.path.join(root, "vlc", "bin"))
+            search_roots.add(os.path.join(root, "vlc"))
 
     if tool == "vlc":
         for base in (program_w6432, program_files, program_files_x86):
@@ -350,6 +422,9 @@ def _collect_tool_candidates(tool_name):
         if choco_root:
             dirs.add(os.path.join(choco_root, "lib", "vlc", "tools"))
             dirs.add(os.path.join(choco_root, "bin"))
+        if platform.system().lower() == "darwin":
+            dirs.add("/Applications/VLC.app/Contents/MacOS")
+            dirs.add(os.path.join(os.path.expanduser("~/Applications"), "VLC.app", "Contents", "MacOS"))
 
     if tool == "ffmpeg":
         for base in (program_w6432, program_files, program_files_x86):
@@ -399,18 +474,28 @@ def _find_executable_path(exe_name, extra_dirs=None):
     exe_base = str(exe_name).strip()
     if not exe_base:
         return None
-    exe_file = exe_base if exe_base.lower().endswith(".exe") else f"{exe_base}.exe"
+    system_name = platform.system().lower()
+    exe_candidates = []
+    if exe_base:
+        exe_candidates.append(exe_base)
+    if system_name == "windows":
+        if not exe_base.lower().endswith(".exe"):
+            exe_candidates.append(f"{exe_base}.exe")
+    elif exe_base.lower().endswith(".exe"):
+        exe_candidates.append(exe_base[:-4])
+    exe_candidates = [candidate for i, candidate in enumerate(exe_candidates) if candidate and candidate not in exe_candidates[:i]]
 
     try:
         _maybe_add_windows_path()
     except Exception:
         pass
 
-    exe = shutil.which(exe_base) or shutil.which(exe_file)
-    if exe and os.path.isfile(exe):
-        return exe
+    for candidate in exe_candidates:
+        exe = shutil.which(candidate)
+        if exe and os.path.isfile(exe):
+            return exe
 
-    if platform.system().lower() == "windows":
+    if system_name == "windows":
         try:
             res = subprocess.run(
                 ["where", exe_base],
@@ -442,17 +527,19 @@ def _find_executable_path(exe_name, extra_dirs=None):
             d_abs = os.path.abspath(d)
         except Exception:
             d_abs = d
-        exe_path = os.path.join(d_abs, exe_file)
-        if os.path.isfile(exe_path):
-            return exe_path
+        for exe_file in exe_candidates:
+            exe_path = os.path.join(d_abs, exe_file)
+            if os.path.isfile(exe_path):
+                return exe_path
 
     for root in search_roots:
         if not root or not os.path.isdir(root):
             continue
         try:
             for cur_root, _, files in os.walk(root):
-                if exe_file in files:
-                    return os.path.join(cur_root, exe_file)
+                for exe_file in exe_candidates:
+                    if exe_file in files:
+                        return os.path.join(cur_root, exe_file)
         except Exception:
             continue
 
@@ -675,6 +762,11 @@ def check_media_tools_status():
         vlc_present = False
         if os.environ.get("PYTHON_VLC_LIB_PATH") and os.path.isfile(os.environ["PYTHON_VLC_LIB_PATH"]):
             vlc_present = True
+        if not vlc_present:
+            vlc_lib_candidates = _candidate_vlc_lib_paths()
+            if vlc_lib_candidates:
+                vlc_present = True
+                os.environ.setdefault("PYTHON_VLC_LIB_PATH", vlc_lib_candidates[0])
         if not vlc_present and _winget_has_package("VideoLAN.VLC"):
             vlc_present = True
 

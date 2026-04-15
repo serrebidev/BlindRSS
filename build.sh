@@ -129,6 +129,7 @@ ensure_deno() {
 ensure_ffmpeg() {
   ensure_bin_dir
   local ffmpeg_path
+  local dest="$SCRIPT_DIR/bin/ffmpeg"
   ffmpeg_path="$(command -v ffmpeg || true)"
   if [[ -z "$ffmpeg_path" && "$PLATFORM" == "macos" && -x "$(command -v brew || true)" ]]; then
     echo "[BlindRSS Build] ffmpeg missing. Installing with Homebrew..."
@@ -139,8 +140,8 @@ ensure_ffmpeg() {
     echo "[X] ffmpeg not found on PATH."
     exit 1
   fi
-  cp "$ffmpeg_path" "$SCRIPT_DIR/bin/ffmpeg"
-  chmod +x "$SCRIPT_DIR/bin/ffmpeg"
+  rm -f "$dest"
+  install -m 755 "$ffmpeg_path" "$dest"
 }
 
 ensure_vlc_macos() {

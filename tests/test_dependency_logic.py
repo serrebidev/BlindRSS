@@ -2,6 +2,7 @@ import unittest
 import sys
 import os
 import platform
+import tempfile
 from unittest.mock import MagicMock, patch, call
 
 # Mock winreg before importing dependency_check
@@ -177,6 +178,41 @@ class TestDependencyLogic(unittest.TestCase):
         dep_check.check_and_install_dependencies()
 
         mock_check_call.assert_not_called()
+
+    @patch('core.dependency_check.platform.system', return_value='darwin')
+    @patch('core.dependency_check.shutil.which', return_value=None)
+    def test_find_executable_path_uses_macos_frameworks_bin_for_frozen_build(self, _mock_which, _mock_platform):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            app_dir = os.path.join(tmpdir, "BlindRSS.app", "Contents", "MacOS")
+            bin_dir = os.path.join(tmpdir, "BlindRSS.app", "Contents", "Frameworks", "bin")
+            os.makedirs(bin_dir, exist_ok=True)
+            bundled_tool = os.path.join(bin_dir, "yt-dlp")
+            with open(bundled_tool, "w", encoding="utf-8") as handle:
+                handle.write("")
+
+            with patch.object(dep_check.sys, "frozen", True, create=True), \
+                 patch.object(dep_check.sys, "executable", os.path.join(app_dir, "BlindRSS"), create=True):
+                found = dep_check._find_executable_path("yt-dlp")
+
+        self.assertEqual(found, bundled_tool)
+
+    @patch('core.dependency_check._find_executable_path', side_effect=[None, "/tmp/ffmpeg", "/tmp/yt-dlp"])
+    @patch('core.dependency_check._candidate_vlc_lib_paths', return_value=["/tmp/libvlc.dylib"])
+    @patch('core.dependency_check._maybe_add_windows_path')
+    @patch('core.dependency_check.platform.system', return_value='darwin')
+    def test_check_media_tools_status_uses_vlc_library_on_macos(
+        self,
+        _mock_platform,
+        _mock_maybe_add_windows_path,
+        _mock_candidate_vlc_lib_paths,
+        _mock_find_executable_path,
+    ):
+        with patch("core.dependency_check.os.path.isfile", return_value=False):
+            missing_vlc, missing_ffmpeg, missing_ytdlp = dep_check.check_media_tools_status()
+
+        self.assertFalse(missing_vlc)
+        self.assertFalse(missing_ffmpeg)
+        self.assertFalse(missing_ytdlp)
 
 if __name__ == '__main__':
     unittest.main()
