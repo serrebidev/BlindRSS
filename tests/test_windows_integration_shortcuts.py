@@ -42,6 +42,14 @@ def test_get_start_menu_shortcut_path_uses_appdata(monkeypatch):
     )
 
 
+def test_taskbar_dir_uses_appdata(monkeypatch):
+    monkeypatch.setenv("APPDATA", r"C:\Users\admin\AppData\Roaming")
+    path = winint._taskbar_dir()
+    assert path.replace("/", "\\") == (
+        r"C:\Users\admin\AppData\Roaming\Microsoft\Internet Explorer\Quick Launch\User Pinned\TaskBar"
+    )
+
+
 def test_ensure_notification_prereqs_creates_start_menu_shortcut(monkeypatch, tmp_path):
     target_lnk = tmp_path / "BlindRSS.lnk"
 

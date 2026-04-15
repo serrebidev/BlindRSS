@@ -11,11 +11,15 @@ ENV/
 build/
 dist/
 *.spec
+!portable.spec
 
 # Local build artifacts
 BlindRSS.zip
 bin/
 config.json
+
+# macOS Finder launcher wrapper (generated locally; rebuild via scripts if needed)
+BlindRSS.app/
 
 # Database
 rss.db

@@ -14,6 +14,8 @@ class BlindRSSTrayIcon(wx.adv.TaskBarIcon):
     def set_default_icon(self):
         # Create a simple colored block icon
         icon_size = wx.SystemSettings.GetMetric(wx.SYS_ICON_X)
+        if icon_size <= 0:
+            icon_size = 32
         bmp = wx.Bitmap(icon_size, icon_size)
         dc = wx.MemoryDC(bmp)
         dc.SetBackground(wx.Brush("ORANGE"))

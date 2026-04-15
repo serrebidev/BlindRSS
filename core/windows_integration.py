@@ -87,7 +87,10 @@ def set_startup_enabled(enabled: bool, app_name: str = APP_NAME) -> tuple[bool, 
 
 
 def _start_menu_programs_dir() -> str:
-    return os.path.join(os.path.expandvars("%APPDATA%"), "Microsoft", "Windows", "Start Menu", "Programs")
+    # os.path.expandvars only expands %VAR% on Windows; read env directly so
+    # callers and tests driven from POSIX hosts get a real path, not a literal.
+    appdata = os.environ.get("APPDATA") or os.path.expandvars("%APPDATA%")
+    return os.path.join(appdata, "Microsoft", "Windows", "Start Menu", "Programs")
 
 
 def get_start_menu_shortcut_path(app_name: str = APP_NAME) -> str:
@@ -232,8 +235,9 @@ def _create_shortcut(shortcut_path: str, target_path: str, arguments: str, worki
 
 
 def _taskbar_dir() -> str:
+    appdata = os.environ.get("APPDATA") or os.path.expandvars("%APPDATA%")
     return os.path.join(
-        os.path.expandvars("%APPDATA%"),
+        appdata,
         "Microsoft",
         "Internet Explorer",
         "Quick Launch",

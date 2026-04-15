@@ -873,15 +873,18 @@ def _add_bin_to_user_path(bin_dir):
                 existing = ""
                 type_id = winreg.REG_EXPAND_SZ
 
-            existing_parts = [p for p in str(existing).split(os.pathsep) if p]
+            # Windows PATH separator is always ';' — do not use os.pathsep,
+            # which is ':' on POSIX and would corrupt the registry value if
+            # this code path is ever driven from a non-Windows host.
+            existing_parts = [p for p in str(existing).split(";") if p]
             norm_existing = {_normalize_path_entry(p) for p in existing_parts}
             norm_bin = _normalize_path_entry(bin_dir)
-            
+
             if norm_bin in norm_existing:
                 return
 
             # Append to end
-            new_path_str = os.pathsep.join(existing_parts + [str(bin_dir)])
+            new_path_str = ";".join(existing_parts + [str(bin_dir)])
             
             # Preserve type if it was REG_SZ, otherwise default to REG_EXPAND_SZ
             if type_id not in (winreg.REG_SZ, winreg.REG_EXPAND_SZ):
@@ -905,13 +908,31 @@ def check_and_install_dependencies():
         return
 
     required = {
-        'yt-dlp', 'wxpython', 'feedparser', 'requests', 'beautifulsoup4', 
+        'yt-dlp', 'wxpython', 'feedparser', 'requests', 'beautifulsoup4',
         'python-dateutil', 'mutagen', 'python-vlc',
         'pychromecast', 'async-upnp-client', 'pyatv', 'trafilatura',
         'webrtcvad', 'brotli', 'html5lib', 'lxml', 'packaging'
     }
-    installed = {d.metadata.get("Name", d.name).lower() for d in importlib.metadata.distributions() if d.metadata.get("Name") or d.name}
-    missing = required - installed
+
+    def _canon(name):
+        return (name or "").lower().replace("_", "-")
+
+    # Distributions that satisfy another required name (e.g. webrtcvad-wheels ships the `webrtcvad` module).
+    equivalents = {
+        'webrtcvad-wheels': 'webrtcvad',
+    }
+
+    installed = set()
+    for d in importlib.metadata.distributions():
+        raw = d.metadata.get("Name") or d.name
+        if not raw:
+            continue
+        canon = _canon(raw)
+        installed.add(canon)
+        if canon in equivalents:
+            installed.add(equivalents[canon])
+
+    missing = {pkg for pkg in required if _canon(pkg) not in installed}
 
     if missing:
         _log(f"Missing pip packages: {missing}. Installing...")

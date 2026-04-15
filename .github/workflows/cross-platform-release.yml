@@ -1,0 +1,137 @@
+name: Cross-Platform Builds
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag to build and upload assets for
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    if: ${{ github.event_name == 'push' }}
+    name: Build Windows Artifact
+    runs-on: windows-2022
+    steps:
+      - name: Check out current commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Windows build dependencies
+        shell: powershell
+        run: choco install vlc -y --no-progress
+
+      - name: Build Windows package
+        shell: cmd
+        run: |
+          set SKIP_SIGN=1
+          call build.bat build
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlindRSS-windows-${{ github.sha }}
+          path: dist/BlindRSS-v*.zip
+
+  macos:
+    name: Build macOS Artifact
+    runs-on: macos-14
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install macOS build dependencies
+        run: |
+          brew update
+          brew install ffmpeg
+          brew install --cask vlc
+
+      - name: Build macOS package
+        run: |
+          chmod +x build.sh
+          ./build.sh build
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlindRSS-macos-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
+          path: dist/BlindRSS-macos-*.zip
+
+      - name: Upload release asset
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-macos-*.zip --clobber
+
+  linux:
+    name: Build Linux AppImage
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Linux build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            ffmpeg \
+            vlc \
+            vlc-plugin-base \
+            libvlc-dev \
+            libgtk-3-0 \
+            libgtk-3-dev \
+            libnotify-dev \
+            libsdl2-dev \
+            libsm-dev \
+            libglib2.0-dev \
+            libwebkit2gtk-4.1-dev \
+            patchelf \
+            desktop-file-utils \
+            unzip
+
+      - name: Build Linux AppImage
+        run: |
+          chmod +x build.sh
+          ./build.sh build
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BlindRSS-linux-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
+          path: dist/BlindRSS-linux-*.AppImage
+
+      - name: Upload release asset
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-linux-*.AppImage --clobber

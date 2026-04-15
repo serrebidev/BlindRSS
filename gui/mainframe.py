@@ -20,6 +20,7 @@ from .dialogs import (
     AboutDialog,
     PersistentSearchDialog,
 )
+from .accessibility import AccessibleBrowserFrame, build_accessible_view_entries, voiceover_is_running
 from .player import PlayerFrame
 from .tray import BlindRSSTrayIcon
 from .hotkeys import HoldRepeatHotkeys
@@ -120,6 +121,9 @@ class MainFrame(wx.Frame):
         # Action Center entries while refresh is processing many new items.
         self._active_notifications = deque(maxlen=500)
         self._notification_payloads = {}
+        self._accessible_browser = None
+        self._accessible_view_entries = []
+        self._voiceover_browser_attempted = False
 
         self.init_ui()
         self.init_menus()
@@ -141,6 +145,7 @@ class MainFrame(wx.Frame):
         self.refresh_feeds()
         wx.CallAfter(self._apply_startup_window_state)
         wx.CallAfter(self._focus_default_control)
+        wx.CallLater(900, self._maybe_open_accessible_browser_for_voiceover)
         wx.CallLater(15000, self._maybe_auto_check_updates)
         wx.CallLater(4000, self._check_media_dependencies)
 
@@ -1075,6 +1080,13 @@ class MainFrame(wx.Frame):
         if not feed_id:
             return
 
+        browser = getattr(self, "_accessible_browser", None)
+        if browser and browser.IsShown() and feed_id != getattr(browser, "current_view_id", None):
+            try:
+                browser.focus_view(feed_id)
+            except Exception:
+                log.exception("Failed to sync accessible browser view")
+
         self.current_feed_id = feed_id
         self.content_ctrl.Clear()
         self.selected_article_id = None
@@ -1233,6 +1245,11 @@ class MainFrame(wx.Frame):
         show_search_item = view_menu.AppendCheckItem(wx.ID_ANY, "Show &Search Field", "Show or hide the search field")
         show_search_item.Check(bool(getattr(self, "_search_visible", True)))
         self._show_search_item = show_search_item
+        accessible_browser_item = view_menu.Append(
+            wx.ID_ANY,
+            "Open &Accessible Browser",
+            "Open the VoiceOver-friendly browser window",
+        )
         # Ctrl+P is handled globally (see main.py GlobalMediaKeyFilter). Do not make it a menu accelerator.
         player_item = view_menu.Append(wx.ID_ANY, "Show/Hide &Player (Ctrl+P)", "Show or hide the media player window")
         view_menu.AppendSeparator()
@@ -1327,6 +1344,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_configure_persistent_search, persistent_search_item)
         self.Bind(wx.EVT_MENU, self.on_add_shortcuts, add_shortcuts_item)
         self.Bind(wx.EVT_MENU, self.on_toggle_search_field, show_search_item)
+        self.Bind(wx.EVT_MENU, self.on_open_accessible_browser, accessible_browser_item)
         self.Bind(wx.EVT_MENU, self.on_show_player, player_item)
         self.Bind(wx.EVT_MENU, self.on_show_player, player_toggle_item)
         self.Bind(wx.EVT_MENU, self.on_player_play_pause, player_play_pause_item)
@@ -2384,6 +2402,12 @@ class MainFrame(wx.Frame):
                 self._media_hotkeys.stop()
         except Exception:
             pass
+        try:
+            browser = getattr(self, "_accessible_browser", None)
+            if browser:
+                browser.Destroy()
+        except Exception:
+            pass
         if self.tray_icon:
             self.tray_icon.Destroy()
         try:
@@ -3152,6 +3176,57 @@ class MainFrame(wx.Frame):
         except Exception as e:
             wx.MessageBox(f"Error fetching feeds: {e}", "Error", wx.ICON_ERROR)
 
+    def _ensure_accessible_browser(self):
+        browser = getattr(self, "_accessible_browser", None)
+        if browser:
+            try:
+                if not browser.IsBeingDeleted():
+                    return browser
+            except Exception:
+                pass
+
+        browser = AccessibleBrowserFrame(self)
+        self._accessible_browser = browser
+        browser.Bind(wx.EVT_CLOSE, self._on_accessible_browser_close)
+        return browser
+
+    def _on_accessible_browser_close(self, event):
+        browser = getattr(self, "_accessible_browser", None)
+        if browser:
+            try:
+                browser.Hide()
+                event.Veto()
+                return
+            except Exception:
+                pass
+        event.Skip()
+
+    def on_open_accessible_browser(self, event=None):
+        browser = self._ensure_accessible_browser()
+        selected_view_id = getattr(browser, "current_view_id", None) or getattr(self, "current_feed_id", None) or "all"
+        try:
+            browser.refresh_views(selected_view_id=selected_view_id)
+        except Exception:
+            log.exception("Failed to refresh accessible browser")
+        browser.Show()
+        browser.Raise()
+        try:
+            browser.focus_view(selected_view_id)
+        except Exception:
+            pass
+
+    def _maybe_open_accessible_browser_for_voiceover(self):
+        if self._voiceover_browser_attempted:
+            return
+        self._voiceover_browser_attempted = True
+        if not sys.platform.startswith("darwin"):
+            return
+        try:
+            if voiceover_is_running():
+                self.on_open_accessible_browser()
+        except Exception:
+            log.exception("Failed to auto-open accessible browser for VoiceOver")
+
     def _on_feed_refresh_progress(self, state):
         # Called from worker threads inside provider.refresh; batch and marshal to UI thread.
         if not isinstance(state, dict):
@@ -3375,6 +3450,13 @@ class MainFrame(wx.Frame):
             for cat in top_level_cats:
                 _add_category_node(cat, self.root)
 
+            self._accessible_view_entries = build_accessible_view_entries(
+                feeds,
+                all_cats,
+                hierarchy,
+                include_favorites=bool(self.favorites_node),
+            )
+
             self.tree.ExpandAll()
 
             # Restore selection (default to All Feeds on first load so the list populates)
@@ -3398,6 +3480,16 @@ class MainFrame(wx.Frame):
             if selection_target and selection_target.IsOk():
                 # Ignore transient EVT_TREE_SEL_CHANGED during rebuild; we refresh explicitly below.
                 self.tree.SelectItem(selection_target)
+            browser = getattr(self, "_accessible_browser", None)
+            if browser:
+                try:
+                    browser.refresh_views(
+                        selected_view_id=getattr(browser, "current_view_id", None)
+                        or getattr(self, "current_feed_id", None)
+                        or "all"
+                    )
+                except Exception:
+                    log.exception("Failed to refresh accessible browser views")
         finally:
             if frozen:
                 try:

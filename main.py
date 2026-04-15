@@ -3,6 +3,10 @@ import warnings
 warnings.filterwarnings("ignore", category=UserWarning, message=r"pkg_resources is deprecated as an API.*")
 warnings.filterwarnings("ignore", category=UserWarning, module="pkg_resources")
 
+from core.runtime_env import configure_runtime_environment
+
+configure_runtime_environment()
+
 import sys
 import multiprocessing
 import logging

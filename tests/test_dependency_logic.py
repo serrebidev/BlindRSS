@@ -36,7 +36,8 @@ class TestDependencyLogic(unittest.TestCase):
         self.mock_winreg.QueryValueEx.return_value = (existing_path, self.mock_winreg.REG_SZ)
         new_bin = r"C:\New\Bin"
         dep_check._add_bin_to_user_path(new_bin)
-        expected_path = existing_path + os.pathsep + new_bin
+        # Windows PATH separator is always ';', regardless of host OS.
+        expected_path = existing_path + ";" + new_bin
         self.mock_winreg.SetValueEx.assert_called_with(
             mock_key, "PATH", 0, self.mock_winreg.REG_SZ, expected_path
         )
@@ -145,6 +146,37 @@ class TestDependencyLogic(unittest.TestCase):
         mock_vlc_fb.assert_called_once()
         mock_ff_fb.assert_called_once()
         mock_dlp_cli.assert_called_once()
+
+    @patch('core.dependency_check.ensure_media_tools')
+    @patch('core.dependency_check._ensure_yt_dlp_cli')
+    @patch('core.dependency_check._should_check_updates', return_value=False)
+    @patch('core.dependency_check.subprocess.check_call')
+    @patch('core.dependency_check.importlib.metadata.distributions')
+    def test_check_and_install_dependencies_accepts_webrtcvad_wheels(
+        self,
+        mock_distributions,
+        mock_check_call,
+        _mock_should_check_updates,
+        _mock_ensure_ytdlp,
+        _mock_ensure_media_tools,
+    ):
+        required = [
+            'yt-dlp', 'wxpython', 'feedparser', 'requests', 'beautifulsoup4',
+            'python-dateutil', 'mutagen', 'python-vlc',
+            'pychromecast', 'async-upnp-client', 'pyatv', 'trafilatura',
+            'webrtcvad-wheels', 'brotli', 'html5lib', 'lxml', 'packaging',
+        ]
+
+        class FakeDist:
+            def __init__(self, name):
+                self.name = name
+                self.metadata = {"Name": name}
+
+        mock_distributions.return_value = [FakeDist(name) for name in required]
+
+        dep_check.check_and_install_dependencies()
+
+        mock_check_call.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()
