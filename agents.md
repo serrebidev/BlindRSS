@@ -7,13 +7,21 @@ You are a python expert skilled in yt-dlp, ffmpeg, and rss.
 ## System Overview
 - Stack: Python 3.13, wxPython (GUI), SQLite (storage), feedparser + requests.
 - Entry: `main.py` -> `core.factory` -> `gui.mainframe`.
-- Build: PyInstaller directory distribution (`main.spec` -> `dist/BlindRSS/BlindRSS.exe`).
+- Build:
+  - Windows: PyInstaller directory distribution (`main.spec` -> `dist/BlindRSS/BlindRSS.exe`).
+  - macOS/Linux: cross-platform PyInstaller build (`portable.spec` -> `dist/BlindRSS.app` or `dist/BlindRSS/`).
 - App version source: `core/version.py`.
 
 ## Build & Release
 - Full build/release instructions are in `build.md`.
 - Mandatory release protocol: always use `.\build.bat release`.
 - Never publish manually from GitHub UI/CLI without generating artifacts via `build.bat release` first.
+- `./build.sh build` is for local macOS/Linux packaging only.
+- Pushes to `main` trigger `.github/workflows/cross-platform-release.yml` for validation artifacts:
+  - Windows ZIP artifact
+  - macOS signed ZIP artifact
+  - Linux `.deb` and `.rpm` artifacts
+- Official GitHub releases still remain Windows-driven so the updater manifest and signed Windows asset stay authoritative.
 
 ## File Structure & Responsibilities
 - `main.py`
@@ -45,8 +53,10 @@ You are a python expert skilled in yt-dlp, ffmpeg, and rss.
   - `dependency_check.py`: Dependency/path handling and media tool availability logic.
   - `config.py`: Config defaults + migrations; paths are exe-relative when frozen.
   - `factory.py`: Provider wiring; initializes DB.
+  - `runtime_env.py`: Frozen runtime PATH/VLC environment setup for macOS and Linux bundles.
 
 - `gui/`
+  - `accessibility.py`: macOS VoiceOver-friendly accessible browser window.
   - `mainframe.py`: Main UI, feed refresh orchestration, list rendering, notifications, and menu actions.
     - Includes special views: All, Unread, Read, Favorites.
     - Includes persistent search UI and remember-last-feed restore behavior.
@@ -61,6 +71,11 @@ You are a python expert skilled in yt-dlp, ffmpeg, and rss.
   - `miniflux.py`, `inoreader.py`, `theoldreader.py`, `bazqux.py`: Hosted provider implementations.
   - Favorites are supported across providers through `supports_favorites` / `set_favorite` / `toggle_favorite`.
   - Inoreader note: `stream/contents` expects URL-encoded `streamId` in path segment, not `s=` query parameter.
+
+- `tools/`
+  - `release.py`: Windows release/version automation.
+  - `build_utils.py`: helper utilities used by build flows.
+  - `linux_packaging.py`: stages native Linux install layout and produces `.deb` and `.rpm` artifacts from the frozen bundle.
 
 ## Data Model (`rss.db`)
 - `feeds`: `id`, `url`, `title`, `category`, `icon_url`, `etag`, `last_modified`.
@@ -84,6 +99,7 @@ You are a python expert skilled in yt-dlp, ffmpeg, and rss.
 - Startup refresh is backgrounded; tree/list updates are marshaled to main thread via `wx.CallAfter`.
 - Main window supports tray minimize/close-to-tray behavior with tray controls.
 - Remember-last-feed can restore the last selected feed/folder/special view on startup.
+- On macOS with VoiceOver running, the accessible browser fallback is the intended accessibility path.
 
 ### 3. Media Playback & Caching
 - Player opens immediately; media/chapter loads continue asynchronously.
@@ -101,6 +117,12 @@ You are a python expert skilled in yt-dlp, ffmpeg, and rss.
 - Checks latest GitHub release + manifest.
 - Verifies zip SHA-256 and signed executable before apply.
 - Uses helper batch script for safe staged replacement/restart.
+
+### 6. Cross-Platform Packaging
+- `build.sh` bundles `yt-dlp`, `deno`, `ffmpeg`, and VLC runtime files outside Windows.
+- macOS builds are ad-hoc signed for free with `codesign` unless disabled.
+- Linux packaging emits native `.deb` and `.rpm` packages from the frozen `dist/BlindRSS` bundle.
+- Linux package launchers must export bundled `bin`, `libvlc`, and VLC plugin paths before starting `BlindRSS`.
 
 ## Build Quality
 - When building, always fix any warnings, bugs, or errors you can before considering the build complete.
