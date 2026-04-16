@@ -2,6 +2,36 @@
 
 This is the only approved workflow for packaging and publishing BlindRSS.
 
+## Every Release, Bluntly
+
+1. On Windows, run `.\build.bat release`.
+2. That creates the new version, builds the Windows release, creates the GitHub release, and kicks off the macOS release workflow.
+3. Wait for the macOS GitHub Actions job to finish.
+4. Only run `./build.sh release vX.Y.Z` on macOS if you need to manually rerun or publish the macOS asset to an already-existing release tag.
+
+For a normal release, the only command you should need to start is:
+
+```powershell
+.\build.bat release
+```
+
+You do not normally need to build locally on both Windows and macOS.
+
+## Supported Flow Matrix
+
+- Official release from Windows:
+  - Run `.\build.bat release`.
+  - Windows builds locally.
+  - GitHub Actions builds macOS automatically and uploads the mac ZIP to the same GitHub release.
+- Local build from macOS:
+  - Run `./build.sh build`.
+  - This builds the mac app locally only.
+  - If you push to `main`, GitHub Actions will build validation artifacts for Windows and macOS automatically.
+- Official release from macOS:
+  - Not the primary release path.
+  - macOS can republish or rerun the mac asset for an existing release tag with `./build.sh release vX.Y.Z`.
+  - macOS does not replace the authoritative Windows release flow for signed Windows assets and `BlindRSS-update.json`.
+
 ## Commands
 
 - Iterative local build: `.\build.bat build`
@@ -24,7 +54,7 @@ GitHub release publication may happen from any OS after the required artifacts a
 - Dispatches the GitHub Actions macOS release-asset build after the Windows release is created.
 - Pushes to `main` also trigger GitHub Actions workflow builds for Windows and macOS as workflow artifacts so you can validate packaging from macOS without publishing a release.
 
-On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZIP to an already-created GitHub release tag. It does not replace the Windows release flow and does not create updater metadata.
+On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZIP to an already-created GitHub release tag. It does not replace the Windows release flow, does not create updater metadata, and does not produce the authoritative signed Windows release asset.
 
 ## Windows Release Prerequisites
 
