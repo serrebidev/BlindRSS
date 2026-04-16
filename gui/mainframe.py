@@ -6201,11 +6201,42 @@ class MainFrame(wx.Frame):
             old_translation_suffix = self._translation_fulltext_cache_suffix()
         except Exception:
             old_translation_suffix = ""
+        try:
+            old_data_location = str(self.config_manager.get("data_location", "app_folder") or "app_folder")
+        except Exception:
+            old_data_location = "app_folder"
+
+        accessible_browser_was_visible = False
+        try:
+            browser = getattr(self, "_accessible_browser", None)
+            if browser is not None:
+                accessible_browser_was_visible = bool(browser.IsShown())
+        except Exception:
+            accessible_browser_was_visible = False
 
         notification_feed_entries = self._collect_notification_feed_entries()
         dlg = SettingsDialog(self, self.config_manager.config, notification_feeds=notification_feed_entries)
         if dlg.ShowModal() == wx.ID_OK:
             data = dlg.get_data()
+
+            # Apply data_location change first so subsequent config.set calls
+            # write to the correct file.
+            new_data_location = str(data.pop("data_location", old_data_location) or old_data_location)
+            if new_data_location != old_data_location:
+                ok, msg = self.config_manager.change_data_location(new_data_location)
+                if not ok:
+                    wx.MessageBox(
+                        msg or "Could not move config file.",
+                        "Storage Location",
+                        wx.ICON_WARNING,
+                    )
+                else:
+                    wx.MessageBox(
+                        "Config has been moved. The feed database will be migrated "
+                        "to the new location the next time BlindRSS starts.",
+                        "Storage Location Changed",
+                        wx.ICON_INFORMATION,
+                    )
 
             # Apply settings
             try:
@@ -6340,6 +6371,17 @@ class MainFrame(wx.Frame):
                 except Exception:
                     pass
         dlg.Destroy()
+
+        if accessible_browser_was_visible:
+            browser = getattr(self, "_accessible_browser", None)
+            if browser is not None:
+                try:
+                    if not browser.IsShown():
+                        browser.Show()
+                    browser.Raise()
+                    wx.CallAfter(browser.Raise)
+                except Exception:
+                    log.exception("Failed to restore accessible browser after settings")
 
     def on_check_updates(self, event):
         self._start_update_check(manual=True)

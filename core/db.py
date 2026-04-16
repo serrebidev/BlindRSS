@@ -1,12 +1,63 @@
 import sqlite3
 import os
+import shutil
 import logging
 import uuid
-from core.config import APP_DIR
+from core.config import APP_DIR, USER_DATA_DIR, get_data_dir
 
 log = logging.getLogger(__name__)
 
-DB_FILE = os.path.join(APP_DIR, "rss.db")
+DB_FILENAME = "rss.db"
+
+
+def _db_path() -> str:
+    data_dir = get_data_dir() or APP_DIR
+    return os.path.join(data_dir, DB_FILENAME)
+
+
+def _ensure_db_available() -> str:
+    """
+    Ensure rss.db exists at the active data dir. If it is missing there but
+    present in the alternate location (APP_DIR vs USER_DATA_DIR), copy it so a
+    data-location switch does not start the user with an empty database.
+    """
+    target = _db_path()
+    if os.path.exists(target):
+        return target
+
+    try:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+    except Exception:
+        log.exception("Could not create data dir for rss.db at %s", target)
+
+    # Look for a DB at the other candidate location.
+    candidates = [
+        os.path.join(APP_DIR, DB_FILENAME),
+        os.path.join(USER_DATA_DIR, DB_FILENAME),
+    ]
+    for src in candidates:
+        try:
+            if os.path.abspath(src) == os.path.abspath(target):
+                continue
+            if os.path.exists(src):
+                shutil.copy2(src, target)
+                for sidecar in ("-wal", "-shm", "-journal"):
+                    side_src = src + sidecar
+                    if os.path.exists(side_src):
+                        try:
+                            shutil.copy2(side_src, target + sidecar)
+                        except Exception:
+                            log.exception("Failed to copy sqlite sidecar %s", side_src)
+                log.info("Migrated rss.db from %s to %s", src, target)
+                return target
+        except Exception:
+            log.exception("Failed while migrating rss.db from %s", src)
+    return target
+
+
+# Compute DB path after config resolution. This is accessed lazily by helpers
+# below so it reflects the active data directory at the time of use.
+DB_FILE = _db_path()
 
 
 def _table_exists(cursor: sqlite3.Cursor, name: str) -> bool:
@@ -185,7 +236,10 @@ def _migrate_legacy_chapters_foreign_key(conn: sqlite3.Connection) -> None:
 
 
 def init_db():
-    conn = sqlite3.connect(DB_FILE, timeout=30, check_same_thread=False)
+    db_path = _ensure_db_available()
+    global DB_FILE
+    DB_FILE = db_path
+    conn = sqlite3.connect(db_path, timeout=30, check_same_thread=False)
     try:
         c = conn.cursor()
         # Improve concurrent writer/readers when refresh runs in multiple threads
@@ -384,7 +438,7 @@ def cleanup_old_articles(days: int, keep_favorites: bool = True):
 
 
 def get_connection():
-    conn = sqlite3.connect(DB_FILE, timeout=30, check_same_thread=False)
+    conn = sqlite3.connect(_db_path(), timeout=30, check_same_thread=False)
     try:
         conn.execute("PRAGMA busy_timeout=60000")
         conn.execute("PRAGMA journal_mode=WAL")

@@ -22,6 +22,7 @@ from core.discovery import (
     search_piefed_feeds,
 )
 from core import utils
+from core import config as config_mod
 from core.casting import CastingManager
 from core import inoreader_oauth
 from core import translation as translation_mod
@@ -1344,6 +1345,65 @@ class SettingsDialog(wx.Dialog):
         translate_panel.SetSizer(translate_sizer)
         notebook.AddPage(translate_panel, "Translate")
 
+        # Advanced Tab
+        advanced_panel = wx.Panel(notebook)
+        advanced_sizer = wx.BoxSizer(wx.VERTICAL)
+
+        storage_group = wx.StaticBox(advanced_panel, label="Data Storage Location")
+        storage_sizer = wx.StaticBoxSizer(storage_group, wx.VERTICAL)
+
+        storage_help = wx.StaticText(
+            advanced_panel,
+            label=(
+                "Where BlindRSS stores config.json and rss.db.\n"
+                "User Data Folder keeps your settings and feeds across app upgrades,\n"
+                "especially on macOS where the installed app bundle is replaced."
+            ),
+        )
+        storage_sizer.Add(storage_help, 0, wx.ALL, 6)
+
+        self._storage_location_map = {
+            "User Data Folder": "user_data",
+            "App Install Folder": "app_folder",
+        }
+        storage_choices = list(self._storage_location_map.keys())
+        storage_row = wx.BoxSizer(wx.HORIZONTAL)
+        storage_row.Add(
+            wx.StaticText(advanced_panel, label="Storage Location:"),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.ALL,
+            5,
+        )
+        self.storage_location_ctrl = wx.Choice(advanced_panel, choices=storage_choices)
+        current_storage = str(config.get("data_location", "app_folder") or "app_folder")
+        selected_label = "App Install Folder"
+        for lbl, val in self._storage_location_map.items():
+            if val == current_storage:
+                selected_label = lbl
+                break
+        self.storage_location_ctrl.SetStringSelection(selected_label)
+        storage_row.Add(self.storage_location_ctrl, 0, wx.ALL, 5)
+        storage_sizer.Add(storage_row, 0, wx.EXPAND | wx.ALL, 4)
+
+        try:
+            paths = config_mod.ConfigManager.location_paths()
+        except Exception:
+            paths = {"user_data": "", "app_folder": ""}
+        paths_lbl = wx.StaticText(
+            advanced_panel,
+            label=(
+                f"User Data Folder path:\n  {paths.get('user_data', '')}\n"
+                f"App Install Folder path:\n  {paths.get('app_folder', '')}"
+            ),
+        )
+        storage_sizer.Add(paths_lbl, 0, wx.ALL, 6)
+
+        self._initial_storage_location = current_storage
+        advanced_sizer.Add(storage_sizer, 0, wx.EXPAND | wx.ALL, 8)
+
+        advanced_panel.SetSizer(advanced_sizer)
+        notebook.AddPage(advanced_panel, "Advanced")
+
         # Main Sizer
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         main_sizer.Add(notebook, 1, wx.EXPAND | wx.ALL, 5)
@@ -2022,6 +2082,10 @@ class SettingsDialog(wx.Dialog):
             "translation_qwen_api_key": (self.translation_qwen_api_key_ctrl.GetValue() or "").strip(),
             "active_provider": self.provider_choice.GetStringSelection(),
             "providers": providers,
+            "data_location": self._storage_location_map.get(
+                self.storage_location_ctrl.GetStringSelection(),
+                self._initial_storage_location,
+            ),
         }
 
 

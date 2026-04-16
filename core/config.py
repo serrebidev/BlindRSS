@@ -6,16 +6,45 @@ import logging
 
 log = logging.getLogger(__name__)
 
-# When frozen (PyInstaller) use the exe directory; otherwise use the directory
-# of the main script so config.json stays alongside the app regardless of
-# where the user launches it from.
+# Install directory (where the executable or main script lives).
+# On macOS frozen builds this is inside the .app bundle, which gets
+# replaced on upgrade — that is why we also support a user-data path.
 if getattr(sys, 'frozen', False):
     APP_DIR = os.path.dirname(sys.executable)
 else:
     APP_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
 
-CONFIG_FILE = os.path.join(APP_DIR, "config.json")
-# ... (rest of the file)
+
+def _user_data_dir() -> str:
+    """OS-appropriate per-user data directory for BlindRSS."""
+    if sys.platform == "darwin":
+        base = os.path.expanduser("~/Library/Application Support")
+    elif sys.platform.startswith("win"):
+        base = os.environ.get("APPDATA") or os.path.expanduser("~\\AppData\\Roaming")
+    else:
+        base = os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config")
+    return os.path.join(base, "BlindRSS")
+
+
+USER_DATA_DIR = _user_data_dir()
+
+CONFIG_FILENAME = "config.json"
+APP_CONFIG_PATH = os.path.join(APP_DIR, CONFIG_FILENAME)
+USER_CONFIG_PATH = os.path.join(USER_DATA_DIR, CONFIG_FILENAME)
+
+# Active config path resolved at ConfigManager init. Defaults to APP_DIR until then.
+CONFIG_FILE = APP_CONFIG_PATH
+
+
+def _default_config_location() -> str:
+    """Default storage location for fresh installs."""
+    if sys.platform == "darwin" and getattr(sys, "frozen", False):
+        return "user_data"
+    return "app_folder"
+
+
+def _path_for_location(location: str) -> str:
+    return USER_CONFIG_PATH if location == "user_data" else APP_CONFIG_PATH
 
 DEFAULT_CONFIG = {
     "max_downloads": 32,
@@ -92,6 +121,9 @@ DEFAULT_CONFIG = {
     "persistent_searches": [],
     "show_search_field": True,
     "search_mode": "title_content",
+    # Storage location for config.json (and, on next startup, rss.db).
+    # "app_folder" = alongside the executable, "user_data" = OS user data folder.
+    "data_location": _default_config_location(),
     # Translation (future/experimental feature wiring)
     "translation_enabled": False,
     "translation_provider": "grok",
@@ -150,10 +182,68 @@ DEFAULT_CONFIG = {
 
 import threading
 
+
+def _resolve_config_path() -> tuple[str, str]:
+    """
+    Decide where config.json should be read from and return (path, location_tag).
+
+    Preference: user_data location if config exists there, else app_folder if
+    config exists there, else the OS default location (which may not yet exist).
+    """
+    user_exists = os.path.exists(USER_CONFIG_PATH)
+    app_exists = os.path.exists(APP_CONFIG_PATH)
+    if user_exists and app_exists:
+        # Prefer whichever was modified more recently.
+        try:
+            if os.path.getmtime(USER_CONFIG_PATH) >= os.path.getmtime(APP_CONFIG_PATH):
+                return USER_CONFIG_PATH, "user_data"
+            return APP_CONFIG_PATH, "app_folder"
+        except OSError:
+            return USER_CONFIG_PATH, "user_data"
+    if user_exists:
+        return USER_CONFIG_PATH, "user_data"
+    if app_exists:
+        return APP_CONFIG_PATH, "app_folder"
+    default_loc = _default_config_location()
+    return _path_for_location(default_loc), default_loc
+
+
+def _ensure_parent_dir(path: str) -> None:
+    try:
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+    except Exception:
+        pass
+
+
+def get_data_dir() -> str:
+    """Directory where config.json lives. Currently also the preferred dir for rss.db."""
+    return os.path.dirname(CONFIG_FILE) or APP_DIR
+
+
 class ConfigManager:
     def __init__(self):
         self._lock = threading.Lock()
+        # Honor a caller-set CONFIG_FILE (e.g., tests that monkeypatch it).
+        current = globals().get("CONFIG_FILE", None)
+        standard_paths = {
+            os.path.abspath(APP_CONFIG_PATH),
+            os.path.abspath(USER_CONFIG_PATH),
+        }
+        if current and os.path.abspath(current) not in standard_paths:
+            self.config_path = current
+            self.data_location = "app_folder"
+        else:
+            self.config_path, self.data_location = _resolve_config_path()
+        global CONFIG_FILE
+        CONFIG_FILE = self.config_path
         self.config = self.load_config()
+        # Make sure the config records its current physical location.
+        try:
+            if str(self.config.get("data_location", "")) != self.data_location:
+                self.config["data_location"] = self.data_location
+                self.save_config()
+        except Exception:
+            log.exception("Failed to record data_location in config")
         try:
             if self._apply_migrations():
                 self.save_config()
@@ -161,10 +251,10 @@ class ConfigManager:
             log.exception("Failed to apply config migrations")
 
     def load_config(self):
-        if os.path.exists(CONFIG_FILE):
+        if os.path.exists(self.config_path):
             try:
                 with self._lock:
-                    with open(CONFIG_FILE, 'r') as f:
+                    with open(self.config_path, 'r') as f:
                         loaded = json.load(f)
                         return self._apply_defaults(loaded)
             except Exception as e:
@@ -239,7 +329,8 @@ class ConfigManager:
     def save_config(self):
         try:
             with self._lock:
-                with open(CONFIG_FILE, 'w') as f:
+                _ensure_parent_dir(self.config_path)
+                with open(self.config_path, 'w') as f:
                     json.dump(self.config, f, indent=4)
         except Exception as e:
             log.error(f"Error saving config: {e}")
@@ -250,10 +341,10 @@ class ConfigManager:
     def set(self, key, value):
         self.config[key] = value
         self.save_config()
-        
+
     def get_provider_config(self, provider_name):
         return self.config.get("providers", {}).get(provider_name, {})
-    
+
     def update_provider_config(self, provider_name, data):
         if "providers" not in self.config:
             self.config["providers"] = {}
@@ -261,3 +352,50 @@ class ConfigManager:
             self.config["providers"][provider_name] = {}
         self.config["providers"][provider_name].update(data)
         self.save_config()
+
+    # --- Data location management --------------------------------------------
+
+    def change_data_location(self, new_location: str) -> tuple[bool, str]:
+        """
+        Move config.json to the requested location and update internal state.
+
+        Returns (ok, message). The DB file is not moved here because it may be
+        open; it will be handled on next startup if needed.
+        """
+        new_location = "user_data" if new_location == "user_data" else "app_folder"
+        if new_location == self.data_location:
+            return True, "No change."
+
+        new_path = _path_for_location(new_location)
+        old_path = self.config_path
+
+        try:
+            _ensure_parent_dir(new_path)
+            with self._lock:
+                self.config["data_location"] = new_location
+                with open(new_path, 'w') as f:
+                    json.dump(self.config, f, indent=4)
+        except Exception as e:
+            log.exception("Failed to write config to new location")
+            return False, f"Could not write config at new location: {e}"
+
+        # Remove the old file so future resolution is unambiguous.
+        try:
+            if os.path.exists(old_path) and os.path.abspath(old_path) != os.path.abspath(new_path):
+                os.remove(old_path)
+        except Exception:
+            log.exception("Failed to remove old config file at %s", old_path)
+
+        self.config_path = new_path
+        self.data_location = new_location
+        global CONFIG_FILE
+        CONFIG_FILE = new_path
+        return True, f"Config moved to {new_path}."
+
+    @staticmethod
+    def location_paths() -> dict:
+        """Helper for UIs to display the two candidate locations."""
+        return {
+            "app_folder": APP_CONFIG_PATH,
+            "user_data": USER_CONFIG_PATH,
+        }

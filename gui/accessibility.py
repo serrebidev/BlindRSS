@@ -207,9 +207,27 @@ class AccessibleBrowserFrame(wx.Frame):
         self.view_list.Bind(wx.EVT_LISTBOX, self.on_view_selected)
         self.article_list.Bind(wx.EVT_LISTBOX, self.on_article_selected)
         self.article_list.Bind(wx.EVT_LISTBOX_DCLICK, self.on_open_article)
+        self.article_list.Bind(wx.EVT_KEY_DOWN, self.on_article_list_key_down)
+        self.Bind(wx.EVT_CHAR_HOOK, self.on_char_hook)
         self.search_ctrl.Bind(wx.EVT_TEXT, self.on_search_changed)
 
         self.refresh_views()
+
+    def on_article_list_key_down(self, event: wx.KeyEvent) -> None:
+        key = event.GetKeyCode()
+        if key in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
+            self.on_open_article(event)
+            return
+        event.Skip()
+
+    def on_char_hook(self, event: wx.KeyEvent) -> None:
+        key = event.GetKeyCode()
+        if key in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
+            focused = self.FindFocus()
+            if focused is self.article_list:
+                self.on_open_article(event)
+                return
+        event.Skip()
 
     def refresh_views(self, selected_view_id=None):
         selected_view_id = selected_view_id or self.current_view_id or getattr(self.mainframe, "current_feed_id", None) or "all"
