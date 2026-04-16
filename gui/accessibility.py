@@ -25,12 +25,12 @@ def voiceover_is_running() -> bool:
 
 def build_accessible_view_entries(feeds, categories=None, hierarchy=None, include_favorites=False):
     entries = [
-        {"label": "All Articles", "view_id": "all", "kind": "special"},
-        {"label": "Unread Articles", "view_id": "unread:all", "kind": "special"},
-        {"label": "Read Articles", "view_id": "read:all", "kind": "special"},
+        {"label": "All Articles", "view_id": "all", "kind": "special", "parent_cats": []},
+        {"label": "Unread Articles", "view_id": "unread:all", "kind": "special", "parent_cats": []},
+        {"label": "Read Articles", "view_id": "read:all", "kind": "special", "parent_cats": []},
     ]
     if include_favorites:
-        entries.append({"label": "Favorites", "view_id": "favorites:all", "kind": "special"})
+        entries.append({"label": "Favorites", "view_id": "favorites:all", "kind": "special", "parent_cats": []})
 
     feeds = list(feeds or [])
     hierarchy = dict(hierarchy or {})
@@ -60,11 +60,14 @@ def build_accessible_view_entries(feeds, categories=None, hierarchy=None, includ
     def _walk(cat, path):
         category_path = list(path) + [cat]
         path_label = " > ".join(category_path)
+        cat_id = f"category:{cat}"
         entries.append(
             {
                 "label": f"Category: {path_label}",
-                "view_id": f"category:{cat}",
+                "view_id": cat_id,
                 "kind": "category",
+                "parent_cats": list(path),
+                "cat_name": cat,
             }
         )
 
@@ -89,6 +92,7 @@ def build_accessible_view_entries(feeds, categories=None, hierarchy=None, includ
                     "label": label,
                     "view_id": str(getattr(feed, "id", "") or ""),
                     "kind": "feed",
+                    "parent_cats": list(category_path),
                 }
             )
 
@@ -101,13 +105,52 @@ def build_accessible_view_entries(feeds, categories=None, hierarchy=None, includ
     return entries
 
 
+def visible_accessible_view_entries(entries, expanded_categories=None):
+    expanded = {str(cat or "").strip() for cat in (expanded_categories or []) if str(cat or "").strip()}
+    visible = []
+    for entry in list(entries or []):
+        kind = str(entry.get("kind", "") or "")
+        parent_cats = [
+            str(cat or "").strip()
+            for cat in (entry.get("parent_cats", []) or [])
+            if str(cat or "").strip()
+        ]
+        if kind in {"category", "feed"} and any(parent not in expanded for parent in parent_cats):
+            continue
+        visible.append(entry)
+    return visible
+
+
+def format_accessible_view_label(entry, expanded_categories=None):
+    entry = dict(entry or {})
+    expanded = {str(cat or "").strip() for cat in (expanded_categories or []) if str(cat or "").strip()}
+    kind = str(entry.get("kind", "") or "")
+    parent_cats = [
+        str(cat or "").strip()
+        for cat in (entry.get("parent_cats", []) or [])
+        if str(cat or "").strip()
+    ]
+    indent = "  " * len(parent_cats)
+    label = str(entry.get("label", "") or "")
+    if kind != "category":
+        return f"{indent}{label}" if indent else label
+
+    cat_name = str(entry.get("cat_name", "") or "").strip()
+    state = "expanded" if cat_name and cat_name in expanded else "collapsed"
+    return f"{indent}{label}, {state}" if indent else f"{label}, {state}"
+
+
 class AccessibleBrowserFrame(wx.Frame):
     def __init__(self, mainframe):
         super().__init__(mainframe, title="BlindRSS Accessible Browser", size=(980, 760))
         self.mainframe = mainframe
         self.current_view_id = None
         self._view_entries = []
+        self._visible_view_entries = []
         self._view_index_by_id = {}
+        self._visible_view_index_by_id = {}
+        self._known_categories = set()
+        self._expanded_categories = set()
         self._base_articles = []
         self._current_articles = []
         self._paged_offset = 0
@@ -133,6 +176,12 @@ class AccessibleBrowserFrame(wx.Frame):
         self.load_more_btn = wx.Button(panel, label="Load More Articles")
         self.load_more_btn.SetName("Load More Articles")
         toolbar.Add(self.load_more_btn, 0, wx.RIGHT, 6)
+        self.expand_btn = wx.Button(panel, label="Expand Category")
+        self.expand_btn.SetName("Expand Category")
+        toolbar.Add(self.expand_btn, 0, wx.RIGHT, 6)
+        self.collapse_btn = wx.Button(panel, label="Collapse Category")
+        self.collapse_btn.SetName("Collapse Category")
+        toolbar.Add(self.collapse_btn, 0, wx.RIGHT, 6)
         self.open_btn = wx.Button(panel, label="Open or Play Article")
         self.open_btn.SetName("Open or Play Article")
         toolbar.Add(self.open_btn, 0, wx.RIGHT, 6)
@@ -168,6 +217,14 @@ class AccessibleBrowserFrame(wx.Frame):
         except Exception:
             pass
         left.Add(self.view_list, 1, wx.EXPAND)
+        self.view_hint_lbl = wx.StaticText(
+            panel,
+            label=(
+                "Categories can be expanded or collapsed. "
+                "Use the buttons, or use Right Arrow to expand and Left Arrow to collapse."
+            ),
+        )
+        left.Add(self.view_hint_lbl, 0, wx.TOP, 6)
         content.Add(left, 1, wx.ALL | wx.EXPAND, 8)
 
         middle = wx.BoxSizer(wx.VERTICAL)
@@ -201,10 +258,13 @@ class AccessibleBrowserFrame(wx.Frame):
 
         self.refresh_btn.Bind(wx.EVT_BUTTON, self.on_refresh_feeds)
         self.load_more_btn.Bind(wx.EVT_BUTTON, self.on_load_more)
+        self.expand_btn.Bind(wx.EVT_BUTTON, self.on_expand_category)
+        self.collapse_btn.Bind(wx.EVT_BUTTON, self.on_collapse_category)
         self.open_btn.Bind(wx.EVT_BUTTON, self.on_open_article)
         self.mark_read_btn.Bind(wx.EVT_BUTTON, self.on_mark_read)
         self.mark_unread_btn.Bind(wx.EVT_BUTTON, self.on_mark_unread)
         self.view_list.Bind(wx.EVT_LISTBOX, self.on_view_selected)
+        self.view_list.Bind(wx.EVT_KEY_DOWN, self.on_view_list_key_down)
         self.article_list.Bind(wx.EVT_LISTBOX, self.on_article_selected)
         self.article_list.Bind(wx.EVT_LISTBOX_DCLICK, self.on_open_article)
         self.article_list.Bind(wx.EVT_KEY_DOWN, self.on_article_list_key_down)
@@ -224,6 +284,13 @@ class AccessibleBrowserFrame(wx.Frame):
         key = event.GetKeyCode()
         if key in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
             focused = self.FindFocus()
+            if focused is self.view_list:
+                if self._toggle_selected_category_expansion():
+                    return
+                entry = self._selected_view_entry()
+                if entry:
+                    self._load_view(entry["view_id"])
+                    return
             if focused is self.article_list:
                 self.on_open_article(event)
                 return
@@ -241,11 +308,9 @@ class AccessibleBrowserFrame(wx.Frame):
             )
         self._view_entries = entries
         self._view_index_by_id = {entry["view_id"]: idx for idx, entry in enumerate(entries)}
-        self.view_list.Set([entry["label"] for entry in entries])
-        idx = self._view_index_by_id.get(selected_view_id, 0)
-        if self.view_list.GetCount() > 0:
-            self.view_list.SetSelection(idx)
-            self._load_view(entries[idx]["view_id"])
+        self._sync_expanded_categories()
+        self._ensure_view_visible(selected_view_id)
+        self._refresh_view_list(selected_view_id=selected_view_id, load_view=True)
 
     def focus_view(self, view_id):
         if not view_id:
@@ -254,7 +319,13 @@ class AccessibleBrowserFrame(wx.Frame):
         if idx is None:
             self.refresh_views(selected_view_id=view_id)
             return
-        self.view_list.SetSelection(idx)
+        self._ensure_view_visible(view_id)
+        self._refresh_view_list(selected_view_id=view_id, load_view=False)
+        visible_idx = self._visible_view_index_by_id.get(view_id)
+        if visible_idx is None:
+            self.refresh_views(selected_view_id=view_id)
+            return
+        self.view_list.SetSelection(visible_idx)
         self._load_view(view_id)
         try:
             self.view_list.SetFocus()
@@ -266,10 +337,130 @@ class AccessibleBrowserFrame(wx.Frame):
         self.status_lbl.SetLabel("Refreshing feeds...")
 
     def on_view_selected(self, _event):
-        idx = self.view_list.GetSelection()
-        if idx == wx.NOT_FOUND or idx < 0 or idx >= len(self._view_entries):
+        entry = self._selected_view_entry()
+        if not entry:
             return
-        self._load_view(self._view_entries[idx]["view_id"])
+        self._update_category_buttons()
+        self._load_view(entry["view_id"])
+
+    def on_view_list_key_down(self, event: wx.KeyEvent) -> None:
+        key = event.GetKeyCode()
+        if key in (wx.WXK_RIGHT, wx.WXK_ADD, ord("+")):
+            if self._set_selected_category_expanded(True):
+                return
+        if key in (wx.WXK_LEFT, wx.WXK_SUBTRACT, ord("-")):
+            if self._set_selected_category_expanded(False):
+                return
+        if key in (wx.WXK_SPACE,):
+            if self._toggle_selected_category_expansion():
+                return
+        event.Skip()
+
+    def _selected_view_entry(self):
+        idx = self.view_list.GetSelection()
+        if idx == wx.NOT_FOUND or idx < 0 or idx >= len(self._visible_view_entries):
+            return None
+        return self._visible_view_entries[idx]
+
+    def _selected_category_entry(self):
+        entry = self._selected_view_entry()
+        if not entry or str(entry.get("kind", "") or "") != "category":
+            return None
+        return entry
+
+    def _sync_expanded_categories(self):
+        category_names = {
+            str(entry.get("cat_name", "") or "").strip()
+            for entry in self._view_entries
+            if str(entry.get("kind", "") or "") == "category" and str(entry.get("cat_name", "") or "").strip()
+        }
+        if not self._known_categories:
+            self._expanded_categories = set(category_names)
+        else:
+            self._expanded_categories &= category_names
+            self._expanded_categories |= (category_names - self._known_categories)
+        self._known_categories = set(category_names)
+
+    def _ensure_view_visible(self, view_id):
+        if not view_id:
+            return
+        entry = next((item for item in self._view_entries if item.get("view_id") == view_id), None)
+        if not entry:
+            return
+        for cat in entry.get("parent_cats", []) or []:
+            cat_name = str(cat or "").strip()
+            if cat_name:
+                self._expanded_categories.add(cat_name)
+        if str(entry.get("kind", "") or "") == "category":
+            cat_name = str(entry.get("cat_name", "") or "").strip()
+            if cat_name:
+                self._expanded_categories.add(cat_name)
+
+    def _refresh_view_list(self, selected_view_id=None, load_view=False):
+        selected_view_id = selected_view_id or self.current_view_id or "all"
+        visible_entries = visible_accessible_view_entries(self._view_entries, self._expanded_categories)
+        labels = [format_accessible_view_label(entry, self._expanded_categories) for entry in visible_entries]
+        self._visible_view_entries = visible_entries
+        self._visible_view_index_by_id = {
+            entry["view_id"]: idx for idx, entry in enumerate(self._visible_view_entries)
+        }
+        self.view_list.Set(labels)
+        self._update_category_buttons()
+        idx = self._visible_view_index_by_id.get(selected_view_id, 0)
+        if self.view_list.GetCount() <= 0:
+            return
+        self.view_list.SetSelection(idx)
+        if load_view:
+            self._load_view(self._visible_view_entries[idx]["view_id"])
+
+    def _set_selected_category_expanded(self, expanded: bool) -> bool:
+        entry = self._selected_category_entry()
+        if not entry:
+            return False
+        cat_name = str(entry.get("cat_name", "") or "").strip()
+        if not cat_name:
+            return False
+        changed = False
+        if expanded:
+            if cat_name not in self._expanded_categories:
+                self._expanded_categories.add(cat_name)
+                changed = True
+        else:
+            if cat_name in self._expanded_categories:
+                self._expanded_categories.discard(cat_name)
+                changed = True
+        if not changed:
+            self._update_category_buttons()
+            return True
+        self._refresh_view_list(selected_view_id=entry["view_id"], load_view=False)
+        self.status_lbl.SetLabel(
+            f"{'Expanded' if expanded else 'Collapsed'} category: {entry['label'].replace('Category: ', '', 1)}"
+        )
+        return True
+
+    def _toggle_selected_category_expansion(self) -> bool:
+        entry = self._selected_category_entry()
+        if not entry:
+            return False
+        cat_name = str(entry.get("cat_name", "") or "").strip()
+        return self._set_selected_category_expanded(cat_name not in self._expanded_categories)
+
+    def _update_category_buttons(self):
+        entry = self._selected_category_entry()
+        if not entry:
+            self.expand_btn.Enable(False)
+            self.collapse_btn.Enable(False)
+            return
+        cat_name = str(entry.get("cat_name", "") or "").strip()
+        is_expanded = bool(cat_name and cat_name in self._expanded_categories)
+        self.expand_btn.Enable(not is_expanded)
+        self.collapse_btn.Enable(is_expanded)
+
+    def on_expand_category(self, _event):
+        self._set_selected_category_expanded(True)
+
+    def on_collapse_category(self, _event):
+        self._set_selected_category_expanded(False)
 
     def _load_view(self, view_id):
         if not view_id or self._loading:
