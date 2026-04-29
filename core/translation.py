@@ -13,7 +13,7 @@ _GROQ_CHAT_COMPLETIONS_URL = "https://api.groq.com/openai/v1/chat/completions"
 _OPENAI_CHAT_COMPLETIONS_URL = "https://api.openai.com/v1/chat/completions"
 _OPENROUTER_CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions"
 _OPENROUTER_MODELS_URL = "https://openrouter.ai/api/v1/models"
-_OPENROUTER_APP_REFERER = "https://github.com/serrebi/BlindRSS"
+_OPENROUTER_APP_REFERER = "https://github.com/serrebidev/BlindRSS"
 _OPENROUTER_APP_TITLE = "BlindRSS"
 _GEMINI_GENERATE_CONTENT_URL_TEMPLATE = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 # Qwen (DashScope) OpenAI-compatible endpoint (international).

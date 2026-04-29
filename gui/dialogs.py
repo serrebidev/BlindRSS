@@ -4248,13 +4248,13 @@ class AboutDialog(wx.Dialog):
         sizer.Add(title_txt, 0, wx.ALIGN_CENTER | wx.TOP, 15)
 
         # Copyright
-        copy_txt = wx.StaticText(self, label="Copyright (c) 2024-2026 serrebi and contributors")
+        copy_txt = wx.StaticText(self, label="Copyright (c) 2024-2026 serrebidev and contributors")
         sizer.Add(copy_txt, 0, wx.ALIGN_CENTER | wx.TOP, 10)
 
         sizer.AddSpacer(20)
 
         # Buttons
-        github_btn = wx.Button(self, label="Follow me on GitHub (@serrebi)")
+        github_btn = wx.Button(self, label="Follow me on GitHub (@serrebidev)")
         repo_btn = wx.Button(self, label="Visit Repository")
 
         sizer.Add(github_btn, 0, wx.ALIGN_CENTER | wx.ALL, 5)
@@ -4269,8 +4269,8 @@ class AboutDialog(wx.Dialog):
         self.Centre()
 
         # Bindings
-        github_btn.Bind(wx.EVT_BUTTON, lambda e: webbrowser.open("https://github.com/serrebi"))
-        repo_btn.Bind(wx.EVT_BUTTON, lambda e: webbrowser.open("https://github.com/serrebi/BlindRSS"))
+        github_btn.Bind(wx.EVT_BUTTON, lambda e: webbrowser.open("https://github.com/serrebidev"))
+        repo_btn.Bind(wx.EVT_BUTTON, lambda e: webbrowser.open("https://github.com/serrebidev/BlindRSS"))
         close_btn.Bind(wx.EVT_BUTTON, lambda e: self.EndModal(wx.ID_CLOSE))
 
 # Backwards-compatible name (menu item was historically called "Search Podcast").

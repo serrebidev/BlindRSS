@@ -24,16 +24,20 @@ if defined SIGNTOOL_PATH (
 ) else (
     set "SIGNTOOL_EXE=%DEFAULT_SIGNTOOL%"
 )
+if not defined GITHUB_REPO_SLUG set "GITHUB_REPO_SLUG=serrebidev/BlindRSS"
+if not defined RELEASE_REMOTE set "RELEASE_REMOTE=origin"
 
 if /I "%MODE%"=="dry-run" (
     call :detect_python
     if errorlevel 1 exit /b 1
     set "TOOL_PY=!PYTHON_EXE!"
+    call :verify_release_remote
+    if errorlevel 1 exit /b 1
     call :compute_next_version
     if errorlevel 1 exit /b 1
     echo [Dry Run] Latest tag: !LATEST_TAG!
     echo [Dry Run] Next version: v!NEXT_VERSION! [!BUMP! bump]
-    echo [Dry Run] Would bump core/version.py, build, sign with "%SIGNTOOL_EXE%", zip, generate manifest, tag, push, create a GitHub release, and dispatch the macOS GitHub Actions asset build.
+    echo [Dry Run] Would bump core/version.py, build, sign with "%SIGNTOOL_EXE%", zip, generate manifest, tag, push to "%RELEASE_REMOTE%", create a GitHub release in "%GITHUB_REPO_SLUG%", and dispatch the macOS GitHub Actions asset build.
     goto :done
 )
 
@@ -42,6 +46,8 @@ if errorlevel 1 exit /b 1
 set "TOOL_PY=%VENV_PYTHON%"
 
 if /I "%MODE%"=="release" (
+    call :verify_release_remote
+    if errorlevel 1 exit /b 1
     call :compute_next_version
     if errorlevel 1 exit /b 1
     set "VERSION_NO_V=!NEXT_VERSION!"
@@ -88,6 +94,22 @@ goto :done
 set "PYTHON_EXE="
 where /q py
 if not errorlevel 1 (
+    for /f "delims=" %%P in ('py -3.14 -c "import sys; print(sys.executable)" 2^>nul') do (
+        set "PYTHON_EXE=%%P"
+    )
+)
+if defined PYTHON_EXE exit /b 0
+
+where /q py
+if not errorlevel 1 (
+    for /f "delims=" %%P in ('py -3.13 -c "import sys; print(sys.executable)" 2^>nul') do (
+        set "PYTHON_EXE=%%P"
+    )
+)
+if defined PYTHON_EXE exit /b 0
+
+where /q py
+if not errorlevel 1 (
     for /f "delims=" %%P in ('py -3.12 -c "import sys; print(sys.executable)" 2^>nul') do (
         set "PYTHON_EXE=%%P"
     )
@@ -121,11 +143,23 @@ set "VENV_DIR=%SCRIPT_DIR%.venv"
 echo [BlindRSS Build] Preparing Python environment...
 call :detect_python
 if errorlevel 1 exit /b 1
+for /f "delims=" %%V in ('"%PYTHON_EXE%" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do (
+    set "TARGET_PYTHON_VERSION=%%V"
+)
 
 if exist "%VENV_DIR%" (
     if not exist "%VENV_DIR%\Scripts\python.exe" (
         echo [BlindRSS Build] Existing virtualenv is incomplete. Recreating...
         rd /s /q "%VENV_DIR%"
+    ) else (
+        set "EXISTING_VENV_VERSION="
+        for /f "delims=" %%V in ('"%VENV_DIR%\Scripts\python.exe" -c "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}')" 2^>nul') do (
+            set "EXISTING_VENV_VERSION=%%V"
+        )
+        if defined TARGET_PYTHON_VERSION if defined EXISTING_VENV_VERSION if not "!EXISTING_VENV_VERSION!"=="!TARGET_PYTHON_VERSION!" (
+            echo [BlindRSS Build] Existing virtualenv uses Python !EXISTING_VENV_VERSION!, recreating with Python !TARGET_PYTHON_VERSION!...
+            rd /s /q "%VENV_DIR%"
+        )
     )
 )
 
@@ -192,8 +226,8 @@ exit /b 0
 
 :compute_next_version
 echo [BlindRSS Build] Syncing tags...
-git fetch origin --tags --prune >nul 2>nul
-if errorlevel 1 echo [WARN] Failed to fetch tags from origin. Using local tags.
+git fetch "%RELEASE_REMOTE%" --tags --prune >nul 2>nul
+if errorlevel 1 echo [WARN] Failed to fetch tags from "%RELEASE_REMOTE%". Using local tags.
 for /f "usebackq tokens=1* delims==" %%A in (`"%TOOL_PY%" tools\release.py next-version`) do (
     set "%%A=%%B"
 )
@@ -209,6 +243,24 @@ for /f "usebackq tokens=1* delims==" %%A in (`"%TOOL_PY%" tools\release.py curre
 )
 if not defined CURRENT_VERSION (
     echo [X] Failed to read current version.
+    exit /b 1
+)
+exit /b 0
+
+:verify_release_remote
+set "REMOTE_URL="
+for /f "delims=" %%U in ('git remote get-url "%RELEASE_REMOTE%" 2^>nul') do (
+    set "REMOTE_URL=%%U"
+)
+if not defined REMOTE_URL (
+    echo [X] Git remote "%RELEASE_REMOTE%" was not found.
+    exit /b 1
+)
+echo(!REMOTE_URL! | findstr /I /C:"%GITHUB_REPO_SLUG%" >nul
+if errorlevel 1 (
+    echo [X] Git remote "%RELEASE_REMOTE%" points to "!REMOTE_URL!".
+    echo [X] Expected a GitHub remote for "%GITHUB_REPO_SLUG%".
+    echo [X] Update it with: git remote set-url %RELEASE_REMOTE% https://github.com/%GITHUB_REPO_SLUG%.git
     exit /b 1
 )
 exit /b 0
@@ -389,24 +441,24 @@ git tag %VERSION_TAG%
 if errorlevel 1 exit /b 1
 
 echo [BlindRSS Release] Pushing branch and tag...
-git push origin HEAD
+git push "%RELEASE_REMOTE%" HEAD
 if errorlevel 1 exit /b 1
-git push origin %VERSION_TAG%
+git push "%RELEASE_REMOTE%" %VERSION_TAG%
 if errorlevel 1 exit /b 1
 
-echo [BlindRSS Release] Creating GitHub release...
+echo [BlindRSS Release] Creating GitHub release in %GITHUB_REPO_SLUG%...
 gh --version >nul 2>&1
 if errorlevel 1 (
     echo [X] gh CLI not found in PATH.
     exit /b 1
 )
-gh release create "%VERSION_TAG%" "%ZIP_PATH%" "%MANIFEST_PATH%" --title "%VERSION_TAG%" --notes-file "%RELEASE_NOTES%"
+gh release create "%VERSION_TAG%" "%ZIP_PATH%" "%MANIFEST_PATH%" --repo "%GITHUB_REPO_SLUG%" --title "%VERSION_TAG%" --notes-file "%RELEASE_NOTES%"
 if errorlevel 1 exit /b 1
 exit /b 0
 
 :dispatch_cross_platform_release
-echo [BlindRSS Release] Dispatching GitHub Actions macOS artifact build...
-gh workflow run "cross-platform-release.yml" --ref "%VERSION_TAG%" -f release_tag="%VERSION_TAG%"
+echo [BlindRSS Release] Dispatching GitHub Actions macOS artifact build in %GITHUB_REPO_SLUG%...
+gh workflow run "cross-platform-release.yml" --repo "%GITHUB_REPO_SLUG%" --ref "%VERSION_TAG%" -f release_tag="%VERSION_TAG%"
 if errorlevel 1 (
     echo [X] Failed to dispatch cross-platform GitHub Actions build.
     exit /b 1

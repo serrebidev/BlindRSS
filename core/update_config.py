@@ -1,7 +1,7 @@
 APP_NAME = "BlindRSS"
 EXE_NAME = "BlindRSS.exe"
 
-GITHUB_OWNER = "serrebi"
+GITHUB_OWNER = "serrebidev"
 GITHUB_REPO = "BlindRSS"
 
 UPDATE_MANIFEST_NAME = "BlindRSS-update.json"

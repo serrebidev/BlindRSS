@@ -20,7 +20,7 @@ BlindRSS is a screen-reader-friendly desktop RSS and podcast app. It is built fo
 
 If BlindRSS has helped you, feel free to submit pull requests with fixes or features you want, and I will consider them.
 ## Quick Start
-1. Download the latest `.zip` asset from [GitHub Releases](https://github.com/serrebi/BlindRSS/releases).
+1. Download the latest `.zip` asset from [GitHub Releases](https://github.com/serrebidev/BlindRSS/releases).
 2. Extract the `.zip` anywhere.
 3. Run `BlindRSS.exe`.
 
