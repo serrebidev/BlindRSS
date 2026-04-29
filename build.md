@@ -71,7 +71,7 @@ On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZI
 - Deno is bundled by `build.sh`.
 - `yt-dlp` is bundled by `build.sh`.
 - `ffmpeg` available on PATH.
-- macOS: VLC installed at `/Applications/VLC.app`, or set `BLINDRSS_VLC_APP`.
+- macOS: VLC installed at `/Applications/VLC.app`, set `BLINDRSS_VLC_APP`, or let `build.sh` download the pinned VLC DMG into `.build/vlc`.
 - macOS: the generated `.app` is ad-hoc signed by default with the free local `codesign` identity (`-`). This is not notarization.
 
 ## What Each Mode Does
@@ -130,6 +130,8 @@ On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZI
 - `SIGN_CERT_THUMBPRINT`: force manifest signing thumbprint value.
 - `SKIP_SIGN=1`: skip signing in `build` mode only.
 - `BLINDRSS_VLC_APP`: override the macOS VLC app bundle path for `build.sh`.
+- `BLINDRSS_VLC_VERSION`: override the VLC version downloaded by `build.sh` when no macOS VLC app bundle is found. Default is `3.0.23`.
+- `BLINDRSS_VLC_SHA256`: override the expected SHA-256 for a custom macOS VLC DMG download.
 - `BLINDRSS_CODESIGN_IDENTITY`: override the macOS `codesign` identity used by `build.sh`. Default is `-` (ad-hoc signing).
 - `BLINDRSS_SKIP_MACOS_CODESIGN=1`: skip ad-hoc signing in `build.sh`.
 

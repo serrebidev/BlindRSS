@@ -86,6 +86,53 @@ download_file() {
   curl -L --fail --retry 3 --retry-delay 2 -o "$dest" "$url"
 }
 
+download_file_resumable() {
+  local url="$1"
+  local dest="$2"
+  local tmp="${dest}.part"
+  local attempt
+  for attempt in 1 2 3 4 5; do
+    echo "[BlindRSS Build] Downloading $url (attempt $attempt/5)..."
+    if curl -L --fail --retry 3 --retry-delay 2 --retry-all-errors \
+      --connect-timeout 30 --speed-limit 1024 --speed-time 60 \
+      --continue-at - -o "$tmp" "$url"; then
+      mv "$tmp" "$dest"
+      return 0
+    fi
+    sleep $((attempt * 5))
+  done
+  return 1
+}
+
+sha256_file() {
+  local file="$1"
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "$file" | awk '{print $1}'
+    return 0
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$file" | awk '{print $1}'
+    return 0
+  fi
+  echo "[X] No SHA-256 checksum tool found." >&2
+  return 1
+}
+
+verify_sha256() {
+  local file="$1"
+  local expected="$2"
+  local actual
+  if ! actual="$(sha256_file "$file")"; then
+    return 1
+  fi
+  if [[ "$actual" != "$expected" ]]; then
+    echo "[X] SHA-256 mismatch for $file"
+    echo "[X] Expected: $expected"
+    echo "[X] Actual:   $actual"
+    return 1
+  fi
+}
+
 ensure_yt_dlp() {
   ensure_bin_dir
   local dest="$SCRIPT_DIR/bin/yt-dlp"
@@ -127,13 +174,130 @@ ensure_ffmpeg() {
 }
 
 ensure_vlc_macos() {
-  local vlc_app="${BLINDRSS_VLC_APP:-/Applications/VLC.app}"
-  if [[ ! -d "$vlc_app" ]]; then
-    echo "[X] VLC.app not found at $vlc_app"
-    echo "[X] Install VLC or set BLINDRSS_VLC_APP to the app bundle path."
+  local vlc_app_candidates=()
+  local requested_vlc_app="${BLINDRSS_VLC_APP:-}"
+  if [[ -n "$requested_vlc_app" ]]; then
+    vlc_app_candidates+=("$requested_vlc_app")
+  fi
+  vlc_app_candidates+=(
+    "/Applications/VLC.app"
+    "$HOME/Applications/VLC.app"
+    "$SCRIPT_DIR/.build/vlc/VLC.app"
+  )
+
+  local vlc_app
+  for vlc_app in "${vlc_app_candidates[@]}"; do
+    if [[ -d "$vlc_app" ]]; then
+      export BLINDRSS_VLC_APP="$vlc_app"
+      return 0
+    fi
+  done
+
+  local vlc_version="${BLINDRSS_VLC_VERSION:-3.0.23}"
+  local vlc_arch
+  local expected_vlc_sha="${BLINDRSS_VLC_SHA256:-}"
+  case "$UNAME_M" in
+    arm64|aarch64)
+      vlc_arch="arm64"
+      if [[ -z "$expected_vlc_sha" && "$vlc_version" == "3.0.23" ]]; then
+        expected_vlc_sha="fc6fac08d87f538517d44aca0c5e7a244b67c8c4cb589bf478363a7315fd5e0d"
+      fi
+      ;;
+    x86_64)
+      vlc_arch="intel64"
+      if [[ -z "$expected_vlc_sha" && "$vlc_version" == "3.0.23" ]]; then
+        expected_vlc_sha="ec01530ce69d849dd057fba8876e68ac39bf279dc28de4e9c04e4aec11fc98db"
+      fi
+      ;;
+    *)
+      echo "[X] Unsupported macOS architecture for VLC download: $UNAME_M"
+      exit 1
+      ;;
+  esac
+
+  if ! command -v hdiutil >/dev/null 2>&1; then
+    echo "[X] VLC.app not found and hdiutil is unavailable for DMG installation."
+    echo "[X] Install VLC, set BLINDRSS_VLC_APP, or run this on macOS."
     exit 1
   fi
-  export BLINDRSS_VLC_APP="$vlc_app"
+
+  local cache_dir="$SCRIPT_DIR/.build/vlc"
+  local dmg_path="$cache_dir/vlc-${vlc_version}-${vlc_arch}.dmg"
+  local vlc_cache_app="$cache_dir/VLC.app"
+  mkdir -p "$cache_dir"
+
+  if [[ ! -f "$dmg_path" ]]; then
+    local vlc_urls=(
+      "https://downloads.videolan.org/pub/videolan/vlc/${vlc_version}/macosx/vlc-${vlc_version}-${vlc_arch}.dmg"
+      "https://get.videolan.org/vlc/${vlc_version}/macosx/vlc-${vlc_version}-${vlc_arch}.dmg"
+    )
+    local downloaded=0
+    local url
+    for url in "${vlc_urls[@]}"; do
+      if download_file_resumable "$url" "$dmg_path"; then
+        downloaded=1
+        break
+      fi
+    done
+    if [[ "$downloaded" != "1" ]]; then
+      echo "[X] Failed to download VLC $vlc_version for macOS $vlc_arch."
+      exit 1
+    fi
+  fi
+
+  if [[ -z "$expected_vlc_sha" ]]; then
+    local sha_path="$dmg_path.sha256"
+    local sha_url="https://downloads.videolan.org/pub/videolan/vlc/${vlc_version}/macosx/vlc-${vlc_version}-${vlc_arch}.dmg.sha256"
+    if [[ ! -f "$sha_path" ]]; then
+      download_file "$sha_url" "$sha_path" || true
+    fi
+    if [[ -f "$sha_path" ]]; then
+      expected_vlc_sha="$(awk 'NR == 1 {print $1}' "$sha_path")"
+    fi
+  fi
+  if [[ -n "$expected_vlc_sha" ]]; then
+    verify_sha256 "$dmg_path" "$expected_vlc_sha"
+  else
+    echo "[WARN] No SHA-256 checksum available for VLC $vlc_version $vlc_arch."
+  fi
+
+  local mount_dir
+  mount_dir="$(mktemp -d)"
+  echo "[BlindRSS Build] Mounting VLC DMG..."
+  if ! hdiutil attach "$dmg_path" -nobrowse -readonly -mountpoint "$mount_dir" >/dev/null; then
+    rm -rf "$mount_dir"
+    echo "[X] Failed to mount $dmg_path"
+    exit 1
+  fi
+
+  local vlc_source="$mount_dir/VLC.app"
+  if [[ ! -d "$vlc_source" ]]; then
+    vlc_source="$(find "$mount_dir" -name "VLC.app" -type d -print | head -n 1)"
+  fi
+  if [[ -z "$vlc_source" || ! -d "$vlc_source" ]]; then
+    hdiutil detach "$mount_dir" >/dev/null || true
+    rm -rf "$mount_dir"
+    echo "[X] VLC.app was not found inside $dmg_path"
+    exit 1
+  fi
+
+  rm -rf "$vlc_cache_app"
+  if ! /usr/bin/ditto "$vlc_source" "$vlc_cache_app"; then
+    hdiutil detach "$mount_dir" >/dev/null || true
+    rm -rf "$mount_dir"
+    echo "[X] Failed to copy VLC.app from $dmg_path"
+    exit 1
+  fi
+  hdiutil detach "$mount_dir" >/dev/null || true
+  rm -rf "$mount_dir"
+
+  if [[ ! -f "$vlc_cache_app/Contents/MacOS/lib/libvlc.dylib" ||
+        ! -f "$vlc_cache_app/Contents/MacOS/lib/libvlccore.dylib" ]]; then
+    echo "[X] Downloaded VLC.app is missing required libvlc files."
+    exit 1
+  fi
+
+  export BLINDRSS_VLC_APP="$vlc_cache_app"
 }
 
 dispatch_macos_release_workflow() {

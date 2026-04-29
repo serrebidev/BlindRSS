@@ -63,12 +63,15 @@ jobs:
           python-version: "3.12"
 
       - name: Install macOS build dependencies
+        env:
+          HOMEBREW_NO_AUTO_UPDATE: "1"
+          HOMEBREW_NO_INSTALL_CLEANUP: "1"
         run: |
-          brew update
-          brew install ffmpeg
-          brew install --cask vlc
+          brew list ffmpeg >/dev/null 2>&1 || brew install ffmpeg
 
       - name: Build macOS package
+        env:
+          BLINDRSS_VLC_VERSION: "3.0.23"
         run: |
           chmod +x build.sh
           ./build.sh build
