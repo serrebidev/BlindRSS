@@ -88,6 +88,35 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
         self.assertEqual(result.info.sha256, "b" * 64)
         self.assertEqual(result.info.signing_thumbprints, ("AABBCC",))
 
+    def test_authenticode_verification_tries_next_powershell(self) -> None:
+        from core import updater
+
+        failed = MagicMock()
+        failed.returncode = 1
+        failed.stderr = "Get-AuthenticodeSignature not found"
+        failed.stdout = ""
+
+        succeeded = MagicMock()
+        succeeded.returncode = 0
+        succeeded.stderr = ""
+        succeeded.stdout = json.dumps(
+            {
+                "Status": "UnknownError",
+                "StatusMessage": "Self-signed certificate.",
+                "Subject": "CN=BlindRSS Dev",
+                "Thumbprint": "aa bb cc",
+            }
+        )
+
+        with patch("core.updater._powershell_executables", return_value=("bad-powershell", "pwsh")):
+            with patch("core.updater.subprocess.run", side_effect=(failed, succeeded)) as run:
+                ok, msg = updater._verify_authenticode_signature("BlindRSS.exe", ["AABBCC"])
+
+        self.assertTrue(ok, msg)
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(run.call_args_list[0].args[0][0], "bad-powershell")
+        self.assertEqual(run.call_args_list[1].args[0][0], "pwsh")
+
 
 if __name__ == "__main__":
     unittest.main()

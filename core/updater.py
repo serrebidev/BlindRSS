@@ -97,6 +97,42 @@ def _format_version_tag(version: Version) -> str:
     return f"v{version.major}.{version.minor}.{version.micro}"
 
 
+def _dedupe_paths(paths: Iterable[str]) -> Tuple[str, ...]:
+    seen = set()
+    out = []
+    for path in paths:
+        raw = str(path or "").strip()
+        if not raw:
+            continue
+        key = os.path.normcase(os.path.abspath(raw))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(raw)
+    return tuple(out)
+
+
+def _powershell_executables() -> Tuple[str, ...]:
+    candidates = []
+    for name in ("pwsh", "powershell"):
+        path = shutil.which(name)
+        if path:
+            candidates.append(path)
+
+    system_root = os.environ.get("SystemRoot") or os.environ.get("WINDIR") or r"C:\Windows"
+    candidates.extend(
+        [
+            os.path.join(system_root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+            os.path.join(system_root, "Sysnative", "WindowsPowerShell", "v1.0", "powershell.exe"),
+        ]
+    )
+    return _dedupe_paths(path for path in candidates if os.path.isfile(path) or shutil.which(path))
+
+
+def _ps_single_quote(value: str) -> str:
+    return "'" + str(value or "").replace("'", "''") + "'"
+
+
 def _fetch_latest_release() -> Tuple[Optional[dict], Optional[str]]:
     url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
     headers = {"Accept": "application/vnd.github+json"}
@@ -242,42 +278,53 @@ def _verify_authenticode_signature(exe_path: str, allowed_thumbprints: Iterable[
     allowed = set(_normalize_thumbprints(allowed_thumbprints))
     ps_script = (
         "$ErrorActionPreference = 'Stop';"
-        f"$sig = Get-AuthenticodeSignature -FilePath '{exe_path}';"
+        "Import-Module Microsoft.PowerShell.Security -ErrorAction SilentlyContinue;"
+        f"$sig = Get-AuthenticodeSignature -FilePath {_ps_single_quote(exe_path)};"
         "$subject = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { '' };"
         "$thumb = if ($sig.SignerCertificate) { $sig.SignerCertificate.Thumbprint } else { '' };"
         "$out = @{Status=$sig.Status.ToString(); StatusMessage=$sig.StatusMessage; Subject=$subject; Thumbprint=$thumb};"
         "$out | ConvertTo-Json -Compress"
     )
-    try:
-        proc = subprocess.run(
-            ["powershell", "-NoProfile", "-Command", ps_script],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-    except Exception as e:
-        return False, f"Failed to run Authenticode verification: {e}"
 
-    if proc.returncode != 0:
-        msg = proc.stderr.strip() or proc.stdout.strip() or "Unknown error"
-        return False, f"Authenticode verification failed: {msg}"
+    last_error = ""
+    for powershell_exe in _powershell_executables():
+        try:
+            proc = subprocess.run(
+                [powershell_exe, "-NoProfile", "-Command", ps_script],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except Exception as e:
+            last_error = f"{powershell_exe}: {e}"
+            continue
 
-    try:
-        data = json.loads(proc.stdout.strip())
-    except Exception as e:
-        return False, f"Authenticode verification returned invalid data: {e}"
+        if proc.returncode != 0:
+            msg = proc.stderr.strip() or proc.stdout.strip() or "Unknown error"
+            last_error = f"{powershell_exe}: {msg}"
+            continue
 
-    status = str(data.get("Status") or "").strip()
-    status_msg = str(data.get("StatusMessage") or "").strip()
-    thumbprint = _normalize_thumbprint(data.get("Thumbprint"))
-    if status.lower() != "valid":
-        if thumbprint and thumbprint in allowed:
-            return True, ""
-        message = f"Signature check failed: {status} {status_msg}".strip()
-        if thumbprint:
-            message = f"{message} (thumbprint {thumbprint})"
-        return False, message
-    return True, ""
+        try:
+            data = json.loads(proc.stdout.strip())
+        except Exception as e:
+            last_error = f"{powershell_exe}: invalid Authenticode data: {e}"
+            continue
+
+        status = str(data.get("Status") or "").strip()
+        status_msg = str(data.get("StatusMessage") or "").strip()
+        thumbprint = _normalize_thumbprint(data.get("Thumbprint"))
+        if status.lower() != "valid":
+            if thumbprint and thumbprint in allowed:
+                return True, ""
+            message = f"Signature check failed: {status} {status_msg}".strip()
+            if thumbprint:
+                message = f"{message} (thumbprint {thumbprint})"
+            return False, message
+        return True, ""
+
+    if last_error:
+        return False, f"Authenticode verification failed: {last_error}"
+    return False, "Authenticode verification failed: PowerShell was not found."
 
 
 def _launch_update_helper(
