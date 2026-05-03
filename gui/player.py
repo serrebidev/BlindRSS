@@ -13,6 +13,7 @@ from core import utils
 from core import discovery
 from core import playback_state
 from core.casting import CastingManager
+from core.vlc_options import build_vlc_instance_args
 from urllib.parse import urlparse
 from core.range_cache_proxy import get_range_cache_proxy
 from core.stream_proxy import get_proxy as get_stream_proxy
@@ -516,14 +517,14 @@ class PlayerFrame(wx.Frame):
             cache_ms = 0
         file_cache_ms = max(500, cache_ms)
         try:
-            self.instance = vlc.Instance(
+            self.instance = vlc.Instance(*build_vlc_instance_args(
                 "--no-video",
                 "--input-fast-seek",
                 "--aout=directsound",
                 f"--network-caching={cache_ms}",
                 f"--file-caching={file_cache_ms}",
                 "--http-reconnect",
-            )
+            ))
             self.player = self.instance.media_player_new()
             self.event_manager = self.player.event_manager()
             try:

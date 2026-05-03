@@ -28,6 +28,32 @@ class RSSProvider(abc.ABC):
         """
         return False
 
+    def refresh_feeds_by_ids(self, feed_ids, progress_cb=None, force: bool = True) -> bool:
+        """
+        Triggers a sync/refresh for a specific set of feeds.
+
+        Providers with a native/batched endpoint should override this. The default
+        uses refresh_feed so targeted UI actions work consistently where possible.
+        """
+        ok = True
+        seen = set()
+        for raw_id in list(feed_ids or []):
+            feed_id = str(raw_id or "").strip()
+            if not feed_id or feed_id in seen:
+                continue
+            seen.add(feed_id)
+            if not self.refresh_feed(feed_id, progress_cb=progress_cb):
+                ok = False
+        return ok
+
+    def _emit_progress(self, progress_cb, state) -> None:
+        if progress_cb is None:
+            return
+        try:
+            progress_cb(state)
+        except Exception:
+            pass
+
     @abc.abstractmethod
     def get_feeds(self) -> List[Feed]:
         pass

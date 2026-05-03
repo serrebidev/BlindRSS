@@ -66,6 +66,7 @@ class StaleCacheHandler(BaseHTTPRequestHandler):
     origin_etag = "v1"
     origin_body = FEED_V1.encode("utf-8")
     saw_no_cache = False
+    saw_conditional = False
 
     def do_GET(self):
         cache_control = (self.headers.get("Cache-Control") or "").lower()
@@ -80,6 +81,8 @@ class StaleCacheHandler(BaseHTTPRequestHandler):
             body = type(self).cached_body
 
         inm = self.headers.get("If-None-Match")
+        if inm or self.headers.get("If-Modified-Since"):
+            type(self).saw_conditional = True
         if inm and inm.strip() == etag:
             self.send_response(304)
             self.send_header("ETag", etag)
@@ -123,6 +126,7 @@ class FeedCacheRevalidationTests(unittest.TestCase):
         StaleCacheHandler.origin_etag = "v1"
         StaleCacheHandler.origin_body = FEED_V1.encode("utf-8")
         StaleCacheHandler.saw_no_cache = False
+        StaleCacheHandler.saw_conditional = False
 
         self.config = {
             "providers": {"local": {}},
@@ -139,6 +143,9 @@ class FeedCacheRevalidationTests(unittest.TestCase):
 
         conn = get_connection()
         c = conn.cursor()
+        c.execute("DELETE FROM chapters")
+        c.execute("DELETE FROM articles")
+        c.execute("DELETE FROM feeds")
         c.execute(
             "INSERT INTO feeds (id, url, title, category, icon_url, etag, last_modified) VALUES (?, ?, ?, ?, ?, ?, ?)",
             (self.feed_id, self.feed_url, "Cache Test Feed", "Tests", "", None, None),
@@ -193,12 +200,21 @@ class FeedCacheRevalidationTests(unittest.TestCase):
         self.assertEqual(count2, 2)
         self.assertEqual(etag2, "v2")
 
-    def test_force_refresh_still_uses_conditional_revalidation(self):
+    def test_initial_refresh_sends_revalidation_without_validators(self):
+        provider = LocalProvider(self.config)
+
+        provider.refresh(force=False)
+
+        self.assertTrue(StaleCacheHandler.saw_no_cache)
+        self.assertFalse(StaleCacheHandler.saw_conditional)
+
+    def test_force_refresh_bypasses_conditional_validators(self):
         provider = LocalProvider(self.config)
 
         provider.refresh(force=False)
 
         StaleCacheHandler.saw_no_cache = False
+        StaleCacheHandler.saw_conditional = False
         provider.refresh(force=True)
 
         conn = get_connection()
@@ -210,6 +226,7 @@ class FeedCacheRevalidationTests(unittest.TestCase):
         conn.close()
 
         self.assertTrue(StaleCacheHandler.saw_no_cache)
+        self.assertFalse(StaleCacheHandler.saw_conditional)
         self.assertEqual(count, 1)
         self.assertEqual(etag, "v1")
 

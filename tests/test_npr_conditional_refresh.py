@@ -88,6 +88,9 @@ class NprConditionalRefreshTests(unittest.TestCase):
 
         conn = get_connection()
         c = conn.cursor()
+        c.execute("DELETE FROM chapters")
+        c.execute("DELETE FROM articles")
+        c.execute("DELETE FROM feeds")
         c.execute(
             "INSERT INTO feeds (id, url, title, category, icon_url, etag, last_modified) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",

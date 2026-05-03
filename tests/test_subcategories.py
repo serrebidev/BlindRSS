@@ -16,6 +16,16 @@ def _setup_db(tmp_dir):
     orig = db_mod.DB_FILE
     db_mod.DB_FILE = os.path.join(tmp_dir, "rss.db")
     db_mod.init_db()
+    conn = db_mod.get_connection()
+    try:
+        c = conn.cursor()
+        c.execute("DELETE FROM chapters")
+        c.execute("DELETE FROM articles")
+        c.execute("DELETE FROM feeds")
+        c.execute("DELETE FROM categories")
+        conn.commit()
+    finally:
+        conn.close()
     return orig
 
 

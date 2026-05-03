@@ -109,6 +109,44 @@ def test_miniflux_refresh_force_refreshes_each_feed(monkeypatch):
     assert ("PUT", "/v1/feeds/2/refresh") in calls
 
 
+def test_miniflux_refresh_feeds_by_ids_refreshes_subset_and_emits_progress(monkeypatch):
+    p = _provider(feed_timeout_seconds=10)
+    calls = []
+    now = datetime.now(timezone.utc)
+    recent = now.isoformat()
+
+    feeds_payload = [
+        {"id": 1, "title": "Feed 1", "category": {"title": "Podcasts"}, "checked_at": recent, "parsing_error_count": 0},
+        {"id": 2, "title": "Feed 2", "category": {"title": "News"}, "checked_at": recent, "parsing_error_count": 0},
+    ]
+
+    def _fake_req(method, endpoint, json=None, params=None):
+        calls.append((method, endpoint))
+        p._last_request_info = {
+            "ok": True,
+            "used_cache": False,
+            "status_code": 204 if method == "PUT" else 200,
+            "endpoint": endpoint,
+            "method": method,
+        }
+        if endpoint == "/v1/feeds":
+            return feeds_payload
+        if endpoint == "/v1/feeds/counters":
+            return {"unreads": {"1": 3, "2": 0}}
+        return None
+
+    states = []
+    monkeypatch.setattr(p, "_req", _fake_req)
+
+    assert p.refresh_feeds_by_ids(["2", "1", "2"], progress_cb=states.append, force=True) is True
+
+    assert calls.count(("PUT", "/v1/feeds/1/refresh")) == 1
+    assert calls.count(("PUT", "/v1/feeds/2/refresh")) == 1
+    assert ("PUT", "/v1/feeds/refresh") not in calls
+    assert [state["id"] for state in states] == ["2", "1"]
+    assert states[1]["unread_count"] == 3
+
+
 def test_miniflux_refresh_non_force_only_retries_stale_or_error(monkeypatch):
     p = _provider(feed_timeout_seconds=10)
     calls = []

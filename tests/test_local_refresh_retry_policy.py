@@ -51,6 +51,9 @@ def _insert_feed(feed_url: str) -> str:
     conn = core.db.get_connection()
     try:
         c = conn.cursor()
+        c.execute("DELETE FROM chapters")
+        c.execute("DELETE FROM articles")
+        c.execute("DELETE FROM feeds")
         c.execute(
             "INSERT INTO feeds (id, url, title, category, icon_url) VALUES (?, ?, ?, ?, ?)",
             (feed_id, feed_url, "Retry Test", "Tests", ""),
@@ -173,7 +176,7 @@ def test_refresh_unresolved_homepage_uses_single_short_probe_and_caches_discover
             core.db.DB_FILE = orig_db_file
 
 
-def test_full_refresh_skips_recent_failed_feed_until_cooldown_expires(monkeypatch):
+def test_forced_full_refresh_bypasses_recent_failure_cooldown(monkeypatch):
     with tempfile.TemporaryDirectory() as tmp:
         orig_db_file = core.db.DB_FILE
         core.db.DB_FILE = os.path.join(tmp, "rss.db")
@@ -202,8 +205,12 @@ def test_full_refresh_skips_recent_failed_feed_until_cooldown_expires(monkeypatc
 
             assert provider.refresh(progress_cb=states.append, force=True) is True
 
-            assert len(calls) == 1
+            assert len(calls) == 2
             assert states[-1]["id"] == feed_id
+            assert states[-1]["status"] == "error"
+
+            assert provider.refresh(progress_cb=states.append, force=False) is True
+            assert len(calls) == 2
             assert states[-1]["status"] == "cooldown"
         finally:
             core.db.DB_FILE = orig_db_file

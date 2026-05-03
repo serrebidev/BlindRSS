@@ -26,6 +26,7 @@ from core import config as config_mod
 from core.casting import CastingManager
 from core import inoreader_oauth
 from core import translation as translation_mod
+from core.vlc_options import build_vlc_instance_args
 
 log = logging.getLogger(__name__)
 
@@ -1942,7 +1943,7 @@ class SettingsDialog(wx.Dialog):
         try:
             import vlc
 
-            instance = vlc.Instance("--no-video", "--aout=mmdevice")
+            instance = vlc.Instance(*build_vlc_instance_args("--no-video", "--aout=mmdevice"))
             devices_ptr = instance.audio_output_device_list_get("mmdevice")
             cur = devices_ptr
             while cur:

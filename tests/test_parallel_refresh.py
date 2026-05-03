@@ -118,6 +118,9 @@ class LocalProviderParallelTests(unittest.TestCase):
 
         conn = get_connection()
         c = conn.cursor()
+        c.execute("DELETE FROM chapters")
+        c.execute("DELETE FROM articles")
+        c.execute("DELETE FROM feeds")
         c.execute(
             "INSERT INTO feeds (id, url, title, category, icon_url) VALUES (?, ?, ?, ?, ?)",
             (self.feed_ids["fast"], f"http://127.0.0.1:{self.port}/fast", "Fast", "Tests", ""),

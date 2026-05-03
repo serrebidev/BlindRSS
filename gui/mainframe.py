@@ -1774,6 +1774,18 @@ class MainFrame(wx.Frame):
             return
         threading.Thread(target=self._refresh_single_feed_thread, args=(feed_id,), daemon=True).start()
 
+    def on_refresh_category(self, event=None, category_title: str | None = None):
+        cat_title = str(category_title or "").strip()
+        if not cat_title:
+            item = self.tree.GetSelection()
+            if item and item.IsOk():
+                data = self.tree.GetItemData(item)
+                if data and data.get("type") == "category":
+                    cat_title = str(data.get("id") or "").strip()
+        if not cat_title:
+            return
+        threading.Thread(target=self._refresh_category_thread, args=(cat_title,), daemon=True).start()
+
     def _play_sound(self, key):
         if not self.config_manager.get("sounds_enabled", True):
             return
@@ -2470,6 +2482,9 @@ class MainFrame(wx.Frame):
         
         if data["type"] == "category":
             cat_title = data["id"]
+
+            refresh_category_item = menu.Append(wx.ID_ANY, "Refresh Category")
+            self.Bind(wx.EVT_MENU, lambda e, ct=cat_title: self.on_refresh_category(e, ct), refresh_category_item)
 
             add_sub_item = menu.Append(wx.ID_ANY, "Add Subcategory")
             self.Bind(wx.EVT_MENU, lambda e, ct=cat_title: self.on_add_subcategory(ct), add_sub_item)
@@ -6010,6 +6025,71 @@ class MainFrame(wx.Frame):
             if fid:
                 out.add(fid)
         return out
+
+    def _collect_category_feed_ids_for_refresh(self, category_title: str | None) -> list[str]:
+        feed_ids = []
+        seen = set()
+        try:
+            feeds = self._collect_category_feeds_for_export(category_title)
+        except Exception:
+            feeds = []
+        for feed in feeds or []:
+            fid = str(getattr(feed, "id", "") or "").strip()
+            if not fid or fid in seen:
+                continue
+            seen.add(fid)
+            feed_ids.append(fid)
+        return feed_ids
+
+    def _refresh_category_thread(self, category_title: str) -> None:
+        feed_ids = self._collect_category_feed_ids_for_refresh(category_title)
+        if not feed_ids:
+            wx.CallAfter(self.refresh_feeds)
+            return
+
+        refresh_many = getattr(self.provider, "refresh_feeds_by_ids", None)
+        refresh_one = getattr(self.provider, "refresh_feed", None)
+        if not callable(refresh_many) and not callable(refresh_one):
+            threading.Thread(target=self._manual_refresh_thread, daemon=True).start()
+            return
+
+        acquired = False
+        try:
+            acquired = self._refresh_guard.acquire(blocking=True)
+        except Exception:
+            acquired = False
+        if not acquired:
+            return
+
+        try:
+            def progress_cb(state):
+                self._on_feed_refresh_progress(state)
+
+            if callable(refresh_many):
+                try:
+                    refresh_many(feed_ids, progress_cb=progress_cb, force=True)
+                except Exception:
+                    log.exception("Failed category batch refresh for %s", category_title)
+                    if callable(refresh_one):
+                        for feed_id in feed_ids:
+                            try:
+                                refresh_one(feed_id, progress_cb=progress_cb)
+                            except Exception:
+                                log.exception("Failed category refresh for feed %s", feed_id)
+            else:
+                for feed_id in feed_ids:
+                    try:
+                        refresh_one(feed_id, progress_cb=progress_cb)
+                    except Exception:
+                        log.exception("Failed category refresh for feed %s", feed_id)
+        finally:
+            try:
+                self._refresh_guard.release()
+            except Exception:
+                pass
+
+        wx.CallAfter(self._flush_feed_refresh_progress)
+        wx.CallAfter(self.refresh_feeds)
 
     def _import_opml_thread(self, path, target_category):
         success = False

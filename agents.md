@@ -1,7 +1,7 @@
 Install anything you need.
-
-You are a python expert skilled in yt-dlp, ffmpeg, and rss.
-
+Debug, and test
+Update this file when necesary.
+Fix any warnings, or errors.
 # BlindRSS Architecture & Dev Guide
 
 ## System Overview

@@ -768,6 +768,86 @@ class MinifluxProvider(RSSProvider):
         )
         return True
 
+    def refresh_feeds_by_ids(self, feed_ids, progress_cb=None, force: bool = True) -> bool:
+        ordered_ids = []
+        seen = set()
+        for raw_id in list(feed_ids or []):
+            fid = str(raw_id or "").strip()
+            if not fid or fid in seen:
+                continue
+            seen.add(fid)
+            ordered_ids.append(fid)
+
+        if not ordered_ids:
+            return True
+
+        ok = True
+        for fid in ordered_ids:
+            if not self._should_attempt_targeted_refresh(fid, force=force):
+                continue
+            self._req("PUT", f"/v1/feeds/{fid}/refresh")
+            info = dict(getattr(self, "_last_request_info", {}) or {})
+            if (
+                str(info.get("endpoint", "")) == f"/v1/feeds/{fid}/refresh"
+                and str(info.get("method", "")).upper() == "PUT"
+            ):
+                call_ok = bool(info.get("ok", False))
+                ok = ok and call_ok
+                self._record_targeted_refresh_attempt_result(
+                    fid,
+                    call_ok,
+                    info.get("status_code"),
+                )
+
+        feeds = self._req("GET", "/v1/feeds") or []
+        counters_data = self._req("GET", "/v1/feeds/counters") or {}
+        unread_map = counters_data.get("unreads", {}) if isinstance(counters_data, dict) else {}
+
+        feeds_by_id = {str(feed.get("id") or ""): feed for feed in feeds or []}
+        stale_cutoff = datetime.now(timezone.utc) - timedelta(hours=3)
+        for fid in ordered_ids:
+            feed = feeds_by_id.get(fid)
+            if feed is None:
+                self._emit_progress(
+                    progress_cb,
+                    {
+                        "id": fid,
+                        "title": fid,
+                        "category": "Uncategorized",
+                        "unread_count": 0,
+                        "status": "error",
+                        "new_items": None,
+                        "error": "Feed not found after refresh.",
+                    },
+                )
+                ok = False
+                continue
+
+            checked_dt = self._parse_checked_at(feed.get("checked_at"))
+            status = "ok"
+            error_msg = None
+            if (feed.get("parsing_error_count") or 0) > 0:
+                status = "error"
+                error_msg = feed.get("parsing_error_message")
+            elif checked_dt and checked_dt < stale_cutoff:
+                status = "stale"
+
+            unread = unread_map.get(fid) or unread_map.get(int(feed.get("id", 0) or 0), 0) or 0
+            category = (feed.get("category") or {}).get("title", "Uncategorized")
+            self._emit_progress(
+                progress_cb,
+                {
+                    "id": fid,
+                    "title": feed.get("title") or "",
+                    "category": category,
+                    "unread_count": unread,
+                    "status": status,
+                    "new_items": None,
+                    "error": error_msg,
+                },
+            )
+        return ok
+
     def get_feeds(self) -> List[Feed]:
         data = self._req("GET", "/v1/feeds")
         if not data: return []

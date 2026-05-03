@@ -382,17 +382,21 @@ class LocalProvider(RSSProvider):
 
         if configured_workers != max_workers:
             log.info(
-                "Clamping max_concurrent_refreshes from %s to %s for responsiveness (cpu=%s, adaptive_cap=%s)",
-                configured_workers,
+                "Using %s local refresh worker(s) for %s feed(s); configured max_concurrent_refreshes=%s "
+                "(cpu=%s, adaptive_cap=%s)",
                 max_workers,
+                len(feed_rows),
+                configured_workers,
                 cpu_count,
                 adaptive_cap,
             )
         if configured_per_host != per_host_limit:
             log.info(
-                "Clamping per_host_max_connections from %s to %s (cpu=%s, adaptive_cap=%s)",
-                configured_per_host,
+                "Using %s per-host local refresh connection(s) for %s feed(s); configured per_host_max_connections=%s "
+                "(cpu=%s, adaptive_cap=%s)",
                 per_host_limit,
+                len(feed_rows),
+                configured_per_host,
                 cpu_count,
                 adaptive_cap,
             )
@@ -487,7 +491,7 @@ class LocalProvider(RSSProvider):
         final_title = feed_title or "Unknown Feed"
         failure_cooldown_seconds = None
 
-        if respect_failure_cooldown:
+        if respect_failure_cooldown and not force:
             expires_at, cached_error = self._get_refresh_failure_cooldown(feed_id)
             if expires_at is not None:
                 status = "cooldown"
@@ -535,23 +539,18 @@ class LocalProvider(RSSProvider):
             except Exception:
                 pass
 
-        headers = {}
+        headers = utils.add_revalidation_headers({})
         is_npr_feed = npr_mod.is_npr_url(feed_url)
 
-        # Some RSS/podcast CDNs set long cache lifetimes and may serve cached 200/304 responses
-        # until their max-age expires. Sending "no-cache" forces intermediary revalidation so
-        # new episodes appear promptly (instead of only after restart / cache expiry).
-        if force:
-            headers = utils.add_revalidation_headers(headers)
-
-        use_conditional = (not is_npr_feed) and bool(etag or last_modified)
+        # Automatic refreshes can use validators. Manual/targeted refreshes are
+        # force=True and should fetch the feed body even when a server's validator
+        # metadata is stale or incorrect.
+        use_conditional = (not force) and (not is_npr_feed) and bool(etag or last_modified)
         if use_conditional:
             if etag:
                 headers['If-None-Match'] = etag
             if last_modified:
                 headers['If-Modified-Since'] = last_modified
-
-            headers = utils.add_revalidation_headers(headers)
         elif not force and is_npr_feed and (etag or last_modified):
             log.debug("Skipping conditional headers for NPR feed %s", feed_url)
 

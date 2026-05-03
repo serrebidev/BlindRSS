@@ -1345,7 +1345,15 @@ class RangeCacheProxy:
                         ent.touch()
                     except Exception:
                         pass
-                    # Keep HEAD fast; do not probe the origin here (VLC can send many HEADs during seeks).
+                    # VLC uses early HEAD responses to decide whether an HTTP
+                    # source is seekable. proxify() already starts the probe in
+                    # the background, so wait briefly for it and include length
+                    # metadata when available without doing network I/O here.
+                    try:
+                        if not ent._probe_done.is_set():
+                            ent._probe_done.wait(timeout=_PROBE_WAIT_S)
+                    except Exception:
+                        pass
                     self.send_response(200)
                     self.send_header("Content-Type", ent.content_type)
                     if ent.total_length is not None:

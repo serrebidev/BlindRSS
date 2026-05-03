@@ -184,6 +184,59 @@ class BazQuxProvider(RSSProvider):
             return False
         return self._login()
 
+    def refresh_feed(self, feed_id: str, progress_cb=None) -> bool:
+        return self.refresh_feeds_by_ids([feed_id], progress_cb=progress_cb, force=True)
+
+    def refresh_feeds_by_ids(self, feed_ids, progress_cb=None, force: bool = True) -> bool:
+        ordered_ids = []
+        seen = set()
+        for raw_id in list(feed_ids or []):
+            fid = str(raw_id or "").strip()
+            if not fid or fid in seen:
+                continue
+            seen.add(fid)
+            ordered_ids.append(fid)
+
+        if not ordered_ids:
+            return True
+        if not self.email or not self.password or not self._login():
+            return False
+
+        feeds = self.get_feeds() or []
+        feeds_by_id = {str(getattr(feed, "id", "") or ""): feed for feed in feeds}
+        ok = True
+        for fid in ordered_ids:
+            feed = feeds_by_id.get(fid)
+            if feed is None:
+                self._emit_progress(
+                    progress_cb,
+                    {
+                        "id": fid,
+                        "title": fid,
+                        "category": "Uncategorized",
+                        "unread_count": 0,
+                        "status": "error",
+                        "new_items": None,
+                        "error": "Feed not found after refresh.",
+                    },
+                )
+                ok = False
+                continue
+
+            self._emit_progress(
+                progress_cb,
+                {
+                    "id": fid,
+                    "title": getattr(feed, "title", "") or "",
+                    "category": getattr(feed, "category", "") or "Uncategorized",
+                    "unread_count": int(getattr(feed, "unread_count", 0) or 0),
+                    "status": "ok",
+                    "new_items": None,
+                    "error": None,
+                },
+            )
+        return ok
+
     def get_feeds(self) -> List[Feed]:
         if not self._login(): return []
         try:

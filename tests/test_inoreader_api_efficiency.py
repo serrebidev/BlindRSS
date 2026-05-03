@@ -33,6 +33,53 @@ def test_inoreader_refresh_skips_when_metadata_cache_is_fresh():
     assert provider.refresh(force=True) is True
 
 
+def test_inoreader_targeted_refresh_invalidates_article_cache_and_emits_progress(monkeypatch):
+    provider = InoreaderProvider(
+        {
+            "providers": {
+                "inoreader": {
+                    "app_id": "app",
+                    "app_key": "key",
+                    "token": "token",
+                    "metadata_cache_ttl_seconds": 3600,
+                }
+            }
+        }
+    )
+    feed = Feed(id="feed/http://example.com/rss", title="Example", url="http://example.com/rss", category="Podcasts")
+    feed.unread_count = 4
+    provider._article_view_cache["all"] = {"articles": [object()], "updated_at": 1.0}
+    calls = {"get_feeds": 0}
+
+    monkeypatch.setattr(provider, "_has_required_auth", lambda: True)
+
+    def _fake_get_feeds():
+        calls["get_feeds"] += 1
+        return [feed]
+
+    monkeypatch.setattr(provider, "get_feeds", _fake_get_feeds)
+    states = []
+
+    assert provider.refresh_feeds_by_ids(
+        ["feed/http://example.com/rss", "feed/http://example.com/rss"],
+        progress_cb=states.append,
+    ) is True
+
+    assert calls["get_feeds"] == 1
+    assert provider._article_view_cache == {}
+    assert states == [
+        {
+            "id": "feed/http://example.com/rss",
+            "title": "Example",
+            "category": "Podcasts",
+            "unread_count": 4,
+            "status": "ok",
+            "new_items": None,
+            "error": None,
+        }
+    ]
+
+
 def test_inoreader_get_articles_page_reuses_cache_and_continuation(monkeypatch):
     provider = InoreaderProvider(
         {
