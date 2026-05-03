@@ -452,8 +452,18 @@ if errorlevel 1 (
     echo [X] gh CLI not found in PATH.
     exit /b 1
 )
-gh release create "%VERSION_TAG%" "%ZIP_PATH%" "%MANIFEST_PATH%" --repo "%GITHUB_REPO_SLUG%" --title "%VERSION_TAG%" --notes-file "%RELEASE_NOTES%"
+gh release create "%VERSION_TAG%" "%ZIP_PATH%" "%MANIFEST_PATH%" --repo "%GITHUB_REPO_SLUG%" --title "%VERSION_TAG%" --notes-file "%RELEASE_NOTES%" --latest
 if errorlevel 1 exit /b 1
+
+rem The Windows updater queries /releases/latest, which silently skips drafts.
+rem gh release create has been observed leaving releases as drafts under some
+rem configurations, so explicitly publish and mark this release as Latest.
+echo [BlindRSS Release] Ensuring %VERSION_TAG% is published and marked as Latest...
+gh release edit "%VERSION_TAG%" --repo "%GITHUB_REPO_SLUG%" --draft=false --latest
+if errorlevel 1 (
+    echo [X] Failed to publish %VERSION_TAG% as Latest. The Windows updater will not see it until this is resolved.
+    exit /b 1
+)
 exit /b 0
 
 :dispatch_cross_platform_release
