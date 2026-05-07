@@ -53,6 +53,7 @@ GitHub release publication may happen from any OS after the required artifacts a
 - Bumps `core/version.py`, tags Git, pushes, and creates the GitHub release.
 - Dispatches the GitHub Actions macOS release-asset build after the Windows release is created.
 - Pushes to `main` also trigger GitHub Actions workflow builds for Windows and macOS as workflow artifacts so you can validate packaging from macOS without publishing a release.
+- Forces the created GitHub release to published/latest and removes any remaining draft releases. Never leave draft releases behind.
 
 On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZIP to an already-created GitHub release tag. It does not replace the Windows release flow, does not create updater metadata, and does not produce the authoritative signed Windows release asset.
 
