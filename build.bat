@@ -464,17 +464,17 @@ if errorlevel 1 (
     echo [X] Failed to publish %VERSION_TAG% as Latest. The Windows updater will not see it until this is resolved.
     exit /b 1
 )
-call :delete_draft_releases
+call :verify_no_draft_releases
 if errorlevel 1 exit /b 1
 call :verify_latest_release
 if errorlevel 1 exit /b 1
 exit /b 0
 
-:delete_draft_releases
+:verify_no_draft_releases
 echo [BlindRSS Release] Checking for draft releases in %GITHUB_REPO_SLUG%...
-powershell -NoProfile -Command "$ErrorActionPreference='Stop'; $repo='%GITHUB_REPO_SLUG%'; $drafts = gh release list --repo $repo --limit 100 --json tagName,isDraft ^| ConvertFrom-Json ^| Where-Object { $_.isDraft }; foreach ($draft in $drafts) { Write-Host ('Deleting draft release ' + $draft.tagName + '...'); gh release delete $draft.tagName --repo $repo --yes }"
+powershell -NoProfile -Command "$ErrorActionPreference='Stop'; $repo='%GITHUB_REPO_SLUG%'; $releaseJson = gh release list --repo $repo --limit 100 --json tagName,isDraft; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $drafts = @($releaseJson | ConvertFrom-Json | Where-Object { $_.isDraft -eq $true }); if ($drafts.Count -gt 0) { Write-Host 'Draft releases found:'; foreach ($draft in $drafts) { Write-Host ('  ' + $draft.tagName) }; exit 1 }"
 if errorlevel 1 (
-    echo [X] Failed to remove draft releases from %GITHUB_REPO_SLUG%.
+    echo [X] Draft releases exist in %GITHUB_REPO_SLUG%. Publish or delete drafts manually, then rerun the release.
     exit /b 1
 )
 exit /b 0

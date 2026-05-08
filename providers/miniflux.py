@@ -249,6 +249,14 @@ class MinifluxProvider(RSSProvider):
                 resp.raise_for_status()
 
                 if status_code == 204:
+                    self._last_request_info = {
+                        "ok": True,
+                        "used_cache": False,
+                        "status_code": status_code,
+                        "endpoint": str(endpoint or ""),
+                        "method": method_upper,
+                        "error_body": None,
+                    }
                     return None
 
                 try:

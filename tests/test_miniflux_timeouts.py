@@ -83,6 +83,66 @@ def test_miniflux_req_adds_revalidation_headers(monkeypatch):
     assert headers.get("Expires") == "0"
 
 
+def test_miniflux_req_records_204_as_success(monkeypatch):
+    p = _provider(feed_timeout_seconds=10)
+
+    def _fake_request(method, url, headers=None, json=None, params=None, timeout=None):
+        return _DummyResp(status_code=204)
+
+    monkeypatch.setattr("providers.miniflux.requests.request", _fake_request)
+
+    assert p._req("PUT", "/v1/feeds/123/refresh") is None
+    assert p._last_request_info["ok"] is True
+    assert p._last_request_info["status_code"] == 204
+    assert p._last_request_info["endpoint"] == "/v1/feeds/123/refresh"
+    assert p._last_request_info["method"] == "PUT"
+
+
+def test_miniflux_successful_204_global_refresh_clears_stale_failure_state(monkeypatch):
+    p = _provider(feed_timeout_seconds=10)
+    now = datetime.now(timezone.utc)
+    recent = now.isoformat()
+    calls = []
+
+    p._last_request_info = {
+        "ok": False,
+        "used_cache": False,
+        "status_code": 502,
+        "endpoint": "/v1/feeds/refresh",
+        "method": "PUT",
+        "error_body": None,
+    }
+
+    def _fake_request(method, url, headers=None, json=None, params=None, timeout=None):
+        endpoint = url.removeprefix("https://example.test")
+        calls.append((method, endpoint))
+        if endpoint == "/v1/feeds/refresh":
+            return _DummyResp(status_code=204)
+        if endpoint == "/v1/feeds/10/refresh":
+            return _DummyResp(status_code=204)
+        if endpoint == "/v1/feeds":
+            return _DummyResp(
+                status_code=200,
+                payload=[
+                    {
+                        "id": 10,
+                        "title": "Feed 10",
+                        "category": {"title": "Podcasts"},
+                        "checked_at": recent,
+                        "parsing_error_count": 0,
+                    }
+                ],
+            )
+        if endpoint == "/v1/feeds/counters":
+            return _DummyResp(status_code=200, payload={"unreads": {"10": 0}})
+        raise AssertionError(f"Unexpected request: {method} {endpoint}")
+
+    monkeypatch.setattr("providers.miniflux.requests.request", _fake_request)
+
+    assert p.refresh(force=True) is True
+    assert ("PUT", "/v1/feeds/10/refresh") in calls
+
+
 def test_miniflux_refresh_force_refreshes_each_feed(monkeypatch):
     p = _provider(feed_timeout_seconds=10)
     calls = []

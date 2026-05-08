@@ -53,7 +53,7 @@ GitHub release publication may happen from any OS after the required artifacts a
 - Bumps `core/version.py`, tags Git, pushes, and creates the GitHub release.
 - Dispatches the GitHub Actions macOS release-asset build after the Windows release is created.
 - Pushes to `main` also trigger GitHub Actions workflow builds for Windows and macOS as workflow artifacts so you can validate packaging from macOS without publishing a release.
-- Forces the created GitHub release to published/latest, removes any remaining draft releases, and verifies GitHub's `/releases/latest` endpoint points at the new tag before exiting. Never leave draft releases behind.
+- Forces the created GitHub release to published/latest, verifies there are no draft releases, and verifies GitHub's `/releases/latest` endpoint points at the new tag before exiting. Never leave draft releases behind. Do not automatically delete releases during this check; publish or delete drafts manually by exact tag if needed.
 
 ## Updater Visibility Rule
 

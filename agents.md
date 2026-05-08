@@ -73,6 +73,7 @@ Fix any warnings, or errors.
   - `base.py`: `RSSProvider` interface.
   - `local.py`: Local RSS provider, parallel refresh (`ThreadPoolExecutor`), conditional GET, cache revalidation headers.
   - `miniflux.py`, `inoreader.py`, `theoldreader.py`, `bazqux.py`: Hosted provider implementations.
+    - Miniflux refresh uses `PUT /v1/feeds/refresh` and `PUT /v1/feeds/{id}/refresh`; HTTP 204 is a successful refresh response and must update request-status tracking as success.
   - Favorites are supported across providers through `supports_favorites` / `set_favorite` / `toggle_favorite`.
   - Inoreader note: `stream/contents` expects URL-encoded `streamId` in path segment, not `s=` query parameter.
 
@@ -137,5 +138,5 @@ Fix any warnings, or errors.
 6. Timeouts: all provider HTTP requests must set finite timeouts.
 7. Inoreader OAuth: HTTPS localhost redirect URIs may require pasted redirect URL flow; validate `state`.
 8. Releases: use `.\build.bat release` for official Windows release builds; macOS release-asset publication may be dispatched from macOS with `./build.sh release <tag>` after the Windows-created release exists (details in `build.md`).
-9. Release publication: every release MUST be published (not draft) and marked as "Latest" before the build flow exits. The Windows updater queries GitHub's `/releases/latest`, which silently skips drafts and ignores unreleased `main` commits and workflow artifacts, so a draft or missing release means no users get the update. `build.bat release` enforces this with an explicit `gh release edit --draft=false --latest` step plus a `/releases/latest` verification; do not remove those guards, and apply the same guard to any new release path.
+9. Release publication: every release MUST be published (not draft) and marked as "Latest" before the build flow exits. The Windows updater queries GitHub's `/releases/latest`, which silently skips drafts and ignores unreleased `main` commits and workflow artifacts, so a draft or missing release means no users get the update. `build.bat release` enforces this with an explicit `gh release edit --draft=false --latest` step, a no-drafts check, and a `/releases/latest` verification; do not remove those guards, and apply the same guard to any new release path. Do not automatically delete releases during release checks; if a draft must be removed, do it manually by exact tag.
 10. Tests: add/extend tests in `tests/` for behavior changes and regressions.
