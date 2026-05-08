@@ -15,13 +15,35 @@ def _db_path() -> str:
     return os.path.join(data_dir, DB_FILENAME)
 
 
+_DEFAULT_DB_FILE = _db_path()
+DB_FILE = _DEFAULT_DB_FILE
+
+
+def _normalized_path(path: str) -> str:
+    try:
+        return os.path.abspath(str(path or ""))
+    except Exception:
+        return str(path or "")
+
+
+def _db_file_is_overridden() -> bool:
+    current = globals().get("DB_FILE", "")
+    return bool(current) and _normalized_path(current) != _normalized_path(_DEFAULT_DB_FILE)
+
+
+def _active_db_path() -> str:
+    if _db_file_is_overridden():
+        return str(globals().get("DB_FILE"))
+    return _db_path()
+
+
 def _ensure_db_available() -> str:
     """
     Ensure rss.db exists at the active data dir. If it is missing there but
     present in the alternate location (APP_DIR vs USER_DATA_DIR), copy it so a
     data-location switch does not start the user with an empty database.
     """
-    target = _db_path()
+    target = _active_db_path()
     if os.path.exists(target):
         return target
 
@@ -29,6 +51,9 @@ def _ensure_db_available() -> str:
         os.makedirs(os.path.dirname(target), exist_ok=True)
     except Exception:
         log.exception("Could not create data dir for rss.db at %s", target)
+
+    if _db_file_is_overridden():
+        return target
 
     # Look for a DB at the other candidate location.
     candidates = [
@@ -53,11 +78,6 @@ def _ensure_db_available() -> str:
         except Exception:
             log.exception("Failed while migrating rss.db from %s", src)
     return target
-
-
-# Compute DB path after config resolution. This is accessed lazily by helpers
-# below so it reflects the active data directory at the time of use.
-DB_FILE = _db_path()
 
 
 def _table_exists(cursor: sqlite3.Cursor, name: str) -> bool:
@@ -438,7 +458,7 @@ def cleanup_old_articles(days: int, keep_favorites: bool = True):
 
 
 def get_connection():
-    conn = sqlite3.connect(_db_path(), timeout=30, check_same_thread=False)
+    conn = sqlite3.connect(_active_db_path(), timeout=30, check_same_thread=False)
     try:
         conn.execute("PRAGMA busy_timeout=60000")
         conn.execute("PRAGMA journal_mode=WAL")

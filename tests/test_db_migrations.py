@@ -173,3 +173,25 @@ def test_init_db_migrates_legacy_chapters_fk_old_articles_without_unique_article
         finally:
             core.db.DB_FILE = orig_db_file
 
+
+def test_init_db_respects_explicit_db_file_override_without_migrating_app_db():
+    with tempfile.TemporaryDirectory() as tmp:
+        orig_db_file = core.db.DB_FILE
+        core.db.DB_FILE = os.path.join(tmp, "rss.db")
+        try:
+            core.db.init_db()
+
+            assert os.path.abspath(core.db.DB_FILE) == os.path.abspath(os.path.join(tmp, "rss.db"))
+
+            conn = core.db.get_connection()
+            try:
+                c = conn.cursor()
+                c.execute("SELECT COUNT(*) FROM feeds")
+                assert c.fetchone()[0] == 0
+                c.execute("SELECT COUNT(*) FROM articles")
+                assert c.fetchone()[0] == 0
+            finally:
+                conn.close()
+        finally:
+            core.db.DB_FILE = orig_db_file
+

@@ -53,7 +53,19 @@ GitHub release publication may happen from any OS after the required artifacts a
 - Bumps `core/version.py`, tags Git, pushes, and creates the GitHub release.
 - Dispatches the GitHub Actions macOS release-asset build after the Windows release is created.
 - Pushes to `main` also trigger GitHub Actions workflow builds for Windows and macOS as workflow artifacts so you can validate packaging from macOS without publishing a release.
-- Forces the created GitHub release to published/latest and removes any remaining draft releases. Never leave draft releases behind.
+- Forces the created GitHub release to published/latest, removes any remaining draft releases, and verifies GitHub's `/releases/latest` endpoint points at the new tag before exiting. Never leave draft releases behind.
+
+## Updater Visibility Rule
+
+BlindRSS Windows auto-update does not look at Git tags, commits on `main`, or GitHub Actions artifacts. It checks GitHub's `repos/serrebidev/BlindRSS/releases/latest` endpoint, downloads `BlindRSS-update.json` from that release, and then downloads the Windows ZIP named by that manifest.
+
+After `.\build.bat release`, the latest endpoint must return the new tag:
+
+```powershell
+gh api repos/serrebidev/BlindRSS/releases/latest --jq .tag_name
+```
+
+If this returns the previous tag, users will see "BlindRSS is up to date" for that previous version even when newer code exists on `main`.
 
 On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZIP to an already-created GitHub release tag. It does not replace the Windows release flow, does not create updater metadata, and does not produce the authoritative signed Windows release asset.
 
