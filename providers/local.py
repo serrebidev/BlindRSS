@@ -21,6 +21,7 @@ from bs4 import BeautifulSoup as BS, XMLParsedAsHTMLWarning
 import xml.etree.ElementTree as ET
 import logging
 import warnings
+from urllib.parse import urlsplit, urlunsplit
 
 # Avoid noisy warnings when falling back to HTML parser for XML content
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
@@ -211,6 +212,56 @@ def _response_looks_feed_like(resp) -> bool:
         or '"version":"https://jsonfeed.org/version/' in snippet
         or '"version": "https://jsonfeed.org/version/' in snippet
     )
+
+
+def _response_looks_cloudflare_challenge(resp) -> bool:
+    headers = getattr(resp, "headers", {}) or {}
+    if str(headers.get("Cf-Mitigated") or headers.get("cf-mitigated") or "").lower() == "challenge":
+        return True
+
+    try:
+        snippet = str(getattr(resp, "text", "") or "")[:4096].lower()
+    except Exception:
+        snippet = ""
+    return "challenges.cloudflare.com" in snippet and "just a moment" in snippet
+
+
+def _wordpress_feed_slash_variant(url: str) -> Optional[str]:
+    raw = str(url or "").strip()
+    if not raw:
+        return None
+    try:
+        parts = urlsplit(raw)
+    except Exception:
+        return None
+
+    path = parts.path or ""
+    if not path or path.endswith("/") or not path.lower().endswith("/feed"):
+        return None
+    return urlunsplit((parts.scheme, parts.netloc, path + "/", parts.query, parts.fragment))
+
+
+def _retry_cloudflare_challenged_wordpress_feed(resp, url: str, *, headers: dict, timeout):
+    """Retry WordPress-style /feed URLs with the canonical trailing slash after a challenge."""
+    try:
+        status_code = int(getattr(resp, "status_code", 0) or 0)
+    except Exception:
+        status_code = 0
+    if status_code != 403 or not _response_looks_cloudflare_challenge(resp):
+        return resp, url
+
+    candidate = _wordpress_feed_slash_variant(url)
+    if not candidate or candidate == url:
+        return resp, url
+
+    try:
+        retry_resp = utils.safe_requests_get(candidate, headers=headers, timeout=timeout)
+    except Exception:
+        return resp, url
+
+    if _response_looks_feed_like(retry_resp):
+        return retry_resp, candidate
+    return resp, url
 
 
 class LocalProvider(RSSProvider):
@@ -560,6 +611,7 @@ class LocalProvider(RSSProvider):
         xml_text = None
         new_etag = None
         new_last_modified = None
+        canonical_feed_url = None
 
         try:
             from core import rumble as rumble_mod
@@ -893,6 +945,16 @@ class LocalProvider(RSSProvider):
                 for attempt in range(1, attempts + 1):
                     try:
                         resp = utils.safe_requests_get(feed_url, headers=headers, timeout=direct_fetch_timeout)
+                        resp, effective_feed_url = _retry_cloudflare_challenged_wordpress_feed(
+                            resp,
+                            feed_url,
+                            headers=headers,
+                            timeout=direct_fetch_timeout,
+                        )
+                        if effective_feed_url != feed_url:
+                            log.info("Resolved challenged local feed URL during refresh: %s -> %s", feed_url, effective_feed_url)
+                            feed_url = effective_feed_url
+                            canonical_feed_url = effective_feed_url
                         if resp.status_code == 304:
                             status = "not_modified"
                             new_etag = etag
@@ -985,8 +1047,14 @@ class LocalProvider(RSSProvider):
                 title_to_store = (
                     str(feed_title or "").strip() if bool(int(title_is_custom or 0)) and str(feed_title or "").strip() else final_title
                 )
-                c.execute("UPDATE feeds SET title = ?, etag = ?, last_modified = ? WHERE id = ?", 
-                          (title_to_store, new_etag, new_last_modified, feed_id))
+                if canonical_feed_url:
+                    c.execute(
+                        "UPDATE feeds SET url = ?, title = ?, etag = ?, last_modified = ? WHERE id = ?",
+                        (canonical_feed_url, title_to_store, new_etag, new_last_modified, feed_id),
+                    )
+                else:
+                    c.execute("UPDATE feeds SET title = ?, etag = ?, last_modified = ? WHERE id = ?",
+                              (title_to_store, new_etag, new_last_modified, feed_id))
                 
                 # Pre-fetch existing articles to avoid N+1 SELECTs
                 c.execute("SELECT id, date FROM articles WHERE feed_id = ?", (feed_id,))
@@ -1738,6 +1806,15 @@ class LocalProvider(RSSProvider):
                 title = page_title or real_url
             else:
                 resp = utils.safe_requests_get(real_url, timeout=10)
+                resp, effective_url = _retry_cloudflare_challenged_wordpress_feed(
+                    resp,
+                    real_url,
+                    headers={},
+                    timeout=10,
+                )
+                if effective_url != real_url:
+                    real_url = effective_url
+                    title = real_url
                 d = feedparser.parse(resp.text)
                 title = d.feed.get('title', real_url)
         except Exception:

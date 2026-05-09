@@ -72,8 +72,12 @@ Fix any warnings, or errors.
 - `providers/`
   - `base.py`: `RSSProvider` interface.
   - `local.py`: Local RSS provider, parallel refresh (`ThreadPoolExecutor`), conditional GET, cache revalidation headers.
+    - Retries Cloudflare-challenged WordPress-style `/feed` URLs with the canonical trailing slash and persists the working URL after success.
   - `miniflux.py`, `inoreader.py`, `theoldreader.py`, `bazqux.py`: Hosted provider implementations.
     - Miniflux refresh uses `PUT /v1/feeds/refresh` and `PUT /v1/feeds/{id}/refresh`; HTTP 204 is a successful refresh response and must update request-status tracking as success.
+    - Miniflux per-feed refresh timeout/5xx retries are expected for some server-side feed failures and should stay at debug/backoff level; keep global API failures visible as warnings/errors.
+    - Miniflux manual/targeted per-feed refreshes run through a bounded worker pool (`miniflux_targeted_refresh_workers`, default 8) so slow feeds do not serialize the whole refresh.
+    - Miniflux entries may carry plausible near-future `published_at` values used by the web UI for ordering; preserve those server dates instead of demoting them to the sentinel date.
   - Favorites are supported across providers through `supports_favorites` / `set_favorite` / `toggle_favorite`.
   - Inoreader note: `stream/contents` expects URL-encoded `streamId` in path segment, not `s=` query parameter.
 

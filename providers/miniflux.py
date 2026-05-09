@@ -3,6 +3,8 @@ import re
 import logging
 import time
 import copy
+import concurrent.futures
+import threading
 from typing import List, Dict, Any
 from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
@@ -49,6 +51,7 @@ class MinifluxProvider(RSSProvider):
         # This avoids hammering a single broken feed refresh route and spamming logs.
         self._targeted_refresh_backoff_until: dict[str, float] = {}
         self._targeted_refresh_fail_counts: dict[str, int] = {}
+        self._targeted_refresh_backoff_lock = threading.Lock()
 
     def _cacheable_get_endpoint(self, endpoint: str) -> str | None:
         ep = str(endpoint or "").split("?", 1)[0].strip()
@@ -113,6 +116,27 @@ class MinifluxProvider(RSSProvider):
     def _is_transient_status(self, status_code: int | None) -> bool:
         return int(status_code or 0) in (429, 500, 502, 503, 504)
 
+    def _is_targeted_refresh_endpoint(self, endpoint: str = "") -> bool:
+        ep = str(endpoint or "").strip().lower()
+        return ep.startswith("/v1/feeds/") and ep.endswith("/refresh") and ep != "/v1/feeds/refresh"
+
+    def _targeted_refresh_worker_count(self, feed_count: int) -> int:
+        try:
+            configured = int(
+                self.config.get(
+                    "miniflux_targeted_refresh_workers",
+                    8,
+                )
+                or 1
+            )
+        except Exception:
+            configured = 8
+        try:
+            count = max(1, int(feed_count or 0))
+        except Exception:
+            count = 1
+        return max(1, min(12, configured, count))
+
     def _retry_backoff_seconds(self, attempt_index: int) -> float:
         # attempt_index is 1-based
         return min(4.0, 0.4 * (2 ** max(0, int(attempt_index) - 1)))
@@ -133,17 +157,18 @@ class MinifluxProvider(RSSProvider):
         if not fid:
             return False
         try:
-            block_until = float(self._targeted_refresh_backoff_until.get(fid, 0.0) or 0.0)
+            with self._targeted_refresh_backoff_lock:
+                block_until = float(self._targeted_refresh_backoff_until.get(fid, 0.0) or 0.0)
         except Exception:
             block_until = 0.0
         now_mono = time.monotonic()
         if block_until > now_mono:
             return False
-        if fid in self._targeted_refresh_backoff_until:
-            try:
+        try:
+            with self._targeted_refresh_backoff_lock:
                 self._targeted_refresh_backoff_until.pop(fid, None)
-            except Exception:
-                pass
+        except Exception:
+            pass
         return True
 
     def _record_targeted_refresh_attempt_result(self, feed_id: str, ok: bool, status_code: int | None) -> None:
@@ -152,8 +177,9 @@ class MinifluxProvider(RSSProvider):
             return
         if bool(ok):
             try:
-                self._targeted_refresh_backoff_until.pop(fid, None)
-                self._targeted_refresh_fail_counts.pop(fid, None)
+                with self._targeted_refresh_backoff_lock:
+                    self._targeted_refresh_backoff_until.pop(fid, None)
+                    self._targeted_refresh_fail_counts.pop(fid, None)
             except Exception:
                 pass
             return
@@ -161,18 +187,20 @@ class MinifluxProvider(RSSProvider):
         # Back off on any failure status (especially repeated 5xx) to reduce log spam
         # and avoid hammering the same endpoint every refresh cycle.
         try:
-            fail_count = int(self._targeted_refresh_fail_counts.get(fid, 0) or 0) + 1
+            with self._targeted_refresh_backoff_lock:
+                fail_count = int(self._targeted_refresh_fail_counts.get(fid, 0) or 0) + 1
+                self._targeted_refresh_fail_counts[fid] = fail_count
         except Exception:
             fail_count = 1
-        self._targeted_refresh_fail_counts[fid] = fail_count
         delay = self._targeted_refresh_failure_backoff_seconds(fail_count)
         try:
-            self._targeted_refresh_backoff_until[fid] = time.monotonic() + float(delay)
+            with self._targeted_refresh_backoff_lock:
+                self._targeted_refresh_backoff_until[fid] = time.monotonic() + float(delay)
         except Exception:
             pass
         try:
             if int(status_code or 0) >= 500 or int(status_code or 0) in (429, 502, 503, 504):
-                log.warning(
+                log.debug(
                     "Miniflux targeted refresh backoff for feed %s after HTTP %s (%.0fs).",
                     fid,
                     int(status_code or 0),
@@ -215,6 +243,7 @@ class MinifluxProvider(RSSProvider):
         req_headers = utils.add_revalidation_headers(self.headers)
         method_upper = str(method or "").upper()
         is_get = method_upper == "GET"
+        is_targeted_refresh = self._is_targeted_refresh_endpoint(endpoint)
         last_error = None
         last_status_code = None
 
@@ -234,7 +263,8 @@ class MinifluxProvider(RSSProvider):
                 last_status_code = status_code
                 if self._is_transient_status(status_code) and attempt <= retries:
                     delay = self._retry_backoff_seconds(attempt)
-                    log.warning(
+                    log_fn = log.debug if is_targeted_refresh else log.warning
+                    log_fn(
                         "Miniflux transient HTTP %s for %s %s (attempt %s/%s); retrying in %.1fs",
                         status_code,
                         method_upper,
@@ -297,7 +327,8 @@ class MinifluxProvider(RSSProvider):
 
                 if self._is_transient_status(status_code) and attempt <= retries:
                     delay = self._retry_backoff_seconds(attempt)
-                    log.warning(
+                    log_fn = log.debug if is_targeted_refresh else log.warning
+                    log_fn(
                         "Miniflux transient HTTP %s for %s %s (attempt %s/%s); retrying in %.1fs",
                         status_code,
                         method_upper,
@@ -310,7 +341,8 @@ class MinifluxProvider(RSSProvider):
                     continue
 
                 if self._is_transient_status(status_code):
-                    log.warning("Miniflux transient HTTP %s for %s %s: %s", status_code, method_upper, url, e)
+                    log_fn = log.debug if is_targeted_refresh else log.warning
+                    log_fn("Miniflux transient HTTP %s for %s %s: %s", status_code, method_upper, url, e)
                 else:
                     body_preview = ""
                     try:
@@ -342,7 +374,8 @@ class MinifluxProvider(RSSProvider):
                 last_status_code = None
                 if attempt <= retries:
                     delay = self._retry_backoff_seconds(attempt)
-                    log.warning(
+                    log_fn = log.debug if is_targeted_refresh else log.warning
+                    log_fn(
                         "Miniflux timeout for %s %s (timeout=%ss, attempt %s/%s); retrying in %.1fs",
                         method_upper,
                         url,
@@ -353,7 +386,10 @@ class MinifluxProvider(RSSProvider):
                     )
                     time.sleep(delay)
                     continue
-                log.warning(f"Miniflux timeout for {url} (timeout={timeout_s}s): {e}")
+                if is_targeted_refresh:
+                    log.debug("Miniflux timeout for %s (timeout=%ss): %s", url, timeout_s, e)
+                else:
+                    log.warning("Miniflux timeout for %s (timeout=%ss): %s", url, timeout_s, e)
                 self._last_request_info = {
                     "ok": False,
                     "used_cache": False,
@@ -368,7 +404,8 @@ class MinifluxProvider(RSSProvider):
                 last_status_code = None
                 if attempt <= retries:
                     delay = self._retry_backoff_seconds(attempt)
-                    log.warning(
+                    log_fn = log.debug if is_targeted_refresh else log.warning
+                    log_fn(
                         "Miniflux request error for %s %s (attempt %s/%s); retrying in %.1fs: %s",
                         method_upper,
                         url,
@@ -428,6 +465,167 @@ class MinifluxProvider(RSSProvider):
         if last_error is not None:
             log.debug("Miniflux request failed with no fallback for %s %s", method_upper, url, exc_info=True)
         return None
+
+    def _request_targeted_refresh(self, feed_id: str) -> dict[str, Any]:
+        fid = str(feed_id or "").strip()
+        endpoint = f"/v1/feeds/{fid}/refresh"
+        info = {
+            "ok": False,
+            "used_cache": False,
+            "status_code": None,
+            "endpoint": endpoint,
+            "method": "PUT",
+            "error_body": None,
+        }
+        if not self.base_url or not fid:
+            return info
+
+        url = f"{self.base_url}{endpoint}"
+        timeout_s = self._request_timeout_seconds(endpoint)
+        retries = self._request_retry_attempts(endpoint)
+        req_headers = utils.add_revalidation_headers(self.headers)
+
+        for attempt in range(1, retries + 2):
+            try:
+                resp = requests.request(
+                    "PUT",
+                    url,
+                    headers=req_headers,
+                    timeout=timeout_s,
+                )
+                status_code = int(getattr(resp, "status_code", 0) or 0)
+                info["status_code"] = status_code
+                if self._is_transient_status(status_code) and attempt <= retries:
+                    delay = self._retry_backoff_seconds(attempt)
+                    log.debug(
+                        "Miniflux transient HTTP %s for PUT %s (attempt %s/%s); retrying in %.1fs",
+                        status_code,
+                        url,
+                        attempt,
+                        retries + 1,
+                        delay,
+                    )
+                    time.sleep(delay)
+                    continue
+
+                resp.raise_for_status()
+                info["ok"] = True
+                return info
+
+            except requests.HTTPError as e:
+                status_code = None
+                try:
+                    status_code = int(getattr(getattr(e, "response", None), "status_code", 0) or 0)
+                except Exception:
+                    status_code = 0
+                info["status_code"] = status_code
+
+                if self._is_transient_status(status_code) and attempt <= retries:
+                    delay = self._retry_backoff_seconds(attempt)
+                    log.debug(
+                        "Miniflux transient HTTP %s for PUT %s (attempt %s/%s); retrying in %.1fs",
+                        status_code,
+                        url,
+                        attempt,
+                        retries + 1,
+                        delay,
+                    )
+                    time.sleep(delay)
+                    continue
+                log.debug("Miniflux transient HTTP %s for PUT %s: %s", status_code, url, e)
+                return info
+
+            except requests.Timeout as e:
+                if attempt <= retries:
+                    delay = self._retry_backoff_seconds(attempt)
+                    log.debug(
+                        "Miniflux timeout for PUT %s (timeout=%ss, attempt %s/%s); retrying in %.1fs",
+                        url,
+                        timeout_s,
+                        attempt,
+                        retries + 1,
+                        delay,
+                    )
+                    time.sleep(delay)
+                    continue
+                log.debug("Miniflux timeout for %s (timeout=%ss): %s", url, timeout_s, e)
+                return info
+
+            except requests.RequestException as e:
+                if attempt <= retries:
+                    delay = self._retry_backoff_seconds(attempt)
+                    log.debug(
+                        "Miniflux request error for PUT %s (attempt %s/%s); retrying in %.1fs: %s",
+                        url,
+                        attempt,
+                        retries + 1,
+                        delay,
+                        e,
+                    )
+                    time.sleep(delay)
+                    continue
+                log.debug("Miniflux request error for PUT %s: %s", url, e)
+                return info
+
+            except Exception as e:
+                log.debug("Miniflux request error for PUT %s: %s", url, e)
+                return info
+
+        return info
+
+    def _refresh_targeted_feeds(self, feed_ids, *, force: bool = False) -> dict[str, dict[str, Any]]:
+        ordered_ids = []
+        seen = set()
+        for raw_id in list(feed_ids or []):
+            fid = str(raw_id or "").strip()
+            if not fid or fid in seen:
+                continue
+            seen.add(fid)
+            if not self._should_attempt_targeted_refresh(fid, force=force):
+                continue
+            ordered_ids.append(fid)
+
+        if not ordered_ids:
+            return {}
+
+        results: dict[str, dict[str, Any]] = {}
+        worker_count = self._targeted_refresh_worker_count(len(ordered_ids))
+
+        if worker_count <= 1 or len(ordered_ids) == 1:
+            for fid in ordered_ids:
+                results[fid] = self._request_targeted_refresh(fid)
+        else:
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=worker_count,
+                thread_name_prefix="miniflux-refresh",
+            ) as executor:
+                futures = {
+                    executor.submit(self._request_targeted_refresh, fid): fid
+                    for fid in ordered_ids
+                }
+                for future in concurrent.futures.as_completed(futures):
+                    fid = futures[future]
+                    try:
+                        results[fid] = future.result()
+                    except Exception as e:
+                        log.debug("Miniflux targeted refresh worker failed for feed %s: %s", fid, e)
+                        results[fid] = {
+                            "ok": False,
+                            "used_cache": False,
+                            "status_code": None,
+                            "endpoint": f"/v1/feeds/{fid}/refresh",
+                            "method": "PUT",
+                            "error_body": None,
+                        }
+
+        for fid, info in results.items():
+            self._record_targeted_refresh_attempt_result(
+                fid,
+                bool((info or {}).get("ok", False)),
+                (info or {}).get("status_code"),
+            )
+
+        return results
 
     def _get_entries_paged(self, endpoint: str, params: Dict[str, Any] = None, limit: int = 200) -> List[Dict[str, Any]]:
         """Retrieve all entries by paging with limit/offset until total is reached.
@@ -558,12 +756,7 @@ class MinifluxProvider(RSSProvider):
                 media_url = (enclosures[0] or {}).get("url")
                 media_type = (enclosures[0] or {}).get("mime_type")
 
-            date = utils.normalize_date(
-                entry.get("published_at") or entry.get("published"),
-                display_title,
-                entry_content,
-                entry_url,
-            )
+            date = self._normalize_entry_date(entry, display_title, entry_content, entry_url)
 
             article_id = str(entry.get("id"))
             feed_id = str(entry.get("feed_id") or fallback_feed_id or "")
@@ -595,6 +788,47 @@ class MinifluxProvider(RSSProvider):
         if "unable to retrieve full-text content" in content:
             return True
         return False
+
+    def _parse_miniflux_server_date(self, value: str | None, *, allow_near_future: bool = False):
+        if not value:
+            return None
+        try:
+            dt = dateparser.parse(str(value), tzinfos=utils.TZINFOS)
+        except Exception:
+            dt = None
+        if not dt:
+            return None
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        else:
+            dt = dt.astimezone(timezone.utc)
+        if dt.year < 1990:
+            return None
+        future_limit = timedelta(days=14 if allow_near_future else 2)
+        if (dt - datetime.now(timezone.utc)) > future_limit:
+            return None
+        return dt
+
+    def _normalize_entry_date(self, entry: Dict[str, Any], title: str, content: str, url: str) -> str:
+        raw_date = entry.get("published_at") or entry.get("published")
+        date = utils.normalize_date(raw_date, title, content, url)
+        if date and not str(date).startswith("0001-01-01"):
+            return date
+
+        # Miniflux may preserve a server-side ordering date that is slightly in the
+        # future. Keep plausible near-future dates so BlindRSS sorting matches the
+        # Miniflux web UI instead of demoting the entry to the sentinel timestamp.
+        for field, allow_near_future in (
+            ("published_at", True),
+            ("published", True),
+            ("created_at", False),
+            ("changed_at", False),
+        ):
+            dt = self._parse_miniflux_server_date(entry.get(field), allow_near_future=allow_near_future)
+            if dt:
+                return utils.format_datetime(dt)
+
+        return date
 
     def _parse_checked_at(self, value: str | None):
         if not value:
@@ -660,24 +894,7 @@ class MinifluxProvider(RSSProvider):
             )
 
         if retry_budget > 0 and allow_targeted_refresh:
-            attempted = 0
-            for feed_id in per_feed_retry_ids:
-                if attempted >= retry_budget:
-                    break
-                if not self._should_attempt_targeted_refresh(feed_id, force=force):
-                    continue
-                self._req("PUT", f"/v1/feeds/{feed_id}/refresh")
-                attempted += 1
-                info = dict(getattr(self, "_last_request_info", {}) or {})
-                if (
-                    str(info.get("endpoint", "")) == f"/v1/feeds/{feed_id}/refresh"
-                    and str(info.get("method", "")).upper() == "PUT"
-                ):
-                    self._record_targeted_refresh_attempt_result(
-                        feed_id,
-                        bool(info.get("ok", False)),
-                        info.get("status_code"),
-                    )
+            self._refresh_targeted_feeds(per_feed_retry_ids[:retry_budget], force=force)
 
         # Re-read feed/counter metadata after targeted refresh requests.
         feeds = self._req("GET", "/v1/feeds") or feeds
@@ -720,17 +937,9 @@ class MinifluxProvider(RSSProvider):
             return False
 
         # Trigger a targeted refresh on the Miniflux server.
-        self._req("PUT", f"/v1/feeds/{fid}/refresh")
-        info = dict(getattr(self, "_last_request_info", {}) or {})
-        if (
-            str(info.get("endpoint", "")) == f"/v1/feeds/{fid}/refresh"
-            and str(info.get("method", "")).upper() == "PUT"
-        ):
-            self._record_targeted_refresh_attempt_result(
-                fid,
-                bool(info.get("ok", False)),
-                info.get("status_code"),
-            )
+        results = self._refresh_targeted_feeds([fid], force=True)
+        if fid in results:
+            self._last_request_info = dict(results[fid])
 
         # Whether the refresh call succeeded or timed out, try to fetch the latest metadata
         # so the UI can stop showing "Adding feed..." and display current state.
@@ -789,23 +998,8 @@ class MinifluxProvider(RSSProvider):
         if not ordered_ids:
             return True
 
-        ok = True
-        for fid in ordered_ids:
-            if not self._should_attempt_targeted_refresh(fid, force=force):
-                continue
-            self._req("PUT", f"/v1/feeds/{fid}/refresh")
-            info = dict(getattr(self, "_last_request_info", {}) or {})
-            if (
-                str(info.get("endpoint", "")) == f"/v1/feeds/{fid}/refresh"
-                and str(info.get("method", "")).upper() == "PUT"
-            ):
-                call_ok = bool(info.get("ok", False))
-                ok = ok and call_ok
-                self._record_targeted_refresh_attempt_result(
-                    fid,
-                    call_ok,
-                    info.get("status_code"),
-                )
+        results = self._refresh_targeted_feeds(ordered_ids, force=force)
+        ok = all(bool(info.get("ok", False)) for info in results.values()) if results else True
 
         feeds = self._req("GET", "/v1/feeds") or []
         counters_data = self._req("GET", "/v1/feeds/counters") or {}

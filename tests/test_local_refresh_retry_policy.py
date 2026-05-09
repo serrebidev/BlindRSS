@@ -30,13 +30,28 @@ _RSS_XML = """<?xml version='1.0' encoding='UTF-8'?>
 </rss>
 """
 
+_CLOUDFLARE_CHALLENGE_HTML = """
+<!doctype html>
+<html><head><title>Just a moment...</title></head>
+<body><script src="https://challenges.cloudflare.com/test"></script></body></html>
+"""
+
 
 class _DummyResp:
-    def __init__(self, text: str, *, status_code: int = 200, content_type: str = "application/rss+xml") -> None:
+    def __init__(
+        self,
+        text: str,
+        *,
+        status_code: int = 200,
+        content_type: str = "application/rss+xml",
+        headers: dict | None = None,
+    ) -> None:
         self.text = text
         self.content = text.encode("utf-8")
         self.status_code = status_code
         self.headers = {"Content-Type": content_type}
+        if headers:
+            self.headers.update(headers)
         self.response = self
 
     def raise_for_status(self) -> None:
@@ -94,6 +109,101 @@ def test_refresh_http_403_does_not_retry(monkeypatch):
             assert sleeps == []
             assert states[-1]["status"] == "error"
             assert "HTTP 403" in str(states[-1]["error"])
+        finally:
+            core.db.DB_FILE = orig_db_file
+
+
+def test_refresh_retries_challenged_wordpress_feed_with_trailing_slash(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        orig_db_file = core.db.DB_FILE
+        core.db.DB_FILE = os.path.join(tmp, "rss.db")
+        try:
+            provider = LocalProvider(
+                {
+                    "providers": {"local": {}},
+                    "feed_timeout_seconds": 2,
+                    "feed_retry_attempts": 0,
+                }
+            )
+            feed_url = "https://www.alexjoneslive.com/feed"
+            feed_id = _insert_feed(feed_url)
+            calls = []
+
+            def _fake_get(url, **kwargs):
+                calls.append((url, dict(kwargs or {})))
+                if url.endswith("/feed"):
+                    return _DummyResp(
+                        _CLOUDFLARE_CHALLENGE_HTML,
+                        status_code=403,
+                        content_type="text/html; charset=utf-8",
+                        headers={"Cf-Mitigated": "challenge"},
+                    )
+                if url.endswith("/feed/"):
+                    return _DummyResp(_RSS_XML)
+                raise AssertionError(f"unexpected URL: {url}")
+
+            monkeypatch.setattr(local_mod.utils, "safe_requests_get", _fake_get)
+
+            assert provider.refresh_feed(feed_id) is True
+
+            assert [url for url, _kwargs in calls] == [
+                "https://www.alexjoneslive.com/feed",
+                "https://www.alexjoneslive.com/feed/",
+            ]
+            articles = provider.get_articles(feed_id=feed_id)
+            assert len(articles) == 1
+            assert articles[0].title == "Episode 1"
+
+            conn = core.db.get_connection()
+            try:
+                c = conn.cursor()
+                c.execute("SELECT url FROM feeds WHERE id = ?", (feed_id,))
+                assert c.fetchone()[0] == "https://www.alexjoneslive.com/feed/"
+            finally:
+                conn.close()
+        finally:
+            core.db.DB_FILE = orig_db_file
+
+
+def test_add_feed_stores_challenged_wordpress_feed_trailing_slash(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        orig_db_file = core.db.DB_FILE
+        core.db.DB_FILE = os.path.join(tmp, "rss.db")
+        try:
+            provider = LocalProvider(
+                {
+                    "providers": {"local": {}},
+                    "feed_timeout_seconds": 2,
+                    "feed_retry_attempts": 0,
+                }
+            )
+            calls = []
+
+            def _fake_get(url, **kwargs):
+                calls.append((url, dict(kwargs or {})))
+                if url.endswith("/feed"):
+                    return _DummyResp(
+                        _CLOUDFLARE_CHALLENGE_HTML,
+                        status_code=403,
+                        content_type="text/html; charset=utf-8",
+                        headers={"Cf-Mitigated": "challenge"},
+                    )
+                if url.endswith("/feed/"):
+                    return _DummyResp(_RSS_XML)
+                raise AssertionError(f"unexpected URL: {url}")
+
+            monkeypatch.setattr(local_mod.utils, "safe_requests_get", _fake_get)
+
+            assert provider.add_feed("https://www.alexjoneslive.com/feed", "Tests") is True
+
+            assert [url for url, _kwargs in calls] == [
+                "https://www.alexjoneslive.com/feed",
+                "https://www.alexjoneslive.com/feed/",
+            ]
+            feeds = provider.get_feeds()
+            assert len(feeds) == 1
+            assert feeds[0].url == "https://www.alexjoneslive.com/feed/"
+            assert feeds[0].title == "Retry Test Feed"
         finally:
             core.db.DB_FILE = orig_db_file
 

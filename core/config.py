@@ -55,6 +55,7 @@ DEFAULT_CONFIG = {
     # CPU spikes and can actually slow large OPML refreshes when a handful of
     # feeds stall or throttle. Keep the default balanced.
     "max_concurrent_refreshes": 6,
+    "miniflux_targeted_refresh_workers": 8,
     "per_host_max_connections": 2,
     "feed_timeout_seconds": 15,
     "feed_retry_attempts": 1,

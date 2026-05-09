@@ -1,5 +1,8 @@
 import os
 import sys
+import logging
+import threading
+import time
 from datetime import datetime, timedelta, timezone
 import requests
 
@@ -9,6 +12,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from providers.miniflux import MinifluxProvider
+from core import utils
 
 
 class _DummyResp:
@@ -146,6 +150,7 @@ def test_miniflux_successful_204_global_refresh_clears_stale_failure_state(monke
 def test_miniflux_refresh_force_refreshes_each_feed(monkeypatch):
     p = _provider(feed_timeout_seconds=10)
     calls = []
+    targeted_calls = []
     now = datetime.now(timezone.utc)
     recent = now.isoformat()
 
@@ -163,15 +168,25 @@ def test_miniflux_refresh_force_refreshes_each_feed(monkeypatch):
         return None
 
     monkeypatch.setattr(p, "_req", _fake_req)
+    monkeypatch.setattr(
+        p,
+        "_request_targeted_refresh",
+        lambda fid: targeted_calls.append(str(fid)) or {
+            "ok": True,
+            "status_code": 204,
+            "endpoint": f"/v1/feeds/{fid}/refresh",
+            "method": "PUT",
+        },
+    )
     p.refresh(force=True)
 
-    assert ("PUT", "/v1/feeds/1/refresh") in calls
-    assert ("PUT", "/v1/feeds/2/refresh") in calls
+    assert set(targeted_calls) == {"1", "2"}
 
 
 def test_miniflux_refresh_feeds_by_ids_refreshes_subset_and_emits_progress(monkeypatch):
     p = _provider(feed_timeout_seconds=10)
     calls = []
+    targeted_calls = []
     now = datetime.now(timezone.utc)
     recent = now.isoformat()
 
@@ -197,11 +212,21 @@ def test_miniflux_refresh_feeds_by_ids_refreshes_subset_and_emits_progress(monke
 
     states = []
     monkeypatch.setattr(p, "_req", _fake_req)
+    monkeypatch.setattr(
+        p,
+        "_request_targeted_refresh",
+        lambda fid: targeted_calls.append(str(fid)) or {
+            "ok": True,
+            "status_code": 204,
+            "endpoint": f"/v1/feeds/{fid}/refresh",
+            "method": "PUT",
+        },
+    )
 
     assert p.refresh_feeds_by_ids(["2", "1", "2"], progress_cb=states.append, force=True) is True
 
-    assert calls.count(("PUT", "/v1/feeds/1/refresh")) == 1
-    assert calls.count(("PUT", "/v1/feeds/2/refresh")) == 1
+    assert targeted_calls.count("1") == 1
+    assert targeted_calls.count("2") == 1
     assert ("PUT", "/v1/feeds/refresh") not in calls
     assert [state["id"] for state in states] == ["2", "1"]
     assert states[1]["unread_count"] == 3
@@ -210,6 +235,7 @@ def test_miniflux_refresh_feeds_by_ids_refreshes_subset_and_emits_progress(monke
 def test_miniflux_refresh_non_force_only_retries_stale_or_error(monkeypatch):
     p = _provider(feed_timeout_seconds=10)
     calls = []
+    targeted_calls = []
     now = datetime.now(timezone.utc)
     stale = (now - timedelta(hours=4)).isoformat()
     recent = now.isoformat()
@@ -248,11 +274,21 @@ def test_miniflux_refresh_non_force_only_retries_stale_or_error(monkeypatch):
         return None
 
     monkeypatch.setattr(p, "_req", _fake_req)
+    monkeypatch.setattr(
+        p,
+        "_request_targeted_refresh",
+        lambda fid: targeted_calls.append(str(fid)) or {
+            "ok": True,
+            "status_code": 204,
+            "endpoint": f"/v1/feeds/{fid}/refresh",
+            "method": "PUT",
+        },
+    )
     p.refresh(force=False)
 
-    assert ("PUT", "/v1/feeds/10/refresh") in calls
-    assert ("PUT", "/v1/feeds/11/refresh") in calls
-    assert ("PUT", "/v1/feeds/12/refresh") not in calls
+    assert "10" in targeted_calls
+    assert "11" in targeted_calls
+    assert "12" not in targeted_calls
 
 
 def test_miniflux_req_retries_transient_502_then_succeeds(monkeypatch):
@@ -272,6 +308,95 @@ def test_miniflux_req_retries_transient_502_then_succeeds(monkeypatch):
     data = p._req("GET", "/v1/me")
     assert data == {"ok": True}
     assert seen["calls"] == 3
+
+
+def test_miniflux_targeted_refresh_transients_are_debug_only(monkeypatch, caplog):
+    p = _provider(feed_timeout_seconds=10)
+    p.config["feed_retry_attempts"] = 1
+    seen = {"calls": 0}
+
+    def _fake_request(method, url, headers=None, json=None, params=None, timeout=None):
+        seen["calls"] += 1
+        return _DummyResp(status_code=500, payload={})
+
+    monkeypatch.setattr("providers.miniflux.requests.request", _fake_request)
+    monkeypatch.setattr("providers.miniflux.time.sleep", lambda _s: None)
+
+    caplog.set_level(logging.WARNING, logger="providers.miniflux")
+    assert p._req("PUT", "/v1/feeds/97/refresh") is None
+
+    assert seen["calls"] == 2
+    assert not [record for record in caplog.records if "Miniflux transient HTTP" in record.getMessage()]
+
+
+def test_miniflux_global_refresh_transients_stay_warning(monkeypatch, caplog):
+    p = _provider(feed_timeout_seconds=10)
+    p.config["feed_retry_attempts"] = 1
+    seen = {"calls": 0}
+
+    def _fake_request(method, url, headers=None, json=None, params=None, timeout=None):
+        seen["calls"] += 1
+        return _DummyResp(status_code=500, payload={})
+
+    monkeypatch.setattr("providers.miniflux.requests.request", _fake_request)
+    monkeypatch.setattr("providers.miniflux.time.sleep", lambda _s: None)
+
+    caplog.set_level(logging.WARNING, logger="providers.miniflux")
+    assert p._req("PUT", "/v1/feeds/refresh") is None
+
+    assert seen["calls"] == 2
+    assert any("Miniflux transient HTTP 500" in record.getMessage() for record in caplog.records)
+
+
+def test_miniflux_targeted_refresh_backoff_is_debug_only(caplog):
+    p = _provider(feed_timeout_seconds=10)
+
+    caplog.set_level(logging.WARNING, logger="providers.miniflux")
+    p._record_targeted_refresh_attempt_result("97", False, 500)
+
+    assert not [record for record in caplog.records if "targeted refresh backoff" in record.getMessage()]
+
+
+def test_miniflux_entries_keep_plausible_near_future_server_dates(monkeypatch):
+    p = _provider(feed_timeout_seconds=10)
+    future_dt = datetime.now(timezone.utc) + timedelta(days=3)
+    entry = {
+        "id": 203054,
+        "feed_id": 114,
+        "title": "Securing the Untrusted Agentic Development Layer",
+        "url": "https://intelligence.theregister.com/paper/view/20103",
+        "content": "",
+        "status": "unread",
+        "published_at": future_dt.isoformat(),
+    }
+    monkeypatch.setattr("providers.miniflux.utils.get_chapters_batch", lambda _ids: {})
+
+    article = p._entries_to_articles([entry])[0]
+
+    assert article.date == utils.format_datetime(future_dt)
+    assert article.timestamp > 0
+
+
+def test_miniflux_entries_fall_back_to_created_at_when_published_is_implausible(monkeypatch):
+    p = _provider(feed_timeout_seconds=10)
+    future_dt = datetime.now(timezone.utc) + timedelta(days=30)
+    created_dt = datetime.now(timezone.utc) - timedelta(hours=2)
+    entry = {
+        "id": 203055,
+        "feed_id": 114,
+        "title": "Article Without Date",
+        "url": "https://example.com/no-date",
+        "content": "",
+        "status": "unread",
+        "published_at": future_dt.isoformat(),
+        "created_at": created_dt.isoformat(),
+    }
+    monkeypatch.setattr("providers.miniflux.utils.get_chapters_batch", lambda _ids: {})
+
+    article = p._entries_to_articles([entry])[0]
+
+    assert article.date == utils.format_datetime(created_dt)
+    assert article.timestamp > 0
 
 
 def test_miniflux_req_uses_cached_get_response_on_502(monkeypatch):
@@ -347,9 +472,42 @@ def test_miniflux_refresh_skips_targeted_refresh_when_unhealthy(monkeypatch):
     assert ("PUT", "/v1/feeds/10/refresh") not in calls
 
 
+def test_miniflux_targeted_refresh_uses_bounded_parallel_workers(monkeypatch):
+    p = _provider(feed_timeout_seconds=10)
+    p.config["miniflux_targeted_refresh_workers"] = 3
+    lock = threading.Lock()
+    active = {"count": 0, "max": 0}
+    calls = []
+
+    def _fake_targeted_refresh(fid):
+        with lock:
+            calls.append(str(fid))
+            active["count"] += 1
+            active["max"] = max(active["max"], active["count"])
+        time.sleep(0.05)
+        with lock:
+            active["count"] -= 1
+        return {
+            "ok": True,
+            "status_code": 204,
+            "endpoint": f"/v1/feeds/{fid}/refresh",
+            "method": "PUT",
+        }
+
+    monkeypatch.setattr(p, "_request_targeted_refresh", _fake_targeted_refresh)
+
+    results = p._refresh_targeted_feeds(["1", "2", "3", "4", "5"], force=True)
+
+    assert set(calls) == {"1", "2", "3", "4", "5"}
+    assert set(results) == {"1", "2", "3", "4", "5"}
+    assert active["max"] > 1
+    assert active["max"] <= 3
+
+
 def test_miniflux_refresh_backs_off_repeated_targeted_feed_500s(monkeypatch):
     p = _provider(feed_timeout_seconds=10)
     calls = []
+    targeted_calls = []
     now = datetime.now(timezone.utc)
     stale = (now - timedelta(hours=4)).isoformat()
     mono = {"t": 1000.0}
@@ -396,15 +554,6 @@ def test_miniflux_refresh_backs_off_repeated_targeted_feed_500s(monkeypatch):
                 "method": method,
             }
             return {"unreads": {"52": 0}}
-        if endpoint == "/v1/feeds/52/refresh":
-            p._last_request_info = {
-                "ok": False,
-                "used_cache": False,
-                "status_code": 500,
-                "endpoint": endpoint,
-                "method": method,
-            }
-            return None
         p._last_request_info = {
             "ok": True,
             "used_cache": False,
@@ -414,14 +563,25 @@ def test_miniflux_refresh_backs_off_repeated_targeted_feed_500s(monkeypatch):
         }
         return None
 
+    def _fake_targeted_refresh(fid):
+        targeted_calls.append(str(fid))
+        return {
+            "ok": False,
+            "used_cache": False,
+            "status_code": 500,
+            "endpoint": f"/v1/feeds/{fid}/refresh",
+            "method": "PUT",
+        }
+
     monkeypatch.setattr("providers.miniflux.time.monotonic", _fake_monotonic)
     monkeypatch.setattr(p, "_req", _fake_req)
+    monkeypatch.setattr(p, "_request_targeted_refresh", _fake_targeted_refresh)
 
     p.refresh(force=False)
     p.refresh(force=False)  # still inside cooldown -> should skip targeted feed retry
 
-    assert calls.count(("PUT", "/v1/feeds/52/refresh")) == 1
+    assert targeted_calls.count("52") == 1
 
     mono["t"] += 61.0  # first cooldown expires (60s)
     p.refresh(force=False)
-    assert calls.count(("PUT", "/v1/feeds/52/refresh")) == 2
+    assert targeted_calls.count("52") == 2
