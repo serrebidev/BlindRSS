@@ -2633,11 +2633,8 @@ class MainFrame(wx.Frame):
         mark_unread_item = menu.Append(wx.ID_ANY, "Mark as Unread")
         menu.AppendSeparator()
         copy_item = menu.Append(wx.ID_ANY, "Copy Link")
-        delete_item = None
         download_item = None
         if idx != wx.NOT_FOUND and 0 <= idx < len(self.current_articles):
-            if not self._is_load_more_row(idx):
-                delete_item = menu.Append(wx.ID_ANY, "Delete Article\tDelete")
             article_for_menu = self.current_articles[idx]
             if article_for_menu.media_url:
                 download_item = menu.Append(wx.ID_ANY, "Download")
@@ -2661,8 +2658,6 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, lambda e: self.mark_article_read(idx), mark_read_item)
         self.Bind(wx.EVT_MENU, lambda e: self.mark_article_unread(idx), mark_unread_item)
         self.Bind(wx.EVT_MENU, lambda e: self.on_copy_link(idx), copy_item)
-        if delete_item:
-            self.Bind(wx.EVT_MENU, lambda e: self.on_delete_article(), delete_item)
 
         self.list_ctrl.PopupMenu(menu, menu_pos)
         menu.Destroy()
