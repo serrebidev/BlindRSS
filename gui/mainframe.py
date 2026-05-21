@@ -3303,7 +3303,10 @@ class MainFrame(wx.Frame):
                 continue
                 
             try:
-                force_refresh = startup_refresh_pending
+                # Startup refresh should be immediate, but not a manual/forced refresh.
+                # For hosted providers such as Miniflux, force=True can fan out into
+                # per-feed refresh requests for every subscription.
+                force_refresh = False
                 startup_refresh_pending = False
                 log.info("Refresh loop tick interval_s=%s force=%s", interval, force_refresh)
                 ran = self._run_refresh(block=False, force=force_refresh)

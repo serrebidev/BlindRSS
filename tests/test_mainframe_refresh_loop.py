@@ -50,12 +50,12 @@ class _RefreshLoopHost:
         return True
 
 
-def test_refresh_loop_forces_only_startup_refresh_when_enabled():
+def test_refresh_loop_runs_startup_refresh_without_force_when_enabled():
     host = _RefreshLoopHost(refresh_on_startup=True, interval=30, wait_results=[True])
 
     host.refresh_loop()
 
-    assert host.refresh_calls == [{"block": False, "force": True}]
+    assert host.refresh_calls == [{"block": False, "force": False}]
 
 
 def test_refresh_loop_periodic_refresh_is_not_forced_after_startup():
@@ -64,7 +64,7 @@ def test_refresh_loop_periodic_refresh_is_not_forced_after_startup():
     host.refresh_loop()
 
     assert host.refresh_calls == [
-        {"block": False, "force": True},
+        {"block": False, "force": False},
         {"block": False, "force": False},
     ]
 

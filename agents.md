@@ -103,7 +103,7 @@ Fix any warnings, or errors.
 - Date normalization is strict; title/URL-derived dates can override feed metadata when inconsistent.
 - Retention cleanup runs in refresh execution flow to avoid read-state resurrection bugs.
 - Provider HTTP requests must use finite timeouts (`feed_timeout_seconds`).
-- When startup refresh is enabled, the first background refresh runs with `force=True` so hosted providers such as Miniflux use the same refresh semantics as a manual full refresh. Later periodic refresh ticks stay non-forced to avoid hammering provider APIs.
+- When startup refresh is enabled, the first background refresh runs immediately but non-forced; hosted providers such as Miniflux should use their normal refresh path on startup, not the expensive manual per-feed refresh path. Manual full refresh remains `force=True`.
 
 ### 2. UI & Threading
 - Startup refresh is backgrounded; tree/list updates are marshaled to main thread via `wx.CallAfter`.
