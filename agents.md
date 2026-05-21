@@ -127,6 +127,7 @@ Fix any warnings, or errors.
 - Checks latest GitHub release + manifest.
 - Verifies zip SHA-256 and signed executable before apply.
 - Uses helper batch script for safe staged replacement/restart.
+- Update helper must close/wait for BlindRSS processes launched from the install directory, verify key install files are unlocked, and verify the old install was fully moved before applying staged files. If locks remain, abort before destructive overlay and roll back/restart cleanly.
 
 ### 6. Cross-Platform Packaging
 - `build.sh` bundles `yt-dlp`, `deno`, `ffmpeg`, and VLC runtime files outside Windows.

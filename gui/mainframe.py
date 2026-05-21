@@ -6772,8 +6772,11 @@ class MainFrame(wx.Frame):
                 return
             wx.MessageBox(msg, "Update Failed", wx.ICON_ERROR)
             return
-        wx.MessageBox(msg, "Update Ready", wx.ICON_INFORMATION)
-        self.real_close()
+        log.info("Update prepared; closing BlindRSS so the helper can apply it: %s", msg)
+        try:
+            wx.CallAfter(self.real_close)
+        except Exception:
+            self.real_close()
 
     def on_exit(self, event):
         self.real_close()
