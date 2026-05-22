@@ -124,6 +124,31 @@ def _looks_like_profile_activity_link(href: str) -> bool:
     return "/profile/" in href_low or "/members/" in href_low
 
 
+# Phrases that mark a title as an "activity log" entry (Ning-style) where the
+# real story title is hidden in the description HTML, e.g. "User posted a video".
+_ACTIVITY_LOG_TITLE_PATTERNS = (
+    r"\bposted\b",
+    r"\breplied\b",
+    r"\bcommented\b",
+    r"\bliked\b",
+    r"\bfavorited\b",
+    r"\bupdated (?:their|his|her|the)\b",
+    r"\b(?:added|uploaded|shared) (?:a|an|the)\b",
+    r"\bis now (?:a member|friends)\b",
+)
+_ACTIVITY_LOG_TITLE_RE = re.compile("|".join(_ACTIVITY_LOG_TITLE_PATTERNS), re.IGNORECASE)
+
+
+def _looks_like_activity_log_title(title: str) -> bool:
+    """True when a feed title reads like an activity-log line rather than a real story title.
+
+    Used to gate the description-HTML title rescue so that feeds with proper item
+    titles (e.g. podcast episodes such as Supercast's "S5 EP33: ...") are never
+    overridden by footer links like "⚙️ Manage Subscription".
+    """
+    return bool(_ACTIVITY_LOG_TITLE_RE.search(_activity_title_norm_space(title)))
+
+
 def enhance_activity_entry_title(title: str | None, url: str | None, content: str | None) -> str:
     """Derive a better title from activity-feed HTML when the real story title is embedded.
 
@@ -131,6 +156,12 @@ def enhance_activity_entry_title(title: str | None, url: str | None, content: st
     generic titles like "X posted a video" hide the actual content title in the description HTML.
     """
     cur_title = _activity_title_norm_space(title or "")
+    # Only rescue a title from the description HTML when the existing title is
+    # missing or reads like a generic activity-log line. Real item titles (e.g.
+    # podcast episode names) must never be replaced by footer links such as
+    # "⚙️ Manage Subscription" found in subscriber feeds (Supercast, etc.).
+    if cur_title and not _looks_like_activity_log_title(cur_title):
+        return cur_title
     html = str(content or "")
     if not html or "<" not in html or ">" not in html:
         return cur_title

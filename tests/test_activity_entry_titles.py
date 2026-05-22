@@ -67,6 +67,38 @@ def test_ning_profile_update_keeps_original_title():
     assert title == "Kathleen (SunKat) updated their profile"
 
 
+def test_supercast_episode_title_not_replaced_by_manage_subscription_footer():
+    # Supercast subscriber feeds append a "Share | Manage Subscription" footer of
+    # <strong><a> links to every episode description. The real episode title must
+    # win over those footer links (GitHub #20).
+    html = """
+    <p>In 1989, young Monica receives an unexpected treatment.</p>
+    <p>
+      <strong><a href="https://sixminutes.supercast.com/subscriber_v2/referrals/new?feed_item_id=1300198">📢 Share</a></strong> |
+      <strong><a href="https://sixminutes.supercast.com/subscriber_v2/subscription">⚙️ Manage Subscription</a></strong>
+    </p>
+    """
+    title = utils.enhance_activity_entry_title(
+        "S5 EP33: A World Without Sad Country Mixtapes",
+        "",
+        html,
+    )
+    assert title == "S5 EP33: A World Without Sad Country Mixtapes"
+
+
+def test_strong_anchor_footer_does_not_override_plain_article_title():
+    html = """
+    <p>Some article body text.</p>
+    <p><strong><a href="https://example.com/newsletter/signup">Subscribe to our newsletter today</a></strong></p>
+    """
+    title = utils.enhance_activity_entry_title(
+        "Breaking: Local Bakery Wins National Award",
+        "https://example.com/articles/bakery",
+        html,
+    )
+    assert title == "Breaking: Local Bakery Wins National Award"
+
+
 def test_ning_posted_discussion_with_only_see_more_does_not_replace_title():
     html = """
     <div><a href="https://creators.ning.com/members/ScottBishop">Scott Bishop</a> posted a discussion</div>
