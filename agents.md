@@ -56,7 +56,7 @@ Fix any warnings, or errors.
   - `updater.py`: GitHub release check, manifest/hash verification, Authenticode verification, update handoff to `update_helper.bat`.
   - `windows_integration.py`: Windows startup registration and shortcut creation helpers.
   - `dependency_check.py`: Dependency/path handling and media tool availability logic.
-  - `config.py`: Config defaults + migrations; paths are exe-relative when frozen.
+  - `config.py`: Config defaults + migrations; paths are exe-relative when frozen and source-root-relative when run from checkout.
   - `factory.py`: Provider wiring; initializes DB.
   - `runtime_env.py`: Frozen runtime PATH/VLC environment setup for packaged app bundles.
 

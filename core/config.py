@@ -6,13 +6,13 @@ import logging
 
 log = logging.getLogger(__name__)
 
-# Install directory (where the executable or main script lives).
+# Install directory (where the executable or source checkout lives).
 # On macOS frozen builds this is inside the .app bundle, which gets
 # replaced on upgrade — that is why we also support a user-data path.
 if getattr(sys, 'frozen', False):
     APP_DIR = os.path.dirname(sys.executable)
 else:
-    APP_DIR = os.path.dirname(os.path.abspath(sys.argv[0]))
+    APP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 
 def _user_data_dir() -> str:
@@ -90,6 +90,7 @@ DEFAULT_CONFIG = {
     "start_maximized": False,
     "max_cached_views": 15,
     "cache_full_text": False,
+    "confirm_article_delete": True,
     "playback_speed": 1.0,
     "volume": 100,
     "volume_step": 5,

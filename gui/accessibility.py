@@ -285,10 +285,27 @@ class AccessibleBrowserFrame(wx.Frame):
         if key in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
             self.on_open_article(event)
             return
+        if key == getattr(wx, "WXK_BACK", 8) and not (
+            event.ControlDown()
+            or event.ShiftDown()
+            or event.AltDown()
+            or event.MetaDown()
+        ):
+            self.on_toggle_read_status(event)
+            return
         event.Skip()
 
     def on_char_hook(self, event: wx.KeyEvent) -> None:
         key = event.GetKeyCode()
+        if key == getattr(wx, "WXK_BACK", 8) and not (
+            event.ControlDown()
+            or event.ShiftDown()
+            or event.AltDown()
+            or event.MetaDown()
+        ):
+            if self.FindFocus() is self.article_list:
+                self.on_toggle_read_status(event)
+                return
         if key in (wx.WXK_RETURN, wx.WXK_NUMPAD_ENTER):
             focused = self.FindFocus()
             if focused is self.view_list:
@@ -650,6 +667,15 @@ class AccessibleBrowserFrame(wx.Frame):
         if article is None:
             return
         self._set_article_read_state(article, False)
+        if idx is not None and idx < self.article_list.GetCount():
+            self.article_list.SetSelection(idx)
+            self._show_article_at_index(idx)
+
+    def on_toggle_read_status(self, _event):
+        idx, article = self._selected_article()
+        if article is None:
+            return
+        self._set_article_read_state(article, not bool(getattr(article, "is_read", False)))
         if idx is not None and idx < self.article_list.GetCount():
             self.article_list.SetSelection(idx)
             self._show_article_at_index(idx)

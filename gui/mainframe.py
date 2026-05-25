@@ -1422,6 +1422,34 @@ class MainFrame(wx.Frame):
         delete_keys.discard(None)
         return key in delete_keys
 
+    def _is_backspace_key(self, key) -> bool:
+        return key == getattr(wx, "WXK_BACK", 8)
+
+    def _is_plain_backspace_event(self, event: wx.KeyEvent, key) -> bool:
+        if not MainFrame._is_backspace_key(self, key):
+            return False
+        try:
+            return not (
+                event.ControlDown()
+                or event.ShiftDown()
+                or event.AltDown()
+                or event.MetaDown()
+            )
+        except Exception:
+            return True
+
+    def _is_shift_delete_event(self, event: wx.KeyEvent, key) -> bool:
+        if not MainFrame._is_delete_key(self, key):
+            return False
+        try:
+            return bool(event.ShiftDown()) and not (
+                event.ControlDown()
+                or event.AltDown()
+                or event.MetaDown()
+            )
+        except Exception:
+            return False
+
     def _is_text_input_focused(self, focus) -> bool:
         try:
             if focus is None:
@@ -1471,6 +1499,14 @@ class MainFrame(wx.Frame):
         except Exception:
             focus = None
 
+        if MainFrame._is_plain_backspace_event(self, event, key):
+            if MainFrame._window_is_or_child(self, focus, self.list_ctrl):
+                try:
+                    self.toggle_selected_article_read_status()
+                    return
+                except Exception:
+                    log.exception("Error toggling article read status on Backspace")
+
         if key == wx.WXK_SPACE and not event.AltDown():
             if focus == self.list_ctrl:
                 idx = self.list_ctrl.GetFirstSelected()
@@ -1484,7 +1520,10 @@ class MainFrame(wx.Frame):
         if MainFrame._is_delete_key(self, key):
             if MainFrame._window_is_or_child(self, focus, self.list_ctrl):
                 try:
-                    self.on_delete_article()
+                    if MainFrame._is_shift_delete_event(self, event, key):
+                        self.on_delete_article(confirm=False)
+                    else:
+                        self.on_delete_article()
                     return
                 except Exception:
                     log.exception("Error handling article delete shortcut")
@@ -1592,9 +1631,19 @@ class MainFrame(wx.Frame):
         except Exception:
             key = None
 
+        if MainFrame._is_plain_backspace_event(self, event, key):
+            try:
+                self.toggle_selected_article_read_status()
+                return
+            except Exception:
+                log.exception("Error toggling article read status on Backspace")
+
         if MainFrame._is_delete_key(self, key):
             try:
-                self.on_delete_article()
+                if MainFrame._is_shift_delete_event(self, event, key):
+                    self.on_delete_article(confirm=False)
+                else:
+                    self.on_delete_article()
                 return
             except Exception:
                 log.exception("Error handling article list delete shortcut")
@@ -2707,8 +2756,8 @@ class MainFrame(wx.Frame):
         open_item = menu.Append(wx.ID_ANY, "Open Article")
         open_browser_item = menu.Append(wx.ID_ANY, "Open in Browser")
         menu.AppendSeparator()
-        mark_read_item = menu.Append(wx.ID_ANY, "Mark as Read")
-        mark_unread_item = menu.Append(wx.ID_ANY, "Mark as Unread")
+        mark_read_item = menu.Append(wx.ID_ANY, "Mark as &Read")
+        mark_unread_item = menu.Append(wx.ID_ANY, "Mark as &Unread")
         delete_item = None
         if valid_article_idx and self._supports_article_delete():
             delete_item = menu.Append(wx.ID_ANY, "Delete Article\tDel")
@@ -2974,7 +3023,7 @@ class MainFrame(wx.Frame):
         except Exception:
             log.exception("Error removing article from cached views")
 
-    def on_delete_article(self, event=None):
+    def on_delete_article(self, event=None, *, confirm: bool | None = None):
         idx = self._get_selected_article_index()
         if idx == wx.NOT_FOUND:
             return
@@ -2984,16 +3033,22 @@ class MainFrame(wx.Frame):
             return
 
         article = self.current_articles[idx]
-        try:
-            ok = wx.MessageBox(
-                "Delete this article? This cannot be undone.",
-                "Confirm Delete",
-                wx.YES_NO | wx.ICON_WARNING,
-            )
-        except Exception:
-            ok = wx.NO
-        if ok != wx.YES:
-            return
+        if confirm is None:
+            try:
+                confirm = bool(self.config_manager.get("confirm_article_delete", True))
+            except Exception:
+                confirm = True
+        if confirm:
+            try:
+                ok = wx.MessageBox(
+                    "Delete this article? This cannot be undone.",
+                    "Confirm Delete",
+                    wx.YES_NO | wx.ICON_WARNING,
+                )
+            except Exception:
+                ok = wx.NO
+            if ok != wx.YES:
+                return
 
         if not self._supports_article_delete():
             wx.MessageBox(
@@ -5386,6 +5441,20 @@ class MainFrame(wx.Frame):
             article.is_read = False
             self.list_ctrl.SetItem(idx, 4, "Unread")
             self._update_feed_unread_count_ui(article.feed_id, 1)
+
+    def toggle_selected_article_read_status(self):
+        idx = self._get_selected_article_index()
+        if idx == wx.NOT_FOUND:
+            return
+        if self._is_load_more_row(idx):
+            return
+        if idx < 0 or idx >= len(self.current_articles):
+            return
+        article = self.current_articles[idx]
+        if bool(getattr(article, "is_read", False)):
+            self.mark_article_unread(idx)
+        else:
+            self.mark_article_read(idx)
 
     def on_mark_all_read(self, event=None):
         feed_id = getattr(self, "current_feed_id", None)

@@ -626,6 +626,10 @@ class SettingsDialog(wx.Dialog):
         self.downloads_chk = wx.CheckBox(general_panel, label="Enable Downloads")
         self.downloads_chk.SetValue(config.get("downloads_enabled", False))
         general_sizer.Add(self.downloads_chk, 0, wx.ALL, 5)
+
+        self.confirm_delete_chk = wx.CheckBox(general_panel, label="Confirm before deleting articles")
+        self.confirm_delete_chk.SetValue(bool(config.get("confirm_article_delete", True)))
+        general_sizer.Add(self.confirm_delete_chk, 0, wx.ALL, 5)
         
         dl_path_sizer = wx.BoxSizer(wx.HORIZONTAL)
         dl_path_sizer.Add(wx.StaticText(general_panel, label="Download Path:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
@@ -2046,6 +2050,7 @@ class SettingsDialog(wx.Dialog):
             "max_cached_views": self.cache_ctrl.GetValue(),
             "cache_full_text": self.cache_full_text_chk.GetValue(),
             "downloads_enabled": self.downloads_chk.GetValue(),
+            "confirm_article_delete": self.confirm_delete_chk.GetValue(),
             "download_path": self.dl_path_ctrl.GetValue(),
             "download_retention": self.retention_ctrl.GetValue(),
             "article_retention": self.art_retention_ctrl.GetValue(),

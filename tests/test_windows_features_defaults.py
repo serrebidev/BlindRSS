@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from core import config
 from core.config import DEFAULT_CONFIG
 from core import windows_integration
 
@@ -8,6 +11,7 @@ def test_default_sort_and_notification_settings():
     assert bool(DEFAULT_CONFIG.get("windows_notifications_enabled", True)) is False
     assert int(DEFAULT_CONFIG.get("windows_notifications_max_per_refresh", -1)) == 0
     assert DEFAULT_CONFIG.get("windows_notifications_excluded_feeds", None) == []
+    assert bool(DEFAULT_CONFIG.get("confirm_article_delete", False)) is True
     assert bool(DEFAULT_CONFIG.get("start_on_windows_login", True)) is False
     assert bool(DEFAULT_CONFIG.get("translation_enabled", True)) is False
     assert str(DEFAULT_CONFIG.get("translation_provider", "")) == "grok"
@@ -24,6 +28,10 @@ def test_default_sort_and_notification_settings():
     assert str(DEFAULT_CONFIG.get("translation_gemini_api_key", "x")) == ""
     assert str(DEFAULT_CONFIG.get("translation_qwen_model", "x")) == ""
     assert str(DEFAULT_CONFIG.get("translation_qwen_api_key", "x")) == ""
+
+
+def test_source_app_dir_is_repository_root():
+    assert Path(config.APP_DIR).resolve() == Path(__file__).resolve().parents[1]
 
 
 def test_windows_integration_launch_parts_script_mode(monkeypatch, tmp_path):

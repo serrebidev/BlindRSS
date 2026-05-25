@@ -357,82 +357,65 @@ def _launch_update_helper(
         if not helper_cwd or not os.path.isdir(helper_cwd):
             helper_cwd = tempfile.gettempdir()
 
-        if not debug_mode:
-            # Invisible execution
-            creationflags = 0
-            startupinfo = None
-            breakaway_flag = 0
-            if sys.platform == "win32":
-                create_no_window = 0x08000000  # CREATE_NO_WINDOW
-                create_new_process_group = 0x00000200
-                breakaway_flag = getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0x01000000)
-                creationflags = create_no_window | create_new_process_group | breakaway_flag
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 0
+        # Always launch the updater hidden. The helper writes a log file for
+        # failures, and a visible cmd.exe can keep the install locked after the
+        # update has completed.
+        _ = debug_mode
+        creationflags = 0
+        startupinfo = None
+        breakaway_flag = 0
+        if sys.platform == "win32":
+            create_no_window = 0x08000000  # CREATE_NO_WINDOW
+            create_new_process_group = 0x00000200
+            breakaway_flag = getattr(subprocess, "CREATE_BREAKAWAY_FROM_JOB", 0x01000000)
+            creationflags = create_no_window | create_new_process_group | breakaway_flag
+            startupinfo = subprocess.STARTUPINFO()
+            startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+            startupinfo.wShowWindow = 0
 
-            cmd = [
-                os.environ.get("COMSPEC", "cmd.exe"),
-                "/c",
-                helper_path,
-                str(parent_pid),
-                install_dir,
-                staging_root,
-                EXE_NAME,
-            ]
-            if temp_root:
-                cmd.append(temp_root)
-            elif show_log:
-                cmd.append("")
-            if show_log:
-                cmd.append("show")
-            try:
+        cmd = [
+            os.environ.get("COMSPEC", "cmd.exe"),
+            "/d",
+            "/c",
+            helper_path,
+            str(parent_pid),
+            install_dir,
+            staging_root,
+            EXE_NAME,
+        ]
+        if temp_root:
+            cmd.append(temp_root)
+        elif show_log:
+            cmd.append("")
+        if show_log:
+            cmd.append("show")
+        try:
+            subprocess.Popen(
+                cmd,
+                cwd=helper_cwd,
+                creationflags=creationflags,
+                startupinfo=startupinfo,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                close_fds=True
+            )
+        except Exception:
+            if sys.platform == "win32" and breakaway_flag:
+                retry_flags = creationflags & ~breakaway_flag
                 subprocess.Popen(
                     cmd,
                     cwd=helper_cwd,
-                    creationflags=creationflags,
+                    creationflags=retry_flags,
                     startupinfo=startupinfo,
                     stdin=subprocess.DEVNULL,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
                     close_fds=True
                 )
-            except Exception:
-                if sys.platform == "win32" and breakaway_flag:
-                    retry_flags = creationflags & ~breakaway_flag
-                    subprocess.Popen(
-                        cmd,
-                        cwd=helper_cwd,
-                        creationflags=retry_flags,
-                        startupinfo=startupinfo,
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
-                        close_fds=True
-                    )
-                else:
-                    raise
-        else:
-            # Visible window for debugging
-            cmd = [
-                os.environ.get("COMSPEC", "cmd.exe"),
-                "/c",
-                "start",
-                "",
-                helper_path,
-                str(parent_pid),
-                install_dir,
-                staging_root,
-                EXE_NAME,
-            ]
-            if temp_root:
-                cmd.append(temp_root)
-            elif show_log:
-                cmd.append("")
-            if show_log:
-                cmd.append("show")
-            subprocess.Popen(cmd, cwd=helper_cwd)
-            
+            else:
+                raise
+
         return True, ""
     except Exception as e:
         return False, f"Failed to start update helper: {e}"

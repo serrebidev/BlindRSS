@@ -38,7 +38,11 @@ class _DummyHost:
     on_char_hook = mainframe.MainFrame.on_char_hook
     on_article_list_key_down = mainframe.MainFrame.on_article_list_key_down
     _is_delete_key = mainframe.MainFrame._is_delete_key
+    _is_backspace_key = mainframe.MainFrame._is_backspace_key
+    _is_plain_backspace_event = mainframe.MainFrame._is_plain_backspace_event
+    _is_shift_delete_event = mainframe.MainFrame._is_shift_delete_event
     _window_is_or_child = mainframe.MainFrame._window_is_or_child
+    toggle_selected_article_read_status = mainframe.MainFrame.toggle_selected_article_read_status
 
     def __init__(self):
         self.tree = object()
@@ -47,6 +51,18 @@ class _DummyHost:
         self._media_hotkeys = None
         self.calls = []
         self._focus = None
+        self.selected_idx = 0
+        self.current_articles = [
+            mainframe.Article(
+                title="Title",
+                url="https://example.com/article",
+                content="",
+                date="",
+                author="",
+                feed_id="feed-1",
+                id="article-1",
+            )
+        ]
 
     def _get_focused_window(self):
         return self._focus
@@ -57,8 +73,8 @@ class _DummyHost:
     def on_find_feed(self, event):
         self.calls.append(("find_feed", event))
 
-    def on_delete_article(self):
-        self.calls.append(("delete_article", None))
+    def on_delete_article(self, confirm=True):
+        self.calls.append(("delete_article", bool(confirm)))
 
     def on_remove_feed(self, event):
         self.calls.append(("remove_feed", event))
@@ -69,6 +85,21 @@ class _DummyHost:
     def _make_list_activate_event(self, idx):
         self.calls.append(("make_list_evt", idx))
         return object()
+
+    def _get_selected_article_index(self):
+        return self.selected_idx
+
+    def _is_load_more_row(self, idx):
+        _ = idx
+        return False
+
+    def mark_article_read(self, idx):
+        self.current_articles[idx].is_read = True
+        self.calls.append(("mark_read", idx))
+
+    def mark_article_unread(self, idx):
+        self.current_articles[idx].is_read = False
+        self.calls.append(("mark_unread", idx))
 
 
 class _FakeMenuItem:
@@ -184,8 +215,8 @@ class _DummyContextMenuHost:
     def mark_article_unread(self, idx):
         self.bindings.append(("unread", idx, None))
 
-    def on_delete_article(self):
-        self.bindings.append(("delete", None, None))
+    def on_delete_article(self, confirm=True):
+        self.bindings.append(("delete", bool(confirm), None))
 
     def on_copy_link(self, idx):
         self.bindings.append(("copy", idx, None))
@@ -197,6 +228,52 @@ class _DummyContextMenuHost:
 class _KeyboardContextEvent:
     def GetPosition(self):
         return mainframe.wx.DefaultPosition
+
+
+class _FakeConfig:
+    def __init__(self, values=None):
+        self.values = dict(values or {})
+
+    def get(self, key, default=None):
+        return self.values.get(key, default)
+
+
+class _DeleteHost:
+    on_delete_article = mainframe.MainFrame.on_delete_article
+
+    def __init__(self, *, confirm_setting=True):
+        self.config_manager = _FakeConfig({"confirm_article_delete": confirm_setting})
+        self.current_articles = [
+            mainframe.Article(
+                title="Title",
+                url="https://example.com/article",
+                content="",
+                date="",
+                author="",
+                feed_id="feed-1",
+                id="article-1",
+            )
+        ]
+
+    def _get_selected_article_index(self):
+        return 0
+
+    def _is_load_more_row(self, idx):
+        _ = idx
+        return False
+
+    def _supports_article_delete(self):
+        return True
+
+    def _fulltext_cache_key_for_article(self, article, idx):
+        _ = article
+        return (f"article:{idx}", "", str(idx))
+
+    def _article_cache_id(self, article):
+        return article.id
+
+    def _delete_article_thread(self, *args):
+        self.delete_thread_args = args
 
 
 def test_f2_shortcut_opens_edit_feed_when_tree_focused():
@@ -227,7 +304,7 @@ def test_delete_shortcut_deletes_article_when_list_focused():
 
     host.on_char_hook(evt)
 
-    assert ("delete_article", None) in host.calls
+    assert ("delete_article", True) in host.calls
     assert evt.skipped is False
 
 
@@ -237,7 +314,53 @@ def test_article_list_key_down_deletes_article():
 
     host.on_article_list_key_down(evt)
 
-    assert ("delete_article", None) in host.calls
+    assert ("delete_article", True) in host.calls
+    assert evt.skipped is False
+
+
+def test_shift_delete_shortcut_deletes_article_without_confirmation():
+    host = _DummyHost()
+    evt = _DummyKeyEvent(mainframe.wx.WXK_DELETE, shift=True)
+
+    host.on_article_list_key_down(evt)
+
+    assert ("delete_article", False) in host.calls
+    assert evt.skipped is False
+
+
+def test_backspace_toggles_unread_article_to_read():
+    host = _DummyHost()
+    host.current_articles[0].is_read = False
+    evt = _DummyKeyEvent(getattr(mainframe.wx, "WXK_BACK", 8))
+
+    host.on_article_list_key_down(evt)
+
+    assert ("mark_read", 0) in host.calls
+    assert host.current_articles[0].is_read is True
+    assert evt.skipped is False
+
+
+def test_backspace_toggles_read_article_to_unread():
+    host = _DummyHost()
+    host.current_articles[0].is_read = True
+    evt = _DummyKeyEvent(getattr(mainframe.wx, "WXK_BACK", 8))
+
+    host.on_article_list_key_down(evt)
+
+    assert ("mark_unread", 0) in host.calls
+    assert host.current_articles[0].is_read is False
+    assert evt.skipped is False
+
+
+def test_global_backspace_toggles_article_when_list_focused():
+    host = _DummyHost()
+    host._focus = host.list_ctrl
+    host.current_articles[0].is_read = False
+    evt = _DummyKeyEvent(getattr(mainframe.wx, "WXK_BACK", 8))
+
+    host.on_char_hook(evt)
+
+    assert ("mark_read", 0) in host.calls
     assert evt.skipped is False
 
 
@@ -249,3 +372,81 @@ def test_article_context_menu_includes_delete_for_supported_provider(monkeypatch
 
     labels = [item.label for item in host.list_ctrl.popup_menu.GetMenuItems()]
     assert "Delete Article\tDel" in labels
+    assert "Mark as &Read" in labels
+    assert "Mark as &Unread" in labels
+
+
+def test_delete_article_skips_confirmation_when_setting_disabled(monkeypatch):
+    started = []
+
+    class FakeThread:
+        def __init__(self, target, args=(), daemon=None):
+            self.target = target
+            self.args = args
+            self.daemon = daemon
+
+        def start(self):
+            started.append((self.target, self.args, self.daemon))
+
+    def fail_message_box(*_args, **_kwargs):
+        raise AssertionError("delete confirmation should not be shown")
+
+    monkeypatch.setattr(mainframe.wx, "MessageBox", fail_message_box)
+    monkeypatch.setattr(mainframe.threading, "Thread", FakeThread)
+
+    host = _DeleteHost(confirm_setting=False)
+    host.on_delete_article()
+
+    assert len(started) == 1
+    assert started[0][1] == ("article-1", "article-1", "article:0")
+
+
+def test_delete_article_can_explicitly_bypass_confirmation(monkeypatch):
+    started = []
+
+    class FakeThread:
+        def __init__(self, target, args=(), daemon=None):
+            self.target = target
+            self.args = args
+            self.daemon = daemon
+
+        def start(self):
+            started.append((self.target, self.args, self.daemon))
+
+    def fail_message_box(*_args, **_kwargs):
+        raise AssertionError("explicit confirmation bypass should not show a dialog")
+
+    monkeypatch.setattr(mainframe.wx, "MessageBox", fail_message_box)
+    monkeypatch.setattr(mainframe.threading, "Thread", FakeThread)
+
+    host = _DeleteHost(confirm_setting=True)
+    host.on_delete_article(confirm=False)
+
+    assert len(started) == 1
+
+
+def test_delete_article_keeps_confirmation_by_default(monkeypatch):
+    started = []
+    prompts = []
+
+    class FakeThread:
+        def __init__(self, target, args=(), daemon=None):
+            self.target = target
+            self.args = args
+            self.daemon = daemon
+
+        def start(self):
+            started.append((self.target, self.args, self.daemon))
+
+    def message_box(*args, **_kwargs):
+        prompts.append(args)
+        return mainframe.wx.NO
+
+    monkeypatch.setattr(mainframe.wx, "MessageBox", message_box)
+    monkeypatch.setattr(mainframe.threading, "Thread", FakeThread)
+
+    host = _DeleteHost(confirm_setting=True)
+    host.on_delete_article()
+
+    assert prompts
+    assert not started
