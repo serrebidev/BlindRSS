@@ -37,7 +37,7 @@ if /I "%MODE%"=="dry-run" (
     if errorlevel 1 exit /b 1
     echo [Dry Run] Latest tag: !LATEST_TAG!
     echo [Dry Run] Next version: v!NEXT_VERSION! [!BUMP! bump]
-    echo [Dry Run] Would bump core/version.py, build, sign with "%SIGNTOOL_EXE%", zip, generate manifest, tag, push to "%RELEASE_REMOTE%", create a GitHub release in "%GITHUB_REPO_SLUG%", and dispatch the macOS GitHub Actions asset build.
+    echo [Dry Run] Would bump core/version.py, build, sign with "%SIGNTOOL_EXE%", zip, generate manifest, tag, push to "%RELEASE_REMOTE%", create a GitHub release in "%GITHUB_REPO_SLUG%", and dispatch the macOS/Linux GitHub Actions asset build.
     goto :done
 )
 
@@ -474,13 +474,13 @@ echo [BlindRSS Release] GitHub latest release is %VERSION_TAG%.
 exit /b 0
 
 :dispatch_cross_platform_release
-echo [BlindRSS Release] Dispatching GitHub Actions macOS artifact build in %GITHUB_REPO_SLUG%...
+echo [BlindRSS Release] Dispatching GitHub Actions macOS/Linux artifact build in %GITHUB_REPO_SLUG%...
 gh workflow run "cross-platform-release.yml" --repo "%GITHUB_REPO_SLUG%" --ref "%VERSION_TAG%" -f release_tag="%VERSION_TAG%"
 if errorlevel 1 (
     echo [X] Failed to dispatch cross-platform GitHub Actions build.
     exit /b 1
 )
-echo [BlindRSS Release] macOS build dispatched for %VERSION_TAG%.
+echo [BlindRSS Release] macOS/Linux build dispatched for %VERSION_TAG%.
 exit /b 0
 
 :done

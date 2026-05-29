@@ -22,11 +22,11 @@ You do not normally need to build locally on both Windows and macOS.
 - Official release from Windows:
   - Run `.\build.bat release`.
   - Windows builds locally.
-  - GitHub Actions builds macOS automatically and uploads the mac ZIP to the same GitHub release.
-- Local build from macOS:
+  - GitHub Actions builds macOS and Linux automatically and uploads the mac ZIP and Linux tarball to the same GitHub release.
+- Local build from macOS or Linux:
   - Run `./build.sh build`.
-  - This builds the mac app locally only.
-  - If you push to `main`, GitHub Actions will build validation artifacts for Windows and macOS automatically.
+  - This builds the mac app (macOS) or Linux tarball locally only.
+  - If you push to `main`, GitHub Actions will build validation artifacts for Windows, macOS, and Linux automatically.
 - Official release from macOS:
   - Not the primary release path.
   - macOS can republish or rerun the mac asset for an existing release tag with `./build.sh release vX.Y.Z`.
@@ -37,9 +37,9 @@ You do not normally need to build locally on both Windows and macOS.
 - Iterative local build: `.\build.bat build`
 - Official Windows release build: `.\build.bat release`
 - No-change preview: `.\build.bat dry-run`
-- Local macOS package build: `./build.sh build`
-- macOS release-asset publish: `./build.sh release vX.Y.Z`
-- Local macOS preview: `./build.sh dry-run`
+- Local macOS/Linux package build: `./build.sh build`
+- macOS/Linux release-asset publish: `./build.sh release vX.Y.Z`
+- Local macOS/Linux preview: `./build.sh dry-run`
 
 ## Mandatory Release Rule
 
@@ -51,8 +51,8 @@ GitHub release publication may happen from any OS after the required artifacts a
 - Computes the release ZIP SHA-256 hash.
 - Signs `BlindRSS.exe` when `signtool.exe` is available.
 - Bumps `core/version.py`, tags Git, pushes, and creates the GitHub release.
-- Dispatches the GitHub Actions macOS release-asset build after the Windows release is created.
-- Pushes to `main` also trigger GitHub Actions workflow builds for Windows and macOS as workflow artifacts so you can validate packaging from macOS without publishing a release.
+- Dispatches the GitHub Actions macOS and Linux release-asset build after the Windows release is created.
+- Pushes to `main` also trigger GitHub Actions workflow builds for Windows, macOS, and Linux as workflow artifacts so you can validate packaging without publishing a release.
 - Forces the created GitHub release to published/latest, verifies there are no draft releases, and verifies GitHub's `/releases/latest` endpoint points at the new tag before exiting. Never leave draft releases behind. Do not automatically delete releases during this check; publish or delete drafts manually by exact tag if needed.
 
 ## Updater Visibility Rule
@@ -86,6 +86,22 @@ On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZI
 - `ffmpeg` available on PATH.
 - macOS: VLC installed at `/Applications/VLC.app`, set `BLINDRSS_VLC_APP`, or let `build.sh` download the pinned VLC DMG into `.build/vlc`.
 - macOS: the generated `.app` is ad-hoc signed by default with the free local `codesign` identity (`-`). This is not notarization.
+
+## Linux Local Build Prerequisites
+
+- Python 3.14 preferred (`python3` preferred).
+- `curl`, `unzip`, and `tar`.
+- Deno and `yt-dlp` are bundled by `build.sh`.
+- `ffmpeg` available on PATH.
+- System VLC installed (e.g. `sudo apt-get install vlc libvlc-dev`) so `libvlc.so*` and the VLC plugins directory are present. Override with `BLINDRSS_VLC_LIB_DIR` / `BLINDRSS_VLC_PLUGINS` if installed in a non-standard location.
+- wxPython: pip cannot find a universal Linux wheel, so either install build deps for a source build or point pip at the prebuilt GTK3 wheel index matching your distro, e.g.:
+
+  ```bash
+  export PIP_FIND_LINKS="https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-22.04"
+  ./build.sh build
+  ```
+
+- Output is a `dist/BlindRSS-linux-vX.Y.Z.tar.gz`; there is no code signing on Linux.
 
 ## What Each Mode Does
 
@@ -129,6 +145,14 @@ On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZI
   - Produces:
     - `dist/BlindRSS.app`
     - `dist/BlindRSS-macos-vX.Y.Z.zip`
+- On Linux:
+  - Creates/uses `.venv`.
+  - Installs Python dependencies (wxPython needs a prebuilt GTK3 wheel; see prerequisites).
+  - Bundles `yt-dlp`, `deno`, `ffmpeg`, and system VLC `libvlc.so*` + plugins.
+  - Runs PyInstaller via `portable.spec`.
+  - Produces:
+    - `dist/BlindRSS/`
+    - `dist/BlindRSS-linux-vX.Y.Z.tar.gz`
 
 ### `build.sh release`
 
@@ -147,6 +171,8 @@ On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZI
 - `BLINDRSS_VLC_SHA256`: override the expected SHA-256 for a custom macOS VLC DMG download.
 - `BLINDRSS_CODESIGN_IDENTITY`: override the macOS `codesign` identity used by `build.sh`. Default is `-` (ad-hoc signing).
 - `BLINDRSS_SKIP_MACOS_CODESIGN=1`: skip ad-hoc signing in `build.sh`.
+- `BLINDRSS_VLC_LIB_DIR`: override the directory `build.sh`/`portable.spec` search for `libvlc.so*` on Linux.
+- `BLINDRSS_VLC_PLUGINS`: override the VLC plugins directory bundled on Linux.
 
 ## Typical Usage
 
