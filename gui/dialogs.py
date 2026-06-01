@@ -696,7 +696,14 @@ class SettingsDialog(wx.Dialog):
 
         cookies_label = wx.StaticText(
             general_panel,
-            label="yt-dlp cookies file (cookies.txt) — for Brave/Chrome/Edge logins on Windows:",
+            label=(
+                "yt-dlp cookies file (cookies.txt) — only needed for age-restricted, private, or "
+                "members-only YouTube content. Installed browsers are detected automatically; Firefox "
+                "is recommended. Chrome, Edge, and Brave may fail on Windows because their cookies can "
+                "be encrypted in a way yt-dlp cannot read, so a cookies.txt is the reliable fallback. "
+                "LibreWolf uses Firefox-compatible cookies. Chrome \"Nightly\" means Chrome Canary; "
+                "Edge \"Nightly\" means Edge Canary."
+            ),
         )
         general_sizer.Add(cookies_label, 0, wx.LEFT | wx.TOP, 5)
         cookies_row = wx.BoxSizer(wx.HORIZONTAL)
@@ -704,8 +711,18 @@ class SettingsDialog(wx.Dialog):
         cookies_row.Add(self.ytdlp_cookies_ctrl, 1, wx.EXPAND | wx.RIGHT, 5)
         cookies_browse = wx.Button(general_panel, label="Browse...")
         cookies_browse.Bind(wx.EVT_BUTTON, self._on_browse_cookies_file)
-        cookies_row.Add(cookies_browse, 0)
+        cookies_row.Add(cookies_browse, 0, wx.RIGHT, 5)
+        cookies_import = wx.Button(general_panel, label="Import from browser...")
+        cookies_import.Bind(wx.EVT_BUTTON, self._on_import_cookies_from_browser)
+        cookies_row.Add(cookies_import, 0)
         general_sizer.Add(cookies_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+
+        self.auto_import_cookies_chk = wx.CheckBox(
+            general_panel,
+            label="Automatically import a YouTube cookies.txt when you export one to Downloads",
+        )
+        self.auto_import_cookies_chk.SetValue(bool(config.get("auto_import_browser_cookies", True)))
+        general_sizer.Add(self.auto_import_cookies_chk, 0, wx.ALL, 5)
 
         self.prompt_missing_deps_chk = wx.CheckBox(
             general_panel,
@@ -2062,6 +2079,108 @@ class SettingsDialog(wx.Dialog):
             self.ytdlp_cookies_ctrl.SetValue(dlg.GetPath())
         dlg.Destroy()
 
+    _COOKIES_EXTENSION_URL = "https://github.com/kairi003/Get-cookies.txt-LOCALLY"
+
+    def _on_import_cookies_from_browser(self, event):
+        """Guide the user through exporting cookies.txt, then auto-import it.
+
+        We cannot read Chromium App-Bound-encrypted cookies directly, so the user
+        exports a cookies.txt with a browser extension and we detect/import it.
+        """
+        import os
+        from core import cookies_import
+
+        steps = (
+            "To use your YouTube login with yt-dlp:\n\n"
+            "1. Install a cookies.txt exporter extension in your browser, e.g. "
+            "\"Get cookies.txt LOCALLY\".\n"
+            "2. Open youtube.com and make sure you are signed in.\n"
+            "3. Click the extension and Export to download a cookies.txt.\n"
+            "4. Come back here and choose \"Find my export\".\n\n"
+            "Cookies are only needed for age-restricted, private, or members-only "
+            "videos. Firefox and LibreWolf do not need this — their cookies are "
+            "detected automatically."
+        )
+        dlg = wx.MessageDialog(
+            self,
+            steps,
+            "Import cookies from browser",
+            style=wx.YES_NO | wx.CANCEL | wx.ICON_INFORMATION,
+        )
+        dlg.SetYesNoCancelLabels("Find my export", "Open extension page", "Cancel")
+        choice = dlg.ShowModal()
+        dlg.Destroy()
+
+        if choice == wx.ID_NO:
+            try:
+                webbrowser.open(self._COOKIES_EXTENSION_URL)
+            except Exception:
+                pass
+            return
+        if choice != wx.ID_YES:
+            return
+
+        # Search the user's current cookies-path directory first (in case they
+        # exported straight there), then the usual Downloads locations.
+        extra_dirs = []
+        current = (self.ytdlp_cookies_ctrl.GetValue() or "").strip()
+        if current:
+            extra_dirs.append(os.path.dirname(current))
+        search_dirs = cookies_import.default_download_dirs(extra_dirs)
+        found = cookies_import.find_latest_youtube_cookie_export(search_dirs)
+
+        if not found:
+            # Fall back to letting the user point us at the file directly.
+            pick = wx.MessageDialog(
+                self,
+                "No recent YouTube cookies.txt export was found in your Downloads.\n\n"
+                "Export one with the extension first, or choose the file manually.",
+                "No export found",
+                style=wx.OK | wx.CANCEL | wx.ICON_WARNING,
+            )
+            pick.SetOKCancelLabels("Choose file...", "Cancel")
+            do_pick = pick.ShowModal()
+            pick.Destroy()
+            if do_pick != wx.ID_OK:
+                return
+            fdlg = wx.FileDialog(
+                self,
+                "Choose exported cookies.txt",
+                wildcard="Cookies (*.txt)|*.txt|All files (*.*)|*.*",
+                style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+            )
+            if fdlg.ShowModal() != wx.ID_OK:
+                fdlg.Destroy()
+                return
+            found = fdlg.GetPath()
+            fdlg.Destroy()
+
+        try:
+            dest = cookies_import.import_cookie_file(found, config_mod.get_data_dir())
+        except ValueError as e:
+            wx.MessageBox(
+                f"That file is not a usable YouTube cookie export:\n\n{e}",
+                "Import failed",
+                wx.ICON_ERROR,
+            )
+            return
+        except OSError as e:
+            wx.MessageBox(
+                f"Could not import the cookies file:\n\n{e}",
+                "Import failed",
+                wx.ICON_ERROR,
+            )
+            return
+
+        self.ytdlp_cookies_ctrl.SetValue(dest)
+        wx.MessageBox(
+            f"Imported YouTube cookies from:\n{found}\n\n"
+            f"Saved as:\n{dest}\n\n"
+            "Save settings to start using it.",
+            "Cookies imported",
+            wx.ICON_INFORMATION,
+        )
+
     def _on_browse_media_tool(self, ctrl, label):
         if sys.platform.startswith("win"):
             wildcard = "Executables (*.exe)|*.exe|All files (*.*)|*.*"
@@ -2193,6 +2312,7 @@ class SettingsDialog(wx.Dialog):
             "ignore_feed_cache": self.ignore_feed_cache_chk.GetValue(),
             "show_image_alt": self.show_image_alt_chk.GetValue(),
             "ytdlp_cookies_file": self.ytdlp_cookies_ctrl.GetValue().strip(),
+            "auto_import_browser_cookies": self.auto_import_cookies_chk.GetValue(),
             "custom_ffmpeg_path": self._media_tool_path_ctrls["custom_ffmpeg_path"].GetValue().strip(),
             "custom_ffprobe_path": self._media_tool_path_ctrls["custom_ffprobe_path"].GetValue().strip(),
             "custom_ytdlp_path": self._media_tool_path_ctrls["custom_ytdlp_path"].GetValue().strip(),

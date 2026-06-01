@@ -105,16 +105,32 @@ _ALTERNATE_FEED_TYPES = {
 # available audio. "default" tracks yt-dlp's current best clients (tv/ios/web*)
 # and `android_vr` is the workaround that has kept packaged builds working.
 YOUTUBE_PLAYER_CLIENTS = ("default", "android_vr")
+# Last-resort, wider client pool tried only after the primary set fails. YouTube
+# blocks/throttles individual clients unpredictably, so casting a wider net is the
+# final way to coax out a playable stream before giving up. Avoids plain "android"
+# (now requires PO tokens) but includes web/tv/ios/mweb variants that frequently
+# still resolve anonymously.
+YOUTUBE_PLAYER_CLIENTS_FALLBACK = (
+    "default",
+    "android_vr",
+    "web_safari",
+    "tv",
+    "ios",
+    "mweb",
+    "web",
+)
 
 
-def youtube_player_client_list() -> list[str]:
+def youtube_player_client_list(clients=None) -> list[str]:
     """yt-dlp Python API form: extractor_args youtube.player_client list."""
-    return list(YOUTUBE_PLAYER_CLIENTS)
+    return list(clients if clients is not None else YOUTUBE_PLAYER_CLIENTS)
 
 
-def youtube_player_client_arg() -> str:
+def youtube_player_client_arg(clients=None) -> str:
     """yt-dlp CLI form: value for --extractor-args youtube:player_client=..."""
-    return "youtube:player_client=" + ",".join(YOUTUBE_PLAYER_CLIENTS)
+    return "youtube:player_client=" + ",".join(
+        clients if clients is not None else YOUTUBE_PLAYER_CLIENTS
+    )
 
 
 def _resolve_ytdlp_cli_path() -> str:
@@ -522,14 +538,24 @@ def _build_cookie_sources() -> list[tuple]:
         # (browser_keyword, user_data_dir, is_default_install). For the default
         # install we pass the keyword alone (yt-dlp finds it); for variants like
         # Brave Beta we pass the explicit User Data path as the profile.
+        # yt-dlp has no separate browser keyword for the Beta/Nightly/Canary
+        # channels, so each variant is read through its base extractor (brave/
+        # chrome/edge) with an explicit User Data path. Chrome "Nightly" is Chrome
+        # Canary (Chrome SxS) and Edge "Nightly" is Edge Canary (Edge SxS); the
+        # Chromium docs put them under "Chrome Beta"/"Chrome SxS"/"Edge Beta"/
+        # "Edge SxS" respectively.
         chromium_dirs = [
             ("brave", os.path.join(local, "BraveSoftware", "Brave-Browser", "User Data"), True),
             ("brave", os.path.join(local, "BraveSoftware", "Brave-Browser-Beta", "User Data"), False),
             ("brave", os.path.join(local, "BraveSoftware", "Brave-Browser-Nightly", "User Data"), False),
             ("chrome", os.path.join(local, "Google", "Chrome", "User Data"), True),
+            ("chrome", os.path.join(local, "Google", "Chrome Beta", "User Data"), False),
+            ("chrome", os.path.join(local, "Google", "Chrome SxS", "User Data"), False),  # Chrome Canary
             ("chromium", os.path.join(local, "Chromium", "User Data"), True),
             ("vivaldi", os.path.join(local, "Vivaldi", "User Data"), True),
             ("edge", os.path.join(local, "Microsoft", "Edge", "User Data"), True),
+            ("edge", os.path.join(local, "Microsoft", "Edge Beta", "User Data"), False),
+            ("edge", os.path.join(local, "Microsoft", "Edge SxS", "User Data"), False),  # Edge Canary
             ("opera", os.path.join(roaming, "Opera Software", "Opera Stable"), True),
         ]
         for name, path, is_default in chromium_dirs:

@@ -19,7 +19,7 @@ class _FakeCompletedProcess:
         self.stderr = str(stderr)
 
 
-def test_extract_ytdlp_info_via_cli_returns_first_playlist_entry_and_uses_browser_name():
+def test_extract_ytdlp_info_via_cli_returns_first_playlist_entry_and_keeps_profile_path():
     captured_cmd = {}
 
     def _fake_run(cmd, **_kwargs):
@@ -30,6 +30,7 @@ def test_extract_ytdlp_info_via_cli_returns_first_playlist_entry_and_uses_browse
             stderr="",
         )
 
+    profile = r"C:\Users\alice\AppData\Local\Microsoft\Edge Beta\User Data"
     with patch("gui.player.subprocess.run", side_effect=_fake_run), patch(
         "gui.player.discovery._resolve_ytdlp_cli_path", return_value="/tmp/BlindRSS/bin/yt-dlp"
     ), patch(
@@ -38,7 +39,7 @@ def test_extract_ytdlp_info_via_cli_returns_first_playlist_entry_and_uses_browse
         info = _extract_ytdlp_info_via_cli(
             "https://www.youtube.com/watch?v=abc123",
             headers={"Accept-Language": "en-US,en;q=0.9", "Origin": "https://www.youtube.com"},
-            cookie_source=("edge", r"C:\Users\alice\AppData\Local\Microsoft\Edge\User Data"),
+            cookie_source=("edge", profile),
             timeout_s=20,
         )
 
@@ -48,12 +49,73 @@ def test_extract_ytdlp_info_via_cli_returns_first_playlist_entry_and_uses_browse
     cmd = captured_cmd["cmd"]
     assert cmd[0] == "/tmp/BlindRSS/bin/yt-dlp"
     assert "--cookies-from-browser" in cmd
-    assert "edge" in cmd
-    assert r"C:\Users\alice\AppData\Local\Microsoft\Edge\User Data" not in cmd
+    # The explicit profile path must be preserved as browser:profile so variants
+    # like Edge Beta / Brave Beta / LibreWolf read the right cookie store. Passing
+    # bare "edge" reads the default profile and breaks cookie-gated playback even
+    # though the download path (which keeps the profile) works.
+    assert f"edge:{profile}" in cmd
+    assert "edge" not in cmd  # not the bare keyword
     assert "--dump-single-json" in cmd
     assert "--format" in cmd
     assert "--add-header" in cmd
     assert "Accept-Language: en-US,en;q=0.9" in cmd
+
+
+def test_extract_ytdlp_info_via_cli_uses_bare_keyword_for_default_profile():
+    captured_cmd = {}
+
+    def _fake_run(cmd, **_kwargs):
+        captured_cmd["cmd"] = list(cmd)
+        return _FakeCompletedProcess(
+            returncode=0,
+            stdout='{"url":"https://cdn.example/audio.m4a","title":"Example"}',
+            stderr="",
+        )
+
+    with patch("gui.player.subprocess.run", side_effect=_fake_run), patch(
+        "gui.player.discovery._resolve_ytdlp_cli_path", return_value="/tmp/BlindRSS/bin/yt-dlp"
+    ), patch(
+        "gui.player.platform.system", return_value="Windows"
+    ), patch("core.dependency_check._get_startup_info", return_value=None):
+        _extract_ytdlp_info_via_cli(
+            "https://www.youtube.com/watch?v=abc123",
+            cookie_source=("firefox",),
+        )
+
+    cmd = captured_cmd["cmd"]
+    assert "--cookies-from-browser" in cmd
+    assert "firefox" in cmd  # bare keyword when no profile path is detected
+
+
+def test_extract_ytdlp_info_via_cli_passes_player_client_override():
+    captured_cmd = {}
+
+    def _fake_run(cmd, **_kwargs):
+        captured_cmd["cmd"] = list(cmd)
+        return _FakeCompletedProcess(
+            returncode=0,
+            stdout='{"url":"https://cdn.example/audio.m4a","title":"Example"}',
+            stderr="",
+        )
+
+    from core import discovery
+
+    with patch("gui.player.subprocess.run", side_effect=_fake_run), patch(
+        "gui.player.discovery._resolve_ytdlp_cli_path", return_value="/tmp/yt-dlp"
+    ), patch("gui.player.platform.system", return_value="Windows"), patch(
+        "core.dependency_check._get_startup_info", return_value=None
+    ):
+        _extract_ytdlp_info_via_cli(
+            "https://www.youtube.com/watch?v=abc123",
+            player_clients=discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK,
+        )
+
+    cmd = captured_cmd["cmd"]
+    assert "--extractor-args" in cmd
+    arg = cmd[cmd.index("--extractor-args") + 1]
+    # The wider fallback pool must reach the CLI as the player_client value.
+    assert arg == discovery.youtube_player_client_arg(discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK)
+    assert "web_safari" in arg
 
 
 def test_extract_ytdlp_info_via_cli_raises_on_nonzero_exit():

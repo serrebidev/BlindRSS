@@ -70,6 +70,13 @@ DEFAULT_CONFIG = {
     # (yt-dlp #10927) blocks --cookies-from-browser. Export from the browser, then
     # set this path. When set, it is tried before browser-cookie extraction.
     "ytdlp_cookies_file": "",
+    # When true, BlindRSS watches the Downloads folder for a freshly exported
+    # YouTube cookies.txt and auto-imports it into the data dir, setting
+    # ytdlp_cookies_file automatically. See core/cookies_import.py.
+    "auto_import_browser_cookies": True,
+    # Internal: mtime of the last cookie export we auto-imported, so the watcher
+    # only imports newer exports and never loops on the same file.
+    "ytdlp_cookies_last_import_mtime": 0,
     # Optional explicit paths to the media-tool executables. When set, they take
     # priority over auto-detection (PATH, Scoop/Choco/WinGet, portable layouts,
     # etc.). Empty => auto-detect. Surfaced in Settings > Media Player.

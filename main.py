@@ -208,6 +208,23 @@ class RSSApp(wx.App):
         # Run dependency check after the UI is visible to reduce startup work.
         wx.CallLater(2000, lambda: threading.Thread(target=check_and_install_dependencies, daemon=True).start())
 
+        # Watch the Downloads folder for a freshly exported YouTube cookies.txt
+        # and auto-import it (Chromium App-Bound Encryption blocks reading those
+        # cookies directly, so the user exports once and we pick it up hands-free).
+        self._cookie_watcher = None
+        try:
+            from core.cookies_import import CookieImportWatcher
+            from core.config import get_data_dir
+
+            self._cookie_watcher = CookieImportWatcher(
+                self.config_manager,
+                get_data_dir(),
+                on_import=self._on_cookies_auto_imported,
+            )
+            self._cookie_watcher.start()
+        except Exception as e:
+            log.debug(f"Cookie import watcher not started: {e}")
+
         # Install a global filter so media shortcuts work everywhere (including modal dialogs)
         try:
             # Keep a reference so it is not garbage-collected.
@@ -217,8 +234,32 @@ class RSSApp(wx.App):
             log.error(f"Failed to install global media filter: {e}")
         return True
 
+    def _on_cookies_auto_imported(self, dest_path):
+        """Notify the user (on the UI thread) when cookies were auto-imported."""
+        def _notify():
+            try:
+                frame = getattr(self, "frame", None)
+                msg = "Imported YouTube login cookies from your browser export. They will be used for restricted videos."
+                if frame is not None and hasattr(frame, "_show_windows_notification"):
+                    frame._show_windows_notification("BlindRSS cookies updated", msg)
+                else:
+                    log.info(msg)
+            except Exception as e:
+                log.debug(f"Cookie auto-import notification failed: {e}")
+
+        try:
+            wx.CallAfter(_notify)
+        except Exception:
+            log.info("Auto-imported YouTube cookies to %s", dest_path)
+
     def OnExit(self):
         log.info("Shutting down proxies...")
+        try:
+            watcher = getattr(self, "_cookie_watcher", None)
+            if watcher is not None:
+                watcher.stop()
+        except Exception as e:
+            log.debug(f"Error stopping cookie watcher: {e}")
         try:
             get_proxy().stop()
         except Exception as e:

@@ -86,6 +86,7 @@ def _extract_ytdlp_info_via_cli(
     headers: dict | None = None,
     cookie_source: tuple | None = None,
     timeout_s: int = 30,
+    player_clients=None,
 ) -> dict:
     target_url = str(url or "").strip()
     if not target_url:
@@ -106,7 +107,7 @@ def _extract_ytdlp_info_via_cli(
         "--format",
         _YTDLP_VLC_AUDIO_FORMAT,
         "--extractor-args",
-        discovery.youtube_player_client_arg(),
+        discovery.youtube_player_client_arg(player_clients),
         "--quiet",
         "--no-warnings",
         "--no-progress",
@@ -129,9 +130,13 @@ def _extract_ytdlp_info_via_cli(
         cmd.extend(["--add-header", f"{key_s}: {val_s}"])
 
     if isinstance(cookie_source, tuple) and cookie_source:
-        browser = str(cookie_source[0] or "").strip()
-        if browser:
-            cmd.extend(["--cookies-from-browser", browser])
+        # Preserve the explicit profile path (browser:profile) for variants like
+        # Brave Beta/Nightly, Edge Beta/Canary, Chrome Beta/Canary, and LibreWolf.
+        # Passing only the bare browser keyword reads the wrong/default profile, so
+        # cookie-gated videos that download fine would silently fail to play.
+        cookie_arg = discovery.cookie_arg_for_ytdlp(cookie_source)
+        if cookie_arg:
+            cmd.extend(["--cookies-from-browser", cookie_arg])
 
     cmd.append(target_url)
 
@@ -2954,6 +2959,43 @@ class PlayerFrame(wx.Frame):
                                 last_err = cli_last_err
 
                     if info is None:
+                        # Exhaust a wider yt-dlp player-client pool before giving up.
+                        # YouTube blocks/throttles individual clients, so a broader set
+                        # is often the difference between "no formats" and a playable
+                        # stream. Try embedded then CLI, anonymously and (if configured)
+                        # with a cookies.txt; skip browser-cookie/DPAPI churn here.
+                        fb_clients = discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK
+                        fb_opts_base = dict(base_opts)
+                        fb_opts_base['extractor_args'] = {
+                            'youtube': {'player_client': discovery.youtube_player_client_list(fb_clients)}
+                        }
+                        fb_attempts = [("base", None)]
+                        if cookiefile:
+                            fb_attempts.append(("cookiefile", cookiefile))
+                        for fb_kind, fb_source in fb_attempts:
+                            fb_opts = dict(fb_opts_base)
+                            if fb_kind == "cookiefile" and fb_source:
+                                fb_opts["cookiefile"] = fb_source
+                            try:
+                                info = _extract_with_opts(fb_opts)
+                                _log(f"yt-dlp resolved via wider player-client fallback ({fb_kind})")
+                                break
+                            except Exception as fb_e:
+                                last_err = fb_e
+                        if info is None:
+                            try:
+                                info = _extract_ytdlp_info_via_cli(
+                                    url,
+                                    headers=ytdlp_headers,
+                                    cookie_source=None,
+                                    timeout_s=30,
+                                    player_clients=fb_clients,
+                                )
+                                _log("yt-dlp resolved via CLI wider player-client fallback")
+                            except Exception as fb_cli_e:
+                                last_err = fb_cli_e
+
+                    if info is None:
                         rokfin_probe = None
                         is_rokfin_url = False
                         try:
@@ -2995,24 +3037,34 @@ class PlayerFrame(wx.Frame):
                                     "Rokfin did not provide a playable stream URL for this post"
                                 )
 
+                        # Last resort: hand the original page URL to VLC directly.
+                        # VLC's own (lua) extractors are an independent code path from
+                        # yt-dlp, so this can occasionally play when every yt-dlp
+                        # attempt failed. VLC emits its own error if it cannot handle
+                        # the URL, so we let it try rather than pre-empting with a raise.
                         if dpapi_cookie_err is not None and base_err is not None:
-                            raise RuntimeError(
-                                f"{base_err} (browser cookies unavailable on this Windows session: DPAPI decryption failed)"
+                            _log(
+                                "yt-dlp failed (browser cookies/DPAPI unavailable); "
+                                "trying VLC direct as a last resort"
                             )
-                        raise last_err or RuntimeError("yt-dlp extraction failed")
+                        else:
+                            _log("yt-dlp extraction failed; trying VLC direct as a last resort")
+                        final_url = url
+                        ytdlp_headers = {}
+                        resolved_title = title or "Media Stream"
+                    else:
+                        # Handle playlists/multi-video pages
+                        if 'entries' in info:
+                            entries = list(info['entries'])
+                            if entries:
+                                info = entries[0]
 
-                    # Handle playlists/multi-video pages
-                    if 'entries' in info:
-                        entries = list(info['entries'])
-                        if entries:
-                            info = entries[0]
+                        final_url = info.get('url')
+                        if not final_url:
+                            raise RuntimeError("No media URL found in yt-dlp info")
 
-                    final_url = info.get('url')
-                    if not final_url:
-                        raise RuntimeError("No media URL found in yt-dlp info")
-
-                    ytdlp_headers = info.get('http_headers', {})
-                    resolved_title = info.get('title', title or 'Media Stream')
+                        ytdlp_headers = info.get('http_headers', {})
+                        resolved_title = info.get('title', title or 'Media Stream')
                 except Exception as e:
                     err_text = str(e or "")
                     err_lower = err_text.lower()
@@ -3213,23 +3265,29 @@ class PlayerFrame(wx.Frame):
                 )
             except Exception:
                 pass
+            # VLC-direct last resort: when yt-dlp could not resolve a media URL we
+            # hand VLC the original page URL so its own extractors can try. That is
+            # not a direct media stream, so skip our range-cache/stream proxies and
+            # silence scan, which expect a real media URL.
+            vlc_direct = bool(use_ytdlp) and str(final_url or "").strip() == str(input_url or "").strip()
             try:
-                if bool(self.config_manager.get("debug_mode", False)):
+                if not vlc_direct and bool(self.config_manager.get("debug_mode", False)):
                     self._start_http_seek_diagnostics(str(final_url), headers=ytdlp_headers)
             except Exception:
                 pass
-            final_url = self._maybe_range_cache_url(final_url, headers=ytdlp_headers, url_is_resolved=url_is_resolved)
-            try:
-                # Frozen Windows builds can fail on direct HTTPS googlevideo URLs
-                # with certain bundled VLC/libvlc combinations. Route through the
-                # local HTTP stream proxy up-front for these URLs.
-                if _should_force_local_stream_proxy(
-                    final_url,
-                    is_frozen=bool(getattr(sys, "frozen", False)),
-                ):
-                    final_url = self._maybe_stream_proxy_url(final_url, headers=ytdlp_headers)
-            except Exception:
-                pass
+            if not vlc_direct:
+                final_url = self._maybe_range_cache_url(final_url, headers=ytdlp_headers, url_is_resolved=url_is_resolved)
+                try:
+                    # Frozen Windows builds can fail on direct HTTPS googlevideo URLs
+                    # with certain bundled VLC/libvlc combinations. Route through the
+                    # local HTTP stream proxy up-front for these URLs.
+                    if _should_force_local_stream_proxy(
+                        final_url,
+                        is_frozen=bool(getattr(sys, "frozen", False)),
+                    ):
+                        final_url = self._maybe_stream_proxy_url(final_url, headers=ytdlp_headers)
+                except Exception:
+                    pass
             try:
                 proxied = bool(self._last_used_range_proxy or self._last_used_stream_proxy)
                 log.info(
@@ -3243,7 +3301,8 @@ class PlayerFrame(wx.Frame):
                 pass
             self._last_load_chapters = chapters
             self._last_load_title = self.current_title
-            self._queue_silence_scan(final_url, int(getattr(self, "_active_load_seq", 0)), headers=ytdlp_headers)
+            if not vlc_direct:
+                self._queue_silence_scan(final_url, int(getattr(self, "_active_load_seq", 0)), headers=ytdlp_headers)
             self._set_status("Buffering...")
             self._load_vlc_url(
                 final_url,
