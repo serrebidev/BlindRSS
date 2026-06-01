@@ -191,7 +191,11 @@ class AccessibleBrowserFrame(wx.Frame):
         toolbar.Add(self.mark_read_btn, 0, wx.RIGHT, 6)
         self.mark_unread_btn = wx.Button(panel, label="Mark Unread")
         self.mark_unread_btn.SetName("Mark Unread")
-        toolbar.Add(self.mark_unread_btn, 0)
+        toolbar.Add(self.mark_unread_btn, 0, wx.RIGHT, 6)
+        self.download_btn = wx.Button(panel, label="Download")
+        self.download_btn.SetName("Download Article")
+        self.download_btn.Enable(False)
+        toolbar.Add(self.download_btn, 0)
         root.Add(toolbar, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
         search_row = wx.BoxSizer(wx.HORIZONTAL)
@@ -264,6 +268,7 @@ class AccessibleBrowserFrame(wx.Frame):
         self.open_btn.Bind(wx.EVT_BUTTON, self.on_open_article)
         self.mark_read_btn.Bind(wx.EVT_BUTTON, self.on_mark_read)
         self.mark_unread_btn.Bind(wx.EVT_BUTTON, self.on_mark_unread)
+        self.download_btn.Bind(wx.EVT_BUTTON, self.on_download_article)
         self.view_list.Bind(wx.EVT_LISTBOX, self.on_view_selected)
         self.view_list.Bind(wx.EVT_KEY_DOWN, self.on_view_list_key_down)
         self.article_list.Bind(wx.EVT_LISTBOX, self.on_article_selected)
@@ -549,6 +554,7 @@ class AccessibleBrowserFrame(wx.Frame):
         if not self._current_articles:
             self.article_list.Set(["No articles found."])
             self.content_ctrl.SetValue("")
+            self._update_download_button(None)
             return
         self.article_list.Set([self._article_label(article) for article in self._current_articles])
         self.article_list.SetSelection(0)
@@ -596,6 +602,7 @@ class AccessibleBrowserFrame(wx.Frame):
 
     def _show_article_at_index(self, idx):
         if idx is None or idx < 0 or idx >= len(self._current_articles):
+            self._update_download_button(None)
             return
         article = self._current_articles[idx]
         header = [
@@ -611,6 +618,20 @@ class AccessibleBrowserFrame(wx.Frame):
         except Exception:
             body = str(getattr(article, "content", "") or "")
         self.content_ctrl.SetValue("\n".join(header) + body)
+        self._update_download_button(article)
+
+    def _update_download_button(self, article):
+        has_media = bool(article and getattr(article, "media_url", None))
+        try:
+            self.download_btn.Enable(has_media)
+        except Exception:
+            pass
+
+    def on_download_article(self, _event):
+        _idx, article = self._selected_article()
+        if article is None:
+            return
+        self.mainframe.on_download_article(article)
 
     def on_search_changed(self, _event):
         self._apply_filter()
