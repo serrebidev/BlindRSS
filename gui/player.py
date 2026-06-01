@@ -3494,32 +3494,15 @@ class PlayerFrame(wx.Frame):
                 pass
 
     def _ytdlp_play_cache_dir(self) -> str:
-        try:
-            from core.config import get_data_dir
-            base = get_data_dir()
-        except Exception:
-            base = os.path.join(os.path.expanduser("~"), ".blindrss")
-        d = os.path.join(base, "ytplay_cache")
-        try:
-            os.makedirs(d, exist_ok=True)
-        except Exception:
-            pass
-        return d
+        from core import play_cache
+        return play_cache.ensure_cache_dir(play_cache.resolve_cache_dir(self.config_manager))
 
-    def _prune_ytplay_cache(self, keep: int = 6) -> None:
-        """Keep only the most recent cached playback files."""
+    def _prune_ytplay_cache(self) -> None:
+        """Trim the playback cache to the configured size cap (oldest first)."""
         try:
-            d = self._ytdlp_play_cache_dir()
-            files = [
-                os.path.join(d, n) for n in os.listdir(d)
-                if not n.endswith((".part", ".ytdl", ".tmp"))
-            ]
-            files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
-            for stale in files[keep:]:
-                try:
-                    os.remove(stale)
-                except OSError:
-                    pass
+            from core import play_cache
+            max_mb = self.config_manager.get("youtube_play_cache_max_mb", 500)
+            play_cache.prune_cache(self._ytdlp_play_cache_dir(), max_mb)
         except Exception:
             pass
 

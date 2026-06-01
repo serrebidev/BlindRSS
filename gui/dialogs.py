@@ -731,6 +731,36 @@ class SettingsDialog(wx.Dialog):
         self.youtube_play_via_download_chk.SetValue(bool(config.get("youtube_play_via_download", False)))
         general_sizer.Add(self.youtube_play_via_download_chk, 0, wx.ALL, 5)
 
+        cache_label = wx.StaticText(
+            general_panel,
+            label="YouTube playback cache folder (blank = default, next to your data):",
+        )
+        general_sizer.Add(cache_label, 0, wx.LEFT | wx.TOP, 5)
+        cache_row = wx.BoxSizer(wx.HORIZONTAL)
+        self.youtube_play_cache_dir_ctrl = wx.TextCtrl(
+            general_panel, value=str(config.get("youtube_play_cache_dir", "") or "")
+        )
+        cache_row.Add(self.youtube_play_cache_dir_ctrl, 1, wx.EXPAND | wx.RIGHT, 5)
+        cache_browse = wx.Button(general_panel, label="Browse...")
+        cache_browse.Bind(wx.EVT_BUTTON, self._on_browse_play_cache_dir)
+        cache_row.Add(cache_browse, 0, wx.RIGHT, 5)
+        cache_clear = wx.Button(general_panel, label="Clear cache now")
+        cache_clear.Bind(wx.EVT_BUTTON, self._on_clear_play_cache)
+        cache_row.Add(cache_clear, 0)
+        general_sizer.Add(cache_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+
+        size_row = wx.BoxSizer(wx.HORIZONTAL)
+        size_row.Add(
+            wx.StaticText(general_panel, label="Max cache size (MB, 0 = unlimited):"),
+            0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5,
+        )
+        self.youtube_play_cache_max_mb_ctrl = wx.SpinCtrl(
+            general_panel, min=0, max=1000000,
+            initial=int(config.get("youtube_play_cache_max_mb", 500) or 0),
+        )
+        size_row.Add(self.youtube_play_cache_max_mb_ctrl, 0)
+        general_sizer.Add(size_row, 0, wx.LEFT | wx.BOTTOM, 5)
+
         self.prompt_missing_deps_chk = wx.CheckBox(
             general_panel,
             label="Ask to install missing media dependencies on startup",
@@ -2086,6 +2116,49 @@ class SettingsDialog(wx.Dialog):
             self.ytdlp_cookies_ctrl.SetValue(dlg.GetPath())
         dlg.Destroy()
 
+    def _current_play_cache_dir(self):
+        """The cache dir reflecting the (possibly unsaved) location field."""
+        from core import play_cache
+        loc = (self.youtube_play_cache_dir_ctrl.GetValue() or "").strip()
+        return loc or play_cache.default_cache_dir()
+
+    def _on_browse_play_cache_dir(self, event):
+        dlg = wx.DirDialog(
+            self,
+            "Choose YouTube playback cache folder",
+            self.youtube_play_cache_dir_ctrl.GetValue(),
+            style=wx.DD_DEFAULT_STYLE,
+        )
+        if dlg.ShowModal() == wx.ID_OK:
+            self.youtube_play_cache_dir_ctrl.SetValue(dlg.GetPath())
+        dlg.Destroy()
+
+    def _on_clear_play_cache(self, event):
+        from core import play_cache
+        cache_dir = self._current_play_cache_dir()
+        size = play_cache.cache_size_bytes(cache_dir)
+        count = play_cache.cache_file_count(cache_dir)
+        if count == 0:
+            wx.MessageBox(
+                f"The playback cache is already empty.\n\n{cache_dir}",
+                "Playback cache",
+                wx.ICON_INFORMATION,
+            )
+            return
+        confirm = wx.MessageBox(
+            f"Delete {count} cached file(s) ({play_cache.human_size(size)})?\n\n{cache_dir}",
+            "Clear playback cache",
+            wx.YES_NO | wx.ICON_QUESTION,
+        )
+        if confirm != wx.YES:
+            return
+        removed, freed = play_cache.clear_cache(cache_dir)
+        wx.MessageBox(
+            f"Removed {removed} file(s), freed {play_cache.human_size(freed)}.",
+            "Playback cache cleared",
+            wx.ICON_INFORMATION,
+        )
+
     _COOKIES_EXTENSION_URL = "https://github.com/kairi003/Get-cookies.txt-LOCALLY"
 
     def _on_import_cookies_from_browser(self, event):
@@ -2321,6 +2394,8 @@ class SettingsDialog(wx.Dialog):
             "ytdlp_cookies_file": self.ytdlp_cookies_ctrl.GetValue().strip(),
             "auto_import_browser_cookies": self.auto_import_cookies_chk.GetValue(),
             "youtube_play_via_download": self.youtube_play_via_download_chk.GetValue(),
+            "youtube_play_cache_dir": self.youtube_play_cache_dir_ctrl.GetValue().strip(),
+            "youtube_play_cache_max_mb": int(self.youtube_play_cache_max_mb_ctrl.GetValue()),
             "custom_ffmpeg_path": self._media_tool_path_ctrls["custom_ffmpeg_path"].GetValue().strip(),
             "custom_ffprobe_path": self._media_tool_path_ctrls["custom_ffprobe_path"].GetValue().strip(),
             "custom_ytdlp_path": self._media_tool_path_ctrls["custom_ytdlp_path"].GetValue().strip(),

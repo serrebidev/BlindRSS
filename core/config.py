@@ -82,6 +82,11 @@ DEFAULT_CONFIG = {
     # (some bundled Windows VLC builds cannot stream googlevideo URLs). When off,
     # BlindRSS streams first and auto-falls back to this on a playback failure.
     "youtube_play_via_download": False,
+    # YouTube playback cache (core/play_cache.py). Empty dir = default location
+    # beside config.json/rss.db; set a folder to relocate it. Cap is enforced by
+    # deleting the oldest cached audio first; 0 = unlimited.
+    "youtube_play_cache_dir": "",
+    "youtube_play_cache_max_mb": 500,
     # Optional explicit paths to the media-tool executables. When set, they take
     # priority over auto-detection (PATH, Scoop/Choco/WinGet, portable layouts,
     # etc.). Empty => auto-detect. Surfaced in Settings > Media Player.

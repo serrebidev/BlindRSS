@@ -47,21 +47,31 @@ def test_resolve_printed_filepath_ignores_partial_when_scanning(tmp_path):
     assert p._resolve_printed_filepath("", str(tmp_path)) is None
 
 
-def test_prune_ytplay_cache_keeps_newest(tmp_path, monkeypatch):
+class _FakeConfig:
+    def __init__(self, data=None):
+        self.data = dict(data or {})
+
+    def get(self, key, default=None):
+        return self.data.get(key, default)
+
+
+def test_prune_ytplay_cache_enforces_size_cap(tmp_path):
     p = _bare_player()
     cache = str(tmp_path)
-    monkeypatch.setattr(p, "_ytdlp_play_cache_dir", lambda: cache)
-    paths = []
-    for i in range(9):
-        fp = os.path.join(cache, f"f{i}.m4a")
+    one_mb = 1024 * 1024
+    # 3 x 1 MB files, distinct ages.
+    for i, name in enumerate(("old.m4a", "mid.m4a", "new.m4a")):
+        fp = os.path.join(cache, name)
         with open(fp, "wb") as fh:
-            fh.write(b"\x00")
+            fh.write(b"\x00" * one_mb)
         os.utime(fp, (1000 + i, 1000 + i))
-        paths.append(fp)
-    p._prune_ytplay_cache(keep=3)
-    remaining = sorted(n for n in os.listdir(cache))
-    # Only the 3 newest survive.
-    assert remaining == ["f6.m4a", "f7.m4a", "f8.m4a"]
+    # 2 MB cap -> oldest dropped, newest two kept.
+    p.config_manager = _FakeConfig({
+        "youtube_play_cache_dir": cache,
+        "youtube_play_cache_max_mb": 2,
+    })
+    p._prune_ytplay_cache()
+    assert sorted(os.listdir(cache)) == ["mid.m4a", "new.m4a"]
 
 
 def test_maybe_play_ytdlp_via_download_declines_when_not_ytdlp():
