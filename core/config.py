@@ -77,6 +77,11 @@ DEFAULT_CONFIG = {
     # Internal: mtime of the last cookie export we auto-imported, so the watcher
     # only imports newer exports and never loops on the same file.
     "ytdlp_cookies_last_import_mtime": 0,
+    # Play YouTube/yt-dlp items by downloading the audio to a local cache first,
+    # instead of streaming. Slower to start but works wherever downloads work
+    # (some bundled Windows VLC builds cannot stream googlevideo URLs). When off,
+    # BlindRSS streams first and auto-falls back to this on a playback failure.
+    "youtube_play_via_download": False,
     # Optional explicit paths to the media-tool executables. When set, they take
     # priority over auto-detection (PATH, Scoop/Choco/WinGet, portable layouts,
     # etc.). Empty => auto-detect. Surfaced in Settings > Media Player.

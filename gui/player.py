@@ -1299,6 +1299,14 @@ class PlayerFrame(wx.Frame):
         log.debug("Handling VLC error")
         if self.is_casting:
             return
+
+        # YouTube/yt-dlp items: the streamed URL (e.g. googlevideo) often won't play
+        # on a bundled Windows VLC even though yt-dlp can fetch it. Fall back to the
+        # proven download path and play a local file. Do this before the range-proxy
+        # recovery, which does not apply to these streams.
+        if self.maybe_play_ytdlp_via_download(int(getattr(self, "_active_load_seq", 0) or 0), reason="vlc-error"):
+            return
+
         if not self._last_vlc_url:
             return
 
@@ -1438,20 +1446,19 @@ class PlayerFrame(wx.Frame):
         return url
 
     def _maybe_recover_stalled_direct_playback(self, state, playing_now: bool, cur_ms: int) -> None:
-        """Fallback for direct YouTube media URLs that stall at startup."""
+        """Fallback for YouTube media URLs that stall at startup.
+
+        First pass: a direct googlevideo URL that won't start is retried via the
+        local stream proxy. If that also stalls (or the item isn't googlevideo), the
+        stream still won't play in this VLC, so escalate to the proven local-download
+        path for the yt-dlp item.
+        """
         try:
             if self.is_casting:
                 return
             if bool(getattr(self, "_last_used_range_proxy", False)):
                 return
-            if bool(getattr(self, "_last_used_stream_proxy", False)):
-                return
-            orig_url = str(getattr(self, "_last_orig_url", "") or "").strip()
-            if not _is_googlevideo_url(orig_url):
-                return
             if bool(playing_now) or int(cur_ms) > 0:
-                return
-            if int(getattr(self, "_stream_proxy_retry_count", 0) or 0) >= 1:
                 return
             load_started = float(getattr(self, "_load_start_ts", 0.0) or 0.0)
             if load_started <= 0.0:
@@ -1476,20 +1483,36 @@ class PlayerFrame(wx.Frame):
             if (now_mono - last_recover) < 6.0:
                 return
 
-            proxied = self._maybe_stream_proxy_url(orig_url, headers=getattr(self, "_last_vlc_http_headers", None))
-            if not proxied or proxied == orig_url:
-                return
+            orig_url = str(getattr(self, "_last_orig_url", "") or "").strip()
 
-            self._stream_proxy_retry_count = 1
+            # First pass: direct googlevideo stalled -> retry via local stream proxy.
+            if (
+                not bool(getattr(self, "_last_used_stream_proxy", False))
+                and _is_googlevideo_url(orig_url)
+                and int(getattr(self, "_stream_proxy_retry_count", 0) or 0) < 1
+            ):
+                proxied = self._maybe_stream_proxy_url(orig_url, headers=getattr(self, "_last_vlc_http_headers", None))
+                if proxied and proxied != orig_url:
+                    self._stream_proxy_retry_count = 1
+                    self._stream_proxy_last_stall_recover_ts = now_mono
+                    self._load_start_ts = now_mono
+                    log.warning(
+                        "Detected stalled direct YouTube playback after %.1fs (state=%s, pos=%sms); retrying via local stream proxy",
+                        max(0.0, now_mono - load_started),
+                        state,
+                        int(cur_ms),
+                    )
+                    self._load_vlc_url(proxied, http_headers=self._last_vlc_http_headers)
+                    return
+
+            # Stream proxy already tried (or N/A) and it still won't play: download
+            # the yt-dlp item and play it locally — the path that always works.
             self._stream_proxy_last_stall_recover_ts = now_mono
-            self._load_start_ts = now_mono
-            log.warning(
-                "Detected stalled direct YouTube playback after %.1fs (state=%s, pos=%sms); retrying via local stream proxy",
-                max(0.0, now_mono - load_started),
-                state,
-                int(cur_ms),
-            )
-            self._load_vlc_url(proxied, http_headers=self._last_vlc_http_headers)
+            if self.maybe_play_ytdlp_via_download(int(getattr(self, "_active_load_seq", 0) or 0), reason="stalled"):
+                log.warning(
+                    "YouTube stream still stalled after %.1fs; downloading to play locally",
+                    max(0.0, now_mono - load_started),
+                )
         except Exception:
             pass
 
@@ -2730,6 +2753,17 @@ class PlayerFrame(wx.Frame):
                 except Exception:
                     pass
 
+            # Opt-in: skip streaming entirely and play YouTube via a local download.
+            # The most reliable path on machines where the bundled VLC cannot stream
+            # googlevideo URLs — playback then works exactly wherever downloads work.
+            if not rumble_handled:
+                try:
+                    if bool(self.config_manager.get("youtube_play_via_download", False)):
+                        if self.maybe_play_ytdlp_via_download(int(load_seq), reason="setting"):
+                            return
+                except Exception:
+                    pass
+
             if not rumble_handled:
                 try:
                     import yt_dlp
@@ -3091,6 +3125,10 @@ class PlayerFrame(wx.Frame):
                             "loaded on this Windows session (DPAPI). Try running BlindRSS as your normal Windows user "
                             "and restart the app."
                         )
+                    # Before surfacing an error, try the local-download fallback:
+                    # if yt-dlp can fetch the file (downloads work), play it locally.
+                    if self.maybe_play_ytdlp_via_download(int(load_seq), reason="resolve-failed"):
+                        return
                     wx.CallAfter(self._handle_media_load_error, int(load_seq), url, ui_msg, True)
                     return
         else:
@@ -3327,6 +3365,22 @@ class PlayerFrame(wx.Frame):
         except Exception:
             self._current_use_ytdlp = False
 
+        # State for the local-download playback fallback. When VLC cannot play the
+        # streamed yt-dlp URL (e.g. googlevideo on a bundled Windows VLC), we re-run
+        # the proven download path to a local file and play that instead. Only armed
+        # for yt-dlp page items; cleared for anything already pointing at media.
+        try:
+            if bool(use_ytdlp):
+                self._ytdlp_page_url = str(url)
+                self._ytdlp_play_title = title
+                self._ytdlp_play_chapters = chapters
+                self._ytdlp_play_article_id = article_id
+                self._ytdlp_download_fallback_tried = False
+            else:
+                self._ytdlp_page_url = None
+        except Exception:
+            self._ytdlp_page_url = None
+
         try:
             if article_id is not None:
                 self.current_article_id = str(article_id)
@@ -3438,6 +3492,207 @@ class PlayerFrame(wx.Frame):
                 )
             except Exception:
                 pass
+
+    def _ytdlp_play_cache_dir(self) -> str:
+        try:
+            from core.config import get_data_dir
+            base = get_data_dir()
+        except Exception:
+            base = os.path.join(os.path.expanduser("~"), ".blindrss")
+        d = os.path.join(base, "ytplay_cache")
+        try:
+            os.makedirs(d, exist_ok=True)
+        except Exception:
+            pass
+        return d
+
+    def _prune_ytplay_cache(self, keep: int = 6) -> None:
+        """Keep only the most recent cached playback files."""
+        try:
+            d = self._ytdlp_play_cache_dir()
+            files = [
+                os.path.join(d, n) for n in os.listdir(d)
+                if not n.endswith((".part", ".ytdl", ".tmp"))
+            ]
+            files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+            for stale in files[keep:]:
+                try:
+                    os.remove(stale)
+                except OSError:
+                    pass
+        except Exception:
+            pass
+
+    def maybe_play_ytdlp_via_download(self, load_seq: int, reason: str = "") -> bool:
+        """If a yt-dlp item failed to stream, download its audio and play locally.
+
+        Returns True when a download fallback was started. This mirrors the proven
+        download path (yt-dlp CLI), so playback works wherever downloads do — even
+        when the bundled VLC cannot play the streamed googlevideo URL directly.
+        """
+        try:
+            if int(load_seq) != int(getattr(self, "_active_load_seq", 0) or 0):
+                return False
+        except Exception:
+            return False
+        if not bool(getattr(self, "_current_use_ytdlp", False)):
+            return False
+        page_url = str(getattr(self, "_ytdlp_page_url", "") or "").strip()
+        if not page_url:
+            return False
+        if bool(getattr(self, "_ytdlp_download_fallback_tried", False)):
+            return False
+        self._ytdlp_download_fallback_tried = True
+        _log(f"YouTube stream playback failed ({reason or 'unknown'}); downloading audio to play locally")
+        try:
+            wx.CallAfter(self._set_status, "Downloading for playback...")
+        except Exception:
+            pass
+        threading.Thread(
+            target=self._ytdlp_download_and_play_worker,
+            args=(int(load_seq), page_url),
+            daemon=True,
+        ).start()
+        return True
+
+    def _ytdlp_download_and_play_worker(self, load_seq: int, page_url: str) -> None:
+        cache_dir = self._ytdlp_play_cache_dir()
+        out_template = os.path.join(cache_dir, "%(id)s.%(ext)s")
+        cli = discovery._resolve_ytdlp_cli_path()
+        base_cmd = [
+            cli,
+            "--no-playlist",
+            "--no-warnings",
+            "--no-progress",
+            "--no-color",
+            "--geo-bypass",
+            "--extractor-args", discovery.youtube_player_client_arg(),
+            # Audio is all the player needs; a single audio stream avoids a merge
+            # step and downloads fast. Fall back to the wider client pool if needed.
+            "-f", _YTDLP_VLC_AUDIO_FORMAT,
+            "--print", "after_move:filepath",
+            "-o", out_template,
+        ]
+        try:
+            from core.dependency_check import _find_executable_path
+            ffmpeg_path = _find_executable_path("ffmpeg")
+            if ffmpeg_path:
+                base_cmd.extend(["--ffmpeg-location", str(ffmpeg_path)])
+        except Exception:
+            pass
+
+        # Anonymous first, then cookies.txt, then browser cookies — same order as
+        # the merged download, so this works wherever downloads work.
+        attempts = [[]]
+        try:
+            cookiefile = str(self.config_manager.get("ytdlp_cookies_file", "") or "").strip()
+            if cookiefile and os.path.isfile(cookiefile):
+                attempts.append(["--cookies", cookiefile])
+        except Exception:
+            pass
+        try:
+            for src in discovery.get_ytdlp_cookie_sources(page_url) or []:
+                arg = discovery.cookie_arg_for_ytdlp(src)
+                if arg:
+                    attempts.append(["--cookies-from-browser", arg])
+        except Exception:
+            pass
+
+        creationflags = 0
+        startupinfo = None
+        if platform.system().lower() == "windows":
+            creationflags = 0x08000000  # CREATE_NO_WINDOW
+            try:
+                from core.dependency_check import _get_startup_info
+                startupinfo = _get_startup_info()
+            except Exception:
+                startupinfo = None
+
+        produced = None
+        last_err = "download failed"
+        wider = False
+        for extra in attempts:
+            try:
+                if int(load_seq) != int(getattr(self, "_active_load_seq", 0) or 0):
+                    return  # a newer load superseded us
+            except Exception:
+                return
+            cmd = list(base_cmd) + extra + [page_url]
+            try:
+                res = subprocess.run(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    stdin=subprocess.DEVNULL,
+                    creationflags=creationflags,
+                    startupinfo=startupinfo,
+                    timeout=900,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                )
+            except Exception as e:
+                last_err = str(e)
+                continue
+            if int(getattr(res, "returncode", -1) or 0) == 0:
+                produced = self._resolve_printed_filepath(res.stdout, cache_dir)
+                if produced:
+                    break
+            last_err = (res.stderr or res.stdout or last_err).strip() or last_err
+            # On the last anonymous/cookie attempt, retry once with the wider pool.
+            if not wider and extra == attempts[-1]:
+                wider = True
+                base_cmd[base_cmd.index("--extractor-args") + 1] = discovery.youtube_player_client_arg(
+                    discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK
+                )
+                attempts.append([])
+
+        if not produced:
+            _log(f"YouTube download-to-play failed: {last_err}")
+            wx.CallAfter(
+                self._handle_media_load_error,
+                int(load_seq),
+                page_url,
+                f"Could not play this YouTube item. yt-dlp could not fetch it: {last_err}",
+                True,
+            )
+            return
+
+        self._prune_ytplay_cache()
+        wx.CallAfter(self._play_local_after_download, int(load_seq), produced)
+
+    def _resolve_printed_filepath(self, stdout_text: str, cache_dir: str) -> str | None:
+        """Pick the downloaded file path from yt-dlp --print output (or scan dir)."""
+        for line in reversed(str(stdout_text or "").splitlines()):
+            cand = line.strip().strip('"')
+            if cand and os.path.isfile(cand):
+                return cand
+        try:
+            files = [
+                os.path.join(cache_dir, n) for n in os.listdir(cache_dir)
+                if not n.endswith((".part", ".ytdl", ".tmp"))
+            ]
+            if files:
+                return max(files, key=os.path.getmtime)
+        except Exception:
+            pass
+        return None
+
+    def _play_local_after_download(self, load_seq: int, local_path: str) -> None:
+        try:
+            if int(load_seq) != int(getattr(self, "_active_load_seq", 0) or 0):
+                return  # superseded by a newer selection
+        except Exception:
+            return
+        # Replay as a plain local file (use_ytdlp=False). Passing the original
+        # article id keeps resume/position continuity across the swap.
+        self.load_media(
+            local_path,
+            use_ytdlp=False,
+            chapters=getattr(self, "_ytdlp_play_chapters", None),
+            title=getattr(self, "_ytdlp_play_title", None),
+            article_id=getattr(self, "_ytdlp_play_article_id", None),
+        )
 
     def toggle_play_pause(self) -> None:
         if self.is_audio_playing():

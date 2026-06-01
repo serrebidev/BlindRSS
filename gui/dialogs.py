@@ -724,6 +724,13 @@ class SettingsDialog(wx.Dialog):
         self.auto_import_cookies_chk.SetValue(bool(config.get("auto_import_browser_cookies", True)))
         general_sizer.Add(self.auto_import_cookies_chk, 0, wx.ALL, 5)
 
+        self.youtube_play_via_download_chk = wx.CheckBox(
+            general_panel,
+            label="Play YouTube by downloading first (most reliable; slower to start)",
+        )
+        self.youtube_play_via_download_chk.SetValue(bool(config.get("youtube_play_via_download", False)))
+        general_sizer.Add(self.youtube_play_via_download_chk, 0, wx.ALL, 5)
+
         self.prompt_missing_deps_chk = wx.CheckBox(
             general_panel,
             label="Ask to install missing media dependencies on startup",
@@ -2313,6 +2320,7 @@ class SettingsDialog(wx.Dialog):
             "show_image_alt": self.show_image_alt_chk.GetValue(),
             "ytdlp_cookies_file": self.ytdlp_cookies_ctrl.GetValue().strip(),
             "auto_import_browser_cookies": self.auto_import_cookies_chk.GetValue(),
+            "youtube_play_via_download": self.youtube_play_via_download_chk.GetValue(),
             "custom_ffmpeg_path": self._media_tool_path_ctrls["custom_ffmpeg_path"].GetValue().strip(),
             "custom_ffprobe_path": self._media_tool_path_ctrls["custom_ffprobe_path"].GetValue().strip(),
             "custom_ytdlp_path": self._media_tool_path_ctrls["custom_ytdlp_path"].GetValue().strip(),
