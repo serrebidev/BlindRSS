@@ -16,6 +16,7 @@ from core import playback_state
 from core.casting import CastingManager
 from core.vlc_options import build_vlc_instance_args
 from urllib.parse import urlparse
+from urllib.request import url2pathname
 from core.range_cache_proxy import get_range_cache_proxy
 from core.stream_proxy import get_proxy as get_stream_proxy
 from core.audio_silence import merge_ranges, merge_ranges_with_gap, scan_audio_for_silence
@@ -64,6 +65,30 @@ def _should_force_local_stream_proxy(url: str | None, *, is_frozen: bool) -> boo
         return bool(is_frozen) and _is_googlevideo_url(url)
     except Exception:
         return False
+
+
+def _existing_local_media_path(raw_url: str | None) -> str | None:
+    raw = str(raw_url or "").strip()
+    if not raw:
+        return None
+    path = raw
+    try:
+        drive, _tail = os.path.splitdrive(raw)
+        if not drive and not raw.startswith(("\\\\", "//")):
+            parsed = urlparse(raw)
+            scheme = (parsed.scheme or "").lower()
+            if scheme == "file":
+                path = url2pathname(parsed.path or "")
+                if parsed.netloc:
+                    path = os.path.join(f"//{parsed.netloc}", path.lstrip("/\\"))
+            elif scheme:
+                return None
+        path = os.path.abspath(os.path.expanduser(path))
+        if os.path.isfile(path):
+            return path
+    except Exception:
+        return None
+    return None
 
 
 def _is_ytdlp_cookie_load_error(exc_or_msg) -> bool:
@@ -1516,6 +1541,12 @@ class PlayerFrame(wx.Frame):
         except Exception:
             pass
 
+    def _new_vlc_media(self, final_url: str):
+        local_path = _existing_local_media_path(final_url)
+        if local_path and hasattr(self.instance, "media_new_path"):
+            return self.instance.media_new_path(local_path)
+        return self.instance.media_new(final_url)
+
     def _load_vlc_url(
         self,
         final_url: str,
@@ -1539,7 +1570,7 @@ class PlayerFrame(wx.Frame):
                 self._last_vlc_http_headers = dict(http_headers or {})
         except Exception:
             pass
-        media = self.instance.media_new(final_url)
+        media = self._new_vlc_media(final_url)
         try:
             effective_headers = dict(getattr(self, "_last_vlc_http_headers", None) or {})
             ua_value = (

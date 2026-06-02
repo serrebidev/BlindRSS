@@ -157,6 +157,9 @@ DEFAULT_CONFIG = {
     "downloads_enabled": False,
     "download_path": os.path.join(APP_DIR, "podcasts"),
     "download_retention": "Unlimited",
+    # Maps stable article/media fingerprints to locally downloaded episode files.
+    # This lets playback prefer a completed download when the network is offline.
+    "downloaded_media": {},
     "article_retention": "Unlimited",
     "persistent_searches": [],
     "show_search_field": True,

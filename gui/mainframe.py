@@ -8,8 +8,10 @@ import time
 import os
 import re
 import logging
+import hashlib
 from collections import deque
 from urllib.parse import urlsplit
+from urllib.request import url2pathname
 from bs4 import BeautifulSoup
 # from dateutil import parser as date_parser  # Removed unused import
 from .dialogs import (
@@ -5788,32 +5790,8 @@ class MainFrame(wx.Frame):
             return
 
         if self._should_play_in_player(article):
-            # Decision logic for which URL to play
-            media_url = getattr(article, "media_url", None)
-            media_type = (getattr(article, "media_type", None) or "").lower()
-            use_ytdlp = media_type == "video/youtube"
-
-            is_direct_media = False
-            try:
-                if media_url:
-                    if utils.media_type_is_audio_video_or_podcast(media_type):
-                        is_direct_media = True
-                    else:
-                        media_path = urlsplit(str(media_url)).path.lower()
-                        if media_path.endswith(
-                            (".mp3", ".m4a", ".m4b", ".aac", ".ogg", ".opus", ".wav", ".flac", ".mp4", ".m4v", ".webm", ".mkv", ".mov")
-                        ):
-                            is_direct_media = True
-            except Exception:
-                is_direct_media = False
-
+            media_url, use_ytdlp = self._playback_target_for_article(article)
             article_url = str(getattr(article, "url", "") or "").strip()
-            if article_url and core.discovery.is_ytdlp_supported(article_url):
-                if use_ytdlp or (not media_url) or (not is_direct_media):
-                    media_url = article_url
-                    use_ytdlp = True
-            elif not media_url and article_url:
-                media_url = article_url
 
             if not media_url:
                 if article_url:
@@ -5910,6 +5888,12 @@ class MainFrame(wx.Frame):
 
     def _should_play_in_player(self, article):
         """Only treat bona-fide podcast/media items as playable; everything else opens in browser."""
+        try:
+            local_resolver = getattr(self, "_downloaded_media_path_for_article", None)
+            if callable(local_resolver) and local_resolver(article):
+                return True
+        except Exception:
+            pass
         
         # 1. Check main URL for yt-dlp compatibility first (high priority)
         # This covers YouTube, Twitch, etc. even if they have thumbnail enclosures.
@@ -5939,6 +5923,230 @@ class MainFrame(wx.Frame):
                 return True
 
         return False
+
+    def _playback_target_for_article(self, article):
+        """Return (url_or_path, use_ytdlp), preferring a completed local download."""
+        if not article:
+            return None, False
+
+        local_path = self._downloaded_media_path_for_article(article)
+        if local_path:
+            return local_path, False
+
+        media_url = getattr(article, "media_url", None)
+        media_type = (getattr(article, "media_type", None) or "").lower()
+        use_ytdlp = media_type == "video/youtube"
+
+        is_direct_media = False
+        try:
+            if media_url:
+                if utils.media_type_is_audio_video_or_podcast(media_type):
+                    is_direct_media = True
+                else:
+                    media_path = urlsplit(str(media_url)).path.lower()
+                    if media_path.endswith(
+                        (".mp3", ".m4a", ".m4b", ".aac", ".ogg", ".opus", ".wav", ".flac", ".mp4", ".m4v", ".webm", ".mkv", ".mov")
+                    ):
+                        is_direct_media = True
+        except Exception:
+            is_direct_media = False
+
+        article_url = str(getattr(article, "url", "") or "").strip()
+        if article_url and core.discovery.is_ytdlp_supported(article_url):
+            if use_ytdlp or (not media_url) or (not is_direct_media):
+                media_url = article_url
+                use_ytdlp = True
+        elif not media_url and article_url:
+            media_url = article_url
+
+        return media_url, use_ytdlp
+
+    def _download_index(self) -> dict:
+        try:
+            raw = self.config_manager.get("downloaded_media", {})
+        except Exception:
+            raw = {}
+        return raw if isinstance(raw, dict) else {}
+
+    def _download_provider_name(self) -> str:
+        try:
+            if getattr(self, "provider", None) and hasattr(self.provider, "get_name"):
+                name = self.provider.get_name()
+                if name:
+                    return str(name)
+        except Exception:
+            pass
+        try:
+            name = self.config_manager.get("active_provider", "")
+            if name:
+                return str(name)
+        except Exception:
+            pass
+        return ""
+
+    def _download_index_key(self, kind: str, value: str) -> str | None:
+        value = str(value or "").strip()
+        if not value:
+            return None
+        digest = hashlib.sha256(value.encode("utf-8", errors="ignore")).hexdigest()
+        return f"{kind}:{digest}"
+
+    def _download_index_keys(self, article) -> list[str]:
+        if not article:
+            return []
+        provider_name = self._download_provider_name()
+        feed_id = str(getattr(article, "feed_id", "") or "")
+        values = []
+        try:
+            cache_id = self._article_cache_id(article)
+        except Exception:
+            cache_id = getattr(article, "cache_id", None) or getattr(article, "id", None)
+        if cache_id:
+            values.append(("article", f"{provider_name}|{cache_id}"))
+        article_id = getattr(article, "id", None)
+        if article_id:
+            values.append(("article-id", f"{provider_name}|{feed_id}|{article_id}"))
+        media_url = str(getattr(article, "media_url", "") or "").strip()
+        if media_url:
+            values.append(("media", media_url))
+        article_url = str(getattr(article, "url", "") or "").strip()
+        if article_url:
+            values.append(("url", article_url))
+
+        keys = []
+        seen = set()
+        for kind, value in values:
+            key = self._download_index_key(kind, value)
+            if key and key not in seen:
+                seen.add(key)
+                keys.append(key)
+        return keys
+
+    def _coerce_existing_local_media_path(self, value) -> str | None:
+        raw = str(value or "").strip()
+        if not raw:
+            return None
+        path = raw
+        try:
+            drive, _tail = os.path.splitdrive(raw)
+            if not drive and not raw.startswith(("\\\\", "//")):
+                parts = urlsplit(raw)
+                scheme = (parts.scheme or "").lower()
+                if scheme == "file":
+                    path = url2pathname(parts.path or "")
+                    if parts.netloc:
+                        path = os.path.join(f"//{parts.netloc}", path.lstrip("/\\"))
+                elif scheme:
+                    return None
+        except Exception:
+            path = raw
+        try:
+            path = os.path.abspath(os.path.expanduser(path))
+        except Exception:
+            path = raw
+        try:
+            if os.path.isfile(path):
+                return path
+        except Exception:
+            pass
+        return None
+
+    def _download_entry_path(self, entry) -> str | None:
+        if isinstance(entry, dict):
+            entry = entry.get("path")
+        return self._coerce_existing_local_media_path(entry)
+
+    def _downloaded_media_path_for_article(self, article) -> str | None:
+        """Return a completed local download for this article, if one exists."""
+        if not article:
+            return None
+
+        for direct in (
+            getattr(article, "local_media_path", None),
+            getattr(article, "download_path", None),
+            getattr(article, "media_url", None),
+        ):
+            path = self._coerce_existing_local_media_path(direct)
+            if path:
+                return path
+
+        index = self._download_index()
+        if index:
+            stale_keys = []
+            for key in self._download_index_keys(article):
+                if key not in index:
+                    continue
+                path = self._download_entry_path(index.get(key))
+                if path:
+                    return path
+                stale_keys.append(key)
+
+            if stale_keys:
+                cleaned = dict(index)
+                changed = False
+                for key in stale_keys:
+                    if key in cleaned:
+                        cleaned.pop(key, None)
+                        changed = True
+                if changed:
+                    try:
+                        self.config_manager.set("downloaded_media", cleaned)
+                    except Exception:
+                        pass
+
+        legacy_path = self._find_legacy_downloaded_media_path(article)
+        if legacy_path:
+            self._record_article_download(article, legacy_path)
+            return legacy_path
+        return None
+
+    def _record_article_download(self, article, local_path: str) -> str | None:
+        path = self._coerce_existing_local_media_path(local_path)
+        if not article or not path:
+            return None
+
+        entry = {
+            "path": path,
+            "title": str(getattr(article, "title", "") or ""),
+            "feed_id": str(getattr(article, "feed_id", "") or ""),
+            "article_id": str(getattr(article, "id", "") or ""),
+            "media_url": str(getattr(article, "media_url", "") or ""),
+            "url": str(getattr(article, "url", "") or ""),
+            "updated_at": int(time.time()),
+        }
+        try:
+            index = dict(self._download_index())
+            for key in self._download_index_keys(article):
+                index[key] = dict(entry)
+            self.config_manager.set("downloaded_media", index)
+        except Exception:
+            log.exception("Failed to record downloaded media path")
+
+        try:
+            article.local_media_path = path
+        except Exception:
+            pass
+        try:
+            self._sync_download_path_in_cached_views(article, path)
+        except Exception:
+            pass
+        return path
+
+    def _sync_download_path_in_cached_views(self, article, local_path: str) -> None:
+        article_id = self._article_cache_id(article)
+        if not article_id:
+            return
+        try:
+            with getattr(self, "_view_cache_lock", threading.Lock()):
+                for st in (self.view_cache or {}).values():
+                    for cached in (st.get("articles") or []):
+                        if self._article_cache_id(cached) == article_id:
+                            try:
+                                cached.local_media_path = local_path
+                            except Exception:
+                                pass
+        except Exception:
+            log.exception("Error syncing download path in cached views")
 
     def on_download_article(self, article):
         if not article or not getattr(article, "media_url", None):
@@ -5970,14 +6178,44 @@ class MainFrame(wx.Frame):
                 pass
         return None
 
-    def _download_dir_for_article(self, article):
+    def _download_dir_for_article(self, article, create: bool = True, allow_provider_lookup: bool = True):
         download_root = self.config_manager.get("download_path", os.path.join(APP_DIR, "podcasts"))
         if not download_root:
             download_root = os.path.join(APP_DIR, "podcasts")
-        feed_title = self._get_feed_title(article.feed_id) or "Feed"
+        feed_title = None
+        if allow_provider_lookup:
+            feed_title = self._get_feed_title(article.feed_id)
+        else:
+            try:
+                feed = self.feed_map.get(article.feed_id) if hasattr(self, "feed_map") else None
+                feed_title = getattr(feed, "title", None)
+            except Exception:
+                feed_title = None
+        feed_title = feed_title or "Feed"
         target_dir = os.path.join(download_root, self._safe_name(feed_title))
-        os.makedirs(target_dir, exist_ok=True)
+        if create:
+            os.makedirs(target_dir, exist_ok=True)
         return target_dir
+
+    def _find_legacy_downloaded_media_path(self, article) -> str | None:
+        """Find downloads written before BlindRSS tracked local media paths."""
+        if not article:
+            return None
+        try:
+            target_dir = self._download_dir_for_article(
+                article,
+                create=False,
+                allow_provider_lookup=False,
+            )
+        except Exception:
+            return None
+        if not target_dir or not os.path.isdir(target_dir):
+            return None
+        try:
+            base_name = self._safe_name(getattr(article, "title", "") or "") or "episode"
+            return self._find_downloaded_file(target_dir, base_name)
+        except Exception:
+            return None
 
     def _download_article_via_ytdlp(self, article, url):
         """Download a yt-dlp-supported item, merging audio+video into one file."""
@@ -6058,6 +6296,8 @@ class MainFrame(wx.Frame):
 
             if int(getattr(res, "returncode", -1) or 0) == 0:
                 produced = self._find_downloaded_file(target_dir, base_name)
+                if produced:
+                    self._record_article_download(article, produced)
                 self._apply_download_retention(target_dir)
                 dest = produced or target_dir
                 wx.CallAfter(lambda d=dest: wx.MessageBox(f"Downloaded to:\n{d}", "Download complete"))
@@ -6108,6 +6348,7 @@ class MainFrame(wx.Frame):
                     if chunk:
                         f.write(chunk)
 
+            self._record_article_download(article, target_path)
             self._apply_download_retention(target_dir)
             wx.CallAfter(lambda: wx.MessageBox(f"Downloaded to:\n{target_path}", "Download complete"))
         except Exception as e:
