@@ -6236,7 +6236,10 @@ class MainFrame(wx.Frame):
             "--geo-bypass",
             "--extractor-args", core.discovery.youtube_player_client_arg(),
             "-f", "bv*+ba/b",
-            "--merge-output-format", "mp4",
+            # Prefer MP4, but let yt-dlp use MKV when the selected video/audio
+            # codecs cannot be safely muxed into MP4. Forcing MP4 can make
+            # ffmpeg fail on common YouTube AV1/Opus downloads.
+            "--merge-output-format", "mp4/mkv",
             "-o", out_template,
         ]
         try:
@@ -6268,41 +6271,54 @@ class MainFrame(wx.Frame):
                 startupinfo = None
 
         last_err = "yt-dlp download failed"
+        timed_out = False
         for extra in attempts:
-            try:
-                res = subprocess.run(
-                    base_cmd + extra + [url],
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    stdin=subprocess.DEVNULL,
-                    creationflags=creationflags,
-                    startupinfo=startupinfo,
-                    timeout=1800,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                )
-            except FileNotFoundError:
-                wx.CallAfter(lambda: wx.MessageBox(
-                    "yt-dlp is not installed. Install it via Settings to download YouTube items.",
-                    "Download error", wx.ICON_ERROR))
-                return
-            except subprocess.TimeoutExpired:
-                last_err = "yt-dlp download timed out"
-                break
-            except Exception as e:
-                last_err = str(e)
-                continue
+            merge_formats = ("mp4/mkv", "mkv")
+            for merge_format in merge_formats:
+                cmd = list(base_cmd)
+                cmd[cmd.index("--merge-output-format") + 1] = merge_format
+                try:
+                    res = subprocess.run(
+                        cmd + extra + [url],
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        stdin=subprocess.DEVNULL,
+                        creationflags=creationflags,
+                        startupinfo=startupinfo,
+                        timeout=1800,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                    )
+                except FileNotFoundError:
+                    wx.CallAfter(lambda: wx.MessageBox(
+                        "yt-dlp is not installed. Install it via Settings to download YouTube items.",
+                        "Download error", wx.ICON_ERROR))
+                    return
+                except subprocess.TimeoutExpired:
+                    last_err = "yt-dlp download timed out"
+                    timed_out = True
+                    break
+                except Exception as e:
+                    last_err = str(e)
+                    break
 
-            if int(getattr(res, "returncode", -1) or 0) == 0:
-                produced = self._find_downloaded_file(target_dir, base_name)
-                if produced:
-                    self._record_article_download(article, produced)
-                self._apply_download_retention(target_dir)
-                dest = produced or target_dir
-                wx.CallAfter(lambda d=dest: wx.MessageBox(f"Downloaded to:\n{d}", "Download complete"))
-                return
-            last_err = (res.stderr or res.stdout or last_err).strip() or last_err
+                if int(getattr(res, "returncode", -1) or 0) == 0:
+                    produced = self._find_downloaded_file(target_dir, base_name)
+                    if produced:
+                        self._record_article_download(article, produced)
+                    self._apply_download_retention(target_dir)
+                    dest = produced or target_dir
+                    wx.CallAfter(lambda d=dest: wx.MessageBox(f"Downloaded to:\n{d}", "Download complete"))
+                    return
+
+                last_err = (res.stderr or res.stdout or last_err).strip() or last_err
+                if merge_format == "mp4/mkv" and "conversion failed" in last_err.lower():
+                    log.info("yt-dlp MP4-preferred merge failed; retrying download as MKV")
+                    continue
+                break
+            if timed_out:
+                break
 
         wx.CallAfter(lambda e=last_err: wx.MessageBox(f"Download failed: {e}", "Download error", wx.ICON_ERROR))
 
@@ -6311,7 +6327,11 @@ class MainFrame(wx.Frame):
             matches = [
                 os.path.join(target_dir, n)
                 for n in os.listdir(target_dir)
-                if n.startswith(base_name) and not n.endswith((".part", ".ytdl", ".tmp"))
+                if (
+                    n.startswith(base_name)
+                    and ".temp." not in n.lower()
+                    and not n.endswith((".part", ".ytdl", ".tmp"))
+                )
             ]
             if matches:
                 return max(matches, key=os.path.getmtime)

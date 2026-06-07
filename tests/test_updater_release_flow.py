@@ -76,8 +76,9 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
 
         with patch("core.updater.APP_VERSION", "1.0.0"):
             with patch("core.updater._fetch_latest_release", return_value=(release, None)):
-                with patch("core.updater._download_json", return_value=(manifest, None)) as download_json:
-                    result = updater.check_for_updates()
+                with patch("core.updater.current_platform", return_value="windows"):
+                    with patch("core.updater._download_json", return_value=(manifest, None)) as download_json:
+                        result = updater.check_for_updates()
 
         self.assertEqual(result.status, "update_available")
         self.assertIsNotNone(result.info)

@@ -1,4 +1,6 @@
 import os
+import platform
+import subprocess
 import sys
 import threading
 from types import SimpleNamespace
@@ -136,3 +138,90 @@ def test_player_uses_vlc_path_api_for_local_download(tmp_path):
 
     assert frame._new_vlc_media(str(local_file)) == "path-media"
     assert calls == [("path", str(local_file))]
+
+
+def test_ytdlp_download_allows_mkv_when_youtube_codecs_are_not_mp4_compatible(tmp_path, monkeypatch):
+    host = _host(tmp_path)
+    article = _article(title="YouTube Video")
+    article.url = "https://www.youtube.com/watch?v=s-59p7kUAaE"
+    article.media_url = article.url
+    article.media_type = "video/youtube"
+    messages = []
+    commands = []
+
+    monkeypatch.setattr(
+        mainframe,
+        "wx",
+        SimpleNamespace(
+            CallAfter=lambda fn, *args, **kwargs: fn(*args, **kwargs),
+            MessageBox=lambda *args, **kwargs: messages.append(args),
+            ICON_ERROR=1,
+        ),
+    )
+    monkeypatch.setattr(mainframe.core.discovery, "_resolve_ytdlp_cli_path", lambda: "/tmp/yt-dlp")
+    monkeypatch.setattr(mainframe.core.discovery, "get_ytdlp_cookie_sources", lambda _url: [])
+    monkeypatch.setattr(mainframe.dependency_check, "_find_executable_path", lambda _name: "/tmp/ffmpeg")
+    monkeypatch.setattr(platform, "system", lambda: "Darwin")
+
+    def fake_run(cmd, **_kwargs):
+        commands.append(cmd)
+        merge_index = cmd.index("--merge-output-format")
+        assert cmd[merge_index + 1] == "mp4/mkv"
+        assert _kwargs["creationflags"] == 0
+        assert _kwargs["startupinfo"] is None
+        target_dir = host._download_dir_for_article(article)
+        with open(os.path.join(target_dir, "YouTube Video.mkv"), "wb") as f:
+            f.write(b"merged-video")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    host._download_article_via_ytdlp(article, article.url)
+
+    assert commands
+    assert host._downloaded_media_path_for_article(article).endswith("YouTube Video.mkv")
+    assert messages and messages[-1][1] == "Download complete"
+
+
+def test_ytdlp_download_retries_conversion_failure_as_mkv(tmp_path, monkeypatch):
+    host = _host(tmp_path)
+    article = _article(title="YouTube Video")
+    article.url = "https://www.youtube.com/watch?v=s-59p7kUAaE"
+    article.media_url = article.url
+    article.media_type = "video/youtube"
+    messages = []
+    merge_formats = []
+
+    monkeypatch.setattr(
+        mainframe,
+        "wx",
+        SimpleNamespace(
+            CallAfter=lambda fn, *args, **kwargs: fn(*args, **kwargs),
+            MessageBox=lambda *args, **kwargs: messages.append(args),
+            ICON_ERROR=1,
+        ),
+    )
+    monkeypatch.setattr(mainframe.core.discovery, "_resolve_ytdlp_cli_path", lambda: "/tmp/yt-dlp")
+    monkeypatch.setattr(mainframe.core.discovery, "get_ytdlp_cookie_sources", lambda _url: [])
+    monkeypatch.setattr(mainframe.dependency_check, "_find_executable_path", lambda _name: "/tmp/ffmpeg")
+
+    def fake_run(cmd, **_kwargs):
+        merge_format = cmd[cmd.index("--merge-output-format") + 1]
+        merge_formats.append(merge_format)
+        if merge_format == "mp4/mkv":
+            target_dir = host._download_dir_for_article(article)
+            with open(os.path.join(target_dir, "YouTube Video.temp.mp4"), "wb") as f:
+                f.write(b"failed-merge")
+            return SimpleNamespace(returncode=1, stdout="", stderr="ERROR: Postprocessing: Conversion failed!")
+        target_dir = host._download_dir_for_article(article)
+        with open(os.path.join(target_dir, "YouTube Video.mkv"), "wb") as f:
+            f.write(b"merged-video")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    host._download_article_via_ytdlp(article, article.url)
+
+    assert merge_formats == ["mp4/mkv", "mkv"]
+    assert host._downloaded_media_path_for_article(article).endswith("YouTube Video.mkv")
+    assert messages and messages[-1][1] == "Download complete"

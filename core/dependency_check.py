@@ -4,6 +4,7 @@ import importlib.metadata
 import shutil
 import platform
 import os
+import ntpath
 import glob
 import ctypes
 import time
@@ -699,6 +700,17 @@ def _find_executable_path(exe_name, extra_dirs=None):
         if exe and os.path.isfile(exe):
             return exe
 
+    # 3. Frozen app bundles carry their own media tools. Prefer those ordered
+    # runtime roots over the unordered generic candidate set when PATH lookup
+    # is unavailable or has been stripped by the launcher.
+    if getattr(sys, "frozen", False):
+        for root in _runtime_search_roots():
+            for d in (root, os.path.join(root, "bin")):
+                for exe_file in exe_candidates:
+                    exe_path = os.path.join(d, exe_file)
+                    if os.path.isfile(exe_path):
+                        return exe_path
+
     if system_name == "windows":
         try:
             res = subprocess.run(
@@ -1023,7 +1035,9 @@ def detect_media_tool_paths(validate=True, tools=("ffmpeg", "ffprobe", "yt-dlp")
         except Exception:
             path = None
         if canon == "ffmpeg" and path:
-            ffmpeg_dir = os.path.dirname(path)
+            # ntpath handles a configured Windows path even when this helper is
+            # exercised from a non-Windows host (for example, cross-platform tests).
+            ffmpeg_dir = os.path.dirname(path) or ntpath.dirname(path)
         valid = None
         if path and validate:
             valid = _validate_executable(path, tool=tool)

@@ -53,6 +53,7 @@ def test_media_dependency_prompt_can_be_disabled(monkeypatch):
 def test_media_dependency_prompt_still_shows_when_enabled(monkeypatch):
     host = _DummyMainFrame(prompt_enabled=True)
     captured = {}
+    monkeypatch.setattr(mainframe.sys, "platform", "win32")
 
     monkeypatch.setattr(
         mainframe.dependency_check,

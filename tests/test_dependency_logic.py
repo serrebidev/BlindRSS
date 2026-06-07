@@ -12,6 +12,9 @@ import core.dependency_check as dep_check
 class TestDependencyLogic(unittest.TestCase):
     def setUp(self):
         dep_check._log = MagicMock()
+        self._original_path = os.environ.get("PATH")
+        self._original_user_tool_paths = dict(dep_check._USER_TOOL_PATHS)
+        dep_check.set_user_tool_paths({})
         # Create a fresh MagicMock for winreg each test and patch it into
         # dep_check directly.  When the full suite runs, other test files may
         # import core.dependency_check before our sys.modules override takes
@@ -28,6 +31,11 @@ class TestDependencyLogic(unittest.TestCase):
 
     def tearDown(self):
         self._winreg_patcher.stop()
+        dep_check.set_user_tool_paths(self._original_user_tool_paths)
+        if self._original_path is None:
+            os.environ.pop("PATH", None)
+        else:
+            os.environ["PATH"] = self._original_path
     
     @patch('core.dependency_check.platform.system', return_value='windows')
     def test_add_bin_to_user_path_append(self, mock_platform):
