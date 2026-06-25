@@ -112,6 +112,14 @@ rem Robocopy exit codes: 0=No Change, 1=Copy Successful, >1=Warning/Error.
 rem We accept <= 3 usually (1=copy, 2=extra, 3=both). 
 rem However, for /MOVE, we want to ensure it worked.
 
+rem A freshly-exited app can leave a runtime DLL (e.g. _internal\VCRUNTIME140.dll)
+rem briefly locked by Defender/Search-indexing, so robocopy /MOVE copies it but
+rem cannot delete the source ("Access is denied"). robocopy /R retries copies, not
+rem the /MOVE source-delete, so retry the whole move a few times with a short settle
+rem before treating leftover files as a hard failure.
+set "BACKUP_ATTEMPTS=0"
+:backup_move_attempt
+set /a BACKUP_ATTEMPTS+=1
 robocopy "%INSTALL_DIR%" "%BACKUP_DIR%" /E /MOVE /R:10 /W:3 /NFL /NDL /XD .git .venv __pycache__
 set RC=%ERRORLEVEL%
 if %RC% gtr 8 (
@@ -119,10 +127,15 @@ if %RC% gtr 8 (
     goto :rollback
 )
 call :verify_install_drained
-if errorlevel 1 (
-    echo [X] Backup did not fully move the current install.
+if not errorlevel 1 goto :backup_drained
+if %BACKUP_ATTEMPTS% geq 5 (
+    echo [X] Backup did not fully move the current install after %BACKUP_ATTEMPTS% attempts.
     goto :rollback
 )
+echo [BlindRSS Update] Install folder not fully drained; waiting for locks to clear, then retrying move (attempt %BACKUP_ATTEMPTS%)...
+powershell -NoProfile -InputFormat None -Command "Start-Sleep -Seconds 2" >nul 2>nul
+goto :backup_move_attempt
+:backup_drained
 
 echo [BlindRSS Update] Applying update...
 robocopy "%STAGING_DIR%" "%INSTALL_DIR%" /E /MOVE /R:10 /W:3 /NFL /NDL

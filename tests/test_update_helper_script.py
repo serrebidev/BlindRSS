@@ -62,3 +62,21 @@ def test_successful_update_exits_without_modal_ready_prompt():
 
     assert 'wx.MessageBox(msg, "Update Ready"' not in text
     assert "wx.CallAfter(self.real_close)" in text
+
+
+def test_update_helper_retries_backup_move_on_transient_lock():
+    text = _helper_text()
+
+    # A runtime DLL transiently locked by AV/indexing must not fail the whole
+    # update on the first robocopy /MOVE: the helper retries the move with a
+    # settle, and only aborts after a bounded number of attempts.
+    assert ":backup_move_attempt" in text
+    assert ":backup_drained" in text
+    assert "retrying move (attempt" in text
+    assert "did not fully move the current install after" in text
+
+    # The retry loop still sits before the staged build is applied, so a partial
+    # backup can never be overwritten.
+    retry_label = text.index(":backup_move_attempt")
+    apply_move = text.index('robocopy "%STAGING_DIR%" "%INSTALL_DIR%"')
+    assert retry_label < apply_move
