@@ -6,6 +6,7 @@ import os
 import sqlite3
 import platform
 import logging
+import math
 import webbrowser
 import json
 import subprocess
@@ -47,6 +48,68 @@ _SEEKABLE_EXTENSIONS = (
 # Prefer AAC/M4A for broader compatibility with older/bundled VLC builds.
 # Fall back to the previous bestaudio behavior when M4A is unavailable.
 _YTDLP_VLC_AUDIO_FORMAT = "bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio/best"
+
+
+def _normalize_chapter_start(value) -> float:
+    try:
+        start = float(value or 0)
+    except (TypeError, ValueError, OverflowError):
+        return 0.0
+    if not math.isfinite(start) or start < 0:
+        return 0.0
+    return start
+
+
+def _format_chapter_timestamp(start_seconds) -> str:
+    total_seconds = int(_normalize_chapter_start(start_seconds))
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{seconds:02d}"
+    return f"{minutes:02d}:{seconds:02d}"
+
+
+def _chapter_index_for_position(chapters, position_ms) -> int:
+    try:
+        current_seconds = max(0.0, float(position_ms or 0) / 1000.0)
+    except (TypeError, ValueError, OverflowError):
+        current_seconds = 0.0
+    active = -1
+    for index, chapter in enumerate(chapters or []):
+        try:
+            start = _normalize_chapter_start(chapter.get("start", 0))
+        except AttributeError:
+            start = 0.0
+        if current_seconds < start:
+            break
+        active = index
+    return active
+
+
+def _validated_chapter_href(value) -> str | None:
+    try:
+        href = str(value or "").strip()
+    except Exception:
+        return None
+    if (
+        not href
+        or "\\" in href
+        or any(char.isspace() or ord(char) == 127 for char in href)
+    ):
+        return None
+    try:
+        parsed = urlparse(href)
+        if (
+            parsed.scheme.lower() not in ("http", "https")
+            or not parsed.hostname
+            or parsed.username is not None
+            or parsed.password is not None
+        ):
+            return None
+        _ = parsed.port
+    except (TypeError, ValueError):
+        return None
+    return href
 
 
 def _is_googlevideo_url(url: str | None) -> bool:
@@ -385,6 +448,7 @@ class PlayerFrame(wx.Frame):
         self._chapter_last_commit_idx = None
         self._chapter_last_commit_ts = 0.0
         self._chapter_menu_show_item = None
+        self._chapter_menu_open_link_item = None
         self._chapter_menu_prev_item = None
         self._chapter_menu_next_item = None
         self.current_url = None
@@ -676,6 +740,19 @@ class PlayerFrame(wx.Frame):
         Best-effort current position in ms, favoring recent seek targets and
         UI-tracked position with elapsed time when playing.
         """
+        if bool(getattr(self, "is_casting", False)):
+            try:
+                base = max(0, int(getattr(self, "_cast_last_pos_ms", 0) or 0))
+            except Exception:
+                base = 0
+            try:
+                dur = int(getattr(self, "duration", 0) or 0)
+                if dur > 0 and base > dur:
+                    base = dur
+            except Exception:
+                pass
+            return int(base)
+
         now = time.monotonic()
         try:
             tgt = getattr(self, "_seek_target_ms", None)
@@ -1705,9 +1782,9 @@ class PlayerFrame(wx.Frame):
         # Time Labels
         time_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.current_time_lbl = wx.StaticText(panel, label="00:00")
-        self.current_time_lbl.SetName("Elapsed Time")
+        self.current_time_lbl.SetName("Elapsed Time: 00:00")
         self.total_time_lbl = wx.StaticText(panel, label="00:00")
-        self.total_time_lbl.SetName("Total Time")
+        self.total_time_lbl.SetName("Total Time: 00:00")
         time_sizer.Add(self.current_time_lbl, 0, wx.LEFT, 5)
         time_sizer.AddStretchSpacer()
         time_sizer.Add(self.total_time_lbl, 0, wx.RIGHT, 5)
@@ -1768,7 +1845,7 @@ class PlayerFrame(wx.Frame):
         self.volume_slider.Bind(wx.EVT_SCROLL_CHANGED, self.on_volume_slider)
         volume_sizer.Add(self.volume_slider, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
         self.volume_value_lbl = wx.StaticText(panel, label=f"{int(getattr(self, 'volume', 100))}%")
-        self.volume_value_lbl.SetName("Volume Level")
+        self.volume_value_lbl.SetName(f"Volume Level: {int(getattr(self, 'volume', 100))}%")
         volume_sizer.Add(self.volume_value_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         sizer.Add(volume_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
         
@@ -1794,6 +1871,11 @@ class PlayerFrame(wx.Frame):
             chapters_menu = wx.Menu()
 
             self._chapter_menu_show_item = chapters_menu.Append(wx.ID_ANY, "Show &Chapters\tCtrl+M")
+            self._chapter_menu_open_link_item = chapters_menu.Append(
+                wx.ID_ANY,
+                "Open Chapter &Link\tCtrl+Shift+L",
+            )
+            chapters_menu.AppendSeparator()
             self._chapter_menu_prev_item = chapters_menu.Append(wx.ID_ANY, "&Previous Chapter\tCtrl+Shift+Left")
             self._chapter_menu_next_item = chapters_menu.Append(wx.ID_ANY, "&Next Chapter\tCtrl+Shift+Right")
 
@@ -1801,6 +1883,7 @@ class PlayerFrame(wx.Frame):
             self.SetMenuBar(menubar)
 
             self.Bind(wx.EVT_MENU, self.on_show_chapters_menu, self._chapter_menu_show_item)
+            self.Bind(wx.EVT_MENU, self.on_open_chapter_link, self._chapter_menu_open_link_item)
             self.Bind(wx.EVT_MENU, self.on_prev_chapter, self._chapter_menu_prev_item)
             self.Bind(wx.EVT_MENU, self.on_next_chapter, self._chapter_menu_next_item)
         except Exception:
@@ -1809,54 +1892,99 @@ class PlayerFrame(wx.Frame):
             self._refresh_chapter_controls_state()
 
     def _refresh_chapter_controls_state(self) -> None:
-        has_chapters = bool(getattr(self, "current_chapters", None))
+        chapters = list(getattr(self, "current_chapters", []) or [])
+        active_idx = self._active_chapter_index() if chapters else -1
+        link_idx = self._chapter_link_action_index()
+        has_link = self._chapter_href_at_index(link_idx) is not None
+        try:
+            item = getattr(self, "_chapter_menu_open_link_item", None)
+            if item is not None:
+                item.Enable(bool(has_link))
+        except Exception:
+            pass
         try:
             item = getattr(self, "_chapter_menu_prev_item", None)
             if item is not None:
-                item.Enable(bool(has_chapters))
+                item.Enable(bool(active_idx > 0))
         except Exception:
             pass
         try:
             item = getattr(self, "_chapter_menu_next_item", None)
             if item is not None:
-                item.Enable(bool(has_chapters))
+                item.Enable(bool(chapters and active_idx < (len(chapters) - 1)))
         except Exception:
             pass
 
     def _active_chapter_index(self) -> int:
         try:
-            idx = int(self.chapter_choice.GetSelection())
-            if idx != wx.NOT_FOUND:
-                return int(idx)
-        except Exception:
-            pass
-
-        try:
             chapters = list(getattr(self, "current_chapters", []) or [])
             if not chapters:
                 return -1
-            cur_sec = float(self._current_position_ms()) / 1000.0
-            active = -1
-            for i, ch in enumerate(chapters):
-                if cur_sec >= float(ch.get("start", 0) or 0):
-                    active = i
-                else:
-                    break
-            return int(active)
+            return _chapter_index_for_position(chapters, self._current_position_ms())
         except Exception:
             return -1
 
     def _format_chapter_menu_label(self, chapter: dict) -> str:
+        timestamp = _format_chapter_timestamp(chapter.get("start", 0))
+        title = str(chapter.get("title", "") or "").strip() or f"Chapter at {timestamp}"
+        return f"{timestamp}  {title}"
+
+    def _chapter_link_action_index(self) -> int:
         try:
-            start = float(chapter.get("start", 0) or 0)
+            selected_idx = int(self.chapter_choice.GetSelection())
+            if 0 <= selected_idx < len(getattr(self, "current_chapters", []) or []):
+                return selected_idx
         except Exception:
-            start = 0.0
-        if start < 0:
-            start = 0.0
-        mins = int(start // 60)
-        secs = int(start % 60)
-        title = str(chapter.get("title", "") or "").strip() or f"Chapter {mins:02d}:{secs:02d}"
-        return f"{mins:02d}:{secs:02d}  {title}"
+            pass
+        return self._active_chapter_index()
+
+    def _chapter_href_at_index(self, idx: int) -> str | None:
+        try:
+            chapters = list(getattr(self, "current_chapters", []) or [])
+            if 0 <= int(idx) < len(chapters):
+                return _validated_chapter_href(chapters[int(idx)].get("href"))
+        except (AttributeError, TypeError, ValueError):
+            pass
+        return None
+
+    def _open_chapter_link_at_index(self, idx: int) -> bool:
+        href = self._chapter_href_at_index(idx)
+        if href is None:
+            try:
+                self._set_status("Chapter link unavailable")
+            except Exception:
+                pass
+            return False
+        try:
+            opened = webbrowser.open(href, new=2)
+        except Exception:
+            log.exception("Failed to open chapter link")
+            opened = False
+        if opened is False:
+            try:
+                self._set_status("Could not open chapter link")
+            except Exception:
+                pass
+            return False
+        return True
+
+    def _update_chapter_accessibility_label(self, active_idx: int | None = None) -> None:
+        try:
+            chapters = list(getattr(self, "current_chapters", []) or [])
+            if not chapters:
+                self.chapter_choice.SetName("Chapters, none available")
+                return
+            if active_idx is None:
+                active_idx = self._active_chapter_index()
+            if 0 <= int(active_idx) < len(chapters):
+                current = self._format_chapter_menu_label(chapters[int(active_idx)])
+                self.chapter_choice.SetName(
+                    f"Chapters, {len(chapters)} available, current chapter {current}"
+                )
+            else:
+                self.chapter_choice.SetName(f"Chapters, {len(chapters)} available")
+        except Exception:
+            pass
 
     def _jump_to_chapter_index(self, idx: int) -> None:
         try:
@@ -1877,6 +2005,10 @@ class PlayerFrame(wx.Frame):
             pass
         self._chapter_pending_idx = int(target_idx)
         self._commit_chapter_selection()
+        try:
+            self._refresh_chapter_controls_state()
+        except Exception:
+            pass
 
     def _show_chapters_popup_menu(self) -> None:
         menu = wx.Menu()
@@ -1887,6 +2019,18 @@ class PlayerFrame(wx.Frame):
                 empty_item.Enable(False)
             else:
                 active_idx = self._active_chapter_index()
+                link_idx = self._chapter_link_action_index()
+                link_label = "Open Link for Selected Chapter"
+                if 0 <= link_idx < len(chapters):
+                    link_label = f"Open Link for {self._format_chapter_menu_label(chapters[link_idx])}"
+                link_item = menu.Append(wx.ID_ANY, link_label)
+                link_item.Enable(self._chapter_href_at_index(link_idx) is not None)
+                menu.Bind(
+                    wx.EVT_MENU,
+                    lambda evt, idx=link_idx: self._open_chapter_link_at_index(idx),
+                    link_item,
+                )
+                menu.AppendSeparator()
                 for i, ch in enumerate(chapters):
                     label = self._format_chapter_menu_label(ch)
                     if int(i) == int(active_idx):
@@ -1915,8 +2059,14 @@ class PlayerFrame(wx.Frame):
     def next_chapter(self) -> None:
         self.on_next_chapter(None)
 
+    def open_chapter_link(self) -> bool:
+        return self._open_chapter_link_at_index(self._chapter_link_action_index())
+
     def on_show_chapters_menu(self, event) -> None:
         self._show_chapters_popup_menu()
+
+    def on_open_chapter_link(self, event) -> None:
+        self.open_chapter_link()
 
     def on_prev_chapter(self, event) -> None:
         idx = self._active_chapter_index()
@@ -3382,8 +3532,7 @@ class PlayerFrame(wx.Frame):
                 http_headers=dict(ytdlp_headers or {}),
             )
 
-        if chapters:
-            self.update_chapters(chapters)
+        self.update_chapters(chapters, load_seq=load_seq)
 
     def load_media(self, url, use_ytdlp=False, chapters=None, title=None, article_id=None):
         if not self.is_casting:
@@ -3484,13 +3633,15 @@ class PlayerFrame(wx.Frame):
             pass
         
         self.slider.SetValue(0)
-        self.current_time_lbl.SetLabel("00:00")
-        self.total_time_lbl.SetLabel("00:00")
+        self._set_elapsed_time_label("00:00")
+        self._set_total_time_label("00:00")
         self.chapter_choice.Clear()
         self.chapter_choice.Disable()
+        self.current_chapters = []
         self._chapter_pending_idx = None
         self._chapter_last_commit_idx = None
         self._chapter_last_commit_ts = 0.0
+        self._update_chapter_accessibility_label()
         self._refresh_chapter_controls_state()
 
         try:
@@ -3717,25 +3868,43 @@ class PlayerFrame(wx.Frame):
         else:
             self.play()
 
-    def update_chapters(self, chapters):
-        self.current_chapters = chapters
+    def update_chapters(self, chapters, load_seq: int | None = None):
+        if load_seq is not None:
+            try:
+                if int(load_seq) != int(getattr(self, "_active_load_seq", 0) or 0):
+                    return False
+            except Exception:
+                return False
+
+        normalized = []
+        for chapter in chapters or []:
+            if not isinstance(chapter, dict):
+                continue
+            item = dict(chapter)
+            item["start"] = _normalize_chapter_start(item.get("start", 0))
+            normalized.append(item)
+        normalized.sort(key=lambda chapter: chapter["start"])
+
+        self.current_chapters = normalized
         self.chapter_choice.Clear()
         self._chapter_pending_idx = None
         self._chapter_last_commit_idx = None
         self._chapter_last_commit_ts = 0.0
-        if not chapters:
+        if not normalized:
             self.chapter_choice.Disable()
+            self._update_chapter_accessibility_label()
             self._refresh_chapter_controls_state()
-            return
+            return True
             
         self.chapter_choice.Enable()
-        for ch in chapters:
-            start = ch.get("start", 0)
-            mins = int(start // 60)
-            secs = int(start % 60)
-            title = ch.get("title", f"Chapter {start}")
-            self.chapter_choice.Append(f"{title} - {mins:02d}:{secs:02d}", ch)
+        for chapter in normalized:
+            self.chapter_choice.Append(self._format_chapter_menu_label(chapter), chapter)
+        active_idx = self._active_chapter_index()
+        if active_idx != wx.NOT_FOUND:
+            self.chapter_choice.SetSelection(int(active_idx))
+        self._update_chapter_accessibility_label(active_idx)
         self._refresh_chapter_controls_state()
+        return True
 
     def on_play_pause(self, event):
         self.toggle_play_pause()
@@ -3780,6 +3949,37 @@ class PlayerFrame(wx.Frame):
                             self._cast_last_pos_ms = val
             except Exception:
                 pass
+            cast_cur = self._current_position_ms()
+            try:
+                if not getattr(self, '_is_dragging_slider', False):
+                    self._set_elapsed_time_label(self._format_time(int(cast_cur)))
+            except Exception:
+                pass
+            try:
+                if getattr(self, 'duration', 0) and int(self.duration) > 0:
+                    if not getattr(self, '_is_dragging_slider', False):
+                        pos = int((float(cast_cur) / float(self.duration)) * 1000.0)
+                        if pos < 0:
+                            pos = 0
+                        if pos > 1000:
+                            pos = 1000
+                        self.slider.SetValue(int(pos))
+            except Exception:
+                pass
+            try:
+                if self.current_chapters:
+                    idx = _chapter_index_for_position(self.current_chapters, cast_cur)
+                    if idx != -1:
+                        try:
+                            if not self._is_focus_in_chapter_choice():
+                                if int(self.chapter_choice.GetSelection()) != int(idx):
+                                    self.chapter_choice.SetSelection(int(idx))
+                                    self._update_chapter_accessibility_label(idx)
+                        except Exception:
+                            pass
+                    self._refresh_chapter_controls_state()
+            except Exception:
+                pass
             try:
                 self._persist_playback_position(force=False)
             except Exception:
@@ -3791,7 +3991,7 @@ class PlayerFrame(wx.Frame):
             if length > 0 and length != int(getattr(self, 'duration', 0) or 0):
                 self.duration = int(length)
                 try:
-                    self.total_time_lbl.SetLabel(self._format_time(int(length)))
+                    self._set_total_time_label(self._format_time(int(length)))
                 except Exception:
                     pass
         except Exception:
@@ -4187,7 +4387,7 @@ class PlayerFrame(wx.Frame):
 
         try:
             if not getattr(self, '_is_dragging_slider', False):
-                self.current_time_lbl.SetLabel(self._format_time(int(ui_cur)))
+                self._set_elapsed_time_label(self._format_time(int(ui_cur)))
         except Exception:
             pass
 
@@ -4204,19 +4404,16 @@ class PlayerFrame(wx.Frame):
 
         try:
             if self.current_chapters:
-                cur_sec = float(ui_cur) / 1000.0
-                idx = -1
-                for i, ch in enumerate(self.current_chapters):
-                    if cur_sec >= float(ch.get("start", 0) or 0):
-                        idx = i
-                    else:
-                        break
+                idx = _chapter_index_for_position(self.current_chapters, ui_cur)
                 if idx != -1:
                     try:
                         if not self._is_focus_in_chapter_choice():
-                            self.chapter_choice.SetSelection(int(idx))
+                            if int(self.chapter_choice.GetSelection()) != int(idx):
+                                self.chapter_choice.SetSelection(int(idx))
+                                self._update_chapter_accessibility_label(idx)
                     except Exception:
                         pass
+                self._refresh_chapter_controls_state()
         except Exception:
             pass
 
@@ -4232,7 +4429,7 @@ class PlayerFrame(wx.Frame):
             val = self.slider.GetValue()
             if self.duration > 0:
                 ms = int((val / 1000.0) * self.duration)
-                self.current_time_lbl.SetLabel(self._format_time(ms))
+                self._set_elapsed_time_label(self._format_time(ms))
         except Exception:
             pass
         # Do not call Skip to prevent interference, but usually safe to skip.
@@ -4359,6 +4556,10 @@ class PlayerFrame(wx.Frame):
         except Exception:
             self._chapter_pending_idx = None
         try:
+            self._refresh_chapter_controls_state()
+        except Exception:
+            pass
+        try:
             has_closeup = bool(getattr(self, "_chapter_closeup_supported", False))
         except Exception:
             has_closeup = False
@@ -4423,16 +4624,24 @@ class PlayerFrame(wx.Frame):
         except Exception:
             data = {}
 
+        start_sec = _normalize_chapter_start(data.get("start", 0))
+        target_ms = int(start_sec * 1000.0)
         try:
-            start_sec = float(data.get("start", 0) or 0)
+            duration_ms = int(getattr(self, "duration", 0) or 0)
         except Exception:
-            start_sec = 0.0
-
-        if start_sec < 0:
-            start_sec = 0.0
+            duration_ms = 0
+        if duration_ms > 0:
+            target_ms = min(target_ms, duration_ms)
 
         if self.is_casting:
-            # TODO: map chapters to casting seek when supported.
+            try:
+                self._chapter_last_commit_idx = int(idx)
+                self._chapter_last_commit_ts = float(now_ts)
+                self._cast_last_pos_ms = int(target_ms)
+                self.casting_manager.seek(float(target_ms) / 1000.0)
+                self._update_chapter_accessibility_label(idx)
+            except Exception:
+                log.exception("Error seeking cast playback on chapter selection")
             return
         try:
             self._chapter_last_commit_idx = int(idx)
@@ -4445,19 +4654,35 @@ class PlayerFrame(wx.Frame):
         except Exception:
             log.exception("Error noting user seek on chapter selection")
         try:
-            self._apply_seek_time_ms(int(start_sec * 1000.0), force=True, reason="chapter")
+            self._apply_seek_time_ms(int(target_ms), force=True, reason="chapter")
         except Exception:
             log.exception("Error applying seek on chapter selection")
+        try:
+            self._update_chapter_accessibility_label(idx)
+        except Exception:
+            pass
         try:
             self._schedule_resume_save_after_seek(delay_ms=400)
         except Exception:
             log.exception("Error scheduling resume save after chapter selection")
 
     def _format_time(self, ms):
-        seconds = ms // 1000
-        mins = seconds // 60
-        secs = seconds % 60
-        return f"{mins:02d}:{secs:02d}"
+        try:
+            seconds = max(0.0, float(ms or 0) / 1000.0)
+        except (TypeError, ValueError, OverflowError):
+            seconds = 0.0
+        return _format_chapter_timestamp(seconds)
+
+    def _set_named_value_label(self, control, name: str, value: str) -> None:
+        text = str(value)
+        control.SetLabel(text)
+        control.SetName(f"{name}: {text}")
+
+    def _set_elapsed_time_label(self, value: str) -> None:
+        self._set_named_value_label(self.current_time_lbl, "Elapsed Time", value)
+
+    def _set_total_time_label(self, value: str) -> None:
+        self._set_named_value_label(self.total_time_lbl, "Total Time", value)
 
     # ---------------------------------------------------------------------
     # Media control helpers
@@ -4483,7 +4708,10 @@ class PlayerFrame(wx.Frame):
                 if int(self.volume_slider.GetValue()) != int(percent):
                     self.volume_slider.SetValue(int(percent))
             if getattr(self, "volume_value_lbl", None):
-                self.volume_value_lbl.SetLabel(f"{int(percent)}%")
+                value = f"{int(percent)}%"
+                self._set_named_value_label(self.volume_value_lbl, "Volume Level", value)
+            if getattr(self, "volume_slider", None):
+                self.volume_slider.SetName(f"Volume: {int(percent)}%")
         except Exception:
             pass
         finally:
@@ -4911,7 +5139,7 @@ class PlayerFrame(wx.Frame):
         try:
             # Only update label if we are not dragging (dragging updates it separately)
             if not getattr(self, '_is_dragging_slider', False):
-                self.current_time_lbl.SetLabel(self._format_time(target_i))
+                self._set_elapsed_time_label(self._format_time(target_i))
         except Exception:
             pass
 
@@ -5183,7 +5411,7 @@ class PlayerFrame(wx.Frame):
             if self.duration and self.duration > 0:
                 pos = max(0.0, min(1.0, float(target) / float(self.duration)))
                 self.slider.SetValue(int(pos * 1000))
-            self.current_time_lbl.SetLabel(self._format_time(int(target)))
+            self._set_elapsed_time_label(self._format_time(int(target)))
         except Exception:
             pass
 
@@ -5320,8 +5548,8 @@ class PlayerFrame(wx.Frame):
 
         try:
             self.slider.SetValue(0)
-            self.current_time_lbl.SetLabel("00:00")
-            self.total_time_lbl.SetLabel(self._format_time(self.duration) if self.duration else "00:00")
+            self._set_elapsed_time_label("00:00")
+            self._set_total_time_label(self._format_time(self.duration) if self.duration else "00:00")
         except Exception:
             pass
         self._stopped_needs_resume = True
@@ -5341,7 +5569,13 @@ class PlayerFrame(wx.Frame):
                 pass
 
         if event.ControlDown() and event.ShiftDown() and not event.AltDown() and not event.MetaDown():
-            if key == wx.WXK_LEFT:
+            if key in (ord("L"), ord("l")):
+                try:
+                    self.open_chapter_link()
+                    return
+                except Exception:
+                    pass
+            elif key == wx.WXK_LEFT:
                 try:
                     self.prev_chapter()
                     return

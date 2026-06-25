@@ -1,4 +1,5 @@
 import requests
+import hashlib
 import time
 import urllib.parse
 import logging
@@ -21,6 +22,15 @@ class TheOldReaderProvider(RSSProvider):
 
     def get_name(self) -> str:
         return "TheOldReader"
+
+    def _chapter_cache_key(self, article_id: str) -> str | None:
+        account = str(self.email or "").strip().lower()
+        identity = f"{self.base_url.rstrip('/').lower()}|{account}"
+        identity_hash = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:20]
+        return utils.build_chapter_cache_key(
+            f"{self.get_name()}:{identity_hash}",
+            article_id,
+        )
 
     def _timeout_s(self) -> int:
         """Default network timeout for TheOldReader API calls.
@@ -329,8 +339,15 @@ class TheOldReaderProvider(RSSProvider):
             items = data.get("items", [])
             log.info(f"TheOldReader: Found {len(items)} items in API response.")
             
-            article_ids = [item["id"] for item in items]
-            chapters_map = utils.get_chapters_batch(article_ids)
+            article_ids = [str(item["id"]) for item in items]
+            chapter_cache_keys = {
+                article_id: self._chapter_cache_key(article_id)
+                for article_id in article_ids
+            }
+            chapters_map = utils.get_chapters_batch(
+                article_ids,
+                cache_keys=chapter_cache_keys,
+            )
             
             articles = []
             fallback_feed_id = real_feed_id or stream_id or feed_id
@@ -347,7 +364,7 @@ class TheOldReaderProvider(RSSProvider):
                         media_url = encs[0].get("href")
                         media_type = encs[0].get("type")
                 
-                article_id = item["id"]
+                article_id = str(item["id"])
                 article_feed_id = self._resolve_item_feed_id(item, fallback_feed_id)
                 cache_id = self._build_item_cache_id(item, fallback_feed_id)
                 article_url = item.get("alternate", [{}])[0].get("href", "")
@@ -412,7 +429,56 @@ class TheOldReaderProvider(RSSProvider):
             return []
 
     def get_article_chapters(self, article_id: str) -> List[Dict]:
-        return utils.get_chapters_from_db(article_id)
+        cache_key = self._chapter_cache_key(article_id)
+        cached_source_url = utils.get_chapter_source_url(article_id, cache_key=cache_key)
+        if not self._login():
+            if cached_source_url:
+                chapters = utils.fetch_and_store_chapters(
+                    article_id,
+                    None,
+                    None,
+                    chapter_url=cached_source_url,
+                    cache_key=cache_key,
+                )
+                if chapters:
+                    return chapters
+            return utils.get_chapters_from_db(article_id, cache_key=cache_key)
+        try:
+            resp = requests.post(
+                f"{self.base_url}/stream/items/contents",
+                headers=self._headers(),
+                data=[("i", str(article_id)), ("output", "json")],
+                timeout=self._timeout_s(),
+            )
+            resp.raise_for_status()
+            items = (resp.json() or {}).get("items") or []
+            if items:
+                chapter_url, media_url, media_type = utils.chapter_source_and_media(items[0])
+                chapters = utils.fetch_and_store_chapters(
+                    article_id,
+                    media_url,
+                    media_type,
+                    chapter_url=chapter_url,
+                    cache_key=cache_key,
+                )
+                if chapters:
+                    return chapters
+                if chapter_url:
+                    return utils.get_chapters_from_db(article_id, cache_key=cache_key)
+        except Exception as e:
+            log.error("TheOldReader chapter fetch failed for %s: %s", article_id, e)
+
+        if cached_source_url:
+            chapters = utils.fetch_and_store_chapters(
+                article_id,
+                None,
+                None,
+                chapter_url=cached_source_url,
+                cache_key=cache_key,
+            )
+            if chapters:
+                return chapters
+        return utils.get_chapters_from_db(article_id, cache_key=cache_key)
 
     def mark_read(self, article_id: str) -> bool:
         if not self._login(): return False

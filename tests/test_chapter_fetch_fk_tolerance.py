@@ -49,6 +49,7 @@ def test_fetch_and_store_chapters_returns_json_chapters_when_fk_insert_fails(mon
             assert "chapters.json" in str(url)
             return _FakeResponse(
                 json_data={
+                    "version": "1.2.0",
                     "chapters": [
                         {"startTime": 0, "title": "Intro"},
                         {"startTime": 65, "title": "Segment 1"},

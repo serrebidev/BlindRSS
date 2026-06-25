@@ -1,4 +1,5 @@
 import requests
+import hashlib
 import logging
 import time
 import threading
@@ -44,6 +45,15 @@ class InoreaderProvider(RSSProvider):
 
     def get_name(self) -> str:
         return "Inoreader"
+
+    def _chapter_cache_key(self, article_id: str) -> str | None:
+        account = self.refresh_token or self.token or self.app_id
+        identity = f"{self.base_url.rstrip('/').lower()}|{account}"
+        identity_hash = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:20]
+        return utils.build_chapter_cache_key(
+            f"{self.get_name()}:{identity_hash}",
+            article_id,
+        )
 
     def _metadata_cache_ttl_s(self) -> int:
         """Cache feed/category metadata aggressively to avoid burning Inoreader API quotas.
@@ -401,7 +411,15 @@ class InoreaderProvider(RSSProvider):
             return []
 
         article_ids = [item.get("id") for item in items if item.get("id") is not None]
-        chapters_map = utils.get_chapters_batch(article_ids)
+        article_ids = [str(article_id) for article_id in article_ids]
+        chapter_cache_keys = {
+            article_id: self._chapter_cache_key(article_id)
+            for article_id in article_ids
+        }
+        chapters_map = utils.get_chapters_batch(
+            article_ids,
+            cache_keys=chapter_cache_keys,
+        )
         articles: List[Article] = []
 
         for item in items:
@@ -422,6 +440,7 @@ class InoreaderProvider(RSSProvider):
             article_id = item.get("id")
             if article_id is None:
                 continue
+            article_id = str(article_id)
             article_feed_id = self._resolve_item_feed_id(item, fallback_feed_id)
             cache_id = self._build_item_cache_id(item, fallback_feed_id)
 
@@ -748,13 +767,54 @@ class InoreaderProvider(RSSProvider):
             return [], 0
 
     def get_article_chapters(self, article_id: str) -> List[Dict]:
-        # Similar to Miniflux, we need media info.
-        # For now, try to check DB.
-        chapters = utils.get_chapters_from_db(article_id)
-        if chapters: return chapters
-        # We can't easily fetch single item details without knowing feed ID in Google Reader API sometimes,
-        # but strictly speaking /stream/items/ids works if supported.
-        return []
+        cache_key = self._chapter_cache_key(article_id)
+        cached_source_url = utils.get_chapter_source_url(article_id, cache_key=cache_key)
+        if not self._has_required_auth():
+            if cached_source_url:
+                chapters = utils.fetch_and_store_chapters(
+                    article_id,
+                    None,
+                    None,
+                    chapter_url=cached_source_url,
+                    cache_key=cache_key,
+                )
+                if chapters:
+                    return chapters
+            return utils.get_chapters_from_db(article_id, cache_key=cache_key)
+        try:
+            resp = self._request(
+                "post",
+                f"{self.base_url}/stream/items/contents",
+                data=[("i", str(article_id)), ("output", "json")],
+            )
+            items = (resp.json() or {}).get("items") or []
+            if items:
+                chapter_url, media_url, media_type = utils.chapter_source_and_media(items[0])
+                chapters = utils.fetch_and_store_chapters(
+                    article_id,
+                    media_url,
+                    media_type,
+                    chapter_url=chapter_url,
+                    cache_key=cache_key,
+                )
+                if chapters:
+                    return chapters
+                if chapter_url:
+                    return utils.get_chapters_from_db(article_id, cache_key=cache_key)
+        except Exception as e:
+            log.error("Inoreader chapter fetch failed for %s: %s", article_id, e)
+
+        if cached_source_url:
+            chapters = utils.fetch_and_store_chapters(
+                article_id,
+                None,
+                None,
+                chapter_url=cached_source_url,
+                cache_key=cache_key,
+            )
+            if chapters:
+                return chapters
+        return utils.get_chapters_from_db(article_id, cache_key=cache_key)
 
     def mark_read(self, article_id: str) -> bool:
         if not self._has_required_auth(): return False

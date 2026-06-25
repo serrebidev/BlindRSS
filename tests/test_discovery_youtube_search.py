@@ -45,6 +45,48 @@ class YouTubeSearchConversionTests(unittest.TestCase):
             ["https://www.youtube.com/feeds/videos.xml?playlist_id=PLiJ1MgXwrS8pbiQpg0-1ZOZLlZvi6ALgU"],
         )
 
+    def test_youtube_hostname_matching_rejects_lookalike_domains(self) -> None:
+        self.assertIsNone(discovery.get_ytdlp_feed_url("https://notyoutube.com/channel/UCFAKE"))
+        self.assertEqual(discovery._youtube_playlist_id_from_url("https://youtube.com.evil.test/?list=PLFAKE"), "")
+        self.assertEqual(discovery._youtube_handle_from_url("https://notyoutube.com/@Fake"), "")
+        self.assertFalse(discovery._supports_quick_title_resolution("https://youtube.com.evil.test/watch?v=fake"))
+
+    def test_youtube_hostname_matching_accepts_subdomains_and_ports(self) -> None:
+        self.assertTrue(
+            discovery.is_youtube_search_url(
+                "https://www.youtube.com:8443/results?search_query=accessible"
+            )
+        )
+        self.assertEqual(
+            discovery._youtube_playlist_id_from_url(
+                "https://m.youtube.com:8443/watch?v=abc&list=PLREAL"
+            ),
+            "PLREAL",
+        )
+
+    def test_handle_resolution_preserves_cookie_profile_and_falls_back(self) -> None:
+        calls = []
+
+        def fake_run(cmd, **_kwargs):
+            calls.append(cmd)
+            if "--cookies-from-browser" not in cmd:
+                return SimpleNamespace(returncode=1, stdout="")
+            return SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps({"_type": "channel", "id": "UCREAL"}),
+            )
+
+        with patch(
+            "core.discovery.get_ytdlp_cookie_sources",
+            return_value=[("firefox", r"C:\Profiles\Accessible")],
+        ), patch("core.discovery.subprocess.run", side_effect=fake_run):
+            out = discovery.get_ytdlp_feed_url("https://www.youtube.com/@Example")
+
+        self.assertEqual(out, "https://www.youtube.com/feeds/videos.xml?channel_id=UCREAL")
+        self.assertNotIn("--cookies-from-browser", calls[0])
+        self.assertEqual(calls[1][calls[1].index("--cookies-from-browser") + 1], r"firefox:C:\Profiles\Accessible")
+        self.assertEqual(calls[1][-1], "https://www.youtube.com/@Example")
+
     def test_youtube_search_entries_to_channel_feeds_dedupes_video_hits(self) -> None:
         entries = [
             {

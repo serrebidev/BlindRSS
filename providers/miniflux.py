@@ -1,5 +1,6 @@
 import requests
 from requests.adapters import HTTPAdapter
+import hashlib
 import re
 import logging
 import time
@@ -241,6 +242,15 @@ class MinifluxProvider(RSSProvider):
 
     def get_name(self) -> str:
         return "Miniflux"
+
+    def _chapter_cache_key(self, article_id: str) -> str | None:
+        account = str(self.conf.get("api_key") or "").strip()
+        identity = f"{self.base_url.rstrip('/').lower()}|{account}"
+        identity_hash = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:20]
+        return utils.build_chapter_cache_key(
+            f"{self.get_name()}:{identity_hash}",
+            article_id,
+        )
 
     def test_connection(self) -> bool:
         try:
@@ -763,7 +773,14 @@ class MinifluxProvider(RSSProvider):
         if not entries:
             return []
         article_ids = [str(e.get("id")) for e in entries if e.get("id") is not None]
-        chapters_map = utils.get_chapters_batch(article_ids)
+        chapter_cache_keys = {
+            article_id: self._chapter_cache_key(article_id)
+            for article_id in article_ids
+        }
+        chapters_map = utils.get_chapters_batch(
+            article_ids,
+            cache_keys=chapter_cache_keys,
+        )
 
         articles: List[Article] = []
         for entry in entries:
@@ -1186,33 +1203,38 @@ class MinifluxProvider(RSSProvider):
         return self._entries_to_articles(entries, fallback_feed_id=fallback_feed_id)
 
     def get_article_chapters(self, article_id: str) -> List[Dict]:
-        """
-        Called by UI when an article is opened/played.
-        We need to find the article's media info first. 
-        Since we don't store articles in DB, we must fetch entry from API or rely on caller?
-        MainFrame calls this with just ID.
-        So we fetch the entry from Miniflux to get the media_url.
-        """
-        # Check DB first just in case
-        chapters = utils.get_chapters_from_db(article_id)
-        if chapters:
-            return chapters
+        cache_key = self._chapter_cache_key(article_id)
+        cached_source_url = utils.get_chapter_source_url(article_id, cache_key=cache_key)
 
-        # Fetch entry info to get media URL
+        # Entry IDs are local to a Miniflux instance, and podcast metadata can be
+        # corrected after an entry was first cached. Re-read the current entry
+        # before choosing a source so a replaced chapter URL is discovered.
         entry = self._req("GET", f"/v1/entries/{article_id}")
-        if not entry:
-            return []
-            
-        media_url = None
-        media_type = None
-        enclosures = entry.get("enclosures", [])
-        if enclosures:
-            media_url = enclosures[0].get("url")
-            media_type = enclosures[0].get("mime_type")
-            
-        if media_url:
-             return utils.fetch_and_store_chapters(article_id, media_url, media_type)
-        return []
+        if entry:
+            chapter_url, media_url, media_type = utils.chapter_source_and_media(entry)
+            chapters = utils.fetch_and_store_chapters(
+                article_id,
+                media_url,
+                media_type,
+                chapter_url=chapter_url,
+                cache_key=cache_key,
+            )
+            if chapters:
+                return chapters
+            if chapter_url:
+                return utils.get_chapters_from_db(article_id, cache_key=cache_key)
+
+        if cached_source_url:
+            chapters = utils.fetch_and_store_chapters(
+                article_id,
+                None,
+                None,
+                chapter_url=cached_source_url,
+                cache_key=cache_key,
+            )
+            if chapters:
+                return chapters
+        return utils.get_chapters_from_db(article_id, cache_key=cache_key)
 
 
     def get_articles_page(self, feed_id: str, offset: int = 0, limit: int = 200):

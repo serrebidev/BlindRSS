@@ -209,3 +209,10 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 8. Releases: cut every official release with `.\build.bat release` on Windows; never hand-pick the version or tag. Full mechanics and the publish/Latest guards are in **Build & Release** above.
 9. Release publication: a release MUST end up published and Latest or the updater never sees it. Do not remove the `build.bat release` guards (`--draft=false --latest`, no-drafts check, `/releases/latest` verify) or auto-delete releases. See **Build & Release** > Updater visibility.
 10. Tests: add/extend tests in `tests/` for behavior changes and regressions.
+
+<!-- claude-memory:begin (managed by sync-claude-memory.py; canonical files live in C:\Users\admin\.claude - edit there, not here) -->
+## Memories (shared from ~/.claude - project: C--Users-admin-git-BlindRSS)
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\MEMORY.md
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\category-identity-model.md
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\provider-flat-vs-nested.md
+<!-- claude-memory:end -->

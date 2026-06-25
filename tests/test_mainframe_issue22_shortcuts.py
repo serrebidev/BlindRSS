@@ -117,6 +117,7 @@ class _FakeMenu:
     def __init__(self):
         self._next_id = 1000
         self._items = []
+        self.submenus = []
         _FakeMenu.last_menu = self
 
     def Append(self, item_id, label, help_text=""):
@@ -130,6 +131,11 @@ class _FakeMenu:
 
     def AppendSeparator(self):
         return self.Append(mainframe.wx.ID_ANY, "---")
+
+    def AppendSubMenu(self, submenu, label):
+        item = self.Append(mainframe.wx.ID_ANY, label)
+        self.submenus.append((str(label), submenu))
+        return item
 
     def GetMenuItems(self):
         return list(self._items)
@@ -176,6 +182,10 @@ class _DummyContextMenuHost:
     _get_selected_article_index = mainframe.MainFrame._get_selected_article_index
     _supports_article_delete = mainframe.MainFrame._supports_article_delete
     _supports_favorites = mainframe.MainFrame._supports_favorites
+    _article_chapter_links = mainframe.MainFrame._article_chapter_links
+    _validated_chapter_web_url = mainframe.MainFrame._validated_chapter_web_url
+    _format_chapter_timestamp = mainframe.MainFrame._format_chapter_timestamp
+    _format_player_chapter_menu_label = mainframe.MainFrame._format_player_chapter_menu_label
 
     def __init__(self):
         self.provider = _FakeProvider()
@@ -208,6 +218,9 @@ class _DummyContextMenuHost:
 
     def on_open_in_browser(self, idx):
         self.bindings.append(("browser", idx, None))
+
+    def on_open_chapter_link(self, href):
+        self.bindings.append(("chapter", href, None))
 
     def mark_article_read(self, idx):
         self.bindings.append(("read", idx, None))
@@ -374,6 +387,21 @@ def test_article_context_menu_includes_delete_for_supported_provider(monkeypatch
     assert "Delete Article\tDel" in labels
     assert "Mark as &Read" in labels
     assert "Mark as &Unread" in labels
+
+
+def test_article_context_menu_exposes_accessible_chapter_link_commands(monkeypatch):
+    monkeypatch.setattr(mainframe.wx, "Menu", _FakeMenu)
+    host = _DummyContextMenuHost()
+    host.current_articles[0].chapters = [
+        {"start": 65, "title": "Details", "href": "/chapters/details"}
+    ]
+
+    host.on_list_context_menu(_KeyboardContextEvent())
+
+    parent_menu = host.list_ctrl.popup_menu
+    assert "Chapter Links" in [item.label for item in parent_menu.GetMenuItems()]
+    chapter_menu = parent_menu.submenus[0][1]
+    assert [item.label for item in chapter_menu.GetMenuItems()] == ["Open 01:05, Details"]
 
 
 def test_delete_article_skips_confirmation_when_setting_disabled(monkeypatch):

@@ -8,6 +8,8 @@ import io
 import contextlib
 import threading
 import concurrent.futures
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone
 from dataclasses import dataclass
 from functools import lru_cache
 from bs4 import BeautifulSoup
@@ -460,7 +462,7 @@ def is_ytdlp_supported(url: str) -> bool:
     if scheme and scheme not in ("http", "https", "lbry"):
         return False
 
-    domain = (parsed.netloc or "").lower()
+    domain = (parsed.hostname or "").lower()
     if scheme in ("http", "https") and not domain:
         return False
 
@@ -471,7 +473,7 @@ def is_ytdlp_supported(url: str) -> bool:
         "instagram.com", "rumble.com", "bilibili.com", "mixcloud.com",
         "odysee.com", "lbry.tv",
     ]
-    if any(kd in domain for kd in known_domains):
+    if any(_host_matches(domain, kd) for kd in known_domains):
         return True
 
     path_low = (parsed.path or "").lower()
@@ -622,10 +624,83 @@ def _looks_like_feed_url(url: str) -> bool:
         return True
     if "/feed/" in path_low or "/feeds/" in path_low:
         return True
-    qs = parse_qs(parsed.query or "")
-    for key in qs.keys():
-        if str(key).lower() in ("feed", "rss", "format"):
+    qs = parse_qs(parsed.query or "", keep_blank_values=True)
+    for key, values in qs.items():
+        key_low = str(key).lower()
+        normalized_values = {
+            str(value or "").strip().lower()
+            for value in values
+        }
+        if key_low in ("feed", "rss") and normalized_values.intersection(
+            {"1", "true", "yes", "feed", "rss", "rss2", "atom", "rdf", "xml", "json", "jsonfeed"}
+        ):
             return True
+        if key_low == "format" and normalized_values.intersection(
+            {"rss", "rss2", "atom", "rdf", "xml", "jsonfeed"}
+        ):
+            return True
+    return False
+
+
+def _host_matches(host: str, domain: str) -> bool:
+    host = str(host or "").strip().lower().rstrip(".")
+    domain = str(domain or "").strip().lower().rstrip(".")
+    return bool(host and domain and (host == domain or host.endswith("." + domain)))
+
+
+def _is_youtube_host(host: str) -> bool:
+    return _host_matches(host, "youtube.com") or _host_matches(host, "youtu.be")
+
+
+def _body_looks_like_feed(body: str, content_type: str = "") -> bool:
+    text = str(body or "").lstrip()
+    if not text:
+        return False
+
+    if text.startswith(("{", "[")) or "json" in str(content_type or "").lower():
+        try:
+            payload = json.loads(text)
+            if not isinstance(payload, dict):
+                return False
+            version = str(payload.get("version") or "").strip()
+            title = payload.get("title")
+            items = payload.get("items")
+            if (
+                version in {
+                    "https://jsonfeed.org/version/1",
+                    "https://jsonfeed.org/version/1.1",
+                }
+                and isinstance(title, str)
+                and bool(title.strip())
+                and isinstance(items, list)
+            ):
+                return True
+        except Exception:
+            pass
+
+    try:
+        root = ET.fromstring(text)
+    except (ET.ParseError, ValueError, TypeError):
+        return False
+    tag = str(getattr(root, "tag", "") or "")
+    local_name = tag.rsplit("}", 1)[-1].rsplit(":", 1)[-1].lower()
+    namespace = tag[1:].split("}", 1)[0] if tag.startswith("{") and "}" in tag else ""
+    child_names = {
+        str(getattr(child, "tag", "") or "").rsplit("}", 1)[-1].rsplit(":", 1)[-1].lower()
+        for child in root
+    }
+    if local_name == "rss":
+        return "channel" in child_names
+    if local_name == "feed":
+        return namespace in {
+            "http://www.w3.org/2005/Atom",
+            "http://purl.org/atom/ns#",
+        }
+    if local_name == "rdf":
+        return (
+            namespace == "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+            and "channel" in child_names
+        )
     return False
 
 
@@ -833,7 +908,7 @@ def _friendly_title_fallback_from_url(url: str, site_label: str | None = None) -
     if not parsed or (parsed.scheme or "").lower() not in ("http", "https"):
         return ""
 
-    host = (parsed.netloc or "").lower()
+    host = (parsed.hostname or "").lower()
     host = host[4:] if host.startswith("www.") else host
     host = host[2:] if host.startswith("m.") and host.endswith("facebook.com") else host
     path = str(parsed.path or "")
@@ -862,8 +937,8 @@ def _friendly_title_fallback_from_url(url: str, site_label: str | None = None) -
         return ""
 
     # Site-specific friendly fallbacks.
-    if "youtube.com" in host or "youtu.be" in host:
-        if "youtu.be" in host and path_parts:
+    if _is_youtube_host(host):
+        if _host_matches(host, "youtu.be") and path_parts:
             return f"YouTube video {path_parts[0]}"
         vid = str((query.get("v") or [""])[0] or "").strip()
         if vid:
@@ -1305,10 +1380,10 @@ def _youtube_oembed_title(url: str, timeout: int = 4) -> str:
         parsed = urlparse(raw)
     except Exception:
         return ""
-    host = (parsed.netloc or "").lower()
+    host = (parsed.hostname or "").lower()
     if not host:
         return ""
-    if not ("youtube.com" in host or "youtu.be" in host):
+    if not _is_youtube_host(host):
         return ""
     try:
         timeout = max(2, min(15, int(timeout or 4)))
@@ -1364,11 +1439,11 @@ def _supports_quick_title_resolution(url: str) -> bool:
         parsed = urlparse(raw)
     except Exception:
         return False
-    host = (parsed.netloc or "").lower()
+    host = (parsed.hostname or "").lower()
     if not host:
         return False
     host = host[4:] if host.startswith("www.") else host
-    return ("youtube.com" in host) or ("youtu.be" in host) or ("rokfin.com" in host)
+    return _is_youtube_host(host) or _host_matches(host, "rokfin.com")
 
 
 def _prefetch_quick_titles_for_entries(entries, limit: int = 10) -> dict[str, str]:
@@ -1889,8 +1964,8 @@ def _youtube_playlist_id_from_url(url: str) -> str:
         return ""
     try:
         parsed = urlparse(url)
-        domain = (parsed.netloc or "").lower()
-        if "youtube.com" not in domain and "youtu.be" not in domain:
+        domain = parsed.hostname or ""
+        if not _is_youtube_host(domain):
             return ""
         playlist_id = str((parse_qs(parsed.query).get("list") or [""])[0] or "").strip()
         if not playlist_id:
@@ -1910,8 +1985,8 @@ def _youtube_handle_from_url(url: str) -> str:
         return ""
     try:
         parsed = urlparse(raw)
-        domain = (parsed.netloc or "").lower()
-        if "youtube.com" not in domain and "youtu.be" not in domain:
+        domain = parsed.hostname or ""
+        if not _is_youtube_host(domain):
             return ""
         m = re.search(r"/@([^/?#]+)", str(parsed.path or ""))
         if not m:
@@ -1987,8 +2062,8 @@ def _youtube_owner_label_from_oembed(url: str) -> str:
         parsed = urlparse(raw)
     except Exception:
         return ""
-    host = (parsed.netloc or "").lower()
-    if not host or ("youtube.com" not in host and "youtu.be" not in host):
+    host = parsed.hostname or ""
+    if not _is_youtube_host(host):
         return ""
 
     try:
@@ -2070,8 +2145,15 @@ def _youtube_search_entries_to_channel_feeds(entries, limit: int = 10) -> list[d
             for candidate in (entry_url, uploader_url):
                 if not candidate:
                     continue
-                low = candidate.lower()
-                if "youtube.com" in low and any(p in low for p in ("/channel/", "/user/", "/@")):
+                try:
+                    candidate_parts = urlparse(candidate)
+                except Exception:
+                    candidate_parts = None
+                candidate_path = str(getattr(candidate_parts, "path", "") or "").lower()
+                candidate_host = str(getattr(candidate_parts, "hostname", "") or "")
+                if _is_youtube_host(candidate_host) and any(
+                    p in candidate_path for p in ("/channel/", "/user/", "/@")
+                ):
                     channel_url = candidate
                     break
 
@@ -3036,7 +3118,7 @@ def is_youtube_search_url(url: str) -> bool:
         parts = urlparse(url)
     except Exception:
         return False
-    if "youtube.com" not in (parts.netloc or "").lower():
+    if not _host_matches(parts.hostname or "", "youtube.com"):
         return False
     if (parts.path or "").rstrip("/").lower() != "/results":
         return False
@@ -3049,6 +3131,8 @@ def is_youtube_search_url(url: str) -> bool:
 
 def youtube_search_query(url: str) -> str | None:
     """Return the search terms from a YouTube search-results URL, or None."""
+    if not is_youtube_search_url(url):
+        return None
     try:
         parts = urlparse(url)
         q = parse_qs(parts.query or "")
@@ -3069,6 +3153,11 @@ def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float
     query = (query or "").strip()
     if not query:
         return (None, [])
+    try:
+        total_timeout = max(0.1, float(timeout_s or 30.0))
+    except (TypeError, ValueError):
+        total_timeout = 30.0
+    deadline = time.monotonic() + total_timeout
     n = max(1, min(100, int(max_items or 30)))
     # Use YouTube's own date-sorted search results URL (sp=CAI%3D == "Sort by upload
     # date"). yt-dlp's `ytsearchdate` prefix is unreliable across versions, but the
@@ -3094,13 +3183,19 @@ def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float
     except Exception:
         startupinfo = None
 
-    def _run(cookie_value: str | None = None, cookiefile: str | None = None) -> str:
+    failures: list[str] = []
+
+    def _run(cookie_value: str | None = None, cookiefile: str | None = None) -> tuple[bool, str]:
         cmd = list(base_cmd)
         if cookiefile:
             cmd.extend(["--cookies", cookiefile])
         elif cookie_value:
             cmd.extend(["--cookies-from-browser", cookie_value])
         cmd.append(search_url)
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            failures.append("total search deadline expired")
+            return False, ""
         try:
             res = subprocess.run(
                 cmd,
@@ -3109,17 +3204,25 @@ def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float
                 stdin=subprocess.DEVNULL,
                 creationflags=creationflags,
                 startupinfo=startupinfo,
-                timeout=timeout_s,
+                timeout=remaining,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
             )
-        except Exception:
-            return ""
-        return res.stdout or ""
+        except subprocess.TimeoutExpired:
+            failures.append("yt-dlp search timed out")
+            return False, ""
+        except Exception as exc:
+            failures.append(f"yt-dlp search failed: {exc}")
+            return False, ""
+        if res.returncode != 0:
+            failures.append(f"yt-dlp search exited with status {res.returncode}")
+            return False, ""
+        return True, res.stdout or ""
 
     def _parse(stdout: str) -> list[YoutubeSearchItem]:
         out: list[YoutubeSearchItem] = []
+        seen_urls: set[str] = set()
         for line in (stdout or "").splitlines():
             line = line.strip()
             if not line:
@@ -3130,16 +3233,31 @@ def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float
                 continue
             if not isinstance(entry, dict):
                 continue
+            entry_type = str(entry.get("_type") or "").strip().lower()
+            if entry_type in ("channel", "playlist"):
+                continue
             vid = str(entry.get("id") or "").strip()
             if not vid:
                 continue
             watch_url = f"https://www.youtube.com/watch?v={vid}"
+            if watch_url in seen_urls:
+                continue
+            seen_urls.add(watch_url)
             title = str(entry.get("title") or "YouTube Video").strip()
             author = entry.get("uploader") or entry.get("channel") or entry.get("uploader_id")
             published = None
             upload_date = entry.get("upload_date")
             if isinstance(upload_date, str) and len(upload_date) == 8 and upload_date.isdigit():
                 published = f"{upload_date[0:4]}-{upload_date[4:6]}-{upload_date[6:8]}"
+            if not published:
+                for timestamp_key in ("timestamp", "release_timestamp"):
+                    timestamp = entry.get(timestamp_key)
+                    try:
+                        if timestamp is not None:
+                            published = datetime.fromtimestamp(float(timestamp), timezone.utc).date().isoformat()
+                            break
+                    except (TypeError, ValueError, OSError, OverflowError):
+                        continue
             out.append(
                 YoutubeSearchItem(
                     url=watch_url,
@@ -3153,27 +3271,36 @@ def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float
     # A configured cookies.txt takes priority (works for Chromium ABE on Windows),
     # then each detected browser's cookies (Brave first), then an anonymous request
     # (reliable for public search; avoids per-browser decryption failures).
+    attempts: list[tuple[str | None, str | None]] = []
     if cookiefile and os.path.isfile(cookiefile):
-        items = _parse(_run(cookiefile=cookiefile))
-        if items:
-            return (f"YouTube: {query}", items)
-
-    attempts: list[str | None] = []
+        attempts.append((None, cookiefile))
     try:
         for src in get_ytdlp_cookie_sources("https://www.youtube.com/"):
             arg = cookie_arg_for_ytdlp(src)
-            if arg:
-                attempts.append(arg)
+            attempt = (arg, None)
+            if arg and attempt not in attempts:
+                attempts.append(attempt)
     except Exception:
         pass
-    attempts.append(None)  # anonymous fallback
+    attempts.append((None, None))  # anonymous fallback
 
-    for cookie_value in attempts:
-        items = _parse(_run(cookie_value=cookie_value))
+    had_successful_attempt = False
+    for cookie_value, attempt_cookiefile in attempts:
+        succeeded, stdout = _run(
+            cookie_value=cookie_value,
+            cookiefile=attempt_cookiefile,
+        )
+        if not succeeded:
+            continue
+        had_successful_attempt = True
+        items = _parse(stdout)
         if items:
             return (f"YouTube: {query}", items)
 
-    return (f"YouTube: {query}", [])
+    if had_successful_attempt:
+        return (f"YouTube: {query}", [])
+    detail = failures[-1] if failures else "yt-dlp search did not run"
+    raise RuntimeError(f"YouTube search failed: {detail}")
 
 
 def get_ytdlp_feed_url(url: str) -> str:
@@ -3187,10 +3314,10 @@ def get_ytdlp_feed_url(url: str) -> str:
         return None
 
     parsed = urlparse(url)
-    domain = parsed.netloc.lower()
+    domain = parsed.hostname or ""
 
     # 1. YouTube specific logic (fastest)
-    if "youtube.com" in domain or "youtu.be" in domain:
+    if _is_youtube_host(domain):
         playlist_id = _youtube_playlist_id_from_url(url)
         if playlist_id:
             return f"https://www.youtube.com/feeds/videos.xml?playlist_id={playlist_id}"
@@ -3213,34 +3340,52 @@ def get_ytdlp_feed_url(url: str) -> str:
             if platform.system().lower() == "windows":
                 creationflags = 0x08000000
                 
-            # extract_flat gives us channel info without downloading every video info
-            # Use cookies to avoid "Sign in to confirm you’re not a bot" errors
-            cmd = [_resolve_ytdlp_cli_path(), "--dump-json", "--playlist-items", "0", url]
-            
-            # Add cookies if available
-            cookies = get_ytdlp_cookie_sources(url)
-            if cookies:
-                # Use the first available source
-                browser = cookies[0][0]
-                cmd.extend(["--cookies-from-browser", browser])
-                if len(cookies[0]) > 1:
-                    cmd.append(cookies[0][1]) # profile
+            # Resolve channel metadata without enumerating the channel's videos.
+            # Browser cookie databases can be locked or undecryptable, so try all
+            # configured sources and retain an anonymous fallback.
+            base_cmd = [
+                _resolve_ytdlp_cli_path(),
+                "--dump-single-json",
+                "--flat-playlist",
+                "--playlist-items",
+                "0",
+            ]
+            cookie_args: list[str | None] = [None]
+            for source in get_ytdlp_cookie_sources(url):
+                cookie_arg = cookie_arg_for_ytdlp(source)
+                if cookie_arg and cookie_arg not in cookie_args:
+                    cookie_args.append(cookie_arg)
 
-            res = subprocess.run(
-                cmd,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                creationflags=creationflags,
-                startupinfo=_get_startup_info(),
-                timeout=15 # Increased timeout for cookie processing
-            )
-            if res.returncode == 0 and res.stdout:
-                data = json.loads(res.stdout)
-                channel_id = data.get("channel_id") or data.get("id")
+            for cookie_arg in cookie_args:
+                cmd = list(base_cmd)
+                if cookie_arg:
+                    cmd.extend(["--cookies-from-browser", cookie_arg])
+                cmd.append(url)
+                try:
+                    res = subprocess.run(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.DEVNULL,
+                        stdin=subprocess.DEVNULL,
+                        creationflags=creationflags,
+                        startupinfo=_get_startup_info(),
+                        timeout=15,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                    )
+                except Exception:
+                    continue
+                if res.returncode != 0 or not res.stdout:
+                    continue
+                try:
+                    data = json.loads(res.stdout)
+                except Exception:
+                    continue
+                channel_id = str(data.get("channel_id") or data.get("id") or "").strip()
                 if channel_id and data.get("_type") in ("playlist", "channel"):
                     return f"https://www.youtube.com/feeds/videos.xml?channel_id={channel_id}"
-        except:
+        except Exception:
             pass
 
     # 2. Rumble note:
@@ -3260,7 +3405,7 @@ def discover_feed(url: str, request_timeout: float = 10.0, probe_timeout: float 
         return None
     
     # If it looks like a feed already
-    if url.endswith(".xml") or url.endswith(".rss") or url.endswith(".atom") or "feed" in url:
+    if _looks_like_feed_url(url):
         return url
 
     # Native feed conversion for supported media URLs (e.g., YouTube channel/playlist URLs).
@@ -3285,8 +3430,11 @@ def discover_feed(url: str, request_timeout: float = 10.0, probe_timeout: float 
         resp = utils.safe_requests_get(url, timeout=req_timeout)
         resp.raise_for_status()
 
+        effective_url = str(getattr(resp, "url", "") or url)
         body_text = resp.text or ""
         content_type = str(resp.headers.get("Content-Type", "") or "").lower()
+        if _body_looks_like_feed(body_text, content_type):
+            return effective_url
         looks_like_xml = (
             "xml" in content_type
             or body_text.lstrip().startswith("<?xml")
@@ -3296,7 +3444,7 @@ def discover_feed(url: str, request_timeout: float = 10.0, probe_timeout: float 
         soup = BeautifulSoup(body_text, "xml" if looks_like_xml else "html.parser")
         
         # 1. Prefer the best matching alternate feed link when multiple are present.
-        candidates = _alternate_feed_candidates(soup, url)
+        candidates = _alternate_feed_candidates(soup, effective_url)
         if candidates:
             return candidates[0]
                     
@@ -3304,7 +3452,7 @@ def discover_feed(url: str, request_timeout: float = 10.0, probe_timeout: float 
         # e.g. /feed, /rss, /atom.xml
         # This is a bit brute force but helpful
         common_paths = ["/feed", "/rss", "/rss.xml", "/atom.xml", "/feed.xml"]
-        base = url.rstrip("/")
+        base = effective_url.rstrip("/")
         for path in common_paths:
             # Avoid re-checking
             candidate = base + path
@@ -3332,8 +3480,7 @@ def discover_feeds(url: str) -> list[str]:
         return []
 
     # If it already looks like a feed, return it as-is.
-    low = str(url).lower()
-    if low.endswith(".xml") or low.endswith(".rss") or low.endswith(".atom") or "feed" in low:
+    if _looks_like_feed_url(url):
         return [url]
 
     try:
@@ -3361,12 +3508,17 @@ def discover_feeds(url: str) -> list[str]:
     try:
         resp = utils.safe_requests_get(url, timeout=10)
         resp.raise_for_status()
+        effective_url = str(getattr(resp, "url", "") or url)
         html = resp.text or ""
+        content_type = str(resp.headers.get("Content-Type", "") or "").lower()
+        if _body_looks_like_feed(html, content_type):
+            _add(effective_url)
+            return feeds
 
         soup = BeautifulSoup(html, "html.parser")
 
         # 1) <link rel="alternate" ...>, ordered by best page/feed match first.
-        for candidate in _alternate_feed_candidates(soup, url):
+        for candidate in _alternate_feed_candidates(soup, effective_url):
             _add(candidate)
 
         # 2) Obvious <a href> candidates (best-effort)
@@ -3377,13 +3529,13 @@ def discover_feeds(url: str) -> list[str]:
                     continue
                 h = href.lower()
                 if any(h.endswith(ext) for ext in (".rss", ".atom", ".xml", ".json")) or "/feed" in h or "rss" in h:
-                    _add(urljoin(url, href))
+                    _add(urljoin(effective_url, href))
             except Exception:
                 continue
 
         # 3) Common paths (HEAD check)
         common_paths = ["/feed", "/rss", "/rss.xml", "/atom.xml", "/feed.xml", "/index.xml"]
-        base = url.rstrip("/")
+        base = effective_url.rstrip("/")
         for path in common_paths:
             candidate = base + path
             try:

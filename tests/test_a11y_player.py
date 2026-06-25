@@ -34,9 +34,8 @@ def test_ambiguous_controls_have_accessible_names():
     # (attribute, expected accessible name) for controls whose visible content is
     # not self-describing for a screen reader.
     expected = {
-        "current_time_lbl": "Elapsed Time",
-        "total_time_lbl": "Total Time",
-        "volume_value_lbl": "Volume Level",
+        "current_time_lbl": "Elapsed Time: 00:00",
+        "total_time_lbl": "Total Time: 00:00",
         "status_lbl": "Playback Status",
         "slider": "Playback Position",
         "volume_slider": "Volume",
@@ -46,6 +45,83 @@ def test_ambiguous_controls_have_accessible_names():
     }
     for attr, name in expected.items():
         assert f'self.{attr}.SetName("{name}")' in src, f"missing accessible name for {attr}"
+    assert 'self.volume_value_lbl.SetName(f"Volume Level: ' in src
+
+
+class _NamedLabel:
+    def __init__(self):
+        self.label = ""
+        self.name = ""
+
+    def SetLabel(self, value):
+        self.label = str(value)
+
+    def SetName(self, value):
+        self.name = str(value)
+
+
+class _Slider:
+    def __init__(self, value=0):
+        self.value = int(value)
+        self.name = ""
+
+    def GetValue(self):
+        return self.value
+
+    def SetValue(self, value):
+        self.value = int(value)
+
+    def SetName(self, value):
+        self.name = str(value)
+
+
+def test_dynamic_time_accessible_names_follow_visible_values():
+    class _Frame:
+        _set_named_value_label = player.PlayerFrame._set_named_value_label
+        _set_elapsed_time_label = player.PlayerFrame._set_elapsed_time_label
+        _set_total_time_label = player.PlayerFrame._set_total_time_label
+
+        def __init__(self):
+            self.current_time_lbl = _NamedLabel()
+            self.total_time_lbl = _NamedLabel()
+
+    frame = _Frame()
+
+    player.PlayerFrame._set_elapsed_time_label(frame, "12:34")
+    player.PlayerFrame._set_total_time_label(frame, "1:02:03")
+
+    assert (frame.current_time_lbl.label, frame.current_time_lbl.name) == (
+        "12:34",
+        "Elapsed Time: 12:34",
+    )
+    assert (frame.total_time_lbl.label, frame.total_time_lbl.name) == (
+        "1:02:03",
+        "Total Time: 1:02:03",
+    )
+
+
+def test_player_time_format_uses_hours_for_long_media():
+    assert player.PlayerFrame._format_time(None, 0) == "00:00"
+    assert player.PlayerFrame._format_time(None, 3_723_000) == "1:02:03"
+
+
+def test_dynamic_volume_accessible_names_follow_visible_value():
+    class _Frame:
+        _set_named_value_label = player.PlayerFrame._set_named_value_label
+
+        def __init__(self):
+            self.volume_slider = _Slider(25)
+            self.volume_value_lbl = _NamedLabel()
+            self._volume_slider_updating = False
+
+    frame = _Frame()
+
+    player.PlayerFrame._update_volume_ui(frame, 73)
+
+    assert frame.volume_slider.value == 73
+    assert frame.volume_slider.name == "Volume: 73%"
+    assert frame.volume_value_lbl.label == "73%"
+    assert frame.volume_value_lbl.name == "Volume Level: 73%"
 
 
 def test_seek_buttons_named_despite_symbolic_labels():

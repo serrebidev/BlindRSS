@@ -2,6 +2,7 @@ import sqlite3
 import os
 import shutil
 import logging
+import time
 import uuid
 from core.config import APP_DIR, USER_DATA_DIR, get_data_dir
 
@@ -88,13 +89,21 @@ def _table_exists(cursor: sqlite3.Cursor, name: str) -> bool:
     return cursor.fetchone() is not None
 
 
-def _chapters_references_old_articles(cursor: sqlite3.Cursor) -> bool:
+def _chapters_fk_needs_migration(cursor: sqlite3.Cursor) -> bool:
     try:
         cursor.execute("PRAGMA foreign_key_list(chapters)")
         rows = cursor.fetchall()
     except sqlite3.Error:
         return False
-    return any(len(row) > 2 and row[2] == "old_articles" for row in rows)
+    for row in rows:
+        if len(row) <= 2:
+            continue
+        if row[2] == "old_articles":
+            return True
+        if row[2] == "articles":
+            on_delete = str(row[6] if len(row) > 6 else "").upper()
+            return on_delete != "CASCADE"
+    return False
 
 
 def _articles_id_is_unique(cursor: sqlite3.Cursor) -> bool:
@@ -138,25 +147,26 @@ def _articles_id_is_unique(cursor: sqlite3.Cursor) -> bool:
     return False
 
 
-def _migrate_legacy_chapters_foreign_key(conn: sqlite3.Connection) -> None:
-    """Repair legacy schemas where `chapters` references `old_articles`.
+def _migrate_chapters_foreign_key(conn: sqlite3.Connection) -> None:
+    """Repair legacy chapter foreign keys and add cascade-on-article-delete.
 
     Older databases used a `chapters.article_id -> old_articles(id)` foreign key.
     With foreign key enforcement enabled, deletes/updates on chapters can fail with:
         "no such table: main.old_articles"
 
-    Prefer migrating the FK to `articles(id)` when possible; otherwise drop the FK.
+    Other existing databases reference `articles(id)` without ON DELETE CASCADE.
+    Prefer a cascading FK when articles.id is unique; otherwise drop the invalid FK.
     """
 
     cursor = conn.cursor()
     if not _table_exists(cursor, "chapters"):
         return
 
-    if not _chapters_references_old_articles(cursor):
+    if not _chapters_fk_needs_migration(cursor):
         return
 
     try:
-        cursor.execute("SAVEPOINT migrate_chapters_old_articles_fk")
+        cursor.execute("SAVEPOINT migrate_chapters_fk")
 
         can_add_fk = _articles_id_is_unique(cursor)
         if not can_add_fk:
@@ -186,7 +196,7 @@ def _migrate_legacy_chapters_foreign_key(conn: sqlite3.Connection) -> None:
                 backup_name = f"chapters_old_{suffix}"
 
             log.warning(
-                "Migrating legacy chapters FK old_articles -> %s (backup table: %s)",
+                "Migrating chapters FK to %s with delete cascade (backup table: %s)",
                 "articles(id)" if can_add_fk else "none",
                 backup_name,
             )
@@ -195,16 +205,16 @@ def _migrate_legacy_chapters_foreign_key(conn: sqlite3.Connection) -> None:
 
             if can_add_fk:
                 cursor.execute(
-                    """
-                    CREATE TABLE chapters (
-                        id TEXT PRIMARY KEY,
-                        article_id TEXT,
-                        start REAL,
-                        title TEXT,
-                        href TEXT,
-                        FOREIGN KEY(article_id) REFERENCES articles(id)
-                    )
-                    """
+                """
+                CREATE TABLE chapters (
+                    id TEXT PRIMARY KEY,
+                    article_id TEXT,
+                    start REAL,
+                    title TEXT,
+                    href TEXT,
+                    FOREIGN KEY(article_id) REFERENCES articles(id) ON DELETE CASCADE
+                )
+                """
                 )
                 cursor.execute(
                     f"""
@@ -245,14 +255,14 @@ def _migrate_legacy_chapters_foreign_key(conn: sqlite3.Connection) -> None:
                 except sqlite3.Error:
                     pass
 
-        cursor.execute("RELEASE SAVEPOINT migrate_chapters_old_articles_fk")
+        cursor.execute("RELEASE SAVEPOINT migrate_chapters_fk")
     except sqlite3.Error:
         try:
-            cursor.execute("ROLLBACK TO SAVEPOINT migrate_chapters_old_articles_fk")
-            cursor.execute("RELEASE SAVEPOINT migrate_chapters_old_articles_fk")
+            cursor.execute("ROLLBACK TO SAVEPOINT migrate_chapters_fk")
+            cursor.execute("RELEASE SAVEPOINT migrate_chapters_fk")
         except sqlite3.Error:
             pass
-        log.exception("Failed to migrate legacy chapters FK from old_articles; leaving schema unchanged")
+        log.exception("Failed to migrate chapters foreign key; leaving schema unchanged")
 
 
 def init_db():
@@ -310,11 +320,38 @@ def init_db():
             start REAL,
             title TEXT,
             href TEXT,
-            FOREIGN KEY(article_id) REFERENCES articles(id)
+            FOREIGN KEY(article_id) REFERENCES articles(id) ON DELETE CASCADE
         )''')
         c.execute("CREATE INDEX IF NOT EXISTS idx_chapters_article_id_start ON chapters (article_id, start)")
 
-        _migrate_legacy_chapters_foreign_key(conn)
+        _migrate_chapters_foreign_key(conn)
+
+        # Hosted providers do not mirror their articles into the local `articles`
+        # table, so their chapter rows cannot use the local article foreign key.
+        # Keep a provider-scoped cache alongside the local chapter table instead.
+        c.execute('''CREATE TABLE IF NOT EXISTS chapter_cache (
+            id TEXT PRIMARY KEY,
+            cache_key TEXT NOT NULL,
+            start REAL,
+            title TEXT,
+            href TEXT
+        )''')
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_chapter_cache_key_start "
+            "ON chapter_cache (cache_key, start)"
+        )
+        c.execute('''CREATE TABLE IF NOT EXISTS chapter_sources (
+            cache_key TEXT PRIMARY KEY,
+            source_url TEXT NOT NULL,
+            etag TEXT,
+            last_modified TEXT,
+            checked_at REAL NOT NULL DEFAULT 0,
+            fetched_at REAL NOT NULL DEFAULT 0
+        )''')
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_chapter_sources_checked_at "
+            "ON chapter_sources (checked_at)"
+        )
 
         c.execute('''CREATE TABLE IF NOT EXISTS categories (
             id TEXT PRIMARY KEY,
@@ -480,6 +517,107 @@ def get_connection():
     except Exception as e:
         log.warning(f"Failed to set PRAGMAs on connection: {e}")
     return conn
+
+
+def delete_hosted_chapter_cache(cache_keys, cursor=None) -> int:
+    """Delete hosted chapter rows and source metadata for exact cache keys."""
+    keys = []
+    for key in cache_keys or []:
+        if key is None:
+            continue
+        normalized = str(key).strip()
+        if normalized and normalized not in keys:
+            keys.append(normalized)
+    if not keys:
+        return 0
+
+    conn = None
+    c = cursor
+    if c is None:
+        conn = get_connection()
+        c = conn.cursor()
+    deleted = 0
+    try:
+        for start in range(0, len(keys), 900):
+            chunk = keys[start:start + 900]
+            placeholders = ",".join("?" for _ in chunk)
+            c.execute(
+                f"DELETE FROM chapter_cache WHERE cache_key IN ({placeholders})",
+                chunk,
+            )
+            deleted += max(0, int(c.rowcount or 0))
+            c.execute(
+                f"DELETE FROM chapter_sources "
+                f"WHERE cache_key IN ({placeholders}) AND cache_key NOT LIKE 'local:%'",
+                chunk,
+            )
+        if conn is not None:
+            conn.commit()
+        return deleted
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def cleanup_hosted_chapter_cache(
+    retention_days: int = 90,
+    max_sources: int | None = 10_000,
+    *,
+    now: float | None = None,
+) -> dict:
+    """Bound hosted chapter cache growth without touching local FK-backed rows.
+
+    Source records are the retention clock, including valid chapter documents
+    whose chapter list is empty. Orphaned hosted rows with no source record are
+    removed because they cannot be safely revalidated.
+    """
+    days = max(0, int(retention_days))
+    limit = None if max_sources is None else max(0, int(max_sources))
+    cutoff = float(time.time() if now is None else now) - (days * 86400)
+
+    conn = get_connection()
+    try:
+        c = conn.cursor()
+        c.execute("SAVEPOINT cleanup_hosted_chapters")
+        try:
+            c.execute(
+                "SELECT cache_key FROM chapter_sources "
+                "WHERE cache_key NOT LIKE 'local:%' "
+                "AND MAX(checked_at, fetched_at) < ?",
+                (cutoff,),
+            )
+            keys = [row[0] for row in c.fetchall()]
+
+            if limit is not None:
+                c.execute(
+                    "SELECT cache_key FROM chapter_sources "
+                    "WHERE cache_key NOT LIKE 'local:%' "
+                    "ORDER BY MAX(checked_at, fetched_at) DESC, cache_key "
+                    "LIMIT -1 OFFSET ?",
+                    (limit,),
+                )
+                keys.extend(row[0] for row in c.fetchall())
+
+            unique_keys = list(dict.fromkeys(keys))
+            deleted_rows = delete_hosted_chapter_cache(unique_keys, cursor=c)
+            c.execute(
+                "DELETE FROM chapter_cache "
+                "WHERE cache_key NOT IN (SELECT cache_key FROM chapter_sources)"
+            )
+            orphan_rows = max(0, int(c.rowcount or 0))
+            c.execute("RELEASE SAVEPOINT cleanup_hosted_chapters")
+            conn.commit()
+            return {
+                "sources": len(unique_keys),
+                "chapters": deleted_rows + orphan_rows,
+                "orphans": orphan_rows,
+            }
+        except Exception:
+            c.execute("ROLLBACK TO SAVEPOINT cleanup_hosted_chapters")
+            c.execute("RELEASE SAVEPOINT cleanup_hosted_chapters")
+            raise
+    finally:
+        conn.close()
 
 
 def get_feed_show_images(feed_id):

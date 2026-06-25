@@ -91,6 +91,37 @@ def test_enable_on_macos_writes_plist_and_loads(monkeypatch, tmp_path):
     assert any(c[:2] == ["launchctl", "load"] for c in runner.calls)
 
 
+def test_enable_on_macos_removes_plist_when_load_fails(monkeypatch, tmp_path):
+    monkeypatch.setattr(macint.sys, "platform", "darwin")
+    expected_plist = _point_launch_agents_at(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        macint,
+        "_program_arguments",
+        lambda: ["/Applications/BlindRSS.app/Contents/MacOS/BlindRSS"],
+    )
+
+    calls = []
+
+    def _run(cmd, *args, **kwargs):
+        calls.append(list(cmd))
+
+        class _Proc:
+            returncode = 1 if "load" in cmd else 0
+            stdout = ""
+            stderr = "bootstrap failed" if returncode else ""
+
+        return _Proc()
+
+    monkeypatch.setattr(macint.subprocess, "run", _run)
+
+    ok, msg = macint.set_macos_startup_enabled(True)
+
+    assert ok is False
+    assert "bootstrap failed" in msg
+    assert not expected_plist.exists()
+    assert any(c[:2] == ["launchctl", "load"] for c in calls)
+
+
 def test_disable_on_macos_unloads_and_removes_plist(monkeypatch, tmp_path):
     monkeypatch.setattr(winint.sys, "platform", "darwin")
     monkeypatch.setattr(macint.sys, "platform", "darwin")

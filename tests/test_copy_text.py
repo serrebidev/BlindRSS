@@ -12,6 +12,9 @@ import gui.mainframe as mainframe
 class _Host:
     on_copy_text = mainframe.MainFrame.on_copy_text
     _compose_article_copy_text = mainframe.MainFrame._compose_article_copy_text
+    _compose_article_reader_text = mainframe.MainFrame._compose_article_reader_text
+    _format_article_chapters_text = mainframe.MainFrame._format_article_chapters_text
+    _format_chapter_timestamp = mainframe.MainFrame._format_chapter_timestamp
     _fulltext_cache_key_for_article = mainframe.MainFrame._fulltext_cache_key_for_article
 
     def __init__(self, articles, cache=None):
@@ -99,3 +102,22 @@ def test_copy_text_blank_cache_falls_back_to_feed_content():
     text = host._compose_article_copy_text(article, 0)
 
     assert "BODY:<p>short feed body</p>" in text
+
+
+def test_copy_text_includes_chapters_with_cached_full_text():
+    chapters = [
+        {
+            "start": 65,
+            "title": "Details",
+            "href": "https://example.com/details",
+        }
+    ]
+    article = _article(chapters=chapters)
+    cached = "Title: My Headline\nAuthor: Jane Doe\n\nFull body here."
+    host = _Host([article], cache={article.url: cached})
+
+    text = host._compose_article_copy_text(article, 0)
+
+    assert text.startswith(cached)
+    assert "Chapters (1):" in text
+    assert "01:05, Details. Link: https://example.com/details" in text

@@ -79,6 +79,19 @@ def test_shift_or_meta_disqualifies():
     assert resolve_media_action("darwin", ctrl=True, alt=False, shift=False, meta=True, keycode=wx.WXK_LEFT) is None
 
 
+def test_ctrl_alt_arrow_is_not_a_media_action():
+    for plat in ("darwin", "win32", "linux"):
+        for kc in (wx.WXK_LEFT, wx.WXK_RIGHT, wx.WXK_UP, wx.WXK_DOWN):
+            assert resolve_media_action(
+                plat,
+                ctrl=True,
+                alt=True,
+                shift=False,
+                meta=False,
+                keycode=kc,
+            ) is None
+
+
 def test_non_arrow_key_returns_none():
     assert resolve_media_action("darwin", ctrl=True, alt=False, shift=False, meta=False, keycode=ord("P")) is None
 
@@ -289,6 +302,23 @@ def test_alt_arrow_ignored_off_macos(monkeypatch):
     )
     assert handled is False
     assert fired == []
+
+
+def test_ctrl_alt_arrow_is_rejected_by_hold_repeat(monkeypatch):
+    monkeypatch.setattr(hotkeys.sys, "platform", "darwin")
+    clock = _FakeClock()
+    keys = _FakeKeyState()
+    fired = []
+    hk = _make_hk(clock, keys)
+
+    handled = hk.handle_ctrl_key(
+        _FakeKeyEvent(wx.WXK_LEFT, ctrl=True, alt=True),
+        {wx.WXK_LEFT: lambda: fired.append(1)},
+    )
+
+    assert handled is False
+    assert fired == []
+    assert hk._active == {}
 
 
 def test_keyup_on_modifier_stops_repeat():

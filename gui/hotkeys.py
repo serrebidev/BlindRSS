@@ -42,16 +42,18 @@ def resolve_media_action(
     Pure function (no wx.App / no event object) so the platform-specific
     modifier rules can be unit-tested deterministically.
 
-    - Ctrl+Arrow maps to seek/volume on every platform (existing behavior).
+    - Ctrl-only+Arrow maps to seek/volume on every platform (existing behavior).
     - On macOS, Alt(Option)+Arrow ALSO maps to the same actions, because the
       default Ctrl+Left/Right system shortcuts ("Move left/right a space")
       shadow the app there.
+    - Ctrl+Alt is rejected so mixed-modifier shortcuts are never interpreted
+      as Ctrl-only or macOS Alt-only media actions.
     - Shift or Meta(Cmd) being down disqualifies it (Ctrl+Shift+Arrow is the
       chapter shortcut; Cmd combos belong to the system).
     - No modifier -> None, so plain arrow navigation is never treated as a
       media key.
     """
-    if shift or meta:
+    if shift or meta or (ctrl and alt):
         return None
 
     accel = bool(ctrl)
@@ -264,15 +266,22 @@ class HoldRepeatHotkeys:
         """
         mask = 0
         try:
-            if event.ControlDown():
-                mask |= 1
+            ctrl_down = bool(event.ControlDown())
         except Exception:
-            pass
+            ctrl_down = False
         try:
-            if _is_macos() and event.AltDown():
-                mask |= 2
+            alt_down = bool(event.AltDown())
         except Exception:
-            pass
+            alt_down = False
+
+        # Accelerator shortcuts are deliberately modifier-exclusive:
+        # Ctrl-only everywhere, or Alt-only on macOS.
+        if ctrl_down and alt_down:
+            return 0
+        if ctrl_down:
+            mask |= 1
+        elif _is_macos() and alt_down:
+            mask |= 2
         return mask
 
     def handle_ctrl_key(

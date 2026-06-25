@@ -6,13 +6,19 @@ snippet, so "full text" did nothing on macOS. These tests cover both the GUI-fre
 body extractor and the frame's background load/apply pipeline.
 """
 
+import threading
+from collections import deque
 from types import SimpleNamespace
 
 import pytest
 
 from core import article_extractor
 from core import utils as core_utils
-from gui.accessibility import extract_article_body
+from gui.accessibility import (
+    extract_article_body,
+    format_accessible_chapters,
+    normalize_accessible_chapters,
+)
 
 
 # --------------------------------------------------------------------------- #
@@ -247,7 +253,7 @@ def _article(**over):
     base = dict(
         id="a1", title="Headline", url="https://example.com/post",
         content="<p>feed snippet</p>", date="", author="Author Name",
-        is_read=False, timestamp=0.0, media_url=None,
+        is_read=False, timestamp=0.0, media_url=None, chapters=[],
     )
     base.update(over)
     return SimpleNamespace(**base)
@@ -284,6 +290,151 @@ def test_full_text_replaces_snippet_and_caches(wxapp, monkeypatch):
         assert "Link: https://example.com/post" in value  # header preserved
         assert frame._fulltext_cache["a1"] == "FULL ARTICLE BODY TEXT"
         assert frame._fulltext_inflight == set()
+    finally:
+        _destroy(mainframe, frame)
+
+
+def test_chapter_formatter_exposes_count_titles_timestamps_and_hrefs():
+    chapters = [
+        {"start": 3723.9, "title": "Long discussion", "href": "https://example.com/long"},
+        {"start": 65, "title": "", "url": "https://example.com/untitled"},
+        {"start": 0, "title": "Opening"},
+    ]
+
+    assert normalize_accessible_chapters(chapters) == [
+        {"start": 0.0, "title": "Opening", "href": ""},
+        {
+            "start": 65.0,
+            "title": "Untitled chapter",
+            "href": "https://example.com/untitled",
+        },
+        {
+            "start": 3723.9,
+            "title": "Long discussion",
+            "href": "https://example.com/long",
+        },
+    ]
+    assert format_accessible_chapters(chapters) == (
+        "Chapters available: 3.\n"
+        "Chapter 1: 00:00, Opening.\n"
+        "Chapter 2: 01:05, Untitled chapter. Link: https://example.com/untitled\n"
+        "Chapter 3: 1:02:03, Long discussion. Link: https://example.com/long"
+    )
+
+
+def test_inline_chapters_are_immediately_in_voiceover_content(wxapp):
+    mainframe, frame = _make_browser()
+    try:
+        article = _article(
+            media_url="https://example.com/episode.mp3",
+            chapters=[
+                {"start": 90, "title": "Interview", "href": "https://example.com/topic"}
+            ],
+        )
+        _select(frame, article)
+
+        frame._show_article_at_index(0)
+
+        value = frame.content_ctrl.GetValue()
+        assert "Chapters available: 1." in value
+        assert "Chapter 1: 01:30, Interview." in value
+        assert "Link: https://example.com/topic" in value
+        assert frame.article_list.GetSelection() == 0
+    finally:
+        _destroy(mainframe, frame)
+
+
+def test_lazy_chapter_fetch_is_provider_locked_and_preserves_full_text(wxapp, monkeypatch):
+    mainframe, frame = _make_browser()
+    try:
+        calls = []
+
+        def _get_chapters(article_id):
+            calls.append(article_id)
+            assert frame._provider_lock.acquire(blocking=False) is False
+            return [{"start": 125, "title": "Fetched", "href": "https://example.com/chapter"}]
+
+        mainframe.provider.get_article_chapters = _get_chapters
+        _patch_sync(monkeypatch, "FULL ARTICLE BODY TEXT")
+        article = _article(media_url="https://example.com/episode.mp3")
+        _select(frame, article)
+
+        frame._show_article_at_index(0)
+        frame._start_fulltext("a1", frame._content_token)
+
+        value = frame.content_ctrl.GetValue()
+        assert calls == ["a1"]
+        assert "FULL ARTICLE BODY TEXT" in value
+        assert "Chapters available: 1." in value
+        assert "Chapter 1: 02:05, Fetched. Link: https://example.com/chapter" in value
+        assert frame.article_list.GetSelection() == 0
+        assert article.chapters == [
+            {"start": 125.0, "title": "Fetched", "href": "https://example.com/chapter"}
+        ]
+    finally:
+        _destroy(mainframe, frame)
+
+
+def test_empty_lazy_chapter_result_announces_unavailability(wxapp, monkeypatch):
+    mainframe, frame = _make_browser()
+    try:
+        mainframe.provider.get_article_chapters = lambda _article_id: []
+        monkeypatch.setattr(accessibility.threading, "Thread", _SyncThread)
+        monkeypatch.setattr(accessibility.wx, "CallAfter", lambda fn, *a, **k: fn(*a, **k))
+        article = _article(media_url="https://example.com/episode.mp3")
+        _select(frame, article)
+
+        frame._show_article_at_index(0)
+
+        assert "Chapters available: 0." in frame.content_ctrl.GetValue()
+    finally:
+        _destroy(mainframe, frame)
+
+
+def test_chapter_update_preserves_reader_text_selection(wxapp):
+    mainframe, frame = _make_browser()
+    try:
+        article = _article(media_url="https://example.com/episode.mp3")
+        _select(frame, article)
+        frame._set_article_content(article, "a1", "BODY WITH SELECTED WORDS")
+        frame.content_ctrl.SetSelection(5, 9)
+        frame._chapter_inflight.add("a1")
+
+        frame._finish_chapters(
+            "a1",
+            token=frame._content_token,
+            chapters=[{"start": 10, "title": "Chapter"}],
+        )
+
+        assert frame.content_ctrl.GetSelection() == (5, 9)
+        assert frame.article_list.GetSelection() == 0
+        assert "Chapter 1: 00:10, Chapter." in frame.content_ctrl.GetValue()
+    finally:
+        _destroy(mainframe, frame)
+
+
+def test_stale_chapter_result_does_not_overwrite_new_selection(wxapp):
+    mainframe, frame = _make_browser()
+    try:
+        old_article = _article(id="old", title="Old")
+        new_article = _article(id="new", title="New", content="NEW BODY")
+        frame._current_articles = [new_article]
+        frame.article_list.Set([frame._article_label(new_article)])
+        frame.article_list.SetSelection(0)
+        frame._content_token = 2
+        frame._set_article_content(new_article, "new", "NEW BODY")
+        before = frame.content_ctrl.GetValue()
+        frame._chapter_inflight.add("old")
+
+        frame._finish_chapters(
+            "old",
+            token=1,
+            chapters=[{"start": 10, "title": "Late old chapter"}],
+        )
+
+        assert frame.content_ctrl.GetValue() == before
+        assert frame._chapter_cache["old"][0]["title"] == "Late old chapter"
+        assert frame.article_list.GetSelection() == 0
     finally:
         _destroy(mainframe, frame)
 
@@ -336,6 +487,102 @@ def test_prefetch_enqueues_read_ahead_articles(wxapp):
         assert queued == ["a1", "a2", "a3"]
     finally:
         _destroy(mainframe, frame)
+
+
+def test_prefetch_replaces_stale_queue_and_skips_inflight_articles():
+    class _Main:
+        @staticmethod
+        def _article_cache_id(article):
+            return article.id
+
+    frame = AccessibleBrowserFrame.__new__(AccessibleBrowserFrame)
+    frame.mainframe = _Main()
+    frame._current_articles = [
+        _article(id=f"a{i}", url=f"https://example.com/{i}") for i in range(9)
+    ]
+    frame._prefetch_ahead = 3
+    frame._fulltext_cache = {}
+    frame._fulltext_inflight = set()
+    frame._prefetch_inflight = {"a6"}
+    frame._prefetch_queue = deque([("a1", frame._current_articles[1])])
+    frame._prefetch_lock = threading.Lock()
+    frame._prefetch_event = threading.Event()
+
+    frame._enqueue_prefetch_from(4)
+
+    assert [art_id for art_id, _ in frame._prefetch_queue] == ["a5", "a7"]
+
+
+def test_finished_prefetch_updates_current_article_without_duplicate_on_demand_load():
+    class _Main:
+        @staticmethod
+        def _article_cache_id(article):
+            return article.id
+
+    class _Content:
+        def __init__(self):
+            self.value = ""
+            self.selection = (17, 29)
+            self.insertion_point = 29
+
+        def SetValue(self, value):
+            self.value = value
+            self.selection = (0, 0)
+            self.insertion_point = 0
+
+        def GetSelection(self):
+            return self.selection
+
+        def SetSelection(self, start, end):
+            self.selection = (start, end)
+            self.insertion_point = end
+
+        def GetInsertionPoint(self):
+            return self.insertion_point
+
+        def SetInsertionPoint(self, pos):
+            self.insertion_point = pos
+
+    article = _article(id="a1")
+    frame = AccessibleBrowserFrame.__new__(AccessibleBrowserFrame)
+    frame.mainframe = _Main()
+    frame._current_articles = [article]
+    frame._fulltext_cache = {}
+    frame._prefetch_inflight = {"a1"}
+    frame._prefetch_lock = threading.Lock()
+    frame.content_ctrl = _Content()
+    frame._selected_article_index = lambda: 0
+
+    frame._finish_prefetch("a1", "PREFETCHED BODY")
+
+    assert frame._prefetch_inflight == set()
+    assert frame._fulltext_cache["a1"] == "PREFETCHED BODY"
+    assert "PREFETCHED BODY" in frame.content_ctrl.value
+    assert frame.content_ctrl.selection == (17, 29)
+    assert frame.content_ctrl.insertion_point == 29
+
+
+def test_failed_prefetch_resumes_deferred_on_demand_load_for_current_token():
+    class _Main:
+        @staticmethod
+        def _article_cache_id(article):
+            return article.id
+
+    article = _article(id="a1")
+    frame = AccessibleBrowserFrame.__new__(AccessibleBrowserFrame)
+    frame.mainframe = _Main()
+    frame._current_articles = [article]
+    frame._content_token = 7
+    frame._prefetch_inflight = {"a1"}
+    frame._prefetch_lock = threading.Lock()
+    frame._selected_article_index = lambda: 0
+    calls = []
+    frame._start_fulltext = lambda art_id, token: calls.append((art_id, token))
+
+    frame._finish_prefetch("a1", None)
+
+    assert frame._prefetch_inflight == set()
+    assert calls == [("a1", 7)]
 
 
 def test_cached_body_used_without_refetch(wxapp, monkeypatch):

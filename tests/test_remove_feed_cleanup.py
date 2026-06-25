@@ -71,6 +71,25 @@ def test_local_provider_remove_feed_deletes_dependent_rows():
                     "INSERT INTO chapters (id, article_id, start, title, href) VALUES (?, ?, ?, ?, ?)",
                     (str(uuid.uuid4()), article_id, 0.0, "Intro", ""),
                 )
+                local_chapter_key = f"local:{article_id}"
+                c.execute(
+                    "INSERT INTO chapter_cache (id, cache_key, start, title, href) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (str(uuid.uuid4()), local_chapter_key, 0.0, "Cached intro", ""),
+                )
+                c.execute(
+                    "INSERT INTO chapter_sources "
+                    "(cache_key, source_url, etag, last_modified, checked_at, fetched_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        local_chapter_key,
+                        "https://example.com/chapters.json",
+                        '"etag"',
+                        None,
+                        1,
+                        1,
+                    ),
+                )
                 # playback_state uses multiple key formats (article:<id> preferred, plus URL fallbacks).
                 c.execute(
                     "INSERT INTO playback_state (id, position_ms, duration_ms, updated_at, completed, seek_supported, title) "
@@ -109,6 +128,10 @@ def test_local_provider_remove_feed_deletes_dependent_rows():
                 assert c.fetchone()[0] == 0
 
                 c.execute("SELECT COUNT(*) FROM chapters WHERE article_id = ?", (article_id,))
+                assert c.fetchone()[0] == 0
+                c.execute("SELECT COUNT(*) FROM chapter_cache WHERE cache_key = ?", (local_chapter_key,))
+                assert c.fetchone()[0] == 0
+                c.execute("SELECT COUNT(*) FROM chapter_sources WHERE cache_key = ?", (local_chapter_key,))
                 assert c.fetchone()[0] == 0
 
                 for pid in (f"article:{article_id}", media_url, article_url):

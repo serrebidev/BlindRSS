@@ -6,6 +6,8 @@ import sys
 import tempfile
 import types
 import unittest
+import subprocess
+from unittest.mock import patch
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
@@ -24,6 +26,8 @@ class YoutubeSearchDetectionTests(unittest.TestCase):
         self.assertFalse(discovery.is_youtube_search_url("https://www.youtube.com/watch?v=abc"))
         self.assertFalse(discovery.is_youtube_search_url("https://www.youtube.com/@ClownfishTV"))
         self.assertFalse(discovery.is_youtube_search_url("https://rumble.com/c/ClownfishTV"))
+        self.assertFalse(discovery.is_youtube_search_url("https://notyoutube.com/results?search_query=test"))
+        self.assertIsNone(discovery.youtube_search_query("https://www.youtube.com/watch?q=not-a-search"))
 
     def test_search_url_has_no_native_feed(self):
         # Must stay as-is so the search-listing path runs on refresh.
@@ -36,7 +40,9 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
             json.dumps(e)
             for e in [
                 {"id": "vid1", "title": "Newest Video", "uploader": "Clownfish TV", "upload_date": "20260524"},
-                {"id": "vid2", "title": "Older Video", "channel": "Clownfish TV"},
+                {"id": "vid2", "title": "Older Video", "channel": "Clownfish TV", "timestamp": 1_700_000_000},
+                {"id": "vid2", "title": "Duplicate Video"},
+                {"id": "PL123", "title": "Playlist", "_type": "playlist"},
                 {"title": "no id, skipped"},
             ]
         )
@@ -61,11 +67,62 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
         self.assertEqual(items[0].title, "Newest Video")
         self.assertEqual(items[0].published, "2026-05-24")
         self.assertEqual(items[0].id, "https://www.youtube.com/watch?v=vid1")
+        self.assertEqual(items[1].published, "2023-11-14")
 
     def test_empty_query(self):
         title, items = discovery.fetch_youtube_search_items("", max_items=10)
         self.assertIsNone(title)
         self.assertEqual(items, [])
+
+    def test_successful_empty_result_is_not_reported_as_failure(self):
+        calls = {"count": 0}
+
+        def fake_run(_cmd, **_kwargs):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                return types.SimpleNamespace(returncode=0, stdout="")
+            return types.SimpleNamespace(returncode=1, stdout="")
+
+        with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[("firefox",)]), patch(
+            "core.discovery.subprocess.run",
+            side_effect=fake_run,
+        ):
+            title, items = discovery.fetch_youtube_search_items("nothing here", timeout_s=10)
+
+        self.assertEqual(title, "YouTube: nothing here")
+        self.assertEqual(items, [])
+
+    def test_all_failed_attempts_raise_for_provider_retry(self):
+        with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[("firefox",)]), patch(
+            "core.discovery.subprocess.run",
+            return_value=types.SimpleNamespace(returncode=1, stdout=""),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "YouTube search failed"):
+                discovery.fetch_youtube_search_items("retry me", timeout_s=10)
+
+    def test_cookie_attempts_share_one_total_deadline(self):
+        timeouts = []
+
+        def fake_run(_cmd, **kwargs):
+            timeouts.append(kwargs["timeout"])
+            return types.SimpleNamespace(returncode=1, stdout="")
+
+        with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[("firefox",)]), patch(
+            "core.discovery.time.monotonic",
+            side_effect=[100.0, 100.0, 102.0],
+        ), patch("core.discovery.subprocess.run", side_effect=fake_run):
+            with self.assertRaises(RuntimeError):
+                discovery.fetch_youtube_search_items("deadline", timeout_s=10)
+
+        self.assertEqual(timeouts, [10.0, 8.0])
+
+    def test_timeout_attempts_raise_for_provider_retry(self):
+        with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[]), patch(
+            "core.discovery.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd=["yt-dlp"], timeout=1),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "timed out"):
+                discovery.fetch_youtube_search_items("timeout", timeout_s=10)
 
 
 class RumbleSearchNormalizationTests(unittest.TestCase):
@@ -134,6 +191,57 @@ class YoutubeSearchRefreshIntegrationTests(unittest.TestCase):
             self.assertTrue(url.startswith("https://www.youtube.com/watch?v="))
             self.assertEqual(media_url, url)
             self.assertEqual(media_type, "video/youtube")
+
+    def test_overlapping_search_feeds_keep_separate_articles_and_refresh_metadata(self):
+        second_feed_id = "yt-search-feed-two"
+        conn = self.db.get_connection()
+        conn.execute(
+            "INSERT INTO feeds (id, url, title, category, icon_url) VALUES (?, ?, ?, ?, ?)",
+            (
+                second_feed_id,
+                "https://www.youtube.com/results?search_query=animation",
+                "YouTube: animation",
+                "Tests",
+                "",
+            ),
+        )
+        conn.commit()
+        conn.close()
+
+        calls = {"count": 0}
+
+        def fake_fetch(query, max_items=30, timeout_s=30.0, cookiefile=None):
+            calls["count"] += 1
+            title = "Updated title" if calls["count"] > 2 else "Original title"
+            return (
+                f"YouTube: {query}",
+                [
+                    discovery.YoutubeSearchItem(
+                        url="https://www.youtube.com/watch?v=shared",
+                        title=title,
+                        author="Shared Creator",
+                    )
+                ],
+            )
+
+        orig = discovery.fetch_youtube_search_items
+        discovery.fetch_youtube_search_items = fake_fetch
+        try:
+            self.provider.refresh(force=True)
+            self.provider.refresh(force=True)
+        finally:
+            discovery.fetch_youtube_search_items = orig
+
+        conn = self.db.get_connection()
+        rows = conn.execute(
+            "SELECT feed_id, title FROM articles WHERE url = ? ORDER BY feed_id",
+            ("https://www.youtube.com/watch?v=shared",),
+        ).fetchall()
+        conn.close()
+
+        self.assertEqual(len(rows), 2)
+        self.assertEqual({row[0] for row in rows}, {self.feed_id, second_feed_id})
+        self.assertTrue(any(row[1] == "Updated title" for row in rows))
 
 
 if __name__ == "__main__":

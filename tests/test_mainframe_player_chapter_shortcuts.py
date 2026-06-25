@@ -85,7 +85,14 @@ class _DummyMain:
     def __init__(self):
         self.list_ctrl = object()
         self.tree = object()
-        self.player_window = object()
+        self.player_window = type(
+            "_ChapterPlayer",
+            (),
+            {
+                "current_chapters": [{"start": 0.0}, {"start": 10.0}, {"start": 20.0}],
+                "get_active_chapter_index": lambda _self: 1,
+            },
+        )()
         self.content_ctrl = object()
         self.search_ctrl = object()
         self._focus = None
@@ -113,6 +120,35 @@ def test_mainframe_ctrl_shift_arrows_trigger_player_chapter_shortcuts():
     assert host.calls == ["prev", "next"]
     assert left_evt.skipped is False
     assert right_evt.skipped is False
+
+
+def test_mainframe_ctrl_shift_arrows_are_not_swallowed_without_chapters():
+    host = _DummyMain()
+    host.player_window.current_chapters = []
+    left_evt = _DummyKeyEvent(mainframe.wx.WXK_LEFT, ctrl=True, shift=True)
+    right_evt = _DummyKeyEvent(mainframe.wx.WXK_RIGHT, ctrl=True, shift=True)
+
+    host.on_char_hook(left_evt)
+    host.on_char_hook(right_evt)
+
+    assert host.calls == []
+    assert left_evt.skipped is True
+    assert right_evt.skipped is True
+
+
+def test_mainframe_ctrl_shift_arrows_are_not_swallowed_at_chapter_boundaries():
+    host = _DummyMain()
+    host.player_window.get_active_chapter_index = lambda: 0
+    left_evt = _DummyKeyEvent(mainframe.wx.WXK_LEFT, ctrl=True, shift=True)
+    host.on_char_hook(left_evt)
+
+    host.player_window.get_active_chapter_index = lambda: 2
+    right_evt = _DummyKeyEvent(mainframe.wx.WXK_RIGHT, ctrl=True, shift=True)
+    host.on_char_hook(right_evt)
+
+    assert host.calls == []
+    assert left_evt.skipped is True
+    assert right_evt.skipped is True
 
 
 def test_mainframe_ctrl_arrows_trigger_player_volume_and_seek_shortcuts():

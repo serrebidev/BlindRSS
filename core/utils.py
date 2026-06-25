@@ -3,12 +3,20 @@ import re
 import uuid
 import logging
 import sqlite3
+import json
+import ipaddress
+import math
+import os
+import socket
+import time
 import xml.etree.ElementTree as ET
+from collections.abc import Mapping
 from bs4 import BeautifulSoup as BS
 from datetime import datetime, timezone, timedelta
 from dateutil import parser as dateparser
 from dateutil.parser import UnknownTimezoneWarning
 from io import BytesIO
+from pathlib import Path
 from core.db import get_connection
 import warnings
 import urllib.parse
@@ -610,54 +618,817 @@ def humanize_article_date(date_str: str, now_utc: datetime = None) -> str:
 
 # --- Chapters ---
 
+_MAX_CHAPTER_JSON_BYTES = 2_000_000
+_MAX_CHAPTER_COUNT = 10_000
+_MAX_CHAPTER_REDIRECTS = 5
+_CHAPTER_REFRESH_SECONDS = 15 * 60
+_CHAPTER_JSON_MIME_TYPES = {
+    "application/json",
+    "application/json+chapters",
+    "application/octet-stream",
+    "text/json",
+    "text/plain",
+}
 
-def get_chapters_from_db(article_id: str):
+
+def build_chapter_cache_key(provider: str | None, article_id) -> str | None:
+    """Build an unambiguous provider-scoped key for hosted article chapters."""
+    try:
+        article_key = str(article_id).strip()
+    except Exception:
+        return None
+    if not article_key:
+        return None
+    provider_key = str(provider or "").strip().lower()
+    if not provider_key:
+        return article_key
+    if (
+        ":" not in provider_key
+        and ":" not in article_key
+        and provider_key != "local"
+    ):
+        return f"{provider_key}:{article_key}"
+    # Length-prefixing is reversible and avoids delimiter collisions such as
+    # ("a:b", "c") versus ("a", "b:c"). Simple legacy keys remain unchanged
+    # when they are already unambiguous.
+    return f"hosted:v1:{len(provider_key)}:{provider_key}{article_key}"
+
+
+def _chapter_start_seconds(value):
+    """Return a finite, non-negative chapter timestamp in seconds."""
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, (int, float)):
+        result = float(value)
+    else:
+        text = str(value).strip()
+        if not text:
+            return None
+        try:
+            if ":" not in text:
+                result = float(text)
+            else:
+                parts = text.split(":")
+                if len(parts) not in (2, 3) or any(not part.strip() for part in parts):
+                    return None
+                values = [float(part.strip()) for part in parts]
+                if any(not math.isfinite(part) or part < 0 for part in values):
+                    return None
+                if any(part >= 60 for part in values[1:]):
+                    return None
+                result = sum(part * (60 ** index) for index, part in enumerate(reversed(values)))
+        except (TypeError, ValueError, OverflowError):
+            return None
+    if not math.isfinite(result) or result < 0:
+        return None
+    return result
+
+
+def _chapter_text(value, *, empty=None):
+    if value is None:
+        return empty
+    try:
+        return str(value)
+    except Exception:
+        return empty
+
+
+def _normalize_chapters(chapters):
+    """Validate, sort, and deduplicate chapter dictionaries.
+
+    Duplicate timestamps are merged in source order so a later duplicate can
+    supply a missing title or href without replacing already-present metadata.
+    """
+    if not isinstance(chapters, (list, tuple)):
+        return []
+
+    normalized = []
+    for chapter in chapters[:_MAX_CHAPTER_COUNT]:
+        if not isinstance(chapter, Mapping):
+            continue
+        if chapter.get("toc") is False:
+            continue
+        start_value = None
+        for key in ("startTime", "start_time", "start"):
+            if key in chapter:
+                start_value = chapter[key]
+                break
+        start = _chapter_start_seconds(start_value)
+        if start is None:
+            continue
+
+        title = _chapter_text(chapter.get("title"), empty="") or ""
+        href_value = chapter.get("url")
+        if href_value in (None, ""):
+            href_value = chapter.get("link")
+        if href_value in (None, ""):
+            href_value = chapter.get("href")
+        href = _chapter_text(href_value, empty=None)
+        normalized.append({"start": start, "title": title, "href": href})
+
+    normalized.sort(key=lambda chapter: chapter["start"])
+    deduped = []
+    for chapter in normalized:
+        if deduped and chapter["start"] == deduped[-1]["start"]:
+            if not deduped[-1]["title"] and chapter["title"]:
+                deduped[-1]["title"] = chapter["title"]
+            if not deduped[-1]["href"] and chapter["href"]:
+                deduped[-1]["href"] = chapter["href"]
+            continue
+        deduped.append(chapter)
+    return deduped
+
+
+def _replace_stored_chapters(article_key, chapters, cursor=None, *, cache_key=None, allow_empty=False):
+    """Atomically replace one article's chapter rows.
+
+    Constraint failures roll back only this replacement and leave any previous
+    rows intact. Parsed chapters are still returned to callers when persistence
+    is impossible (for example, a missing article foreign key).
+    """
+    storage_key = str(cache_key or article_key or "").strip()
+    if not storage_key or (not chapters and not allow_empty):
+        return False
+
+    conn = None
+    c = cursor
+    if c is None:
+        conn = get_connection()
+        c = conn.cursor()
+
+    savepoint = f"replace_chapters_{uuid.uuid4().hex}"
+    try:
+        c.execute(f"SAVEPOINT {savepoint}")
+        if cache_key:
+            c.execute("DELETE FROM chapter_cache WHERE cache_key = ?", (storage_key,))
+            if chapters:
+                c.executemany(
+                    "INSERT INTO chapter_cache (id, cache_key, start, title, href) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    [
+                        (
+                            str(uuid.uuid4()),
+                            storage_key,
+                            chapter["start"],
+                            chapter["title"],
+                            chapter["href"],
+                        )
+                        for chapter in chapters
+                    ],
+                )
+        else:
+            c.execute("DELETE FROM chapters WHERE article_id = ?", (storage_key,))
+            if chapters:
+                c.executemany(
+                    "INSERT INTO chapters (id, article_id, start, title, href) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    [
+                        (
+                            str(uuid.uuid4()),
+                            storage_key,
+                            chapter["start"],
+                            chapter["title"],
+                            chapter["href"],
+                        )
+                        for chapter in chapters
+                    ],
+                )
+        c.execute(f"RELEASE SAVEPOINT {savepoint}")
+        if conn is not None:
+            conn.commit()
+        return True
+    except sqlite3.Error as e:
+        try:
+            c.execute(f"ROLLBACK TO SAVEPOINT {savepoint}")
+            c.execute(f"RELEASE SAVEPOINT {savepoint}")
+        except sqlite3.Error:
+            pass
+        log.info(
+            "Skipping chapter DB persistence for key=%s due to database error: %s",
+            storage_key,
+            e,
+        )
+        return False
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def _response_header(response, name):
+    headers = getattr(response, "headers", {}) or {}
+    for key, value in headers.items():
+        if str(key).lower() == name.lower():
+            return value
+    return None
+
+
+def _validated_public_http_url(url, *, purpose):
+    try:
+        raw_url = str(url or "").strip()
+        parsed_url = urllib.parse.urlsplit(raw_url)
+    except Exception as e:
+        raise ValueError(f"invalid {purpose} URL") from e
+    if parsed_url.scheme.lower() not in {"http", "https"} or not parsed_url.netloc:
+        raise ValueError(f"{purpose} URL must use HTTP or HTTPS")
+    if "\\" in parsed_url.netloc:
+        raise ValueError(f"{purpose} URL has an invalid authority")
+    if parsed_url.username is not None or parsed_url.password is not None:
+        raise ValueError(f"{purpose} URL must not contain credentials")
+    try:
+        port = parsed_url.port
+    except ValueError as e:
+        raise ValueError(f"{purpose} URL has an invalid port") from e
+    hostname = str(parsed_url.hostname or "").strip().rstrip(".").lower()
+    if not hostname or hostname == "localhost" or hostname.endswith(".localhost"):
+        raise ValueError(f"{purpose} URL must use a public host")
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        address = None
+    if address is not None and not address.is_global:
+        raise ValueError(f"{purpose} URL must not target a private or local address")
+
+    # Requests performs its own DNS lookup after this check. Validating every
+    # redirect substantially reduces SSRF exposure, but without replacing
+    # Requests' connection layer there remains a DNS-rebinding/TOCTOU window
+    # where an answer can change between validation and socket connection.
+    try:
+        resolved = socket.getaddrinfo(
+            hostname,
+            port or (443 if parsed_url.scheme.lower() == "https" else 80),
+            type=socket.SOCK_STREAM,
+        )
+    except OSError as e:
+        raise ValueError(f"{purpose} host could not be resolved") from e
+    addresses = set()
+    for result in resolved:
+        sockaddr = result[4] if len(result) > 4 else None
+        if not sockaddr:
+            continue
+        try:
+            addresses.add(ipaddress.ip_address(sockaddr[0]))
+        except (ValueError, TypeError):
+            continue
+    if not addresses:
+        raise ValueError(f"{purpose} host did not resolve to an IP address")
+    if any(not address.is_global for address in addresses):
+        raise ValueError(f"{purpose} host resolved to a private or local address")
+    return parsed_url.geturl()
+
+
+def _validated_chapter_url(chapter_url):
+    return _validated_public_http_url(chapter_url, purpose="chapter")
+
+
+def _open_public_http_stream(
+    url,
+    *,
+    headers,
+    timeout,
+    purpose,
+    max_redirects=_MAX_CHAPTER_REDIRECTS,
+):
+    """Open a bounded streaming GET after validating every redirect target."""
+    current_url = str(url or "").strip()
+    for redirect_count in range(int(max_redirects) + 1):
+        current_url = _validated_public_http_url(current_url, purpose=purpose)
+        response = safe_requests_get(
+            current_url,
+            headers=headers,
+            timeout=timeout,
+            stream=True,
+            allow_redirects=False,
+        )
+        status_code = int(getattr(response, "status_code", 200) or 200)
+        if status_code not in {301, 302, 303, 307, 308}:
+            return response, current_url
+        try:
+            location = _response_header(response, "Location")
+        finally:
+            try:
+                response.close()
+            except Exception:
+                pass
+        if not location:
+            raise ValueError(f"{purpose} redirect is missing a Location header")
+        if redirect_count >= int(max_redirects):
+            raise ValueError(f"too many {purpose} redirects")
+        current_url = urllib.parse.urljoin(current_url, str(location))
+    raise ValueError(f"too many {purpose} redirects")
+
+
+def _chapter_json_mime_is_compatible(content_type):
+    if not content_type:
+        return True
+    mime = str(content_type).split(";", 1)[0].strip().lower()
+    return mime in _CHAPTER_JSON_MIME_TYPES or (
+        mime.startswith("application/") and mime.endswith("+json")
+    )
+
+
+def _validate_chapter_document(data):
+    if not isinstance(data, Mapping):
+        raise ValueError("chapter JSON root must be an object")
+    version = data.get("version")
+    if not isinstance(version, str) or not version.strip():
+        raise ValueError("chapter JSON requires a string version")
+    chapters = data.get("chapters")
+    if not isinstance(chapters, list):
+        raise ValueError("chapter JSON requires a chapters array")
+    return data
+
+
+def _fetch_chapter_json(chapter_url, *, etag=None, last_modified=None):
+    request_headers = add_revalidation_headers(
+        {
+            "Accept": (
+                "application/json+chapters, application/json;q=0.9, "
+                "application/*+json;q=0.8, text/json;q=0.7"
+            )
+        }
+    )
+    if etag:
+        request_headers["If-None-Match"] = str(etag)
+    if last_modified:
+        request_headers["If-Modified-Since"] = str(last_modified)
+
+    resp, current_url = _open_public_http_stream(
+        chapter_url,
+        headers=request_headers,
+        timeout=(5, 10),
+        purpose="chapter",
+    )
+    try:
+        status_code = int(getattr(resp, "status_code", 200) or 200)
+        if status_code == 304:
+            return {
+                "status": 304,
+                "data": None,
+                "etag": _response_header(resp, "ETag") or etag,
+                "last_modified": (
+                    _response_header(resp, "Last-Modified") or last_modified
+                ),
+                "url": current_url,
+            }
+
+        resp.raise_for_status()
+        content_type = _response_header(resp, "Content-Type")
+        if not _chapter_json_mime_is_compatible(content_type):
+            raise ValueError(
+                f"unsupported chapter JSON content type: {content_type}"
+            )
+        content_length = _response_header(resp, "Content-Length")
+        if content_length:
+            try:
+                declared_length = int(content_length)
+            except (TypeError, ValueError):
+                declared_length = None
+            if declared_length is not None and declared_length > _MAX_CHAPTER_JSON_BYTES:
+                raise ValueError("chapter JSON is too large")
+
+        raw = bytearray()
+        if hasattr(resp, "iter_content"):
+            for chunk in resp.iter_content(chunk_size=65536):
+                if not chunk:
+                    continue
+                raw.extend(chunk)
+                if len(raw) > _MAX_CHAPTER_JSON_BYTES:
+                    raise ValueError("chapter JSON is too large")
+        if raw:
+            data = json.loads(raw.decode("utf-8-sig"))
+        else:
+            data = resp.json()
+        _validate_chapter_document(data)
+        return {
+            "status": status_code,
+            "data": data,
+            "etag": _response_header(resp, "ETag"),
+            "last_modified": _response_header(resp, "Last-Modified"),
+            "url": current_url,
+        }
+    finally:
+        try:
+            resp.close()
+        except Exception:
+            pass
+
+
+def _load_chapter_json(chapter_url):
+    """Compatibility wrapper for callers/tests that only need the parsed document."""
+    return _fetch_chapter_json(chapter_url)["data"]
+
+
+def _chapter_source_key(article_key, cache_key=None):
+    storage_key = str(cache_key or article_key or "").strip()
+    if not storage_key:
+        return None
+    return storage_key if cache_key else f"local:{storage_key}"
+
+
+def _get_chapter_source(article_key=None, *, cache_key=None, cursor=None):
+    source_key = _chapter_source_key(article_key, cache_key)
+    if not source_key:
+        return None
+    conn = None
+    c = cursor
+    if c is None:
+        conn = get_connection()
+        c = conn.cursor()
+    try:
+        c.execute(
+            "SELECT source_url, etag, last_modified, checked_at, fetched_at "
+            "FROM chapter_sources WHERE cache_key = ?",
+            (source_key,),
+        )
+        row = c.fetchone()
+        if not row:
+            return None
+        return {
+            "source_url": row[0],
+            "etag": row[1],
+            "last_modified": row[2],
+            "checked_at": float(row[3] or 0),
+            "fetched_at": float(row[4] or 0),
+        }
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def _save_chapter_source(
+    article_key,
+    source_url,
+    *,
+    cache_key=None,
+    etag=None,
+    last_modified=None,
+    checked_at=None,
+    fetched_at=None,
+    cursor=None,
+):
+    source_key = _chapter_source_key(article_key, cache_key)
+    if not source_key or not source_url:
+        return False
+    conn = None
+    c = cursor
+    if c is None:
+        conn = get_connection()
+        c = conn.cursor()
+    checked = float(checked_at if checked_at is not None else time.time())
+    fetched = float(fetched_at if fetched_at is not None else checked)
+    try:
+        c.execute(
+            "INSERT INTO chapter_sources "
+            "(cache_key, source_url, etag, last_modified, checked_at, fetched_at) "
+            "VALUES (?, ?, ?, ?, ?, ?) "
+            "ON CONFLICT(cache_key) DO UPDATE SET "
+            "source_url=excluded.source_url, etag=excluded.etag, "
+            "last_modified=excluded.last_modified, checked_at=excluded.checked_at, "
+            "fetched_at=excluded.fetched_at",
+            (
+                source_key,
+                str(source_url),
+                etag,
+                last_modified,
+                checked,
+                fetched,
+            ),
+        )
+        if conn is not None:
+            conn.commit()
+        return True
+    except sqlite3.Error as e:
+        log.debug("Could not persist chapter source metadata for %s: %s", source_key, e)
+        return False
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def get_chapter_source_url(article_id=None, *, cache_key=None):
+    source = _get_chapter_source(article_id, cache_key=cache_key)
+    return source.get("source_url") if source else None
+
+
+def get_chapters_from_db(article_id: str, *, cache_key=None):
+    storage_key = str(cache_key or article_id or "").strip()
+    if not storage_key:
+        return []
     conn = get_connection()
     try:
         c = conn.cursor()
-        c.execute("SELECT start, title, href FROM chapters WHERE article_id = ? ORDER BY start", (article_id,))
+        if cache_key:
+            c.execute(
+                "SELECT start, title, href FROM chapter_cache "
+                "WHERE cache_key = ? ORDER BY start",
+                (storage_key,),
+            )
+        else:
+            c.execute(
+                "SELECT start, title, href FROM chapters "
+                "WHERE article_id = ? ORDER BY start",
+                (storage_key,),
+            )
         rows = c.fetchall()
+        if not rows and cache_key and article_id:
+            # Preserve caches written by older builds before hosted IDs were scoped.
+            c.execute(
+                "SELECT start, title, href FROM chapters "
+                "WHERE article_id = ? ORDER BY start",
+                (str(article_id),),
+            )
+            rows = c.fetchall()
         return [{"start": r[0], "title": r[1], "href": r[2]} for r in rows]
     finally:
         conn.close()
 
 
-def get_chapters_batch(article_ids: list) -> dict:
+def get_chapters_batch(article_ids: list, *, cache_keys=None) -> dict:
     """
-    Fetches chapters for multiple articles in chunks to optimize performance.
-    Returns a dict: {article_id: [chapter_list]}
+    Fetch chapters for multiple articles in chunks.
+
+    ``cache_keys`` maps hosted article IDs to provider-scoped cache keys. Local
+    callers omit it and continue reading the foreign-keyed ``chapters`` table.
     """
     if not article_ids:
         return {}
-    
+
+    normalized_ids = [str(article_id) for article_id in article_ids]
+    key_map = {
+        article_id: str((cache_keys or {}).get(article_id) or article_id)
+        for article_id in normalized_ids
+    }
+    reverse_keys = {}
+    for article_id, storage_key in key_map.items():
+        reverse_keys.setdefault(storage_key, []).append(article_id)
+
     conn = get_connection()
     try:
         c = conn.cursor()
         chapters_map = {}
-        
-        # SQLite limit usually 999 vars
+        storage_keys = list(reverse_keys)
         chunk_size = 900
-        for i in range(0, len(article_ids), chunk_size):
-            chunk = article_ids[i:i+chunk_size]
-            placeholders = ','.join(['?'] * len(chunk))
-            c.execute(f"SELECT article_id, start, title, href FROM chapters WHERE article_id IN ({placeholders}) ORDER BY article_id, start", chunk)
-            for row in c.fetchall():
-                aid = row[0]
-                if aid not in chapters_map:
-                    chapters_map[aid] = []
-                chapters_map[aid].append({"start": row[1], "title": row[2], "href": row[3]})
-                
+        table = "chapter_cache" if cache_keys else "chapters"
+        key_column = "cache_key" if cache_keys else "article_id"
+        for i in range(0, len(storage_keys), chunk_size):
+            chunk = storage_keys[i:i + chunk_size]
+            placeholders = ",".join(["?"] * len(chunk))
+            c.execute(
+                f"SELECT {key_column}, start, title, href FROM {table} "
+                f"WHERE {key_column} IN ({placeholders}) ORDER BY {key_column}, start",
+                chunk,
+            )
+            for storage_key, start, title, href in c.fetchall():
+                for article_id in reverse_keys.get(storage_key, []):
+                    chapters_map.setdefault(article_id, []).append(
+                        {"start": start, "title": title, "href": href}
+                    )
         return chapters_map
     finally:
         conn.close()
 
 
-def fetch_and_store_chapters(article_id, media_url, media_type, chapter_url=None, allow_id3: bool = True, cursor=None):
-    """
-    Fetches chapters from chapter_url (JSON) or media_url (ID3 tags).
-    Stores them in DB linked to article_id.
-    Returns list of chapter dicts.
-    """
+def chapter_source_and_media(item):
+    """Return ``(chapter_url, media_url, media_type)`` from common provider shapes."""
+    if not isinstance(item, Mapping):
+        return None, None, None
+
+    chapter_url = None
+    for key in (
+        "chapter_url",
+        "chapters_url",
+        "podcast_chapters",
+        "podcast:chapters",
+        "chapters",
+    ):
+        candidate = item.get(key)
+        if isinstance(candidate, Mapping):
+            candidate = candidate.get("url") or candidate.get("href")
+        if isinstance(candidate, str) and candidate.strip().lower().startswith(("http://", "https://")):
+            chapter_url = candidate.strip()
+            break
+
+    media_url = item.get("media_url")
+    media_type = item.get("media_type") or item.get("mime_type")
+    enclosure_groups = (
+        item.get("enclosures"),
+        item.get("enclosure"),
+        item.get("attachments"),
+    )
+    for group in enclosure_groups:
+        if isinstance(group, Mapping):
+            group = [group]
+        if not isinstance(group, (list, tuple)):
+            continue
+        for enclosure in group:
+            if not isinstance(enclosure, Mapping):
+                continue
+            url = enclosure.get("url") or enclosure.get("href")
+            mime = enclosure.get("mime_type") or enclosure.get("type")
+            mime_l = canonical_media_type(mime)
+            if url and (
+                mime_l == "application/json+chapters"
+                or mime_l.endswith("+json") and "chapter" in mime_l
+            ):
+                chapter_url = chapter_url or str(url)
+                continue
+            if url and not media_url:
+                media_url = url
+                media_type = mime
+    return chapter_url, media_url, media_type
+
+
+def _chapters_from_id3(id3):
+    parsed_chapters = []
+    for frame in id3.getall("CHAP"):
+        start_ms = getattr(frame, "start_time", None)
+        start = _chapter_start_seconds(
+            float(start_ms) / 1000.0 if start_ms is not None else None
+        )
+        if start is None:
+            continue
+        title_ch = ""
+        sub_frames = getattr(frame, "sub_frames", {}) or {}
+        tit2 = sub_frames.get("TIT2")
+        if tit2 is None and hasattr(sub_frames, "getall"):
+            title_frames = sub_frames.getall("TIT2")
+            tit2 = title_frames[0] if title_frames else None
+        if tit2 and tit2.text:
+            title_ch = _chapter_text(tit2.text[0], empty="") or ""
+        href = None
+        for frame_name in ("WXXX", "WOAR", "WCOM", "WPUB"):
+            url_frame = sub_frames.get(frame_name)
+            if url_frame is None and hasattr(sub_frames, "getall"):
+                url_frames = sub_frames.getall(frame_name)
+                url_frame = url_frames[0] if url_frames else None
+            candidate = getattr(url_frame, "url", None) if url_frame else None
+            if candidate:
+                href = _chapter_text(candidate, empty=None)
+                break
+        parsed_chapters.append({"start": start, "title": title_ch, "href": href})
+    return _normalize_chapters(parsed_chapters)
+
+
+def _local_media_path(media_url):
+    value = str(media_url or "").strip()
+    if not value:
+        return None
+    normalized_slashes = value.replace("\\", "/")
+    if normalized_slashes.startswith("//") or normalized_slashes.lower().startswith("//?/unc/"):
+        return None
+    drive, _tail = os.path.splitdrive(value)
+    if drive:
+        if _path_is_network_share(value):
+            return None
+        return value if os.path.isfile(value) else None
+    parsed = urllib.parse.urlsplit(value)
+    if parsed.scheme:
+        if parsed.scheme.lower() != "file" or parsed.netloc:
+            return None
+        path = urllib.parse.unquote(parsed.path or "")
+        if path.replace("\\", "/").startswith("//"):
+            return None
+        if os.name == "nt" and re.match(r"^/[A-Za-z]:/", path):
+            path = path[1:]
+    else:
+        path = value
+    if _path_is_network_share(path):
+        return None
+    return path if os.path.isfile(path) else None
+
+
+def _path_is_network_share(path):
+    normalized = str(path or "").replace("\\", "/")
+    if normalized.startswith("//") or normalized.lower().startswith("//?/unc/"):
+        return True
+    if os.name != "nt":
+        return False
+    drive, _tail = os.path.splitdrive(str(path or ""))
+    if not drive:
+        return False
+    try:
+        import ctypes
+        root = drive.rstrip("\\/") + "\\"
+        return int(ctypes.windll.kernel32.GetDriveTypeW(root)) == 4
+    except Exception:
+        return False
+
+
+def _read_prefix_bytes(url: str, *, headers: dict, max_bytes: int, timeout_s: int) -> bytes:
+    if max_bytes <= 0:
+        return b""
+    resp, _final_url = _open_public_http_stream(
+        url,
+        headers=headers,
+        timeout=int(timeout_s),
+        purpose="media",
+    )
+    try:
+        if not getattr(resp, "ok", False):
+            return b""
+        buf = bytearray()
+        for chunk in resp.iter_content(chunk_size=65536):
+            if not chunk:
+                continue
+            remaining = int(max_bytes) - len(buf)
+            if remaining <= 0:
+                break
+            if len(chunk) > remaining:
+                buf.extend(chunk[:remaining])
+                break
+            buf.extend(chunk)
+            if len(buf) >= int(max_bytes):
+                break
+        return bytes(buf)
+    finally:
+        try:
+            resp.close()
+        except Exception:
+            pass
+
+
+def _embedded_media_chapters(media_url, media_type):
+    media_url_str = str(media_url or "")
+    media_type_l = canonical_media_type(media_type)
+    media_path_l = urllib.parse.urlsplit(media_url_str).path.lower() or media_url_str.lower()
+    local_path = _local_media_path(media_url_str)
+
+    if local_path:
+        suffix = Path(local_path).suffix.lower()
+        if suffix == ".mp3" or media_type_l == "audio/mpeg":
+            from mutagen.id3 import ID3
+            return _chapters_from_id3(ID3(local_path))
+        if suffix in {".m4a", ".m4b", ".mp4"} or media_type_l in {
+            "audio/mp4",
+            "video/mp4",
+            "audio/x-m4a",
+        }:
+            from mutagen.mp4 import MP4
+            mp4_file = MP4(local_path)
+            return _normalize_chapters(
+                [
+                    {
+                        "start": getattr(chapter, "start", None),
+                        "title": getattr(chapter, "title", ""),
+                    }
+                    for chapter in (getattr(mp4_file, "chapters", None) or [])
+                ]
+            )
+        return []
+
+    # Mutagen can reliably parse an ID3 tag from a bounded prefix request. MP4
+    # chapter atoms can live at the end of the file, so remote MP4/AAC/Ogg/FLAC
+    # files are intentionally not downloaded or advertised as supported here.
+    if not (
+        media_path_l.endswith(".mp3")
+        or media_type_l == "audio/mpeg"
+        or media_type_l == "audio/mp3"
+    ):
+        return []
+
+    from mutagen.id3 import ID3
+    hdr = _read_prefix_bytes(
+        media_url_str,
+        headers={"Range": "bytes=0-9"},
+        max_bytes=10,
+        timeout_s=6,
+    )
+    if len(hdr) < 10 or hdr[:3] != b"ID3":
+        return []
+    flags = int(hdr[5])
+    ss = hdr[6:10]
+    tag_size = (
+        ((ss[0] & 0x7F) << 21)
+        | ((ss[1] & 0x7F) << 14)
+        | ((ss[2] & 0x7F) << 7)
+        | (ss[3] & 0x7F)
+    )
+    total = int(tag_size) + 10 + (10 if flags & 0x10 else 0)
+    if total <= 10 or total > 1_000_000:
+        return []
+    tag_bytes = _read_prefix_bytes(
+        media_url_str,
+        headers={"Range": f"bytes=0-{total - 1}"},
+        max_bytes=total,
+        timeout_s=12,
+    )
+    if len(tag_bytes) < 10 or tag_bytes[:3] != b"ID3":
+        return []
+    return _chapters_from_id3(ID3(BytesIO(tag_bytes)))
+
+
+def fetch_and_store_chapters(
+    article_id,
+    media_url,
+    media_type,
+    chapter_url=None,
+    allow_id3: bool = True,
+    cursor=None,
+    *,
+    cache_key=None,
+    force_refresh: bool = False,
+):
+    """Fetch, validate, cache, and return external or embedded chapters."""
     try:
         article_key = str(article_id).strip() if article_id is not None else ""
     except Exception:
@@ -665,206 +1436,121 @@ def fetch_and_store_chapters(article_id, media_url, media_type, chapter_url=None
     if not article_key:
         article_key = None
 
-    # Check DB first
-    # Note: get_chapters_from_db opens its own connection. 
-    # If we are in a transaction (cursor provided), we should probably use that cursor or skip this check if we know it's a fresh insert.
-    # But for simplicity, we can just query using the provided cursor if available.
-    if cursor and article_key:
-        cursor.execute("SELECT start, title, href FROM chapters WHERE article_id = ? ORDER BY start", (article_key,))
+    storage_key = str(cache_key or article_key or "").strip()
+    if cursor and storage_key:
+        if cache_key:
+            cursor.execute(
+                "SELECT start, title, href FROM chapter_cache "
+                "WHERE cache_key = ? ORDER BY start",
+                (storage_key,),
+            )
+        else:
+            cursor.execute(
+                "SELECT start, title, href FROM chapters "
+                "WHERE article_id = ? ORDER BY start",
+                (storage_key,),
+            )
         rows = cursor.fetchall()
         existing = [{"start": float(r[0] or 0), "title": r[1], "href": r[2]} for r in rows]
-    elif article_key:
-        existing = get_chapters_from_db(article_key)
+    elif storage_key:
+        existing = get_chapters_from_db(article_key, cache_key=cache_key)
     else:
         existing = []
-        
+
+    # 1) Explicit chapter URL (Podcasting 2.0)
+    if chapter_url:
+        source = _get_chapter_source(article_key, cache_key=cache_key, cursor=cursor)
+        source_matches = bool(
+            source and str(source.get("source_url") or "") == str(chapter_url)
+        )
+        if (
+            existing
+            and source_matches
+            and not force_refresh
+            and (time.time() - float(source.get("checked_at") or 0))
+            < _CHAPTER_REFRESH_SECONDS
+        ):
+            return existing
+        try:
+            result = _fetch_chapter_json(
+                chapter_url,
+                etag=source.get("etag") if source_matches else None,
+                last_modified=source.get("last_modified") if source_matches else None,
+            )
+            now = time.time()
+            if result["status"] == 304:
+                if not existing:
+                    # A validator is only useful with a cached representation.
+                    # Broken intermediaries can return 304 after the local rows
+                    # were evicted, so retry once with no conditional headers.
+                    result = _fetch_chapter_json(chapter_url)
+                    if result["status"] == 304:
+                        raise ValueError(
+                            "chapter server returned 304 to an unconditional request"
+                        )
+                    now = time.time()
+                else:
+                    _save_chapter_source(
+                        article_key,
+                        chapter_url,
+                        cache_key=cache_key,
+                        etag=result.get("etag"),
+                        last_modified=result.get("last_modified"),
+                        checked_at=now,
+                        fetched_at=(source or {}).get("fetched_at") or now,
+                        cursor=cursor,
+                    )
+                    return existing
+
+            chapters_out = _normalize_chapters(result["data"]["chapters"])
+            _replace_stored_chapters(
+                article_key,
+                chapters_out,
+                cursor=cursor,
+                cache_key=cache_key,
+                allow_empty=True,
+            )
+            _save_chapter_source(
+                article_key,
+                chapter_url,
+                cache_key=cache_key,
+                etag=result.get("etag"),
+                last_modified=result.get("last_modified"),
+                checked_at=now,
+                fetched_at=now,
+                cursor=cursor,
+            )
+            return chapters_out
+        except Exception as e:
+            log.warning("Chapter fetch failed for %s: %s", chapter_url, e)
+            if existing:
+                return existing
+
     if existing:
         return existing
 
-    chapters_out = []
-    
-    # 1) Explicit chapter URL (Podcasting 2.0)
-    if chapter_url:
-        try:
-            resp = safe_requests_get(chapter_url, timeout=10)
-            resp.raise_for_status()
-            data = resp.json()
-            chapters = data.get("chapters", [])
-            
-            persist_enabled = bool(article_key)
-            c = None
-            conn = None
-            if persist_enabled:
-                if cursor:
-                    c = cursor
-                else:
-                    conn = get_connection()
-                    c = conn.cursor()
-                
-            try:
-                persist_blocked = False
-                for ch in chapters:
-                    ch_id = str(uuid.uuid4())
-                    start = ch.get("startTime") or ch.get("start_time") or 0
-                    title_ch = ch.get("title", "")
-                    href = ch.get("url") or ch.get("link")
-                    start_f = float(start)
-                    chapters_out.append({"start": start_f, "title": title_ch, "href": href})
-                    if c is None or persist_blocked:
-                        continue
-                    try:
-                        c.execute(
-                            "INSERT OR REPLACE INTO chapters (id, article_id, start, title, href) VALUES (?, ?, ?, ?, ?)",
-                            (ch_id, article_key, start_f, title_ch, href),
-                        )
-                    except sqlite3.IntegrityError as e:
-                        persist_blocked = True
-                        log.info(
-                            "Skipping chapter DB persistence for article_id=%s due to DB constraint: %s",
-                            article_key,
-                            e,
-                        )
-                
-                if conn is not None:
-                    conn.commit()
-            finally:
-                if conn is not None:
-                    conn.close()
-
-            if chapters_out:
-                return chapters_out
-        except Exception as e:
-            log.warning(f"Chapter fetch failed for {chapter_url}: {e}")
-
     if not allow_id3:
-        return chapters_out
+        return []
 
-    # 2) ID3 CHAP frames if audio
-    media_url_str = str(media_url or "")
-    media_type_l = canonical_media_type(media_type)
-    media_path_l = urllib.parse.urlsplit(media_url_str).path.lower() or media_url_str.lower()
-    audio_exts = (".mp3", ".m4a", ".m4b", ".aac", ".ogg", ".opus", ".wav", ".flac")
-
-    if media_url and (media_type_l.startswith("audio/") or "podcast" in media_type_l or media_path_l.endswith(audio_exts)):
+    # 2) Embedded chapters in formats Mutagen exposes reliably.
+    if media_url:
         try:
-            from mutagen.id3 import ID3, error as ID3Error
-
-            def _read_prefix_bytes(url: str, *, headers: dict, max_bytes: int, timeout_s: int) -> bytes:
-                if max_bytes <= 0:
-                    return b""
-                resp = safe_requests_get(url, headers=headers, timeout=int(timeout_s), stream=True)
-                try:
-                    if not getattr(resp, "ok", False):
-                        return b""
-                    buf = bytearray()
-                    for chunk in resp.iter_content(chunk_size=65536):
-                        if not chunk:
-                            continue
-                        remaining = int(max_bytes) - len(buf)
-                        if remaining <= 0:
-                            break
-                        if len(chunk) > remaining:
-                            buf.extend(chunk[:remaining])
-                            break
-                        buf.extend(chunk)
-                        if len(buf) >= int(max_bytes):
-                            break
-                    return bytes(buf)
-                finally:
-                    try:
-                        resp.close()
-                    except Exception:
-                        pass
-
-            # Read just the ID3v2 header first to determine tag size.
-            hdr = _read_prefix_bytes(media_url, headers={"Range": "bytes=0-9"}, max_bytes=10, timeout_s=6)
-            if len(hdr) < 10 or hdr[:3] != b"ID3":
-                return chapters_out
-
-            try:
-                flags = int(hdr[5])
-                ss = hdr[6:10]
-                tag_size = ((ss[0] & 0x7F) << 21) | ((ss[1] & 0x7F) << 14) | ((ss[2] & 0x7F) << 7) | (ss[3] & 0x7F)
-                total = int(tag_size) + 10
-                if flags & 0x10:
-                    # Footer present.
-                    total += 10
-            except Exception:
-                total = 0
-
-            # Never download large media files just to detect chapters.
-            max_tag_bytes = 1_000_000
-            if total <= 10 or total > max_tag_bytes:
-                return chapters_out
-
-            tag_bytes = _read_prefix_bytes(
-                media_url,
-                headers={"Range": f"bytes=0-{int(total) - 1}"},
-                max_bytes=int(total),
-                timeout_s=12,
-            )
-            if len(tag_bytes) < 10 or tag_bytes[:3] != b"ID3":
-                return chapters_out
-
-            id3 = ID3(BytesIO(tag_bytes))
-
-            parsed_chapters = []
-            for frame in id3.getall("CHAP"):
-                start = frame.start_time / 1000.0 if frame.start_time else 0
-                title_ch = ""
-                tit2 = frame.sub_frames.get("TIT2")
-                if tit2 and tit2.text:
-                    title_ch = tit2.text[0]
-                href = None
-                parsed_chapters.append({"start": float(start), "title": title_ch, "href": href})
-
+            parsed_chapters = _embedded_media_chapters(media_url, media_type)
             if not parsed_chapters:
-                return chapters_out
-
-            chapters_out.extend(parsed_chapters)
-
-            persist_enabled = bool(article_key)
-            c = None
-            conn = None
-            if persist_enabled:
-                if cursor:
-                    c = cursor
-                else:
-                    conn = get_connection()
-                    c = conn.cursor()
-            
-            try:
-                persist_blocked = False
-                for ch in parsed_chapters:
-                    ch_id = str(uuid.uuid4())
-                    if c is None or persist_blocked:
-                        continue
-                    try:
-                        c.execute(
-                            "INSERT OR REPLACE INTO chapters (id, article_id, start, title, href) VALUES (?, ?, ?, ?, ?)",
-                            (ch_id, article_key, float(ch["start"]), ch.get("title", ""), ch.get("href")),
-                        )
-                    except sqlite3.IntegrityError as e:
-                        persist_blocked = True
-                        log.info(
-                            "Skipping chapter DB persistence for article_id=%s due to DB constraint: %s",
-                            article_key,
-                            e,
-                        )
-
-                if conn is not None:
-                    conn.commit()
-            finally:
-                if conn is not None:
-                    conn.close()
+                return []
+            _replace_stored_chapters(
+                article_key,
+                parsed_chapters,
+                cursor=cursor,
+                cache_key=cache_key,
+            )
+            return parsed_chapters
         except ImportError:
-            log.info("mutagen not installed, skipping ID3 chapter parse.")
-        except ID3Error as e:
-            log.info(f"ID3 chapter parse failed for {media_url}: {e}")
+            log.info("mutagen not installed, skipping embedded chapter parse.")
         except Exception as e:
-            log.info(f"ID3 chapter parse failed for {media_url}: {e}")
+            log.info("Embedded chapter parse failed for %s: %s", media_url, e)
 
-    return chapters_out
+    return []
 
 
 # --- OPML Helpers ---

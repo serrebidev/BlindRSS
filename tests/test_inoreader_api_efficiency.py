@@ -95,7 +95,10 @@ def test_inoreader_get_articles_page_reuses_cache_and_continuation(monkeypatch):
         }
     )
 
-    monkeypatch.setattr("providers.inoreader.utils.get_chapters_batch", lambda ids: {})
+    monkeypatch.setattr(
+        "providers.inoreader.utils.get_chapters_batch",
+        lambda ids, **_kwargs: {},
+    )
     monkeypatch.setattr("providers.inoreader.utils.normalize_date", lambda raw, title, content, url: "2024-01-01T00:00:00Z")
 
     calls = []

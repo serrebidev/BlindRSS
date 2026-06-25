@@ -5,6 +5,7 @@ import threading
 import sqlite3
 import concurrent.futures
 import os
+import re
 import requests
 from typing import Any, Dict, List, Optional, Tuple
 from collections import defaultdict
@@ -51,6 +52,142 @@ _NAME_RESOLUTION_ERROR_MARKERS = (
     "nodename nor servname provided",
     "getaddrinfo failed",
 )
+_CHAPTER_ELEMENT_RE = re.compile(r"<(?:[A-Za-z_][\w.-]*:)?chapters(?:\s|/?>)", re.IGNORECASE)
+
+
+def _xml_local_name(name) -> str:
+    text = str(name or "")
+    if "}" in text:
+        text = text.rsplit("}", 1)[-1]
+    if ":" in text:
+        text = text.rsplit(":", 1)[-1]
+    return text.lower()
+
+
+def _xml_attribute(element, *names) -> Optional[str]:
+    wanted = {str(name).lower() for name in names}
+    for key, value in getattr(element, "attrib", {}).items():
+        if _xml_local_name(key) in wanted:
+            text = str(value or "").strip()
+            if text:
+                return text
+    return None
+
+
+def _feed_item_identity_keys(element) -> List[str]:
+    keys = []
+    for child in list(element):
+        local_name = _xml_local_name(child.tag)
+        if local_name not in {"guid", "id", "link"}:
+            continue
+        value = _xml_attribute(child, "href") if local_name == "link" else None
+        if not value:
+            value = str(child.text or "").strip()
+        if value and value not in keys:
+            keys.append(value)
+    return keys
+
+
+def _parse_feed_chapter_metadata_soup(xml_text: str) -> Dict[str, Dict[str, Any]]:
+    """Best-effort fallback for feeds that feedparser accepts despite malformed XML."""
+    try:
+        soup = BS(xml_text, "xml")
+    except Exception as parser_exc:
+        log.debug("XML parser unavailable for chapter metadata fallback; using html.parser (%s)", parser_exc)
+        soup = BS(xml_text, "html.parser")
+    items = soup.find_all(lambda tag: _xml_local_name(getattr(tag, "name", "")) in {"item", "entry"})
+    if not items:
+        soup = BS(xml_text, "html.parser")
+        items = soup.find_all(lambda tag: _xml_local_name(getattr(tag, "name", "")) in {"item", "entry"})
+
+    metadata = {}
+    for item in items:
+        keys = []
+        for child in item.find_all(recursive=False):
+            local_name = _xml_local_name(getattr(child, "name", ""))
+            if local_name not in {"guid", "id", "link"}:
+                continue
+            value = child.get("href") if local_name == "link" else None
+            if not value:
+                value = child.get_text(strip=True)
+            if value and value not in keys:
+                keys.append(value)
+
+        chapter_url = None
+        inline_chapters = []
+        for element in item.find_all(
+            lambda tag: _xml_local_name(getattr(tag, "name", "")) == "chapters"
+        ):
+            if not chapter_url:
+                chapter_url = (
+                    element.get("url")
+                    or element.get("href")
+                    or element.get("src")
+                    or element.get("link")
+                )
+            for chapter in element.find_all(
+                lambda tag: _xml_local_name(getattr(tag, "name", "")) == "chapter"
+            ):
+                inline_chapters.append(
+                    {
+                        "start": chapter.get("start") or chapter.get("starttime") or chapter.get("start_time"),
+                        "title": chapter.get("title") or "",
+                        "href": chapter.get("href") or chapter.get("url") or chapter.get("link"),
+                    }
+                )
+
+        normalized_inline = utils._normalize_chapters(inline_chapters) if inline_chapters else []
+        if not chapter_url and not normalized_inline:
+            continue
+        value = {"chapter_url": chapter_url, "chapters": normalized_inline}
+        for key in keys:
+            metadata[key] = value
+    return metadata
+
+
+def _parse_feed_chapter_metadata(xml_text: str) -> Dict[str, Dict[str, Any]]:
+    """Map RSS/Atom item identities to external or inline chapter metadata."""
+    text = str(xml_text or "")
+    if not text or not _CHAPTER_ELEMENT_RE.search(text):
+        return {}
+
+    try:
+        root = ET.fromstring(text)
+    except (ET.ParseError, ValueError) as e:
+        log.debug("Chapter metadata XML parse failed; using tolerant parser: %s", e)
+        return _parse_feed_chapter_metadata_soup(text)
+
+    metadata = {}
+    for item in root.iter():
+        if _xml_local_name(item.tag) not in {"item", "entry"}:
+            continue
+
+        chapter_url = None
+        inline_chapters = []
+        for element in item.iter():
+            if _xml_local_name(element.tag) != "chapters":
+                continue
+            if not chapter_url:
+                chapter_url = _xml_attribute(element, "url", "href", "src", "link")
+            for chapter in element.iter():
+                if chapter is element or _xml_local_name(chapter.tag) != "chapter":
+                    continue
+                inline_chapters.append(
+                    {
+                        "start": _xml_attribute(chapter, "start", "starttime", "start_time"),
+                        "title": _xml_attribute(chapter, "title") or "",
+                        "href": _xml_attribute(chapter, "href", "url", "link"),
+                    }
+                )
+
+        normalized_inline = utils._normalize_chapters(inline_chapters) if inline_chapters else []
+        if not chapter_url and not normalized_inline:
+            continue
+        value = {"chapter_url": chapter_url, "chapters": normalized_inline}
+        for key in _feed_item_identity_keys(item):
+            metadata[key] = value
+
+    return metadata
 
 
 def _is_locked_error(error: Exception) -> bool:
@@ -859,21 +996,34 @@ class LocalProvider(RSSProvider):
                     entry_count = total_entries
                     for i, item in enumerate(all_items):
                         try:
-                            article_id = item.id
+                            legacy_article_id = item.id
                             title = item.title or "No Title"
                             url = item.url or ""
+                            article_id = str(
+                                uuid.uuid5(
+                                    uuid.NAMESPACE_URL,
+                                    f"blindrss:youtube-search:{feed_id}:{url or legacy_article_id}",
+                                )
+                            )
                             author = item.author or final_title or "YouTube"
                             raw_date = item.published or ""
                             date = utils.normalize_date(raw_date, title, "", url)
 
-                            c.execute("SELECT date FROM articles WHERE id = ?", (article_id,))
+                            c.execute(
+                                "SELECT id, date FROM articles "
+                                "WHERE feed_id = ? AND (id = ? OR id = ? OR url = ?) LIMIT 1",
+                                (feed_id, article_id, legacy_article_id, url),
+                            )
                             row = c.fetchone()
                             if row:
-                                existing_date = row[0] or ""
-                                if existing_date != date:
-                                    c.execute("UPDATE articles SET date = ? WHERE id = ?", (date, article_id))
-                                    if i % 5 == 0 or i == total_entries - 1:
-                                        conn.commit()
+                                existing_id, existing_date = row
+                                c.execute(
+                                    "UPDATE articles SET title = ?, url = ?, date = ?, author = ?, "
+                                    "media_url = ?, media_type = ? WHERE id = ?",
+                                    (title, url, date, author, url, "video/youtube", existing_id),
+                                )
+                                if existing_date != date or i % 5 == 0 or i == total_entries - 1:
+                                    conn.commit()
                                 continue
 
                             c.execute(
@@ -1214,39 +1364,9 @@ class LocalProvider(RSSProvider):
                 feed_url,
             )
             
-            # Build chapter map only when the feed payload hints chapter tags exist.
-            # Most feeds have no embedded chapter pointers; skipping a second full XML parse saves CPU.
-            chapter_map = {}
-            xml_text_l = str(xml_text or "").lower()
-            has_embedded_chapter_tags = any(
-                marker in xml_text_l
-                for marker in ("podcast:chapters", "psc:chapters", "<chapters")
-            )
-            if has_embedded_chapter_tags:
-                try:
-                    # Prefer XML parser if available (lxml), otherwise fall back to built-in HTML parser
-                    try:
-                        soup = BS(xml_text, "xml")
-                    except Exception as parser_exc:
-                        log.debug(f"XML parser unavailable for chapter map on {feed_url}; falling back to html.parser ({parser_exc})")
-                        soup = BS(xml_text, "html.parser")
-
-                    for item in soup.find_all("item"):
-                        chap = item.find(["podcast:chapters", "psc:chapters", "chapters"])
-                        if chap:
-                            chap_url = chap.get("url") or chap.get("href") or chap.get("src") or chap.get("link")
-                            if chap_url:
-                                guid = item.find("guid")
-                                link = item.find("link")
-                                key = None
-                                if guid and guid.text:
-                                    key = guid.text.strip()
-                                elif link and link.text:
-                                    key = link.text.strip()
-                                if key:
-                                    chapter_map[key] = chap_url
-                except Exception as e:
-                    log.warning(f"Chapter map build failed for {feed_url}: {e}")
+            # Parse only feeds that contain a local-name "chapters" element. Element
+            # matching deliberately ignores namespace prefixes and namespace URIs.
+            chapter_metadata = _parse_feed_chapter_metadata(xml_text)
 
             conn = get_connection()
             try:
@@ -1269,8 +1389,20 @@ class LocalProvider(RSSProvider):
                               (title_to_store, new_etag, new_last_modified, feed_id))
                 
                 # Pre-fetch existing articles to avoid N+1 SELECTs
-                c.execute("SELECT id, date FROM articles WHERE feed_id = ?", (feed_id,))
-                existing_articles = {row[0]: row[1] or "" for row in c.fetchall()}
+                c.execute(
+                    "SELECT id, date, chapter_url, media_url, media_type "
+                    "FROM articles WHERE feed_id = ?",
+                    (feed_id,),
+                )
+                existing_articles = {
+                    row[0]: {
+                        "date": row[1] or "",
+                        "chapter_url": row[2],
+                        "media_url": row[3],
+                        "media_type": row[4],
+                    }
+                    for row in c.fetchall()
+                }
 
                 entry_ids = []
                 for entry in d.entries:
@@ -1357,20 +1489,17 @@ class LocalProvider(RSSProvider):
                         url
                     )
 
-                    existing_date = existing_articles.get(base_id)
-                    if existing_date is not None:
-                        if existing_date != date:
-                                c.execute("UPDATE articles SET date = ? WHERE id = ?", (date, base_id))
-                        continue
-
-                    existing_date = existing_articles.get(scoped_id)
-                    if existing_date is not None:
-                        if existing_date != date:
-                                c.execute("UPDATE articles SET date = ? WHERE id = ?", (date, scoped_id))
-                        continue
-
                     if base_id in conflicting_ids:
                         article_id = scoped_id
+
+                    existing_article_id = None
+                    existing_metadata = existing_articles.get(base_id)
+                    if existing_metadata is not None:
+                        existing_article_id = base_id
+                    else:
+                        existing_metadata = existing_articles.get(scoped_id)
+                        if existing_metadata is not None:
+                            existing_article_id = scoped_id
 
                     media_url = None
                     media_type = None
@@ -1424,11 +1553,16 @@ class LocalProvider(RSSProvider):
                                     media_type = mc_type_norm or "audio/mpeg"
                                     break
 
-                    # 4. Check NPR-specific extraction if still no media
+                    # 4. Check NPR-specific extraction if still no media. Do not
+                    # retain an existing URL merely because the article already
+                    # had media: removed enclosures must clear stale media. NPR is
+                    # the explicit exception, and only after extraction confirms
+                    # a currently working media URL.
                     if not media_url and npr_mod.is_npr_url(url):
                         media_url, media_type = npr_mod.extract_npr_audio(url, timeout_s=feed_timeout)
 
                     chapter_url = None
+                    inline_chapters = []
                     if 'podcast_chapters' in entry:
                         chapters_tag = entry.podcast_chapters
                         chapter_url = getattr(chapters_tag, 'href', None) or getattr(chapters_tag, 'url', None) or getattr(chapters_tag, 'value', None)
@@ -1436,10 +1570,34 @@ class LocalProvider(RSSProvider):
                         chapters_tag = entry.psc_chapters
                         chapter_url = getattr(chapters_tag, 'href', None) or getattr(chapters_tag, 'url', None) or getattr(chapters_tag, 'value', None)
 
-                    if not chapter_url:
-                        key = entry.get('guid') or entry.get('id') or entry.get('link')
-                        if key and key in chapter_map:
-                            chapter_url = chapter_map[key]
+                    for key in (entry.get('guid'), entry.get('id'), entry.get('link')):
+                        if not key or key not in chapter_metadata:
+                            continue
+                        raw_metadata = chapter_metadata[key]
+                        if not chapter_url:
+                            chapter_url = raw_metadata.get("chapter_url")
+                        inline_chapters = raw_metadata.get("chapters") or []
+                        break
+
+                    if existing_article_id is not None:
+                        c.execute(
+                            "UPDATE articles SET date = ?, media_url = ?, media_type = ?, chapter_url = ? "
+                            "WHERE id = ?",
+                            (date, media_url, media_type, chapter_url, existing_article_id),
+                        )
+                        if inline_chapters:
+                            utils._replace_stored_chapters(
+                                existing_article_id,
+                                inline_chapters,
+                                cursor=c,
+                            )
+                        existing_articles[existing_article_id] = {
+                            "date": date,
+                            "chapter_url": chapter_url,
+                            "media_url": media_url,
+                            "media_type": media_type,
+                        }
+                        continue
 
                     try:
                         c.execute(
@@ -1456,7 +1614,14 @@ class LocalProvider(RSSProvider):
                             media_url=media_url,
                             media_type=media_type,
                         )
-                        existing_articles[article_id] = date
+                        if inline_chapters:
+                            utils._replace_stored_chapters(article_id, inline_chapters, cursor=c)
+                        existing_articles[article_id] = {
+                            "date": date,
+                            "chapter_url": chapter_url,
+                            "media_url": media_url,
+                            "media_type": media_type,
+                        }
                     except sqlite3.IntegrityError as e:
                         if _rollback_and_abort_on_foreign_key(conn, e):
                             status = "deleted"
@@ -1471,10 +1636,18 @@ class LocalProvider(RSSProvider):
 
                             if row:
                                 existing_feed_id = row[0]
-                                existing_date = row[1] or ""
                                 if existing_feed_id == feed_id:
-                                    if existing_date != date:
-                                        c.execute("UPDATE articles SET date = ? WHERE id = ?", (date, base_id))
+                                    c.execute(
+                                        "UPDATE articles SET date = ?, media_url = ?, media_type = ?, "
+                                        "chapter_url = ? WHERE id = ?",
+                                        (date, media_url, media_type, chapter_url, base_id),
+                                    )
+                                    if inline_chapters:
+                                        utils._replace_stored_chapters(
+                                            base_id,
+                                            inline_chapters,
+                                            cursor=c,
+                                        )
                                     continue
 
                                 try:
@@ -1493,7 +1666,14 @@ class LocalProvider(RSSProvider):
                                         media_url=media_url,
                                         media_type=media_type,
                                     )
-                                    existing_articles[article_id] = date
+                                    if inline_chapters:
+                                        utils._replace_stored_chapters(article_id, inline_chapters, cursor=c)
+                                    existing_articles[article_id] = {
+                                        "date": date,
+                                        "chapter_url": chapter_url,
+                                        "media_url": media_url,
+                                        "media_type": media_type,
+                                    }
                                 except sqlite3.IntegrityError:
                                     continue
                             else:
@@ -2000,6 +2180,9 @@ class LocalProvider(RSSProvider):
         try:
             c = conn.cursor()
             c.execute("DELETE FROM chapters WHERE article_id = ?", (article_id,))
+            local_cache_key = f"local:{article_id}"
+            c.execute("DELETE FROM chapter_cache WHERE cache_key = ?", (local_cache_key,))
+            c.execute("DELETE FROM chapter_sources WHERE cache_key = ?", (local_cache_key,))
             c.execute("DELETE FROM articles WHERE id = ?", (article_id,))
             deleted = int(c.rowcount or 0)
             conn.commit()
@@ -2110,6 +2293,16 @@ class LocalProvider(RSSProvider):
             # Remove dependent chapter rows before deleting articles.
             c.execute(
                 "DELETE FROM chapters WHERE article_id IN (SELECT id FROM articles WHERE feed_id = ?)",
+                (feed_id,),
+            )
+            c.execute(
+                "DELETE FROM chapter_cache "
+                "WHERE cache_key IN (SELECT 'local:' || id FROM articles WHERE feed_id = ?)",
+                (feed_id,),
+            )
+            c.execute(
+                "DELETE FROM chapter_sources "
+                "WHERE cache_key IN (SELECT 'local:' || id FROM articles WHERE feed_id = ?)",
                 (feed_id,),
             )
             c.execute("DELETE FROM articles WHERE feed_id = ?", (feed_id,))

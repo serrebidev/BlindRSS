@@ -33,7 +33,7 @@ def test_ytdlp_resolve():
     print(f"PASS: yt-dlp resolved Shorts URL -> {info['url'][:80]}...")
 
 
-def test_should_resolve_defined_for_ytdlp():
+def test_should_resolve_defined_for_ytdlp(tmp_path):
     """Ensure the player's resolve worker doesn't crash on yt-dlp paths.
 
     Before the fix, `should_resolve` was only defined in the else (non-yt-dlp)
@@ -45,6 +45,10 @@ def test_should_resolve_defined_for_ytdlp():
     from core.config import ConfigManager
 
     config = ConfigManager()
+    # Playback can legitimately fall back to a local yt-dlp download. Keep that
+    # integration artifact in pytest's temporary directory instead of polluting
+    # the source checkout with the default ``ytplay_cache`` folder.
+    config.config["youtube_play_cache_dir"] = str(tmp_path / "ytplay_cache")
     player = PlayerFrame(None, config_manager=config)
     player.Show()
 

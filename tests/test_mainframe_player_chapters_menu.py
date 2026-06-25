@@ -77,6 +77,7 @@ class _PlayerStub:
 
 
 class _DummyMain:
+    _format_chapter_timestamp = mainframe.MainFrame._format_chapter_timestamp
     _format_player_chapter_menu_label = mainframe.MainFrame._format_player_chapter_menu_label
     _clear_menu_items = mainframe.MainFrame._clear_menu_items
     _refresh_player_chapters_submenu = mainframe.MainFrame._refresh_player_chapters_submenu
@@ -112,14 +113,14 @@ def test_refresh_player_chapters_submenu_populates_dynamic_entries():
 
     assert host._player_chapters_show_item.enabled is True
     assert host._player_chapters_prev_item.enabled is True
-    assert host._player_chapters_next_item.enabled is True
+    assert host._player_chapters_next_item.enabled is False
     assert len(host._player_chapter_dynamic_item_ids) == 2
     labels = [host._player_chapters_submenu.items[i].label for i in host._player_chapter_dynamic_item_ids]
-    assert labels[0].startswith("00:00")
-    assert labels[1].startswith("[Current] 00:15")
+    assert labels[0] == "00:00, Intro"
+    assert labels[1] == "Current chapter, 00:15, News"
     ordered_labels = [item.label for item in host._player_chapters_submenu.GetMenuItems()]
-    assert ordered_labels[0].startswith("00:00")
-    assert ordered_labels[1].startswith("[Current] 00:15")
+    assert ordered_labels[0] == "00:00, Intro"
+    assert ordered_labels[1] == "Current chapter, 00:15, News"
     assert "Show Chapters..." in ordered_labels
     assert "Previous Chapter (Ctrl+Shift+Left)" in ordered_labels
     assert "Next Chapter (Ctrl+Shift+Right)" in ordered_labels
@@ -153,3 +154,29 @@ def test_player_chapters_handlers_dispatch_to_player_window():
         ("next", None),
         ("jump", 3),
     ]
+
+
+def test_chapter_menu_formats_hours_and_invalid_timestamps_accessibly():
+    host = _DummyMain(chapters=[])
+
+    assert host._format_player_chapter_menu_label(
+        {"start": 3723.9, "title": "Long episode"}
+    ) == "1:02:03, Long episode"
+    assert host._format_player_chapter_menu_label(
+        {"start": float("nan"), "title": ""}
+    ) == "00:00, Untitled chapter"
+
+
+def test_chapter_menu_enables_only_available_direction():
+    host = _DummyMain(
+        chapters=[
+            {"start": 0.0, "title": "Intro"},
+            {"start": 15.0, "title": "News"},
+        ],
+        active_idx=0,
+    )
+
+    host._refresh_player_chapters_submenu()
+
+    assert host._player_chapters_prev_item.enabled is False
+    assert host._player_chapters_next_item.enabled is True

@@ -87,6 +87,37 @@ def test_direct_download_records_local_path_for_offline_playback(tmp_path, monke
     assert messages and messages[-1][1] == "Download complete"
 
 
+def test_direct_download_failure_callback_keeps_exception_message(tmp_path, monkeypatch):
+    host = _host(tmp_path)
+    article = _article()
+    callbacks = []
+    messages = []
+
+    def fail_request(*_args, **_kwargs):
+        raise RuntimeError("network unavailable")
+
+    monkeypatch.setattr(mainframe.utils, "safe_requests_get", fail_request)
+    monkeypatch.setattr(
+        mainframe,
+        "wx",
+        SimpleNamespace(
+            CallAfter=lambda fn, *args, **kwargs: callbacks.append(
+                lambda: fn(*args, **kwargs)
+            ),
+            MessageBox=lambda *args, **kwargs: messages.append(args),
+            ICON_ERROR=1,
+        ),
+    )
+
+    host._download_article_thread(article)
+
+    assert len(callbacks) == 1
+    callbacks[0]()
+    assert messages == [
+        ("Download failed: network unavailable", "Download error", 1)
+    ]
+
+
 def test_playback_target_prefers_recorded_download(tmp_path):
     host = _host(tmp_path)
     article = _article()

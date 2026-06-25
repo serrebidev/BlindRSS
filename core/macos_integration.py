@@ -91,6 +91,21 @@ def set_macos_startup_enabled(enabled: bool) -> tuple[bool, str]:
             # plist is written and that state is still "enabled", so accept it.
             if not ok and "already loaded" not in msg.lower():
                 log.warning("launchctl load failed for %s: %s", target, msg)
+                try:
+                    target.unlink()
+                except FileNotFoundError:
+                    pass
+                except OSError as cleanup_error:
+                    log.warning(
+                        "Could not remove failed LaunchAgent plist %s: %s",
+                        target,
+                        cleanup_error,
+                    )
+                    return (
+                        False,
+                        "Could not register BlindRSS to start at login: "
+                        f"{msg} (the failed plist could not be removed: {cleanup_error})",
+                    )
                 return False, f"Could not register BlindRSS to start at login: {msg}"
             return True, "BlindRSS will now start when you log in."
 

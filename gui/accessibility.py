@@ -1,7 +1,9 @@
 import logging
+import math
 import subprocess
 import threading
 from collections import deque
+from collections.abc import Mapping
 
 import wx
 
@@ -15,6 +17,57 @@ log = logging.getLogger(__name__)
 # A body shorter than this is probably a snippet/paywall stub, not a full article, so it's
 # worth asking the provider's server-side fetcher for more.
 _PROVIDER_FETCH_MIN_LEN = 1500
+
+
+def normalize_accessible_chapters(chapters):
+    """Return valid chapters sorted by their start time for reader presentation."""
+    normalized = []
+    for chapter in chapters or []:
+        if not isinstance(chapter, Mapping):
+            continue
+        try:
+            start = float(chapter.get("start", 0) or 0)
+        except (TypeError, ValueError, OverflowError):
+            start = 0.0
+        if not math.isfinite(start) or start < 0:
+            start = 0.0
+        title = str(chapter.get("title", "") or "").strip() or "Untitled chapter"
+        href = str(
+            chapter.get("href", "")
+            or chapter.get("url", "")
+            or chapter.get("link", "")
+            or ""
+        ).strip()
+        normalized.append({"start": start, "title": title, "href": href})
+    normalized.sort(key=lambda chapter: chapter["start"])
+    return normalized
+
+
+def format_accessible_chapter_timestamp(start) -> str:
+    try:
+        seconds = float(start or 0)
+    except (TypeError, ValueError, OverflowError):
+        seconds = 0.0
+    if not math.isfinite(seconds) or seconds < 0:
+        seconds = 0.0
+    total_seconds = int(seconds)
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes:02d}:{secs:02d}"
+
+
+def format_accessible_chapters(chapters) -> str:
+    chapter_list = normalize_accessible_chapters(chapters)
+    lines = [f"Chapters available: {len(chapter_list)}."]
+    for index, chapter in enumerate(chapter_list, start=1):
+        timestamp = format_accessible_chapter_timestamp(chapter["start"])
+        line = f"Chapter {index}: {timestamp}, {chapter['title']}."
+        if chapter["href"]:
+            line += f" Link: {chapter['href']}"
+        lines.append(line)
+    return "\n".join(lines)
 
 
 def extract_article_body(article, *, provider_fetch=None, timeout: int = 20, max_pages: int = 6):
@@ -284,12 +337,17 @@ class AccessibleBrowserFrame(wx.Frame):
         self._fulltext_inflight = set()
         self._fulltext_timer = None
         self._fulltext_debounce_ms = 350
+        self._chapter_cache = {}
+        self._chapter_inflight = set()
+        self._current_body_art_id = None
+        self._current_body_text = ""
         # Read-ahead prefetch: while the user reads one article, warm the full text of
         # the next few so VoiceOver reads the FULL article (not the feed snippet) the
         # moment they navigate to it. Web extraction is slow (2-7s); without this the
         # async result swaps in silently after the user has already heard the snippet.
         self._prefetch_ahead = 8
         self._prefetch_queue = deque()
+        self._prefetch_inflight = set()
         self._prefetch_lock = threading.Lock()
         self._prefetch_event = threading.Event()
         self._prefetch_stop = False
@@ -768,6 +826,121 @@ class AccessibleBrowserFrame(wx.Frame):
         ]
         return "\n".join(header)
 
+    def _chapter_text(self, art_id) -> str:
+        chapter_cache = getattr(self, "_chapter_cache", {})
+        if art_id in chapter_cache:
+            return format_accessible_chapters(chapter_cache[art_id])
+        if art_id in getattr(self, "_chapter_inflight", set()):
+            return "Chapter availability: Loading."
+        return ""
+
+    def _compose_article_content(self, article, art_id, body) -> str:
+        text = self._article_header(article) + str(body or "")
+        chapter_text = self._chapter_text(art_id)
+        if chapter_text:
+            text = text.rstrip() + "\n\n" + chapter_text + "\n"
+        return text
+
+    def _set_article_content(self, article, art_id, body, *, preserve_position=False):
+        insertion_point = None
+        selection = None
+        if preserve_position:
+            try:
+                insertion_point = self.content_ctrl.GetInsertionPoint()
+                selection = self.content_ctrl.GetSelection()
+            except Exception:
+                pass
+        self._current_body_art_id = art_id
+        self._current_body_text = str(body or "")
+        self.content_ctrl.SetValue(self._compose_article_content(article, art_id, body))
+        if preserve_position:
+            try:
+                if selection is not None:
+                    self.content_ctrl.SetSelection(*selection)
+                elif insertion_point is not None:
+                    self.content_ctrl.SetInsertionPoint(insertion_point)
+            except Exception:
+                pass
+
+    def _cache_inline_chapters(self, article, art_id):
+        chapters = normalize_accessible_chapters(getattr(article, "chapters", None))
+        if not chapters:
+            return
+        self._chapter_cache[art_id] = chapters
+        try:
+            article.chapters = chapters
+        except Exception:
+            pass
+
+    def _article_can_have_chapters(self, article) -> bool:
+        return bool(
+            getattr(article, "media_url", None)
+            or getattr(article, "chapter_url", None)
+            or getattr(article, "chapters", None)
+        )
+
+    def _start_chapters_load(self, article, art_id, token):
+        if art_id in self._chapter_cache or art_id in self._chapter_inflight:
+            return
+        provider = getattr(self.mainframe, "provider", None)
+        if not self._article_can_have_chapters(article) or not callable(
+            getattr(provider, "get_article_chapters", None)
+        ):
+            return
+        article_id = str(
+            getattr(article, "id", "") or getattr(article, "article_id", "") or ""
+        ).strip()
+        if not article_id:
+            return
+        self._chapter_inflight.add(art_id)
+        if self._current_body_art_id == art_id:
+            self._set_article_content(
+                article, art_id, self._current_body_text, preserve_position=True
+            )
+        threading.Thread(
+            target=self._chapters_thread,
+            args=(article_id, art_id, token),
+            daemon=True,
+        ).start()
+
+    def _chapters_thread(self, article_id, art_id, token):
+        chapters = None
+        provider = getattr(self.mainframe, "provider", None)
+        getter = getattr(provider, "get_article_chapters", None)
+        if callable(getter):
+            with self._provider_lock:
+                try:
+                    chapters = getter(article_id)
+                except Exception:
+                    chapters = None
+        wx.CallAfter(self._finish_chapters, art_id, token, chapters)
+
+    def _finish_chapters(self, art_id, token, chapters):
+        self._chapter_inflight.discard(art_id)
+        if chapters is not None:
+            chapter_list = normalize_accessible_chapters(chapters)
+            self._chapter_cache[art_id] = chapter_list
+            for article in list(getattr(self, "_base_articles", []) or []) + list(
+                getattr(self, "_current_articles", []) or []
+            ):
+                if self.mainframe._article_cache_id(article) == art_id:
+                    try:
+                        article.chapters = chapter_list
+                    except Exception:
+                        pass
+        if token != self._content_token:
+            return
+        idx = self._selected_article_index()
+        if idx is None:
+            return
+        article = self._current_articles[idx]
+        if self.mainframe._article_cache_id(article) != art_id:
+            return
+        if self._current_body_art_id == art_id:
+            self._set_article_content(
+                article, art_id, self._current_body_text, preserve_position=True
+            )
+
     def _show_article_at_index(self, idx):
         if idx is None or idx < 0 or idx >= len(self._current_articles):
             self._update_download_button(None)
@@ -777,26 +950,25 @@ class AccessibleBrowserFrame(wx.Frame):
         self._content_token += 1
         token = self._content_token
         art_id = self.mainframe._article_cache_id(article)
-        header = self._article_header(article)
+        self._cache_inline_chapters(article, art_id)
 
         cached = self._fulltext_cache.get(art_id)
         if cached is not None:
-            self.content_ctrl.SetValue(header + cached)
-            self._update_download_button(article)
-            self._enqueue_prefetch_from(idx)
-            return
-
-        try:
-            body = self.mainframe._strip_html(getattr(article, "content", "") or "")
-        except Exception:
-            body = str(getattr(article, "content", "") or "")
-        self.content_ctrl.SetValue(header + body)
+            body = cached
+        else:
+            try:
+                body = self.mainframe._strip_html(getattr(article, "content", "") or "")
+            except Exception:
+                body = str(getattr(article, "content", "") or "")
+        self._set_article_content(article, art_id, body)
         self._update_download_button(article)
-        self._schedule_fulltext(art_id, token)
+        self._start_chapters_load(article, art_id, token)
+        if cached is None:
+            self._schedule_fulltext(art_id, token)
         self._enqueue_prefetch_from(idx)
 
     def _enqueue_prefetch_from(self, idx):
-        """Queue full-text prefetch for the articles AHEAD of `idx` (read-ahead)."""
+        """Replace queued prefetch work with the bounded read-ahead window."""
         arts = self._current_articles
         pending = []
         for j in range(idx + 1, min(idx + 1 + self._prefetch_ahead, len(arts))):
@@ -805,15 +977,21 @@ class AccessibleBrowserFrame(wx.Frame):
             if art_id in self._fulltext_cache:
                 continue
             pending.append((art_id, article))
-        if not pending:
-            return
         with self._prefetch_lock:
-            queued = {a for a, _ in self._prefetch_queue}
+            busy = set(self._prefetch_inflight)
+            busy.update(self._fulltext_inflight)
+            replacement = deque()
             for art_id, article in pending:
-                if art_id in queued:
+                if art_id in busy:
                     continue
-                self._prefetch_queue.append((art_id, article))
-        self._prefetch_event.set()
+                replacement.append((art_id, article))
+                busy.add(art_id)
+            self._prefetch_queue = replacement
+            has_work = bool(replacement)
+            if not has_work:
+                self._prefetch_event.clear()
+        if has_work:
+            self._prefetch_event.set()
 
     def _prefetch_worker_loop(self):
         while True:
@@ -829,8 +1007,14 @@ class AccessibleBrowserFrame(wx.Frame):
             if not item:
                 continue
             art_id, article = item
-            if art_id in self._fulltext_cache:
-                continue
+            with self._prefetch_lock:
+                if (
+                    art_id in self._fulltext_cache
+                    or art_id in self._fulltext_inflight
+                    or art_id in self._prefetch_inflight
+                ):
+                    continue
+                self._prefetch_inflight.add(art_id)
             body = None
             cacheable = False
             try:
@@ -839,14 +1023,35 @@ class AccessibleBrowserFrame(wx.Frame):
                 )
             except Exception:
                 body, cacheable = None, False
-            # Only store authoritative results; never poison the cache with a feed
-            # fallback from a transient web failure (the user can re-fetch on arrival).
-            if body and cacheable:
-                wx.CallAfter(self._store_prefetch, art_id, body)
+            wx.CallAfter(
+                self._finish_prefetch,
+                art_id,
+                body if body and cacheable else None,
+            )
 
-    def _store_prefetch(self, art_id, body):
+    def _finish_prefetch(self, art_id, body):
+        with self._prefetch_lock:
+            self._prefetch_inflight.discard(art_id)
+        idx = self._selected_article_index()
+        if idx is None:
+            return
+        article = self._current_articles[idx]
+        if self.mainframe._article_cache_id(article) != art_id:
+            return
+        if not body:
+            # The selected article's debounced on-demand load may have yielded to this
+            # prefetch while it was in flight. If prefetch could not produce an
+            # authoritative result, resume on-demand loading for the current selection.
+            self._start_fulltext(art_id, self._content_token)
+            return
         if art_id not in self._fulltext_cache:
             self._fulltext_cache[art_id] = body
+        try:
+            # A late prefetch completion must not move VoiceOver's reader cursor back
+            # to the beginning after the user has started reading the snippet.
+            self._set_article_content(article, art_id, body, preserve_position=True)
+        except Exception:
+            pass
 
     def _schedule_fulltext(self, art_id, token):
         """Debounce a background full-text load so rapid list navigation doesn't hammer sites."""
@@ -868,6 +1073,9 @@ class AccessibleBrowserFrame(wx.Frame):
             return
         if art_id in self._fulltext_cache or art_id in self._fulltext_inflight:
             return
+        with self._prefetch_lock:
+            if art_id in self._prefetch_inflight:
+                return
         article = next(
             (a for a in self._current_articles if self.mainframe._article_cache_id(a) == art_id),
             None,
@@ -922,7 +1130,7 @@ class AccessibleBrowserFrame(wx.Frame):
         if self.mainframe._article_cache_id(article) != art_id:
             return
         try:
-            self.content_ctrl.SetValue(self._article_header(article) + body)
+            self._set_article_content(article, art_id, body)
             self.content_ctrl.SetInsertionPoint(0)
         except Exception:
             pass
@@ -940,7 +1148,6 @@ class AccessibleBrowserFrame(wx.Frame):
         art_id = self.mainframe._article_cache_id(article)
         if art_id in self._fulltext_cache or art_id in self._fulltext_inflight:
             return
-        self._content_token += 1
         self._start_fulltext(art_id, self._content_token)
 
     def Destroy(self):

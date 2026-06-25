@@ -10,7 +10,7 @@ import re
 import logging
 import hashlib
 from collections import deque
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 from urllib.request import url2pathname
 from bs4 import BeautifulSoup
 # from dateutil import parser as date_parser  # Removed unused import
@@ -84,6 +84,10 @@ class MainFrame(wx.Frame):
         self._critical_workers = set()
         self.feed_map = {}
         self.feed_nodes = {}
+        # Per-feed image-alt overrides change rarely but are consulted while rendering
+        # every settled article selection. Cache the nullable override so arrow-key
+        # navigation does not perform a synchronous SQLite read for each article.
+        self._feed_show_images_cache = {}
         self._article_refresh_pending = False
         # View/article cache so switching between nodes doesn't re-index history every time.
         # Keys are feed_id values like: "all", "<feed_id>", "category:<id>".
@@ -1261,9 +1265,17 @@ class MainFrame(wx.Frame):
     def _show_images_for_feed(self, feed_id) -> bool:
         """Resolve image-alt display for a feed: per-feed override wins, else global."""
         if feed_id:
+            cache = getattr(self, "_feed_show_images_cache", None)
+            if cache is None:
+                cache = {}
+                self._feed_show_images_cache = cache
             try:
-                from core.db import get_feed_show_images
-                override = get_feed_show_images(feed_id)
+                if feed_id in cache:
+                    override = cache[feed_id]
+                else:
+                    from core.db import get_feed_show_images
+                    override = get_feed_show_images(feed_id)
+                    cache[feed_id] = override
                 if override is not None:
                     return bool(override)
             except Exception:
@@ -1619,19 +1631,27 @@ class MainFrame(wx.Frame):
                 event.Skip()
                 return
             pw = getattr(self, "player_window", None)
-            if pw:
-                if key == wx.WXK_LEFT:
+            chapters = list(getattr(pw, "current_chapters", []) or []) if pw else []
+            if pw and chapters:
+                try:
+                    active_idx = int(pw.get_active_chapter_index())
+                except Exception:
+                    active_idx = -1
+                if key == wx.WXK_LEFT and active_idx > 0:
                     try:
                         self.on_player_prev_chapter(None)
                         return
                     except Exception:
                         pass
-                elif key == wx.WXK_RIGHT:
+                elif key == wx.WXK_RIGHT and active_idx < len(chapters) - 1:
                     try:
                         self.on_player_next_chapter(None)
                         return
                     except Exception:
                         pass
+            if key in (wx.WXK_LEFT, wx.WXK_RIGHT):
+                event.Skip()
+                return
 
         if event.ControlDown() and not event.ShiftDown() and not event.AltDown() and not event.MetaDown():
             if key in (wx.WXK_LEFT, wx.WXK_RIGHT, wx.WXK_UP, wx.WXK_DOWN) and self._is_text_input_focused(focus):
@@ -1766,17 +1786,24 @@ class MainFrame(wx.Frame):
         except Exception:
             pass
 
-    def _format_player_chapter_menu_label(self, chapter: dict) -> str:
+    def _format_chapter_timestamp(self, start) -> str:
         try:
-            start = float(chapter.get("start", 0) or 0)
+            seconds = float(start or 0)
         except Exception:
-            start = 0.0
-        if start < 0:
-            start = 0.0
-        mins = int(start // 60)
-        secs = int(start % 60)
-        title = str(chapter.get("title", "") or "").strip() or f"Chapter {mins:02d}:{secs:02d}"
-        return f"{mins:02d}:{secs:02d}  {title}"
+            seconds = 0.0
+        if not (-float("inf") < seconds < float("inf")) or seconds < 0:
+            seconds = 0.0
+        total_seconds = int(seconds)
+        hours, remainder = divmod(total_seconds, 3600)
+        minutes, secs = divmod(remainder, 60)
+        if hours:
+            return f"{hours:d}:{minutes:02d}:{secs:02d}"
+        return f"{minutes:02d}:{secs:02d}"
+
+    def _format_player_chapter_menu_label(self, chapter: dict) -> str:
+        timestamp = self._format_chapter_timestamp(chapter.get("start", 0))
+        title = str(chapter.get("title", "") or "").strip() or "Untitled chapter"
+        return f"{timestamp}, {title}"
 
     def _clear_menu_items(self, menu: wx.Menu) -> None:
         try:
@@ -1804,6 +1831,7 @@ class MainFrame(wx.Frame):
         pw = getattr(self, "player_window", None)
         chapters = list(getattr(pw, "current_chapters", []) or []) if pw else []
         has_chapters = bool(chapters)
+        active_idx = -1
 
         if not has_chapters:
             try:
@@ -1822,7 +1850,7 @@ class MainFrame(wx.Frame):
                 try:
                     label = self._format_player_chapter_menu_label(ch)
                     if int(i) == int(active_idx):
-                        label = f"[Current] {label}"
+                        label = f"Current chapter, {label}"
                     item = submenu.Append(wx.ID_ANY, label)
                     submenu.Bind(wx.EVT_MENU, lambda evt, idx=i: self.on_player_chapter_jump(evt, idx), item)
                     self._player_chapter_dynamic_item_ids.append(int(item.GetId()))
@@ -1868,13 +1896,15 @@ class MainFrame(wx.Frame):
         except Exception:
             self._player_chapters_next_item = None
 
-        for attr in ("_player_chapters_show_item", "_player_chapters_prev_item", "_player_chapters_next_item"):
-            try:
-                item = getattr(self, attr, None)
-                if item is not None:
-                    item.Enable(bool(has_chapters))
-            except Exception:
-                pass
+        try:
+            if self._player_chapters_show_item is not None:
+                self._player_chapters_show_item.Enable(bool(has_chapters))
+            if self._player_chapters_prev_item is not None:
+                self._player_chapters_prev_item.Enable(bool(has_chapters and active_idx > 0))
+            if self._player_chapters_next_item is not None:
+                self._player_chapters_next_item.Enable(bool(has_chapters and active_idx < len(chapters) - 1))
+        except Exception:
+            pass
 
     def on_player_show_chapters(self, event):
         pw = getattr(self, "player_window", None)
@@ -2041,6 +2071,10 @@ class MainFrame(wx.Frame):
         except Exception:
             log.debug("Failed to set per-feed image override", exc_info=True)
             return
+        try:
+            self._feed_show_images_cache[feed_id] = value
+        except Exception:
+            self._feed_show_images_cache = {feed_id: value}
         # Re-render the current article so the change takes effect immediately.
         try:
             idx = self.list_ctrl.GetFirstSelected()
@@ -2511,6 +2545,14 @@ class MainFrame(wx.Frame):
         except Exception as e:
             log.error(f"Retention cleanup failed: {e}")
 
+        # The hosted-provider chapter cache has its own time-based retention, so bound
+        # its growth unconditionally (independent of the article-retention setting).
+        try:
+            from core.db import cleanup_hosted_chapter_cache
+            cleanup_hosted_chapter_cache()
+        except Exception as e:
+            log.error(f"Hosted chapter cache cleanup failed: {e}")
+
     def _run_refresh(self, block: bool, force: bool = False) -> bool:
         """Run provider.refresh with optional blocking guard to avoid overlap.
         
@@ -2871,6 +2913,23 @@ class MainFrame(wx.Frame):
             except Exception:
                 pass
 
+            chapter_links = (
+                self._article_chapter_links(article_for_menu)
+                if getattr(article_for_menu, "chapters", None)
+                else []
+            )
+            if chapter_links:
+                chapter_links_menu = wx.Menu()
+                for chapter, href in chapter_links:
+                    label = f"Open {self._format_player_chapter_menu_label(chapter)}"
+                    item = chapter_links_menu.Append(wx.ID_ANY, label)
+                    self.Bind(
+                        wx.EVT_MENU,
+                        lambda e, chapter_href=href: self.on_open_chapter_link(chapter_href),
+                        item,
+                    )
+                menu.AppendSubMenu(chapter_links_menu, "Chapter Links")
+
             try:
                 if getattr(self.provider, "supports_favorites", lambda: False)() and hasattr(self, "_toggle_favorite_id"):
                     label = "Remove from Favorites" if getattr(article_for_menu, "is_favorite", False) else "Add to Favorites"
@@ -2970,6 +3029,32 @@ class MainFrame(wx.Frame):
             article = self.current_articles[idx]
             self._copy_to_clipboard(self._compose_article_copy_text(article, idx))
 
+    def _compose_article_reader_text(self, base_text: str, article=None, chapters=None) -> str:
+        """Compose the reader text without letting chapter sections get lost or duplicated."""
+        text = str(base_text or "")
+        chapter_list = list(
+            chapters if chapters is not None else (getattr(article, "chapters", None) or [])
+        )
+        if not chapter_list:
+            return text
+        chapter_text = self._format_article_chapters_text(chapter_list)
+        if text.rstrip().endswith(chapter_text.strip()):
+            return text
+        return text.rstrip() + chapter_text
+
+    def _set_article_reader_text(self, article, base_text: str, *, reset_insertion: bool = False) -> str:
+        """Set the main reader from chapter-free base text and return the displayed text."""
+        displayed = self._compose_article_reader_text(base_text, article=article)
+        try:
+            changed = self.content_ctrl.GetValue() != displayed
+            if changed:
+                self.content_ctrl.SetValue(displayed)
+            if reset_insertion and changed:
+                self.content_ctrl.SetInsertionPoint(0)
+        except Exception:
+            pass
+        return displayed
+
     def _compose_article_copy_text(self, article, idx) -> str:
         """Build the readable article text for copying, mirroring the reading pane."""
         # If the full text has already been extracted (on focus or via prefetch),
@@ -2981,7 +3066,7 @@ class MainFrame(wx.Frame):
         except Exception:
             cached = None
         if cached and str(cached).strip():
-            return str(cached)
+            return self._compose_article_reader_text(str(cached), article=article)
 
         # Not extracted yet: mirror the pre-extraction pane (title, date, author,
         # link header + cleaned feed content).
@@ -2992,7 +3077,63 @@ class MainFrame(wx.Frame):
         header += f"Link: {getattr(article, 'url', '') or ''}\n"
         header += "-" * 40 + "\n\n"
         body = self._strip_html(getattr(article, "content", ""), include_images=include_images)
-        return header + body
+        return self._compose_article_reader_text(header + body, article=article)
+
+    def _article_chapter_links(self, article) -> list[tuple[dict, str]]:
+        """Return actionable HTTP(S) chapter links, resolving relative hrefs."""
+        article_url = str(getattr(article, "url", "") or "")
+        links = []
+        for chapter in list(getattr(article, "chapters", None) or []):
+            href = str(chapter.get("href", "") or "")
+            if not href:
+                continue
+            if "\\" in href or any(
+                ch.isspace() or ord(ch) < 32 or 127 <= ord(ch) <= 159
+                for ch in href
+            ):
+                continue
+            try:
+                if urlsplit(href).scheme:
+                    safe_url = self._validated_chapter_web_url(href)
+                    if safe_url is not None:
+                        links.append((chapter, safe_url))
+                    continue
+                resolved = urljoin(article_url, href)
+            except Exception:
+                continue
+            safe_url = self._validated_chapter_web_url(resolved)
+            if safe_url is not None:
+                links.append((chapter, safe_url))
+        return links
+
+    def _validated_chapter_web_url(self, href: str) -> str | None:
+        """Return a strict HTTP(S) chapter URL, or None when it is unsafe."""
+        value = str(href or "")
+        if not value or "\\" in value:
+            return None
+        if any(ch.isspace() or ord(ch) < 32 or 127 <= ord(ch) <= 159 for ch in value):
+            return None
+        try:
+            parsed = urlsplit(value)
+            if parsed.scheme.lower() not in ("http", "https"):
+                return None
+            if not parsed.hostname:
+                return None
+            if parsed.username is not None or parsed.password is not None:
+                return None
+            parsed.port
+        except (TypeError, ValueError):
+            return None
+        return value
+
+    def on_open_chapter_link(self, href: str) -> None:
+        safe_url = self._validated_chapter_web_url(href)
+        if safe_url is None:
+            return
+        try:
+            webbrowser.open(safe_url)
+        except Exception:
+            log.debug("Failed to open chapter link", exc_info=True)
 
     def on_copy_image_link(self, idx):
         """Copy the first image URL found in the article content, if any."""
@@ -3091,9 +3232,10 @@ class MainFrame(wx.Frame):
         return view_id.startswith("favorites:") or view_id.startswith("fav:")
 
     def _get_display_title(self, article) -> str:
-        """Return title to display in list. Now that we have a Feed column, just return the title."""
+        """Return an accessible article-list title, including chapter availability."""
         title = article.title or ""
-        # Removed appending feed title since it now has a column
+        if getattr(article, "chapters", None):
+            return f"{title}, Chapters available"
         return title
 
     def _article_cache_id(self, article) -> str | None:
@@ -4689,7 +4831,7 @@ class MainFrame(wx.Frame):
             include_images = self._show_images_for_feed(getattr(article, "feed_id", None))
             content = self._strip_html(article.content, include_images=include_images)
             full_text = header + content
-            self.content_ctrl.SetValue(full_text)
+            self._set_article_reader_text(article, full_text)
         except Exception:
             pass
         
@@ -5146,10 +5288,7 @@ class MainFrame(wx.Frame):
         if cached:
             try:
                 self._fulltext_loading_url = None
-                # Fix: Don't reset text if it's already displayed (preserves cursor position)
-                if self.content_ctrl.GetValue() != cached:
-                    self.content_ctrl.SetValue(cached)
-                    self.content_ctrl.SetInsertionPoint(0)
+                self._set_article_reader_text(article, cached, reset_insertion=True)
             except Exception:
                 pass
             return
@@ -5196,8 +5335,7 @@ class MainFrame(wx.Frame):
         if cached:
             try:
                 self._fulltext_loading_url = None
-                self.content_ctrl.SetValue(cached)
-                self.content_ctrl.SetInsertionPoint(0)
+                self._set_article_reader_text(article, cached, reset_insertion=True)
             except Exception:
                 pass
             return
@@ -5462,8 +5600,7 @@ class MainFrame(wx.Frame):
 
                     try:
                         self._fulltext_loading_url = None
-                        self.content_ctrl.SetValue(rendered)
-                        self.content_ctrl.SetInsertionPoint(0)
+                        self._set_article_reader_text(article_now, rendered, reset_insertion=True)
                     except Exception:
                         pass
 
@@ -5540,22 +5677,117 @@ class MainFrame(wx.Frame):
         if chapters:
             wx.CallAfter(self._append_chapters, self._article_cache_id(article), chapters)
 
+    def _cache_article_chapters(self, article_cache_id, chapters) -> None:
+        chapter_list = list(chapters or [])
+        seen = set()
+        collections = [
+            getattr(self, "current_articles", []) or [],
+            getattr(self, "_base_articles", []) or [],
+        ]
+        try:
+            with self._view_cache_lock:
+                collections.extend(
+                    state.get("articles", []) or []
+                    for state in (getattr(self, "view_cache", {}) or {}).values()
+                )
+        except Exception:
+            pass
+
+        for articles in collections:
+            for article in articles:
+                marker = id(article)
+                if marker in seen:
+                    continue
+                seen.add(marker)
+                if self._article_cache_id(article) == article_cache_id:
+                    try:
+                        article.chapters = chapter_list
+                    except Exception:
+                        pass
+
+    def _update_article_chapter_indicator(self, article_cache_id) -> None:
+        try:
+            for idx, article in enumerate(getattr(self, "current_articles", []) or []):
+                if self._article_cache_id(article) == article_cache_id:
+                    self.list_ctrl.SetItem(idx, 0, self._get_display_title(article))
+                    return
+        except Exception:
+            pass
+
+    def _format_article_chapters_text(self, chapters) -> str:
+        chapter_list = list(chapters or [])
+        lines = [f"Chapters ({len(chapter_list)}):"]
+        for chapter in chapter_list:
+            timestamp = self._format_chapter_timestamp(chapter.get("start", 0))
+            title = str(chapter.get("title", "") or "").strip() or "Untitled chapter"
+            line = f"{timestamp}, {title}"
+            href = str(chapter.get("href", "") or "").strip()
+            if href:
+                line += f". Link: {href}"
+            lines.append(line)
+        return "\n\n" + "\n".join(lines) + "\n"
+
+    def _remove_trailing_article_chapters_text(self, text: str, chapters) -> str:
+        """Remove a previously rendered trailing chapter section from reader text."""
+        value = str(text or "")
+        chapter_list = list(chapters or [])
+        if not chapter_list:
+            return value
+        chapter_text = self._format_article_chapters_text(chapter_list)
+        if value.endswith(chapter_text):
+            return value[:-len(chapter_text)]
+        stripped_chapters = chapter_text.strip()
+        if value.rstrip().endswith(stripped_chapters):
+            return value.rstrip()[:-len(stripped_chapters)].rstrip()
+        return value
+
     def _append_chapters(self, article_cache_id, chapters):
+        chapter_list = list(chapters or [])
+        if not chapter_list:
+            return
+        selected_article = None
+        previous_chapters = []
+        try:
+            for article in getattr(self, "current_articles", []) or []:
+                if self._article_cache_id(article) == article_cache_id:
+                    selected_article = article
+                    previous_chapters = list(getattr(article, "chapters", None) or [])
+                    break
+        except Exception:
+            pass
+        self._cache_article_chapters(article_cache_id, chapter_list)
+        self._update_article_chapter_indicator(article_cache_id)
+
         # Verify selection hasn't changed
         if hasattr(self, 'selected_article_id') and self.selected_article_id == article_cache_id:
-            text = "\n\nChapters:\n"
-            for ch in chapters:
-                start = ch.get("start", 0)
-                mins = int(start // 60)
-                secs = int(start % 60)
-                start_str = f"{mins:02d}:{secs:02d}"
-                title = ch.get("title", "")
-                href = ch.get("href", "")
-                if href:
-                    text += f"- {start_str}  {title} ({href})\n"
-                else:
-                    text += f"- {start_str}  {title}\n"
-            self.content_ctrl.AppendText(text)
+            try:
+                current_text = self.content_ctrl.GetValue()
+            except Exception:
+                current_text = ""
+            base_text = self._remove_trailing_article_chapters_text(current_text, previous_chapters)
+            displayed = self._compose_article_reader_text(
+                base_text,
+                article=selected_article,
+                chapters=chapter_list,
+            )
+            if displayed == current_text:
+                return
+
+            insertion_point = None
+            selection = None
+            try:
+                insertion_point = self.content_ctrl.GetInsertionPoint()
+                selection = self.content_ctrl.GetSelection()
+            except Exception:
+                pass
+            self.content_ctrl.SetValue(displayed)
+            try:
+                if selection is not None:
+                    self.content_ctrl.SetSelection(*selection)
+                elif insertion_point is not None:
+                    self.content_ctrl.SetInsertionPoint(insertion_point)
+            except Exception:
+                pass
 
     def on_show_player(self, event):
         self.toggle_player_visibility()
@@ -5854,6 +6086,11 @@ class MainFrame(wx.Frame):
 
             try:
                 if pw.is_current_media(getattr(article, "id", None), media_url):
+                    if chapters and list(getattr(pw, "current_chapters", []) or []) != list(chapters):
+                        try:
+                            pw.update_chapters(chapters)
+                        except Exception:
+                            log.exception("Error updating chapters for current article")
                     try:
                         if pw.is_audio_playing():
                             pw.pause()
@@ -5864,6 +6101,12 @@ class MainFrame(wx.Frame):
                     return
             except Exception:
                 log.exception("Error checking if article is currently playing")
+
+            if not chapters:
+                try:
+                    pw.update_chapters([])
+                except Exception:
+                    log.exception("Error clearing chapters before media load")
 
             pw.load_media(
                 media_url,
@@ -5911,26 +6154,43 @@ class MainFrame(wx.Frame):
 
         if chapters:
             try:
-                wx.CallAfter(self._apply_chapters_for_player, article_id, chapters)
+                wx.CallAfter(self._apply_chapters_for_player, article_id, chapters, media_url)
             except Exception:
                 pass
 
-    def _apply_chapters_for_player(self, article_id: str, chapters: list[dict]) -> None:
+    def _apply_chapters_for_player(
+        self,
+        article_id: str,
+        chapters: list[dict],
+        media_url: str | None = None,
+    ) -> None:
+        chapter_list = list(chapters or [])
+        matching_cache_ids = []
         try:
             for a in getattr(self, "current_articles", []) or []:
                 if getattr(a, "id", None) == article_id:
                     try:
-                        a.chapters = chapters
+                        a.chapters = chapter_list
+                        matching_cache_ids.append(self._article_cache_id(a))
                     except Exception:
                         pass
-                    break
         except Exception:
             pass
+        for article_cache_id in matching_cache_ids:
+            self._cache_article_chapters(article_cache_id, chapter_list)
+            self._update_article_chapter_indicator(article_cache_id)
 
         try:
             pw = getattr(self, "player_window", None)
-            if pw:
-                pw.update_chapters(chapters)
+            if not pw:
+                return
+            current_article_id = getattr(pw, "current_article_id", None)
+            if current_article_id is not None and article_id is not None:
+                is_current = str(current_article_id) == str(article_id)
+            else:
+                is_current = bool(pw.is_current_media(article_id, media_url))
+            if is_current:
+                pw.update_chapters(chapter_list)
         except Exception:
             pass
 
@@ -6420,7 +6680,14 @@ class MainFrame(wx.Frame):
             self._apply_download_retention(target_dir)
             wx.CallAfter(lambda: wx.MessageBox(f"Downloaded to:\n{target_path}", "Download complete"))
         except Exception as e:
-            wx.CallAfter(lambda: wx.MessageBox(f"Download failed: {e}", "Download error", wx.ICON_ERROR))
+            error_message = str(e) or type(e).__name__
+            wx.CallAfter(
+                lambda message=error_message: wx.MessageBox(
+                    f"Download failed: {message}",
+                    "Download error",
+                    wx.ICON_ERROR,
+                )
+            )
 
     def _guess_extension(self, url, content_type=None):
         path = urlsplit(url).path if url else ""

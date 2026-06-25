@@ -369,7 +369,10 @@ def test_miniflux_entries_keep_plausible_near_future_server_dates(monkeypatch):
         "status": "unread",
         "published_at": future_dt.isoformat(),
     }
-    monkeypatch.setattr("providers.miniflux.utils.get_chapters_batch", lambda _ids: {})
+    monkeypatch.setattr(
+        "providers.miniflux.utils.get_chapters_batch",
+        lambda _ids, **_kwargs: {},
+    )
 
     article = p._entries_to_articles([entry])[0]
 
@@ -391,7 +394,10 @@ def test_miniflux_entries_fall_back_to_created_at_when_published_is_implausible(
         "published_at": future_dt.isoformat(),
         "created_at": created_dt.isoformat(),
     }
-    monkeypatch.setattr("providers.miniflux.utils.get_chapters_batch", lambda _ids: {})
+    monkeypatch.setattr(
+        "providers.miniflux.utils.get_chapters_batch",
+        lambda _ids, **_kwargs: {},
+    )
 
     article = p._entries_to_articles([entry])[0]
 
