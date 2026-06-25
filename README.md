@@ -1,6 +1,6 @@
 # BlindRSS
 
-A screen-reader-friendly desktop RSS and podcast client for Windows, macOS, and Linux, built for fast feed reading and dependable audio playback.
+A vibe-coded, screen-reader-friendly desktop RSS and podcast client for Windows, macOS, and Linux, built for fast feed reading and dependable audio playback.
 
 [![Join SerrebiProjects on Telegram](https://img.shields.io/badge/Telegram-SerrebiProjects-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/SerrebiProjects)
 
