@@ -2175,6 +2175,7 @@ class PlayerFrame(wx.Frame):
         local_was_playing = bool(self.is_playing)
         self._cast_local_was_playing = local_was_playing
         self._cast_last_pos_ms = local_pos_ms
+        local_paused_for_cast = False
 
         dlg = CastDialog(self, self.casting_manager)
         try:
@@ -2185,7 +2186,11 @@ class PlayerFrame(wx.Frame):
                 return
 
             try:
-                self.casting_manager.connect(device)
+                # CastDialog already connects before returning wx.ID_OK. Reuse
+                # that live session instead of disconnecting it and repeating
+                # discovery; reconnect only if the session dropped meanwhile.
+                if not self.casting_manager.is_connected_to(device):
+                    self.casting_manager.connect(device)
                 self.is_casting = True
                 self.cast_btn.SetLabel('Disconnect')
                 self.title_lbl.SetLabel(f"{self.current_title} (Casting to {device.name})")
@@ -2193,6 +2198,7 @@ class PlayerFrame(wx.Frame):
                 if local_was_playing:
                     try:
                         self.player.pause()
+                        local_paused_for_cast = True
                     except Exception:
                         pass
                 else:
@@ -2225,7 +2231,26 @@ class PlayerFrame(wx.Frame):
                             pass
                         self.is_playing = False
             except Exception as e:
-                wx.MessageBox(f"Connection failed: {e}", 'Error', wx.ICON_ERROR)
+                try:
+                    self.casting_manager.disconnect()
+                except Exception:
+                    pass
+                self.is_casting = False
+                self._cast_handoff_source_url = None
+                try:
+                    self.cast_btn.SetLabel('Cast')
+                except Exception:
+                    pass
+                try:
+                    self.title_lbl.SetLabel(f"{self.current_title} (Local)")
+                except Exception:
+                    pass
+                if local_was_playing and local_paused_for_cast:
+                    try:
+                        self.player.play()
+                    except Exception:
+                        pass
+                wx.MessageBox(f"Casting failed: {e}", 'Error', wx.ICON_ERROR)
         finally:
             try:
                 dlg.Destroy()

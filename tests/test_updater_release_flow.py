@@ -34,6 +34,8 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
                 "Test summary.",
                 output,
                 signing_thumbprint="12 34",
+                installer_asset_name="BlindRSS-Setup-v9.8.7.exe",
+                installer_sha256="c" * 64,
             )
 
             with open(output, "r", encoding="utf-8") as f:
@@ -47,6 +49,13 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
         )
         self.assertEqual(manifest["sha256"], "a" * 64)
         self.assertEqual(manifest["signing_thumbprint"], "12 34")
+        self.assertEqual(manifest["installer"]["asset"], "BlindRSS-Setup-v9.8.7.exe")
+        self.assertEqual(manifest["installer"]["sha256"], "c" * 64)
+        self.assertEqual(
+            manifest["installer"]["download_url"],
+            "https://github.com/serrebidev/BlindRSS/releases/download/"
+            "v9.8.7/BlindRSS-Setup-v9.8.7.exe",
+        )
 
     def test_check_for_updates_accepts_release_manifest_and_zip_assets(self) -> None:
         from core import updater
@@ -88,6 +97,52 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
         self.assertEqual(result.info.download_url, "https://github.com/assets/zip")
         self.assertEqual(result.info.sha256, "b" * 64)
         self.assertEqual(result.info.signing_thumbprints, ("AABBCC",))
+        self.assertEqual(result.info.asset_kind, "archive")
+
+    def test_installed_windows_build_selects_installer_asset(self) -> None:
+        from core import updater
+
+        release = {
+            "tag_name": "v9.8.7",
+            "published_at": "2026-04-29T00:00:00Z",
+            "assets": [
+                {
+                    "name": "BlindRSS-update.json",
+                    "browser_download_url": "https://github.com/assets/manifest",
+                },
+                {
+                    "name": "BlindRSS-v9.8.7.zip",
+                    "browser_download_url": "https://github.com/assets/zip",
+                },
+                {
+                    "name": "BlindRSS-Setup-v9.8.7.exe",
+                    "browser_download_url": "https://github.com/assets/setup",
+                },
+            ],
+        }
+        manifest = {
+            "version": "v9.8.7",
+            "asset": "BlindRSS-v9.8.7.zip",
+            "sha256": "b" * 64,
+            "installer": {
+                "asset": "BlindRSS-Setup-v9.8.7.exe",
+                "sha256": "c" * 64,
+            },
+        }
+
+        with patch("core.updater.APP_VERSION", "1.0.0"):
+            with patch("core.updater._fetch_latest_release", return_value=(release, None)):
+                with patch("core.updater.current_platform", return_value="windows"):
+                    with patch("core.updater.is_windows_installed_build", return_value=True):
+                        with patch("core.updater._download_json", return_value=(manifest, None)):
+                            result = updater.check_for_updates()
+
+        self.assertEqual(result.status, "update_available")
+        self.assertIsNotNone(result.info)
+        self.assertEqual(result.info.asset_name, "BlindRSS-Setup-v9.8.7.exe")
+        self.assertEqual(result.info.download_url, "https://github.com/assets/setup")
+        self.assertEqual(result.info.sha256, "c" * 64)
+        self.assertEqual(result.info.asset_kind, "installer")
 
     def test_authenticode_verification_tries_next_powershell(self) -> None:
         from core import updater

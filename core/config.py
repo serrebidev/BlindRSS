@@ -1,6 +1,7 @@
 import copy
 import json
 import os
+import shutil
 import sys
 import logging
 
@@ -29,6 +30,7 @@ def _user_data_dir() -> str:
 USER_DATA_DIR = _user_data_dir()
 
 CONFIG_FILENAME = "config.json"
+WINDOWS_INSTALL_MARKER = ".windows-installed"
 APP_CONFIG_PATH = os.path.join(APP_DIR, CONFIG_FILENAME)
 USER_CONFIG_PATH = os.path.join(USER_DATA_DIR, CONFIG_FILENAME)
 
@@ -36,8 +38,19 @@ USER_CONFIG_PATH = os.path.join(USER_DATA_DIR, CONFIG_FILENAME)
 CONFIG_FILE = APP_CONFIG_PATH
 
 
+def is_windows_installed_build() -> bool:
+    """Return True for the per-user Windows installer distribution."""
+    return bool(
+        sys.platform.startswith("win")
+        and getattr(sys, "frozen", False)
+        and os.path.isfile(os.path.join(APP_DIR, WINDOWS_INSTALL_MARKER))
+    )
+
+
 def _default_config_location() -> str:
     """Default storage location for fresh installs."""
+    if is_windows_installed_build():
+        return "user_data"
     if sys.platform == "darwin" and getattr(sys, "frozen", False):
         return "user_data"
     return "app_folder"
@@ -45,6 +58,13 @@ def _default_config_location() -> str:
 
 def _path_for_location(location: str) -> str:
     return USER_CONFIG_PATH if location == "user_data" else APP_CONFIG_PATH
+
+
+def _default_download_dir() -> str:
+    if is_windows_installed_build():
+        return os.path.join(USER_DATA_DIR, "podcasts")
+    return os.path.join(APP_DIR, "podcasts")
+
 
 DEFAULT_CONFIG = {
     "max_downloads": 32,
@@ -155,7 +175,7 @@ DEFAULT_CONFIG = {
     "range_cache_background_chunk_kb": 16384,  # chunk size for background download
     "range_cache_debug": False,  # verbose local proxy debug logs (PROXY_DEBUG)
     "downloads_enabled": False,
-    "download_path": os.path.join(APP_DIR, "podcasts"),
+    "download_path": _default_download_dir(),
     "download_retention": "Unlimited",
     # Maps stable article/media fingerprints to locally downloaded episode files.
     # This lets playback prefer a completed download when the network is offline.
@@ -233,6 +253,9 @@ def _resolve_config_path() -> tuple[str, str]:
     Preference: user_data location if config exists there, else app_folder if
     config exists there, else the OS default location (which may not yet exist).
     """
+    if is_windows_installed_build():
+        return USER_CONFIG_PATH, "user_data"
+
     user_exists = os.path.exists(USER_CONFIG_PATH)
     app_exists = os.path.exists(APP_CONFIG_PATH)
     if user_exists and app_exists:
@@ -258,6 +281,103 @@ def _ensure_parent_dir(path: str) -> None:
         pass
 
 
+def _copy_file_if_missing(source: str, target: str) -> bool:
+    """Copy a legacy data file atomically without replacing newer roaming data."""
+    if not os.path.isfile(source) or os.path.exists(target):
+        return bool(os.path.exists(target))
+    _ensure_parent_dir(target)
+    temp_target = f"{target}.migrating-{os.getpid()}"
+    try:
+        shutil.copy2(source, temp_target)
+        os.replace(temp_target, target)
+        return True
+    except Exception:
+        log.exception("Failed to migrate user data file from %s to %s", source, target)
+        try:
+            if os.path.exists(temp_target):
+                os.remove(temp_target)
+        except Exception:
+            pass
+        return False
+
+
+def _copy_tree_missing(source: str, target: str) -> bool:
+    """Merge a legacy user-data directory without overwriting roaming files."""
+    if not os.path.isdir(source):
+        return bool(os.path.isdir(target))
+    try:
+        os.makedirs(target, exist_ok=True)
+        for root, dirs, files in os.walk(source):
+            rel = os.path.relpath(root, source)
+            dest_root = target if rel == "." else os.path.join(target, rel)
+            os.makedirs(dest_root, exist_ok=True)
+            for directory in dirs:
+                os.makedirs(os.path.join(dest_root, directory), exist_ok=True)
+            for filename in files:
+                dest_file = os.path.join(dest_root, filename)
+                if not os.path.exists(dest_file):
+                    shutil.copy2(os.path.join(root, filename), dest_file)
+        return True
+    except Exception:
+        log.exception("Failed to migrate user data directory from %s to %s", source, target)
+        return False
+
+
+def _prepare_windows_installed_data() -> None:
+    """Seed roaming storage from a legacy app-folder Windows distribution."""
+    if not is_windows_installed_build():
+        return
+    try:
+        os.makedirs(USER_DATA_DIR, exist_ok=True)
+    except Exception:
+        log.exception("Could not create BlindRSS roaming data directory at %s", USER_DATA_DIR)
+        return
+
+    _copy_file_if_missing(APP_CONFIG_PATH, USER_CONFIG_PATH)
+    _copy_file_if_missing(
+        os.path.join(APP_DIR, "youtube_cookies.txt"),
+        os.path.join(USER_DATA_DIR, "youtube_cookies.txt"),
+    )
+    for dirname in ("podcasts", "ytplay_cache"):
+        _copy_tree_missing(
+            os.path.join(APP_DIR, dirname),
+            os.path.join(USER_DATA_DIR, dirname),
+        )
+
+
+def _path_inside(path: str, parent: str) -> bool:
+    try:
+        return os.path.commonpath(
+            (os.path.abspath(path), os.path.abspath(parent))
+        ) == os.path.abspath(parent)
+    except (OSError, ValueError, TypeError):
+        return False
+
+
+def _migrate_app_relative_path(value):
+    """Copy an app-relative user-data path to roaming storage and return it."""
+    raw = str(value or "").strip()
+    if not raw or not os.path.isabs(raw) or not _path_inside(raw, APP_DIR):
+        return value
+    try:
+        relative = os.path.relpath(raw, APP_DIR)
+    except (OSError, ValueError):
+        return value
+    target = os.path.join(USER_DATA_DIR, relative)
+    if os.path.isdir(raw):
+        migrated = _copy_tree_missing(raw, target)
+    elif os.path.isfile(raw):
+        migrated = _copy_file_if_missing(raw, target)
+    else:
+        # A configured download/cache directory may not exist yet.
+        try:
+            os.makedirs(target, exist_ok=True)
+            migrated = True
+        except Exception:
+            migrated = False
+    return target if migrated else value
+
+
 def get_data_dir() -> str:
     """Directory where config.json lives. Currently also the preferred dir for rss.db."""
     return os.path.dirname(CONFIG_FILE) or APP_DIR
@@ -276,6 +396,7 @@ class ConfigManager:
             self.config_path = current
             self.data_location = "app_folder"
         else:
+            _prepare_windows_installed_data()
             self.config_path, self.data_location = _resolve_config_path()
         global CONFIG_FILE
         CONFIG_FILE = self.config_path
@@ -367,6 +488,34 @@ class ConfigManager:
                 "Could not migrate refresh defaults due to invalid values in config.json; leaving them as is."
             )
 
+        if is_windows_installed_build():
+            for key in (
+                "download_path",
+                "youtube_play_cache_dir",
+                "range_cache_dir",
+                "ytdlp_cookies_file",
+            ):
+                previous = cfg.get(key)
+                migrated = _migrate_app_relative_path(previous)
+                if migrated != previous:
+                    cfg[key] = migrated
+                    changed = True
+
+            downloaded_media = cfg.get("downloaded_media")
+            if isinstance(downloaded_media, dict):
+                for entry_key, entry in downloaded_media.items():
+                    if isinstance(entry, dict):
+                        previous = entry.get("path")
+                        migrated = _migrate_app_relative_path(previous)
+                        if migrated != previous:
+                            entry["path"] = migrated
+                            changed = True
+                    elif isinstance(entry, str):
+                        migrated = _migrate_app_relative_path(entry)
+                        if migrated != entry:
+                            downloaded_media[entry_key] = migrated
+                            changed = True
+
         return bool(changed)
 
     def save_config(self):
@@ -406,6 +555,8 @@ class ConfigManager:
         open; it will be handled on next startup if needed.
         """
         new_location = "user_data" if new_location == "user_data" else "app_folder"
+        if is_windows_installed_build() and new_location != "user_data":
+            return False, "Installed Windows builds store data in the User Data Folder."
         if new_location == self.data_location:
             return True, "No change."
 

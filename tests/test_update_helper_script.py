@@ -48,6 +48,15 @@ def test_update_helper_relocated_batch_shell_exits_cleanly():
     assert 'start "" /b "!TMP_HELPER!"' not in text
 
 
+def test_update_helper_supports_signed_installer_updates():
+    text = _helper_text()
+
+    assert 'if /I "%~1"=="--installer"' in text
+    assert 'start "" /wait "%INSTALLER_PATH%" /VERYSILENT' in text
+    assert 'if not exist "%INSTALL_DIR%\\.windows-installed"' in text
+    assert 'copy /Y "%OLD_DIR%\\.windows-installed"' in text
+
+
 def test_successful_update_exits_without_modal_ready_prompt():
     text = MAINFRAME.read_text(encoding="utf-8")
 

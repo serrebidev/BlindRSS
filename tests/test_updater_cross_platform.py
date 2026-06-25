@@ -251,3 +251,53 @@ def test_apply_macos_invokes_helper(monkeypatch, tmp_path):
     assert calls["install_target"] == "/Applications/BlindRSS.app"
     assert calls["staging_root"].endswith("BlindRSS.app")
     assert calls["relaunch_path"] == "/Applications/BlindRSS.app"
+
+
+def test_apply_windows_installer_verifies_and_launches_helper(monkeypatch, tmp_path):
+    install = tmp_path / "install"
+    install.mkdir()
+    (install / "update_helper.bat").write_text("@echo off\n")
+    installer = tmp_path / "BlindRSS-Setup-v2.0.0.exe"
+    installer.write_bytes(b"setup")
+    info = updater.UpdateInfo(
+        version=updater.Version("2.0.0"),
+        tag="v2.0.0",
+        published_at="",
+        notes_summary="",
+        asset_name=installer.name,
+        download_url="https://example.test/setup.exe",
+        sha256="a" * 64,
+        signing_thumbprints=("AABBCC",),
+        asset_kind="installer",
+    )
+
+    monkeypatch.setattr(
+        updater,
+        "_verify_authenticode_signature",
+        lambda path, thumbs: (path == str(installer) and thumbs == ("AABBCC",), ""),
+    )
+    captured = {}
+
+    def fake_launch(helper, parent_pid, install_dir, staging_root, **kwargs):
+        captured.update(
+            helper=helper,
+            install_dir=install_dir,
+            staging_root=staging_root,
+            kwargs=kwargs,
+        )
+        return True, ""
+
+    monkeypatch.setattr(updater, "_launch_update_helper", fake_launch)
+    ok, message = updater._apply_windows_installer(
+        info,
+        str(install),
+        str(tmp_path),
+        str(installer),
+        False,
+        lambda *_args: True,
+    )
+
+    assert ok, message
+    assert captured["install_dir"] == str(install)
+    assert captured["staging_root"] == ""
+    assert captured["kwargs"]["installer_path"] == str(installer)

@@ -1,6 +1,5 @@
 import sqlite3
 import os
-import shutil
 import logging
 import time
 import uuid
@@ -66,19 +65,34 @@ def _ensure_db_available() -> str:
             if os.path.abspath(src) == os.path.abspath(target):
                 continue
             if os.path.exists(src):
-                shutil.copy2(src, target)
-                for sidecar in ("-wal", "-shm", "-journal"):
-                    side_src = src + sidecar
-                    if os.path.exists(side_src):
-                        try:
-                            shutil.copy2(side_src, target + sidecar)
-                        except Exception:
-                            log.exception("Failed to copy sqlite sidecar %s", side_src)
+                _backup_database(src, target)
                 log.info("Migrated rss.db from %s to %s", src, target)
                 return target
         except Exception:
             log.exception("Failed while migrating rss.db from %s", src)
     return target
+
+
+def _backup_database(source: str, target: str) -> None:
+    """Create a consistent SQLite copy, including committed WAL contents."""
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    temp_target = f"{target}.migrating-{os.getpid()}"
+    try:
+        source_conn = sqlite3.connect(source, timeout=30, check_same_thread=False)
+        target_conn = sqlite3.connect(temp_target, timeout=30, check_same_thread=False)
+        try:
+            source_conn.backup(target_conn)
+        finally:
+            target_conn.close()
+            source_conn.close()
+        os.replace(temp_target, target)
+    except Exception:
+        try:
+            if os.path.exists(temp_target):
+                os.remove(temp_target)
+        except Exception:
+            pass
+        raise
 
 
 def _table_exists(cursor: sqlite3.Cursor, name: str) -> bool:

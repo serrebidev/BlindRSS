@@ -7,10 +7,12 @@ Each device is labeled with its type for easy identification.
 import asyncio
 import logging
 import threading
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Dict, List, Optional
+from uuid import UUID
 import os
 import urllib.parse
 
@@ -145,21 +147,32 @@ class BaseCaster(ABC):
 
 try:
     import pychromecast
+    from pychromecast.config import APP_MEDIA_RECEIVER
     _HAS_CHROMECAST = True
 except ImportError:
     _HAS_CHROMECAST = False
     pychromecast = None
+    APP_MEDIA_RECEIVER = "CC1AD845"
 
 
 class ChromecastCaster(BaseCaster):
     """Chromecast protocol implementation."""
+
+    _DISCOVERY_TIMEOUT = 8.0
+    _READY_TIMEOUT = 15.0
+    _SOCKET_TIMEOUT = 5.0
+    _CONNECT_TRIES = 3
+    _RETRY_WAIT = 1.0
+    _RECEIVER_LAUNCH_TIMEOUT = 15.0
+    _RECEIVER_CONFIRM_TIMEOUT = 8.0
+    _RECEIVER_STATUS_WAIT = 1.0
+    _RECEIVER_STOP_TIMEOUT = 8.0
     
     def __init__(self):
         if not _HAS_CHROMECAST:
             raise CastError("pychromecast is not installed. Run: pip install pychromecast")
         self._cast = None
         self._browser = None
-        self._devices: Dict[str, any] = {}
         # StreamProxy starts lazily when needed.
     
     async def discover(self, timeout: float = 5.0) -> List[CastDevice]:
@@ -170,17 +183,22 @@ class ChromecastCaster(BaseCaster):
         loop = asyncio.get_event_loop()
         
         def do_discovery():
+            browser = None
             try:
                 # Use the standard discovery function
                 # This returns a list of Playable/Cast objects and the browser, but we just want discovery info here.
                 # get_chromecasts returns (casts, browser). blocking=True waits until timeout.
                 casts, browser = pychromecast.get_chromecasts(timeout=timeout)
-                # We need to stop the discovery/browser or it keeps running
-                browser.stop_discovery()
                 return casts
             except Exception as e:
                 LOG.warning("Chromecast discovery error: %s", e)
                 return []
+            finally:
+                if browser is not None:
+                    try:
+                        browser.stop_discovery()
+                    except Exception as e:
+                        LOG.debug("Failed to stop Chromecast discovery browser: %s", e)
         
         discovered_casts = await loop.run_in_executor(None, do_discovery)
         
@@ -218,37 +236,255 @@ class ChromecastCaster(BaseCaster):
         loop = asyncio.get_event_loop()
         
         def do_connect():
-            try:
-                # Try by UUID first using get_listed_chromecasts
-                # This performs discovery for the specific UUID
-                chromecasts, browser = pychromecast.get_listed_chromecasts(
-                    uuids=[device.identifier]
+            cast = None
+            browser = None
+
+            def stop_browser(candidate) -> None:
+                if candidate is None:
+                    return
+                try:
+                    candidate.stop_discovery()
+                except Exception as e:
+                    LOG.debug("Failed to stop Chromecast discovery browser: %s", e)
+
+            def disconnect_cast(candidate) -> None:
+                if candidate is None:
+                    return
+                try:
+                    candidate.disconnect(timeout=5.0)
+                except Exception as e:
+                    LOG.debug("Failed to disconnect unsuccessful Chromecast session: %s", e)
+
+            def find_listed(**criteria):
+                found, found_browser = pychromecast.get_listed_chromecasts(
+                    tries=self._CONNECT_TRIES,
+                    retry_wait=self._RETRY_WAIT,
+                    timeout=self._SOCKET_TIMEOUT,
+                    discovery_timeout=self._DISCOVERY_TIMEOUT,
+                    known_hosts=[device.host] if device.host else None,
+                    **criteria,
                 )
+                if not found:
+                    stop_browser(found_browser)
+                    return [], None
+                return found, found_browser
+
+            try:
+                try:
+                    device_uuid = UUID(str(device.identifier))
+                except (TypeError, ValueError, AttributeError):
+                    device_uuid = None
+
+                chromecasts = []
+                if device_uuid is not None:
+                    chromecasts, browser = find_listed(uuids=[device_uuid])
+
                 if not chromecasts:
-                    # If strictly searching by UUID failed, try searching by known IP
-                    # This is useful if the UUID changed or discovery is flaky but IP is known
-                    # However, get_chromecasts(known_hosts=[...]) is better
-                    chromecasts, browser = pychromecast.get_chromecasts(known_hosts=[device.host])
-                    # Filter for the one we want if possible, or take the first one at that IP
-                    if chromecasts:
-                        # If we have a UUID, match it. If not, just take the first one (fallback)
-                        for cc in chromecasts:
-                            if str(cc.uuid) == device.identifier:
-                                cast = cc
-                                break
-                        else:
-                            cast = chromecasts[0]
-                    else:
-                        raise ConnectionError(f"Could not find Chromecast {device.name} at {device.host}")
-                else:
-                    cast = chromecasts[0]
+                    # Friendly-name matching is a safe fallback when a device has
+                    # been reset and advertises a new UUID. Names are passed as
+                    # plain values, so characters such as "&" need no escaping.
+                    chromecasts, browser = find_listed(friendly_names=[device.name])
+
+                if not chromecasts:
+                    raise DeviceNotFoundError(
+                        f"Could not find Chromecast {device.name} at {device.host}"
+                    )
+
+                cast = chromecasts[0]
                 
-                cast.wait()
+                cast.wait(timeout=self._READY_TIMEOUT)
                 return cast, browser
             except Exception as e:
+                disconnect_cast(cast)
+                stop_browser(browser)
                 raise ConnectionError(f"Failed to connect to {device.name}: {e}")
         
         self._cast, self._browser = await loop.run_in_executor(None, do_connect)
+
+    @staticmethod
+    def _reported_app_ids(cast) -> set[str]:
+        """Return non-empty app IDs reported by the cast and receiver status."""
+        app_ids = set()
+        candidates = []
+        try:
+            candidates.append(getattr(cast, "app_id", None))
+        except Exception:
+            pass
+        try:
+            candidates.append(getattr(getattr(cast, "status", None), "app_id", None))
+        except Exception:
+            pass
+        try:
+            receiver = getattr(getattr(cast, "socket_client", None), "receiver_controller", None)
+            candidates.append(getattr(receiver, "app_id", None))
+            candidates.append(getattr(getattr(receiver, "status", None), "app_id", None))
+        except Exception:
+            pass
+
+        for app_id in candidates:
+            if app_id:
+                app_ids.add(str(app_id))
+        return app_ids
+
+    def _poll_for_default_media_receiver(
+        self,
+        cast,
+        *,
+        accept_missing: bool,
+    ) -> tuple[bool, set[str], Optional[Exception]]:
+        """Refresh receiver status until the default receiver is confirmed."""
+        target_app_id = APP_MEDIA_RECEIVER
+        receiver = getattr(getattr(cast, "socket_client", None), "receiver_controller", None)
+        deadline = time.monotonic() + self._RECEIVER_CONFIRM_TIMEOUT
+        last_status_error = None
+
+        while True:
+            reported = self._reported_app_ids(cast)
+            if target_app_id in reported:
+                return True, reported, last_status_error
+            if accept_missing and not reported:
+                return True, reported, last_status_error
+
+            remaining = max(0.0, deadline - time.monotonic())
+            if remaining <= 0:
+                return False, reported, last_status_error
+
+            status_event = threading.Event()
+
+            def status_callback(_sent, _response):
+                status_event.set()
+
+            if receiver is not None:
+                try:
+                    receiver.update_status(callback_function=status_callback)
+                except TypeError:
+                    try:
+                        receiver.update_status()
+                    except Exception as e:
+                        last_status_error = e
+                except Exception as e:
+                    last_status_error = e
+
+            if receiver is not None:
+                status_event.wait(min(self._RECEIVER_STATUS_WAIT, remaining))
+            else:
+                time.sleep(min(0.2, remaining))
+
+            remaining = max(0.0, deadline - time.monotonic())
+            if remaining:
+                time.sleep(min(0.1, remaining))
+
+    def _stop_current_receiver_app(self, cast) -> Optional[Exception]:
+        """Best-effort bounded stop of the app currently owning the receiver."""
+        try:
+            quit_app = getattr(cast, "quit_app", None)
+            if callable(quit_app):
+                quit_app(timeout=self._RECEIVER_STOP_TIMEOUT)
+                return None
+
+            receiver = getattr(
+                getattr(cast, "socket_client", None),
+                "receiver_controller",
+                None,
+            )
+            if receiver is None or not hasattr(receiver, "stop_app"):
+                return RuntimeError("Chromecast does not expose an app stop command")
+
+            stopped = threading.Event()
+            outcome = {"sent": False}
+
+            def stop_callback(sent, _response):
+                outcome["sent"] = bool(sent)
+                stopped.set()
+
+            receiver.stop_app(callback_function=stop_callback)
+            if not stopped.wait(self._RECEIVER_STOP_TIMEOUT):
+                return TimeoutError("Timed out stopping the current Chromecast app")
+            if not outcome["sent"]:
+                return RuntimeError("Chromecast rejected the app stop command")
+            return None
+        except Exception as e:
+            return e
+
+    def _ensure_default_media_receiver(self, cast) -> None:
+        """Launch and confirm the Default Media Receiver before sending media."""
+        target_app_id = APP_MEDIA_RECEIVER
+        reported = self._reported_app_ids(cast)
+        if target_app_id in reported:
+            return
+
+        launch_errors = []
+        status_error = None
+
+        try:
+            cast.start_app(
+                target_app_id,
+                force_launch=True,
+                timeout=self._RECEIVER_LAUNCH_TIMEOUT,
+            )
+        except Exception as e:
+            launch_errors.append(e)
+            confirmed, reported, status_error = self._poll_for_default_media_receiver(
+                cast,
+                accept_missing=False,
+            )
+            if confirmed:
+                return
+        else:
+            confirmed, reported, status_error = self._poll_for_default_media_receiver(
+                cast,
+                accept_missing=True,
+            )
+            if confirmed:
+                return
+
+        stop_error = None
+        if reported:
+            stop_error = self._stop_current_receiver_app(cast)
+
+        try:
+            cast.start_app(
+                target_app_id,
+                force_launch=True,
+                timeout=self._RECEIVER_LAUNCH_TIMEOUT,
+            )
+        except Exception as e:
+            launch_errors.append(e)
+            confirmed, reported, retry_status_error = (
+                self._poll_for_default_media_receiver(
+                    cast,
+                    accept_missing=False,
+                )
+            )
+            status_error = retry_status_error or status_error
+            if confirmed:
+                return
+        else:
+            confirmed, reported, retry_status_error = (
+                self._poll_for_default_media_receiver(
+                    cast,
+                    accept_missing=True,
+                )
+            )
+            status_error = retry_status_error or status_error
+            if confirmed:
+                return
+
+        current = ", ".join(sorted(reported)) or "unknown"
+        details = []
+        if launch_errors:
+            details.append(
+                "launch error(s): " + "; ".join(str(error) for error in launch_errors)
+            )
+        if stop_error is not None:
+            details.append(f"stop error: {stop_error}")
+        if status_error is not None:
+            details.append(f"status refresh error: {status_error}")
+        detail = f"; {'; '.join(details)}" if details else ""
+        raise PlaybackError(
+            "Chromecast did not switch to the Default Media Receiver "
+            f"(reported app: {current}){detail}"
+        )
     
     async def play(self, url: str, title: str = "IPTV Stream",
                    content_type: str = "video/mp2t", headers: Optional[Dict[str, str]] = None,
@@ -260,7 +496,9 @@ class ChromecastCaster(BaseCaster):
         loop = asyncio.get_event_loop()
         
         def do_play():
-            mc = self._cast.media_controller
+            cast = self._cast
+            self._ensure_default_media_receiver(cast)
+            mc = cast.media_controller
             
             content_type_actual = _detect_mime_type(url, content_type)
             
@@ -268,9 +506,9 @@ class ChromecastCaster(BaseCaster):
             # must be served/proxied via StreamProxy using an IP reachable from the cast device.
             device_ip = None
             try:
-                device_ip = getattr(self._cast, 'host', None)
-                if not device_ip and getattr(self._cast, 'cast_info', None):
-                    device_ip = getattr(self._cast.cast_info, 'host', None)
+                device_ip = getattr(cast, 'host', None)
+                if not device_ip and getattr(cast, 'cast_info', None):
+                    device_ip = getattr(cast.cast_info, 'host', None)
             except Exception:
                 device_ip = None
             
@@ -293,9 +531,12 @@ class ChromecastCaster(BaseCaster):
                     if fp.startswith('/') and len(fp) >= 3 and fp[2] == ':':
                         fp = fp[1:]
                     file_path = fp
-                elif parsed.scheme in ('', None):
-                    if url and os.path.isfile(url):
-                        file_path = url
+                # urlparse treats a Windows drive letter as a URL scheme
+                # (for example, C:\Music\track.wav has scheme "c"). Check
+                # existing paths independently so raw Windows paths are served
+                # through StreamProxy instead of being sent to Chromecast.
+                elif url and os.path.isfile(url):
+                    file_path = url
             
                 if proxy and file_path:
                     proxied_url = proxy.get_file_url(file_path, device_ip=device_ip)
@@ -355,22 +596,27 @@ class ChromecastCaster(BaseCaster):
                 kwargs["current_time"] = float(target_start)
 
             try:
-                mc.play_media(
-                    proxied_url,
-                    content_type_actual,
-                    **kwargs
-                )
-            except TypeError:
-                # Older pychromecast versions may not accept current_time
-                if "current_time" in kwargs:
-                    kwargs.pop("current_time", None)
-                mc.play_media(
-                    proxied_url,
-                    content_type_actual,
-                    **kwargs
-                )
+                try:
+                    mc.play_media(
+                        proxied_url,
+                        content_type_actual,
+                        **kwargs
+                    )
+                except TypeError:
+                    # Older pychromecast versions may not accept current_time
+                    if "current_time" in kwargs:
+                        kwargs.pop("current_time", None)
+                    mc.play_media(
+                        proxied_url,
+                        content_type_actual,
+                        **kwargs
+                    )
 
-            mc.block_until_active(timeout=10)
+                mc.block_until_active(timeout=10)
+            except PlaybackError:
+                raise
+            except Exception as e:
+                raise PlaybackError(f"Chromecast playback failed: {e}") from e
 
             # Some devices ignore current_time; enforce via seek with retries.
             if target_start and target_start > 0:
@@ -406,9 +652,22 @@ class ChromecastCaster(BaseCaster):
         await loop.run_in_executor(None, do_play)
     
     async def stop(self) -> None:
-        if self._cast:
+        cast = self._cast
+        if cast:
             loop = asyncio.get_event_loop()
-            await loop.run_in_executor(None, self._cast.media_controller.stop)
+
+            def do_stop():
+                mc = cast.media_controller
+                try:
+                    mc.update_status()
+                except Exception:
+                    pass
+                status = getattr(mc, "status", None)
+                if status is not None and getattr(status, "media_session_id", None) is None:
+                    return
+                mc.stop()
+
+            await loop.run_in_executor(None, do_stop)
     
     async def pause(self) -> None:
         if self._cast:
@@ -493,21 +752,39 @@ class ChromecastCaster(BaseCaster):
             await loop.run_in_executor(None, self._cast.set_volume, max(0.0, min(1.0, level)))
     
     async def disconnect(self) -> None:
-        if self._cast:
-            try:
-                self._cast.disconnect()
-            except Exception:
-                pass
-            self._cast = None
-        if self._browser:
-            try:
-                self._browser.stop_discovery()
-            except Exception:
-                pass
-            self._browser = None
+        cast = self._cast
+        browser = self._browser
+        self._cast = None
+        self._browser = None
+
+        if cast is None and browser is None:
+            return
+
+        def do_disconnect():
+            if cast:
+                try:
+                    cast.disconnect(timeout=5.0)
+                except Exception:
+                    pass
+            if browser:
+                try:
+                    browser.stop_discovery()
+                except Exception:
+                    pass
+
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, do_disconnect)
     
     def is_connected(self) -> bool:
-        return self._cast is not None
+        if self._cast is None:
+            return False
+        try:
+            socket_client = getattr(self._cast, "socket_client", None)
+            if socket_client is not None and hasattr(socket_client, "is_connected"):
+                return bool(socket_client.is_connected)
+        except Exception:
+            return False
+        return True
 
 
 # ============================================================================
@@ -1154,3 +1431,10 @@ class CastingManager:
         # but for UI checks it's okay to read the local prop if updated correctly.
         # However, 'active_caster' is set on the loop.
         return self.active_caster is not None and self.active_caster.is_connected()
+
+    def is_connected_to(self, device: CastDevice) -> bool:
+        """Return whether the active session is connected to ``device``."""
+        active = self.active_device
+        if active is None or active.unique_id != device.unique_id:
+            return False
+        return self.is_connected()

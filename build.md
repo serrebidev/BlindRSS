@@ -49,7 +49,8 @@ GitHub release publication may happen from any OS after the required artifacts a
 
 - Creates `BlindRSS-update.json` for auto-updates.
 - Computes the release ZIP SHA-256 hash.
-- Signs `BlindRSS.exe` when `signtool.exe` is available.
+- Builds the per-user Windows installer and computes its SHA-256 hash.
+- Signs `BlindRSS.exe` and the installer when `signtool.exe` is available.
 - Bumps `core/version.py`, tags Git, pushes, and creates the GitHub release.
 - Dispatches the GitHub Actions macOS and Linux release-asset build after the Windows release is created.
 - Pushes to `main` also trigger GitHub Actions workflow builds for Windows, macOS, and Linux as workflow artifacts so you can validate packaging without publishing a release.
@@ -59,7 +60,10 @@ GitHub release publication may happen from any OS after the required artifacts a
 
 BlindRSS auto-update does not look at Git tags, commits on `main`, or GitHub Actions artifacts. It checks GitHub's `repos/serrebidev/BlindRSS/releases/latest` endpoint, downloads its platform manifest from that release, and then downloads the asset named by that manifest:
 
-- Windows: `BlindRSS-update.json` -> `BlindRSS-vX.Y.Z.zip`
+- Windows portable/legacy: `BlindRSS-update.json` -> `BlindRSS-vX.Y.Z.zip`
+- Windows installed: `BlindRSS-update.json` -> `BlindRSS-Setup-vX.Y.Z.exe` (the
+  manifest keeps the ZIP as its canonical asset and adds signed-installer
+  metadata for installer-managed copies)
 - macOS: `BlindRSS-update-macos.json` -> `BlindRSS-macos-vX.Y.Z.zip`
 - Linux: `BlindRSS-update-linux.json` -> `BlindRSS-linux-vX.Y.Z.tar.gz`
 
@@ -81,6 +85,9 @@ On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZI
 - VLC 64-bit installed (expected at `C:\Program Files\VideoLAN\VLC`).
 - GitHub CLI (`gh`) authenticated for `release` mode.
 - Windows SDK `signtool.exe` for signed builds/releases.
+- Inno Setup 6 or 7. `build.bat` auto-detects per-user installs at
+  `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`, standard Program Files
+  installs, and `ISCC.exe` on PATH. Set `INNO_SETUP_COMPILER` to override.
 - Network access (the script installs deps and can download `yt-dlp.exe` and `deno.exe`).
 
 ## macOS Local Build Prerequisites
@@ -121,6 +128,7 @@ On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZI
 - Produces:
   - `dist\BlindRSS\`
   - `dist\BlindRSS-vX.Y.Z.zip`
+  - `dist\BlindRSS-Setup-vX.Y.Z.exe`
   - `BlindRSS.exe` in repo root
   - `BlindRSS.zip` in repo root
 
@@ -131,9 +139,31 @@ On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZI
 - Signs executable.
 - Produces:
   - `dist\BlindRSS-vX.Y.Z.zip`
+  - `dist\BlindRSS-Setup-vX.Y.Z.exe`
   - `dist\BlindRSS-update.json`
   - `dist\release-notes-vX.Y.Z.md`
-- Commits version bump, tags, pushes, creates GitHub release assets (ZIP + manifest), and dispatches the `cross-platform-release.yml` GitHub Actions workflow to attach the macOS asset to the same release.
+- Commits version bump, tags, pushes, creates GitHub release assets (ZIP +
+  installer + manifest), and dispatches the `cross-platform-release.yml`
+  GitHub Actions workflow to attach the macOS/Linux assets to the same release.
+
+## Windows Installer and Data Locations
+
+- The installer is non-elevated and installs to
+  `%LOCALAPPDATA%\Programs\BlindRSS` by default.
+- It creates Start Menu/uninstall registration and an optional desktop shortcut.
+- Installer-managed copies carry `.windows-installed` beside `BlindRSS.exe`.
+  That marker makes packaged Windows BlindRSS use `%APPDATA%\BlindRSS` for
+  `config.json`, `rss.db`, logs, imported cookies, playback cache, and the
+  default podcast download folder.
+- On first installed launch, legacy app-folder config/database/download data is
+  copied into `%APPDATA%\BlindRSS`. Existing roaming files win, SQLite migration
+  uses the backup API (including committed WAL data), and legacy originals are
+  retained for rollback.
+- The portable ZIP has no installed marker and retains app-folder storage.
+- Uninstall removes the application but intentionally leaves
+  `%APPDATA%\BlindRSS` intact.
+- Installed copies use the signed installer for in-app updates. Portable and
+  older copies continue using the ZIP updater.
 
 ### `dry-run`
 
@@ -171,6 +201,8 @@ On macOS, `./build.sh release <tag>` is the approved way to publish the macOS ZI
 
 - `SIGNTOOL_PATH`: override default signtool path.
 - `SIGN_CERT_THUMBPRINT`: force manifest signing thumbprint value.
+- `INNO_SETUP_COMPILER`: full path to `ISCC.exe` when auto-detection is not
+  sufficient.
 - `SKIP_SIGN=1`: skip signing in `build` mode only.
 - `BLINDRSS_VLC_APP`: override the macOS VLC app bundle path for `build.sh`.
 - `BLINDRSS_VLC_VERSION`: override the VLC version downloaded by `build.sh` when no macOS VLC app bundle is found. Default is `3.0.23`.

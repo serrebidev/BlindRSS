@@ -73,6 +73,36 @@ class UpdaterLaunchTests(unittest.TestCase):
             except Exception:
                 pass
 
+    def test_launch_update_helper_supports_installer_mode(self) -> None:
+        from core import updater
+
+        helper_dir = tempfile.mkdtemp(prefix="blindrss_helper_test_")
+        helper_path = os.path.join(helper_dir, "update_helper.bat")
+        try:
+            with open(helper_path, "w", encoding="utf-8") as f:
+                f.write("@echo off\n")
+
+            with patch("core.updater.subprocess.Popen", return_value=MagicMock()) as popen:
+                ok, msg = updater._launch_update_helper(
+                    helper_path,
+                    1234,
+                    r"C:\Install",
+                    "",
+                    temp_root=r"C:\Temp\BlindRSS_update_1",
+                    installer_path=r"C:\Temp\BlindRSS-Setup-v2.0.0.exe",
+                )
+
+            self.assertTrue(ok, msg)
+            cmd = popen.call_args.args[0]
+            self.assertEqual(cmd[4], "--installer")
+            self.assertEqual(cmd[5], "1234")
+            self.assertEqual(cmd[6], r"C:\Install")
+            self.assertEqual(cmd[7], r"C:\Temp\BlindRSS-Setup-v2.0.0.exe")
+        finally:
+            import shutil
+
+            shutil.rmtree(helper_dir, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

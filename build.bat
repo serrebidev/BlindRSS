@@ -35,9 +35,12 @@ if /I "%MODE%"=="dry-run" (
     if errorlevel 1 exit /b 1
     call :compute_next_version
     if errorlevel 1 exit /b 1
+    call :find_inno_setup
+    if errorlevel 1 exit /b 1
     echo [Dry Run] Latest tag: !LATEST_TAG!
     echo [Dry Run] Next version: v!NEXT_VERSION! [!BUMP! bump]
-    echo [Dry Run] Would bump core/version.py, build, sign with "%SIGNTOOL_EXE%", zip, generate manifest, tag, push to "%RELEASE_REMOTE%", create a GitHub release in "%GITHUB_REPO_SLUG%", and dispatch the macOS/Linux GitHub Actions asset build.
+    echo [Dry Run] Inno Setup compiler: !INNO_SETUP_EXE!
+    echo [Dry Run] Would bump core/version.py, build, sign with "%SIGNTOOL_EXE%", create the portable ZIP and per-user installer, generate the manifest, tag, push to "%RELEASE_REMOTE%", create a GitHub release in "%GITHUB_REPO_SLUG%", and dispatch the macOS/Linux GitHub Actions asset build.
     goto :done
 )
 
@@ -64,6 +67,12 @@ if /I "%MODE%"=="release" (
     if errorlevel 1 exit /b 1
     call :hash_zip
     if errorlevel 1 exit /b 1
+    call :build_installer
+    if errorlevel 1 exit /b 1
+    call :sign_installer
+    if errorlevel 1 exit /b 1
+    call :hash_installer
+    if errorlevel 1 exit /b 1
     call :write_notes
     if errorlevel 1 exit /b 1
     call :write_manifest
@@ -85,6 +94,12 @@ if /I "%MODE%"=="release" (
     call :zip_release
     if errorlevel 1 exit /b 1
     call :hash_zip
+    if errorlevel 1 exit /b 1
+    call :build_installer
+    if errorlevel 1 exit /b 1
+    call :sign_installer
+    if errorlevel 1 exit /b 1
+    call :hash_installer
     if errorlevel 1 exit /b 1
 )
 
@@ -395,13 +410,91 @@ if not defined ZIP_SHA (
 )
 exit /b 0
 
+:find_inno_setup
+set "INNO_SETUP_EXE="
+if defined INNO_SETUP_COMPILER if exist "%INNO_SETUP_COMPILER%" set "INNO_SETUP_EXE=%INNO_SETUP_COMPILER%"
+if defined INNO_SETUP_EXE exit /b 0
+
+for %%I in (
+    "%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe"
+    "%ProgramFiles%\Inno Setup 6\ISCC.exe"
+    "%ProgramFiles(x86)%\Inno Setup 6\ISCC.exe"
+    "%LOCALAPPDATA%\Programs\Inno Setup 7\ISCC.exe"
+    "%ProgramFiles%\Inno Setup 7\ISCC.exe"
+    "%ProgramFiles(x86)%\Inno Setup 7\ISCC.exe"
+) do (
+    if not defined INNO_SETUP_EXE if exist "%%~fI" set "INNO_SETUP_EXE=%%~fI"
+)
+if defined INNO_SETUP_EXE exit /b 0
+
+for /f "delims=" %%I in ('where ISCC.exe 2^>nul') do (
+    if not defined INNO_SETUP_EXE set "INNO_SETUP_EXE=%%I"
+)
+if defined INNO_SETUP_EXE exit /b 0
+
+echo [X] Inno Setup compiler ISCC.exe was not found.
+echo [X] Install Inno Setup 6 per-user or system-wide, add ISCC.exe to PATH,
+echo [X] or set INNO_SETUP_COMPILER to its full path.
+exit /b 1
+
+:build_installer
+call :find_inno_setup
+if errorlevel 1 exit /b 1
+set "INSTALLER_NAME=BlindRSS-Setup-v%VERSION_NO_V%.exe"
+set "INSTALLER_PATH=%SCRIPT_DIR%dist\%INSTALLER_NAME%"
+if exist "%INSTALLER_PATH%" del /f /q "%INSTALLER_PATH%"
+echo [BlindRSS Build] Compiling per-user installer with "%INNO_SETUP_EXE%"...
+"%INNO_SETUP_EXE%" /DMyAppVersion=%VERSION_NO_V% "%SCRIPT_DIR%installer\BlindRSS.iss"
+if errorlevel 1 exit /b 1
+if not exist "%INSTALLER_PATH%" (
+    echo [X] Installer output was not created at "%INSTALLER_PATH%".
+    exit /b 1
+)
+exit /b 0
+
+:sign_installer
+if /I "%MODE%"=="build" (
+    if defined SKIP_SIGN (
+        echo [BlindRSS Build] SKIP_SIGN is set. Skipping installer Authenticode signing.
+        exit /b 0
+    )
+    if not exist "%SIGNTOOL_EXE%" (
+        echo [WARN] signtool.exe not found at "%SIGNTOOL_EXE%". Installer remains unsigned.
+        exit /b 0
+    )
+)
+if not exist "%SIGNTOOL_EXE%" (
+    echo [X] signtool.exe not found at "%SIGNTOOL_EXE%".
+    exit /b 1
+)
+if not exist "%INSTALLER_PATH%" (
+    echo [X] Installer not found at "%INSTALLER_PATH%".
+    exit /b 1
+)
+echo [BlindRSS Build] Signing "%INSTALLER_PATH%"...
+"%SIGNTOOL_EXE%" sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a "%INSTALLER_PATH%"
+if errorlevel 1 exit /b 1
+exit /b 0
+
+:hash_installer
+set "INSTALLER_SHA="
+set "INSTALLER_HASH_FILE=%TEMP%\BlindRSS_installer_hash.txt"
+"%TOOL_PY%" tools\build_utils.py sha256 --input "%INSTALLER_PATH%" --output "!INSTALLER_HASH_FILE!"
+if exist "!INSTALLER_HASH_FILE!" set /p INSTALLER_SHA=<"!INSTALLER_HASH_FILE!"
+if exist "!INSTALLER_HASH_FILE!" del /f /q "!INSTALLER_HASH_FILE!" >nul 2>&1
+if not defined INSTALLER_SHA (
+    echo [X] Failed to compute installer SHA-256.
+    exit /b 1
+)
+exit /b 0
+
 :write_manifest
 set "MANIFEST_PATH=%SCRIPT_DIR%dist\BlindRSS-update.json"
 echo [BlindRSS Build] Writing update manifest...
 if defined SIGNING_THUMBPRINT (
-    "%TOOL_PY%" tools\release.py write-manifest --version-tag "%VERSION_TAG%" --asset-name "%ZIP_NAME%" --sha256 "%ZIP_SHA%" --output "%MANIFEST_PATH%" --notes-summary-file "%SUMMARY_FILE%" --signing-thumbprint "!SIGNING_THUMBPRINT!"
+    "%TOOL_PY%" tools\release.py write-manifest --version-tag "%VERSION_TAG%" --asset-name "%ZIP_NAME%" --sha256 "%ZIP_SHA%" --installer-asset-name "%INSTALLER_NAME%" --installer-sha256 "%INSTALLER_SHA%" --output "%MANIFEST_PATH%" --notes-summary-file "%SUMMARY_FILE%" --signing-thumbprint "!SIGNING_THUMBPRINT!"
 ) else (
-    "%TOOL_PY%" tools\release.py write-manifest --version-tag "%VERSION_TAG%" --asset-name "%ZIP_NAME%" --sha256 "%ZIP_SHA%" --output "%MANIFEST_PATH%" --notes-summary-file "%SUMMARY_FILE%"
+    "%TOOL_PY%" tools\release.py write-manifest --version-tag "%VERSION_TAG%" --asset-name "%ZIP_NAME%" --sha256 "%ZIP_SHA%" --installer-asset-name "%INSTALLER_NAME%" --installer-sha256 "%INSTALLER_SHA%" --output "%MANIFEST_PATH%" --notes-summary-file "%SUMMARY_FILE%"
 )
 if errorlevel 1 exit /b 1
 exit /b 0
@@ -428,7 +521,7 @@ if errorlevel 1 (
     echo [X] gh CLI not found in PATH.
     exit /b 1
 )
-gh release create "%VERSION_TAG%" "%ZIP_PATH%" "%MANIFEST_PATH%" --repo "%GITHUB_REPO_SLUG%" --title "%VERSION_TAG%" --notes-file "%RELEASE_NOTES%" --latest
+gh release create "%VERSION_TAG%" "%ZIP_PATH%" "%INSTALLER_PATH%" "%MANIFEST_PATH%" --repo "%GITHUB_REPO_SLUG%" --title "%VERSION_TAG%" --notes-file "%RELEASE_NOTES%" --latest
 if errorlevel 1 exit /b 1
 
 rem The Windows updater queries /releases/latest, which silently skips drafts.

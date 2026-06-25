@@ -6,15 +6,26 @@ for /f %%T in ('powershell -NoProfile -InputFormat None -Command "(Get-Date).ToS
 set "LOG_FILE=%TEMP%\BlindRSS_update_!RUNSTAMP!_!RANDOM!.log"
 set "SENTINEL=__BLINDRSS_UPDATE_DONE__"
 
-set "PID=%~1"
-set "INSTALL_DIR=%~2"
-set "STAGING_DIR=%~3"
-set "EXE_NAME=%~4"
-set "TEMP_ROOT=%~5"
-set "SHOW_LOG=%~6"
+set "UPDATE_MODE=archive"
+if /I "%~1"=="--installer" (
+    set "UPDATE_MODE=installer"
+    set "PID=%~2"
+    set "INSTALL_DIR=%~3"
+    set "INSTALLER_PATH=%~4"
+    set "EXE_NAME=BlindRSS.exe"
+    set "TEMP_ROOT=%~5"
+    set "SHOW_LOG=%~6"
+) else (
+    set "PID=%~1"
+    set "INSTALL_DIR=%~2"
+    set "STAGING_DIR=%~3"
+    set "EXE_NAME=%~4"
+    set "TEMP_ROOT=%~5"
+    set "SHOW_LOG=%~6"
+)
 set "BACKUP_DIR="
 
-call :main %* >> "%LOG_FILE%" 2>&1
+call :main >> "%LOG_FILE%" 2>&1
 set "RC=%ERRORLEVEL%"
 
 if %RC% equ 0 (
@@ -31,8 +42,12 @@ echo [BlindRSS Update] Log: "%LOG_FILE%"
 
 if "%PID%"=="" goto :usage
 if "%INSTALL_DIR%"=="" goto :usage
-if "%STAGING_DIR%"=="" goto :usage
 if "%EXE_NAME%"=="" goto :usage
+if /I "%UPDATE_MODE%"=="installer" (
+    if "%INSTALLER_PATH%"=="" goto :usage
+) else (
+    if "%STAGING_DIR%"=="" goto :usage
+)
 
 rem Ensure we are not running from within the install directory
 if not defined BLINDRSS_UPDATE_HELPER_RELOCATED (
@@ -43,7 +58,11 @@ if not defined BLINDRSS_UPDATE_HELPER_RELOCATED (
         for /f %%T in ('powershell -NoProfile -InputFormat None -Command "(Get-Date).ToString(\"yyyyMMddHHmmss\")"') do set "HSTAMP=%%T"
         set "TMP_HELPER=%TEMP%\BlindRSS_update_helper_!HSTAMP!_!RANDOM!.bat"
         copy /Y "%~f0" "!TMP_HELPER!" >nul 2>nul
-        start "" /b cmd /d /c call "!TMP_HELPER!" "%PID%" "%INSTALL_DIR%" "%STAGING_DIR%" "%EXE_NAME%" "%TEMP_ROOT%" "%SHOW_LOG%"
+        if /I "%UPDATE_MODE%"=="installer" (
+            start "" /b cmd /d /c call "!TMP_HELPER!" --installer "%PID%" "%INSTALL_DIR%" "%INSTALLER_PATH%" "%TEMP_ROOT%" "%SHOW_LOG%"
+        ) else (
+            start "" /b cmd /d /c call "!TMP_HELPER!" "%PID%" "%INSTALL_DIR%" "%STAGING_DIR%" "%EXE_NAME%" "%TEMP_ROOT%" "%SHOW_LOG%"
+        )
         exit /b 0
     )
 )
@@ -54,6 +73,8 @@ if exist "%TEMP%" (
 ) else if exist "%SystemRoot%" (
     pushd "%SystemRoot%" >nul 2>nul
 )
+
+if /I "%UPDATE_MODE%"=="installer" goto :run_installer_update
 
 if not exist "%STAGING_DIR%" (
     echo [BlindRSS Update] Staging folder not found: "%STAGING_DIR%"
@@ -119,6 +140,43 @@ start "" /b "%INSTALL_DIR%\%EXE_NAME%"
 call :cleanup_success "%BACKUP_DIR%" "%STAGING_DIR%" "%TEMP_ROOT%"
 exit /b 0
 
+:run_installer_update
+if not exist "%INSTALLER_PATH%" (
+    echo [BlindRSS Update] Installer not found: "%INSTALLER_PATH%"
+    exit /b 1
+)
+
+call :ensure_app_stopped
+if errorlevel 1 goto :installer_failure
+
+call :verify_install_unlocked
+if errorlevel 1 goto :installer_failure
+
+echo [BlindRSS Update] Running signed per-user installer...
+start "" /wait "%INSTALLER_PATH%" /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /DIR="%INSTALL_DIR%"
+set "RC=%ERRORLEVEL%"
+if not "%RC%"=="0" (
+    echo [X] Installer failed with exit code %RC%.
+    goto :installer_failure
+)
+if not exist "%INSTALL_DIR%\.windows-installed" (
+    echo [X] Installer completed without the installed-build marker.
+    goto :installer_failure
+)
+
+echo [BlindRSS Update] Launching app...
+start "" /b "%INSTALL_DIR%\%EXE_NAME%"
+if not "%TEMP_ROOT%"=="" call :schedule_temp_cleanup "%TEMP_ROOT%"
+exit /b 0
+
+:installer_failure
+if not "%SHOW_LOG%"=="" if /I not "%SHOW_LOG%"=="0" (
+    call :start_log_window "%LOG_FILE%" "%SENTINEL%"
+)
+if exist "%INSTALL_DIR%\%EXE_NAME%" start "" /b "%INSTALL_DIR%\%EXE_NAME%"
+powershell -NoProfile -InputFormat None -Command "param([string]$log) try { Add-Type -AssemblyName PresentationFramework | Out-Null; $msg = 'BlindRSS installer update failed.' + \"`n`n\" + 'Log file:' + \"`n\" + $log; [System.Windows.MessageBox]::Show($msg, 'BlindRSS Update', 'OK', 'Error') | Out-Null } catch { }" "%LOG_FILE%" >nul 2>nul
+exit /b 1
+
 :rollback
 echo [BlindRSS Update] Update failed. Restoring backup...
 if not "%SHOW_LOG%"=="" if /I not "%SHOW_LOG%"=="0" (
@@ -164,6 +222,10 @@ for %%F in (rss.db rss.db-wal rss.db-shm rss.db-journal) do (
     if exist "%OLD_DIR%\%%F" (
         copy /Y "%OLD_DIR%\%%F" "%NEW_DIR%\%%F" >nul 2>nul
     )
+)
+
+if exist "%OLD_DIR%\.windows-installed" (
+    copy /Y "%OLD_DIR%\.windows-installed" "%NEW_DIR%\.windows-installed" >nul 2>nul
 )
 
 rem Restore podcasts folder if exists
@@ -226,6 +288,8 @@ if exist "%BACKUP_DIR%\config.json" if not exist "%INSTALL_DIR%\config.json" set
 for %%F in (rss.db rss.db-wal rss.db-shm rss.db-journal) do (
     if exist "%BACKUP_DIR%\%%F" if not exist "%INSTALL_DIR%\%%F" set "KEEP=1"
 )
+
+if exist "%BACKUP_DIR%\.windows-installed" if not exist "%INSTALL_DIR%\.windows-installed" set "KEEP=1"
 
 if exist "%BACKUP_DIR%\podcasts" if not exist "%INSTALL_DIR%\podcasts" set "KEEP=1"
 
@@ -314,4 +378,5 @@ exit /b 0
 
 :usage
 echo Usage: update_helper.bat ^<pid^> ^<install_dir^> ^<staging_dir^> ^<exe_name^> [temp_root]
+echo    or: update_helper.bat --installer ^<pid^> ^<install_dir^> ^<installer.exe^> [temp_root]
 exit /b 1

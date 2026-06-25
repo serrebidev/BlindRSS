@@ -16,7 +16,7 @@ from typing import Iterable, Optional, Tuple
 
 from packaging.version import Version, InvalidVersion
 
-from core.config import APP_DIR
+from core.config import APP_DIR, is_windows_installed_build
 from core.utils import safe_requests_get
 from core.version import APP_VERSION
 from core.update_config import (
@@ -73,6 +73,7 @@ class UpdateInfo:
     download_url: str
     sha256: str
     signing_thumbprints: Tuple[str, ...] = ()
+    asset_kind: str = "archive"
 
 
 @dataclass
@@ -242,6 +243,39 @@ def check_for_updates() -> UpdateCheckResult:
     published_at = str(release.get("published_at") or manifest.get("published_at") or "")
     manifest_thumbprints = _extract_manifest_thumbprints(manifest)
     allowed_thumbprints = _normalize_thumbprints(list(manifest_thumbprints) + list(_env_thumbprints()))
+    asset_kind = "archive"
+
+    # Keep the ZIP fields canonical for existing/portable Windows clients, but
+    # let installer-managed copies update through the installer so Add/Remove
+    # Programs metadata and installed-file ownership stay current.
+    if platform == "windows" and is_windows_installed_build():
+        installer = manifest.get("installer")
+        if isinstance(installer, dict):
+            installer_name = str(
+                installer.get("asset") or installer.get("asset_name") or ""
+            ).strip()
+            if not installer_name.lower().endswith(".exe"):
+                return UpdateCheckResult("error", "Windows installer asset must be an .exe file.")
+            installer_asset = _find_release_asset(release, installer_name)
+            if not installer_asset:
+                return UpdateCheckResult(
+                    "error",
+                    f"Update installer '{installer_name}' not found in release assets.",
+                )
+            installer_sha256 = str(installer.get("sha256") or "").strip().lower()
+            if not re.fullmatch(r"[0-9a-f]{64}", installer_sha256):
+                return UpdateCheckResult("error", "Update installer has an invalid SHA-256 hash.")
+            installer_url = (
+                installer_asset.get("browser_download_url")
+                or installer.get("download_url")
+                or ""
+            )
+            if not installer_url:
+                return UpdateCheckResult("error", "Update installer is missing a download URL.")
+            asset_name = installer_name
+            download_url = installer_url
+            sha256 = installer_sha256
+            asset_kind = "installer"
 
     info = UpdateInfo(
         version=latest,
@@ -252,6 +286,7 @@ def check_for_updates() -> UpdateCheckResult:
         download_url=download_url,
         sha256=sha256,
         signing_thumbprints=allowed_thumbprints,
+        asset_kind=asset_kind,
     )
     return UpdateCheckResult("update_available", "Update available.", info)
 
@@ -410,6 +445,7 @@ def _launch_update_helper(
     temp_root: Optional[str] = None,
     debug_mode: bool = False,
     show_log: bool = False,
+    installer_path: Optional[str] = None,
 ) -> Tuple[bool, str]:
     try:
         helper_cwd = None
@@ -439,22 +475,27 @@ def _launch_update_helper(
             startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
             startupinfo.wShowWindow = 0
 
-        cmd = [
-            os.environ.get("COMSPEC", "cmd.exe"),
-            "/d",
-            "/c",
-            helper_path,
-            str(parent_pid),
-            install_dir,
-            staging_root,
-            EXE_NAME,
-        ]
-        if temp_root:
-            cmd.append(temp_root)
-        elif show_log:
-            cmd.append("")
-        if show_log:
-            cmd.append("show")
+        cmd = [os.environ.get("COMSPEC", "cmd.exe"), "/d", "/c", helper_path]
+        if installer_path:
+            cmd.extend(
+                [
+                    "--installer",
+                    str(parent_pid),
+                    install_dir,
+                    installer_path,
+                    temp_root or "",
+                ]
+            )
+            if show_log:
+                cmd.append("show")
+        else:
+            cmd.extend([str(parent_pid), install_dir, staging_root, EXE_NAME])
+            if temp_root:
+                cmd.append(temp_root)
+            elif show_log:
+                cmd.append("")
+            if show_log:
+                cmd.append("show")
         try:
             subprocess.Popen(
                 cmd,
@@ -641,6 +682,16 @@ def download_and_apply_update(info: UpdateInfo, debug_mode: bool = False, progre
     if digest.lower() != info.sha256.lower():
         return False, "Downloaded update failed SHA-256 verification."
 
+    if platform == "windows" and info.asset_kind == "installer":
+        return _apply_windows_installer(
+            info,
+            install_dir,
+            temp_root,
+            archive_path,
+            debug_mode,
+            report,
+        )
+
     report("Extracting update…", None)
     try:
         _extract_archive(archive_path, extract_dir)
@@ -705,6 +756,59 @@ def _apply_windows(info, install_dir, temp_root, extract_dir, debug_mode, report
         return False, msg
 
     return True, "Update prepared. The app will restart after it exits."
+
+
+def _apply_windows_installer(
+    info,
+    install_dir,
+    temp_root,
+    installer_path,
+    debug_mode,
+    report,
+) -> Tuple[bool, str]:
+    helper_path = os.path.join(install_dir, WINDOWS_UPDATE_HELPER_NAME)
+    if not os.path.isfile(helper_path):
+        return False, f"{WINDOWS_UPDATE_HELPER_NAME} is missing from the install directory."
+    if not os.path.isfile(installer_path):
+        return False, "Downloaded Windows installer is missing."
+
+    report("Verifying signature…", None)
+    ok, msg = _verify_authenticode_signature(installer_path, info.signing_thumbprints)
+    if not ok:
+        return False, msg
+
+    report("Preparing restart…", None)
+    helper_run_path = helper_path
+    try:
+        helper_temp = os.path.join(temp_root, WINDOWS_UPDATE_HELPER_NAME)
+        shutil.copy2(helper_path, helper_temp)
+        helper_run_path = helper_temp
+    except Exception:
+        helper_run_path = helper_path
+
+    show_log = False
+    try:
+        raw_show = os.environ.get("BLINDRSS_UPDATE_SHOW_WINDOW", "0")
+        if str(raw_show).strip().lower() in ("1", "true", "yes", "on"):
+            show_log = True
+    except Exception:
+        show_log = False
+    if debug_mode:
+        show_log = False
+
+    ok, msg = _launch_update_helper(
+        helper_run_path,
+        os.getpid(),
+        install_dir,
+        "",
+        temp_root=temp_root,
+        debug_mode=debug_mode,
+        show_log=show_log,
+        installer_path=installer_path,
+    )
+    if not ok:
+        return False, msg
+    return True, "Installer update prepared. The app will restart after it exits."
 
 
 def _verify_macos_codesign(app_path: str) -> Tuple[bool, str]:
