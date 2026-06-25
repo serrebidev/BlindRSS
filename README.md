@@ -2,9 +2,9 @@
 
 A screen-reader-friendly desktop RSS and podcast client for Windows, macOS, and Linux, built for fast feed reading and dependable audio playback.
 
-[![Join the BlindRSS community on Telegram](https://img.shields.io/badge/Telegram-Join%20the%20community-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/SerrebiProjects)
+[![Join SerrebiProjects on Telegram](https://img.shields.io/badge/Telegram-SerrebiProjects-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/SerrebiProjects)
 
-**Have a question, hit a bug, or want early word on new releases?** Join the [BlindRSS Telegram group](https://t.me/SerrebiProjects) — it's the fastest place to get help and to help shape where the app goes next.
+**Have a question, hit a bug, or want early word on new releases?** Join the [SerrebiProjects Telegram group](https://t.me/SerrebiProjects) — the community hub for BlindRSS and my other projects, and the fastest place to get help.
 
 ## Features
 
@@ -60,4 +60,4 @@ Pull requests are welcome. If BlindRSS has been useful to you, open a PR with a 
 
 ## Community and support
 
-Report bugs and request features in [Issues](https://github.com/serrebidev/BlindRSS/issues). For questions, feedback, and release news, join the [Telegram group](https://t.me/SerrebiProjects).
+Report bugs and request features in [Issues](https://github.com/serrebidev/BlindRSS/issues). For questions, feedback, and release news, join the [SerrebiProjects Telegram group](https://t.me/SerrebiProjects).
