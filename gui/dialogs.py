@@ -44,6 +44,8 @@ class AddFeedDialog(wx.Dialog):
         # URL Input
         sizer.Add(wx.StaticText(self, label="Feed or Media URL:"), 0, wx.ALL, 5)
         self.url_ctrl = wx.TextCtrl(self)
+        self.url_ctrl.SetName("Feed or Media URL")
+        self.url_ctrl.SetHint("https://example.com/feed or a YouTube/podcast URL")
         wx.CallAfter(self.url_ctrl.SetFocus)
         sizer.Add(self.url_ctrl, 0, wx.EXPAND | wx.ALL, 5)
         
@@ -55,6 +57,7 @@ class AddFeedDialog(wx.Dialog):
         # Category Input
         sizer.Add(wx.StaticText(self, label="Category:"), 0, wx.ALL, 5)
         self.cat_ctrl = wx.ComboBox(self, choices=self.categories, style=wx.CB_DROPDOWN)
+        self.cat_ctrl.SetName("Category")
         if self.categories:
             # Try to select 'YouTube' if it exists
             yt_idx = self.cat_ctrl.FindString("YouTube")
@@ -187,6 +190,7 @@ class ExcludeNotificationFeedsDialog(wx.Dialog):
             labels.append(t)
 
         self.feed_list = wx.CheckListBox(self, choices=labels)
+        self.feed_list.SetName("Feeds (checked feeds send notifications)")
         sizer.Add(self.feed_list, 1, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
 
         for idx, fid in self._feed_id_by_index.items():
@@ -635,8 +639,10 @@ class SettingsDialog(wx.Dialog):
         dl_path_sizer = wx.BoxSizer(wx.HORIZONTAL)
         dl_path_sizer.Add(wx.StaticText(general_panel, label="Download Path:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         self.dl_path_ctrl = wx.TextCtrl(general_panel, value=config.get("download_path", ""))
+        self.dl_path_ctrl.SetName("Download path")
         dl_path_sizer.Add(self.dl_path_ctrl, 1, wx.ALL, 5)
         browse_btn = wx.Button(general_panel, label="Browse...")
+        browse_btn.SetName("Browse for download folder")
         browse_btn.Bind(wx.EVT_BUTTON, self.on_browse_dl_path)
         dl_path_sizer.Add(browse_btn, 0, wx.ALL, 5)
         general_sizer.Add(dl_path_sizer, 0, wx.EXPAND | wx.ALL, 5)
@@ -709,8 +715,11 @@ class SettingsDialog(wx.Dialog):
         general_sizer.Add(cookies_label, 0, wx.LEFT | wx.TOP, 5)
         cookies_row = wx.BoxSizer(wx.HORIZONTAL)
         self.ytdlp_cookies_ctrl = wx.TextCtrl(general_panel, value=str(config.get("ytdlp_cookies_file", "") or ""))
+        self.ytdlp_cookies_ctrl.SetName("yt-dlp cookies file path")
+        self.ytdlp_cookies_ctrl.SetHint("Path to a cookies.txt file")
         cookies_row.Add(self.ytdlp_cookies_ctrl, 1, wx.EXPAND | wx.RIGHT, 5)
         cookies_browse = wx.Button(general_panel, label="Browse...")
+        cookies_browse.SetName("Browse for cookies file")
         cookies_browse.Bind(wx.EVT_BUTTON, self._on_browse_cookies_file)
         cookies_row.Add(cookies_browse, 0, wx.RIGHT, 5)
         cookies_import = wx.Button(general_panel, label="Import from browser...")
@@ -741,8 +750,11 @@ class SettingsDialog(wx.Dialog):
         self.youtube_play_cache_dir_ctrl = wx.TextCtrl(
             general_panel, value=str(config.get("youtube_play_cache_dir", "") or "")
         )
+        self.youtube_play_cache_dir_ctrl.SetName("YouTube playback cache folder")
+        self.youtube_play_cache_dir_ctrl.SetHint("Leave blank for the default location")
         cache_row.Add(self.youtube_play_cache_dir_ctrl, 1, wx.EXPAND | wx.RIGHT, 5)
         cache_browse = wx.Button(general_panel, label="Browse...")
+        cache_browse.SetName("Browse for playback cache folder")
         cache_browse.Bind(wx.EVT_BUTTON, self._on_browse_play_cache_dir)
         cache_row.Add(cache_browse, 0, wx.RIGHT, 5)
         cache_clear = wx.Button(general_panel, label="Clear cache now")
@@ -930,6 +942,7 @@ class SettingsDialog(wx.Dialog):
             for label, key, style in fields:
                 fg.Add(wx.StaticText(pnl, label=label), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 2)
                 tc = wx.TextCtrl(pnl, style=style)
+                tc.SetName(label.rstrip(":").strip())
                 tc.SetValue(str(p_cfg.get(key, "") or ""))
                 fg.Add(tc, 1, wx.EXPAND | wx.ALL, 2)
                 ctrls[key] = tc
@@ -948,18 +961,21 @@ class SettingsDialog(wx.Dialog):
 
             fg.Add(wx.StaticText(pnl, label="Inoreader App ID:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 2)
             app_id_ctrl = wx.TextCtrl(pnl)
+            app_id_ctrl.SetName("Inoreader App ID")
             app_id_ctrl.SetValue(str(p_cfg.get("app_id", "") or ""))
             fg.Add(app_id_ctrl, 1, wx.EXPAND | wx.ALL, 2)
             ctrls["app_id"] = app_id_ctrl
 
             fg.Add(wx.StaticText(pnl, label="Inoreader App Key:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 2)
             app_key_ctrl = wx.TextCtrl(pnl, style=wx.TE_PASSWORD)
+            app_key_ctrl.SetName("Inoreader App Key")
             app_key_ctrl.SetValue(str(p_cfg.get("app_key", "") or ""))
             fg.Add(app_key_ctrl, 1, wx.EXPAND | wx.ALL, 2)
             ctrls["app_key"] = app_key_ctrl
 
             default_redirect_uri = inoreader_oauth.get_redirect_uri(scheme="https")
             redirect_uri_ctrl = wx.TextCtrl(pnl)
+            redirect_uri_ctrl.SetName("Redirect URI")
             redirect_uri_ctrl.SetValue(str(p_cfg.get("redirect_uri", "") or "").strip() or default_redirect_uri)
             fg.Add(wx.StaticText(pnl, label="Redirect URI:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 2)
             fg.Add(redirect_uri_ctrl, 1, wx.EXPAND | wx.ALL, 2)
@@ -1043,13 +1059,16 @@ class SettingsDialog(wx.Dialog):
         sounds_sizer.Add(self.sounds_enabled_chk, 0, wx.ALL, 5)
         
         def _add_sound_field(label, key):
+            field_name = label.rstrip(":").strip()
             s = wx.BoxSizer(wx.HORIZONTAL)
             s.Add(wx.StaticText(sounds_panel, label=label), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
             val = config.get(key, "")
             ctrl = wx.TextCtrl(sounds_panel, value=str(val))
+            ctrl.SetName(field_name)
             s.Add(ctrl, 1, wx.ALL, 5)
             browse_btn = wx.Button(sounds_panel, label="Browse...")
-            
+            browse_btn.SetName(f"Browse for {field_name}")
+
             def _on_browse(evt):
                 dlg = wx.FileDialog(self, f"Choose {label}", defaultFile=ctrl.GetValue(), wildcard="WAV files (*.wav)|*.wav|All files (*.*)|*.*", style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
                 if dlg.ShowModal() == wx.ID_OK:
@@ -1200,6 +1219,7 @@ class SettingsDialog(wx.Dialog):
             choices=[label for label, _code in self._TRANSLATION_LANGUAGE_PRESETS],
             style=wx.CB_DROPDOWN,
         )
+        self.translation_target_language_ctrl.SetName("Target language")
         self.translation_target_language_ctrl.SetValue(
             self._translation_language_display_value(
                 str(config.get("translation_target_language", "en") or "en")
@@ -1234,6 +1254,7 @@ class SettingsDialog(wx.Dialog):
             choices=list(dict.fromkeys(model_choices)),
             style=wx.CB_DROPDOWN,
         )
+        self.translation_grok_model_ctrl.SetName("Grok (xAI) model")
         self.translation_grok_model_ctrl.SetValue(str(config.get("translation_grok_model", "") or ""))
         model_row.Add(self.translation_grok_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
@@ -1255,6 +1276,7 @@ class SettingsDialog(wx.Dialog):
             value=str(config.get("translation_grok_api_key", "") or ""),
             style=wx.TE_PASSWORD,
         )
+        self.translation_grok_api_key_ctrl.SetName("Grok (xAI) API key")
         api_key_row.Add(self.translation_grok_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
@@ -1275,6 +1297,7 @@ class SettingsDialog(wx.Dialog):
             choices=list(dict.fromkeys(groq_model_choices)),
             style=wx.CB_DROPDOWN,
         )
+        self.translation_groq_model_ctrl.SetName("Groq model")
         self.translation_groq_model_ctrl.SetValue(str(config.get("translation_groq_model", "") or ""))
         groq_model_row.Add(self.translation_groq_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(groq_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
@@ -1291,6 +1314,7 @@ class SettingsDialog(wx.Dialog):
             value=str(config.get("translation_groq_api_key", "") or ""),
             style=wx.TE_PASSWORD,
         )
+        self.translation_groq_api_key_ctrl.SetName("Groq API key")
         groq_api_key_row.Add(self.translation_groq_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(groq_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
         self.translation_groq_hint_lbl = wx.StaticText(
@@ -1321,6 +1345,7 @@ class SettingsDialog(wx.Dialog):
             choices=list(dict.fromkeys(openai_model_choices)),
             style=wx.CB_DROPDOWN,
         )
+        self.translation_openai_model_ctrl.SetName("OpenAI model")
         self.translation_openai_model_ctrl.SetValue(str(config.get("translation_openai_model", "") or ""))
         openai_model_row.Add(self.translation_openai_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(openai_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
@@ -1337,6 +1362,7 @@ class SettingsDialog(wx.Dialog):
             value=str(config.get("translation_openai_api_key", "") or ""),
             style=wx.TE_PASSWORD,
         )
+        self.translation_openai_api_key_ctrl.SetName("OpenAI API key")
         openai_api_key_row.Add(self.translation_openai_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(openai_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
@@ -1357,6 +1383,7 @@ class SettingsDialog(wx.Dialog):
             choices=list(dict.fromkeys(openrouter_model_choices)),
             style=wx.CB_DROPDOWN,
         )
+        self.translation_openrouter_model_ctrl.SetName("OpenRouter model")
         self.translation_openrouter_model_ctrl.SetValue(str(config.get("translation_openrouter_model", "") or ""))
         openrouter_model_row.Add(self.translation_openrouter_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(openrouter_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
@@ -1373,6 +1400,7 @@ class SettingsDialog(wx.Dialog):
             value=str(config.get("translation_openrouter_api_key", "") or ""),
             style=wx.TE_PASSWORD,
         )
+        self.translation_openrouter_api_key_ctrl.SetName("OpenRouter API key")
         openrouter_api_key_row.Add(self.translation_openrouter_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(openrouter_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
@@ -1403,6 +1431,7 @@ class SettingsDialog(wx.Dialog):
             choices=list(dict.fromkeys(gemini_model_choices)),
             style=wx.CB_DROPDOWN,
         )
+        self.translation_gemini_model_ctrl.SetName("Gemini model")
         self.translation_gemini_model_ctrl.SetValue(str(config.get("translation_gemini_model", "") or ""))
         gemini_model_row.Add(self.translation_gemini_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(gemini_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
@@ -1419,6 +1448,7 @@ class SettingsDialog(wx.Dialog):
             value=str(config.get("translation_gemini_api_key", "") or ""),
             style=wx.TE_PASSWORD,
         )
+        self.translation_gemini_api_key_ctrl.SetName("Gemini API key")
         gemini_api_key_row.Add(self.translation_gemini_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(gemini_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
@@ -1439,6 +1469,7 @@ class SettingsDialog(wx.Dialog):
             choices=list(dict.fromkeys(qwen_model_choices)),
             style=wx.CB_DROPDOWN,
         )
+        self.translation_qwen_model_ctrl.SetName("Qwen model")
         self.translation_qwen_model_ctrl.SetValue(str(config.get("translation_qwen_model", "") or ""))
         qwen_model_row.Add(self.translation_qwen_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(qwen_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
@@ -1455,6 +1486,7 @@ class SettingsDialog(wx.Dialog):
             value=str(config.get("translation_qwen_api_key", "") or ""),
             style=wx.TE_PASSWORD,
         )
+        self.translation_qwen_api_key_ctrl.SetName("Qwen API key")
         qwen_api_key_row.Add(self.translation_qwen_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
         translate_sizer.Add(qwen_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
 
@@ -1871,6 +1903,8 @@ class SettingsDialog(wx.Dialog):
             )
             sizer.Add(wx.StaticText(dlg, label=msg), 0, wx.ALL, 10)
             tc = wx.TextCtrl(dlg, style=wx.TE_MULTILINE)
+            tc.SetName("Redirected URL")
+            tc.SetHint("Paste the full URL from your browser address bar")
             sizer.Add(tc, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
             btns = dlg.CreateButtonSizer(wx.OK | wx.CANCEL)
             sizer.Add(btns, 0, wx.ALIGN_CENTER | wx.ALL, 10)
@@ -2454,12 +2488,14 @@ class FeedPropertiesDialog(wx.Dialog):
         title_sizer = wx.BoxSizer(wx.HORIZONTAL)
         title_sizer.Add(wx.StaticText(self, label="Title:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         self.title_ctrl = wx.TextCtrl(self, value=str(feed.title or ""))
+        self.title_ctrl.SetName("Feed title")
         title_sizer.Add(self.title_ctrl, 1, wx.ALL, 5)
         sizer.Add(title_sizer, 0, wx.EXPAND)
 
         url_sizer = wx.BoxSizer(wx.HORIZONTAL)
         url_sizer.Add(wx.StaticText(self, label="URL:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         self.url_ctrl = wx.TextCtrl(self, value=str(feed.url or ""))
+        self.url_ctrl.SetName("Feed URL")
         if not bool(allow_url_edit):
             try:
                 self.url_ctrl.SetEditable(False)
@@ -2470,6 +2506,7 @@ class FeedPropertiesDialog(wx.Dialog):
 
         sizer.Add(wx.StaticText(self, label="Category:"), 0, wx.ALL, 5)
         self.cat_ctrl = wx.ComboBox(self, choices=self.categories, style=wx.CB_DROPDOWN)
+        self.cat_ctrl.SetName("Category")
         self.cat_ctrl.SetValue(feed.category or "Uncategorized")
         sizer.Add(self.cat_ctrl, 0, wx.EXPAND | wx.ALL, 5)
 
@@ -2554,12 +2591,15 @@ class FeedSearchDialog(wx.Dialog):
         
         self.search_ctrl = wx.SearchCtrl(self, style=wx.TE_PROCESS_ENTER)
         self.search_ctrl.ShowCancelButton(True)
+        self.search_ctrl.SetName("Search for a podcast or RSS feed")
+        self.search_ctrl.SetHint("Podcast name, topic, or site URL")
         wx.CallAfter(self.search_ctrl.SetFocus)
         input_sizer.Add(self.search_ctrl, 1, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
 
         input_sizer.Add(wx.StaticText(self, label="Source:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT, 5)
         source_labels = [label for label, _ in self._SOURCE_CHOICES]
         self.source_combo = wx.ComboBox(self, choices=source_labels, style=wx.CB_READONLY)
+        self.source_combo.SetName("Search source")
         self.source_combo.SetSelection(0)
         input_sizer.Add(self.source_combo, 0, wx.ALIGN_CENTER_VERTICAL | wx.LEFT | wx.RIGHT, 5)
 
@@ -2574,6 +2614,7 @@ class FeedSearchDialog(wx.Dialog):
         
         # Results List
         self.results_list = wx.ListCtrl(self, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
+        self.results_list.SetName("Search results")
         self.results_list.InsertColumn(0, "Title", width=350)
         self.results_list.InsertColumn(1, "Provider", width=120)
         self.results_list.InsertColumn(2, "Details", width=250)
@@ -3218,6 +3259,8 @@ class YtdlpGlobalSearchDialog(wx.Dialog):
         query_row.Add(wx.StaticText(self, label="Search:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         self.search_ctrl = wx.SearchCtrl(self, style=wx.TE_PROCESS_ENTER)
         self.search_ctrl.ShowCancelButton(True)
+        self.search_ctrl.SetName("Video search")
+        self.search_ctrl.SetHint("Search videos across sites")
         query_row.Add(self.search_ctrl, 1, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         self.search_btn = wx.Button(self, label="Search")
         query_row.Add(self.search_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
@@ -3229,9 +3272,11 @@ class YtdlpGlobalSearchDialog(wx.Dialog):
         opts_row = wx.BoxSizer(wx.HORIZONTAL)
         opts_row.Add(wx.StaticText(self, label="Search Sites:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         self.scope_choice = wx.Choice(self)
+        self.scope_choice.SetName("Search sites")
         opts_row.Add(self.scope_choice, 1, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         opts_row.Add(wx.StaticText(self, label="Filter Results:"), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         self.filter_choice = wx.Choice(self)
+        self.filter_choice.SetName("Filter results by site")
         opts_row.Add(self.filter_choice, 1, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         root.Add(opts_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 5)
 
@@ -4531,6 +4576,7 @@ class PersistentSearchDialog(wx.Dialog):
         sizer.Add(wx.StaticText(self, label="Saved searches:"), 0, wx.ALL, 5)
 
         self.list_ctrl = wx.ListBox(self, choices=self._searches)
+        self.list_ctrl.SetName("Saved searches")
         sizer.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 5)
 
         btn_row = wx.BoxSizer(wx.HORIZONTAL)

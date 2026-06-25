@@ -1705,7 +1705,9 @@ class PlayerFrame(wx.Frame):
         # Time Labels
         time_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.current_time_lbl = wx.StaticText(panel, label="00:00")
+        self.current_time_lbl.SetName("Elapsed Time")
         self.total_time_lbl = wx.StaticText(panel, label="00:00")
+        self.total_time_lbl.SetName("Total Time")
         time_sizer.Add(self.current_time_lbl, 0, wx.LEFT, 5)
         time_sizer.AddStretchSpacer()
         time_sizer.Add(self.total_time_lbl, 0, wx.RIGHT, 5)
@@ -1766,6 +1768,7 @@ class PlayerFrame(wx.Frame):
         self.volume_slider.Bind(wx.EVT_SCROLL_CHANGED, self.on_volume_slider)
         volume_sizer.Add(self.volume_slider, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
         self.volume_value_lbl = wx.StaticText(panel, label=f"{int(getattr(self, 'volume', 100))}%")
+        self.volume_value_lbl.SetName("Volume Level")
         volume_sizer.Add(self.volume_value_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         sizer.Add(volume_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
         

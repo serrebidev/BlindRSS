@@ -41,6 +41,19 @@ import core.discovery
 
 log = logging.getLogger(__name__)
 
+
+def should_show_add_shortcuts(platform=None):
+    """Whether to offer the "Add Shortcuts..." File-menu item.
+
+    Desktop/Start Menu/Taskbar shortcuts are Windows-only concepts. On macOS the
+    equivalent (start at login) lives in Settings, and the dialog is disabled off
+    Windows, so the item is dead weight for VoiceOver users there. Linux keeps it
+    for parity with the existing behavior.
+    """
+    plat = sys.platform if platform is None else platform
+    return not plat.startswith("darwin")
+
+
 try:
     EVT_NOTIFICATION_MESSAGE_CLICK = wx.PyEventBinder(wx.adv.wxEVT_NOTIFICATION_MESSAGE_CLICK, 1)
     EVT_NOTIFICATION_MESSAGE_ACTION = wx.PyEventBinder(wx.adv.wxEVT_NOTIFICATION_MESSAGE_ACTION, 1)
@@ -289,7 +302,7 @@ class MainFrame(wx.Frame):
         
         # Left: Tree (Feeds)
         self.tree = wx.TreeCtrl(splitter, style=wx.TR_DEFAULT_STYLE | wx.TR_HIDE_ROOT | wx.TR_HAS_BUTTONS)
-        self.tree.SetName("Feeds Tree")
+        self.tree.SetName("Feeds and folders")
         self.root = self.tree.AddRoot("Root")
         self.all_feeds_node = self.tree.AppendItem(self.root, "All Feeds")
         
@@ -298,7 +311,7 @@ class MainFrame(wx.Frame):
         right_sizer = wx.BoxSizer(wx.VERTICAL)
 
         self.search_ctrl = wx.SearchCtrl(right_panel, style=wx.TE_PROCESS_ENTER)
-        self.search_ctrl.SetName("Article Filter")
+        self.search_ctrl.SetName("Search articles")
         try:
             self.search_ctrl.SetDescriptiveText("Filter current view (Enter)")
         except Exception:
@@ -316,7 +329,7 @@ class MainFrame(wx.Frame):
         
         # Top Right: List (Articles)
         self.list_ctrl = wx.ListCtrl(right_splitter, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
-        self.list_ctrl.SetName("Articles List")
+        self.list_ctrl.SetName("Articles")
         self.list_ctrl.InsertColumn(0, "Title", width=350)
         self.list_ctrl.InsertColumn(1, "Author", width=120)
         self.list_ctrl.InsertColumn(2, "Date", width=120)
@@ -325,7 +338,7 @@ class MainFrame(wx.Frame):
         
         # Bottom Right: Content (No embedded player anymore)
         self.content_ctrl = wx.TextCtrl(right_splitter, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2)
-        self.content_ctrl.SetName("Article Content")
+        self.content_ctrl.SetName("Article text")
         
         right_splitter.SplitHorizontally(self.list_ctrl, self.content_ctrl, 300)
         right_sizer.Add(right_splitter, 1, wx.EXPAND)
@@ -1273,7 +1286,10 @@ class MainFrame(wx.Frame):
         export_opml_item = file_menu.Append(wx.ID_ANY, "E&xport OPML...", "Export feeds to OPML")
         file_menu.AppendSeparator()
         persistent_search_item = file_menu.Append(wx.ID_ANY, "Configure Persistent Search...", "Configure saved search queries")
-        add_shortcuts_item = file_menu.Append(wx.ID_ANY, "Add &Shortcuts...", "Create desktop, taskbar, or Start Menu shortcuts")
+        # Desktop/Start Menu/Taskbar shortcuts are Windows-only; hide the dead item on macOS.
+        add_shortcuts_item = None
+        if should_show_add_shortcuts():
+            add_shortcuts_item = file_menu.Append(wx.ID_ANY, "Add &Shortcuts...", "Create desktop, taskbar, or Start Menu shortcuts")
         file_menu.AppendSeparator()
         exit_item = file_menu.Append(wx.ID_EXIT, "E&xit", "Exit application")
 
@@ -1389,7 +1405,8 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_import_opml, import_opml_item)
         self.Bind(wx.EVT_MENU, self.on_export_opml, export_opml_item)
         self.Bind(wx.EVT_MENU, self.on_configure_persistent_search, persistent_search_item)
-        self.Bind(wx.EVT_MENU, self.on_add_shortcuts, add_shortcuts_item)
+        if add_shortcuts_item is not None:
+            self.Bind(wx.EVT_MENU, self.on_add_shortcuts, add_shortcuts_item)
         self.Bind(wx.EVT_MENU, self.on_toggle_search_field, show_search_item)
         self.Bind(wx.EVT_MENU, self.on_open_accessible_browser, accessible_browser_item)
         self.Bind(wx.EVT_MENU, self.on_show_player, player_item)
@@ -3366,6 +3383,7 @@ class MainFrame(wx.Frame):
 
         sizer.Add(wx.StaticText(dlg, label="Category name:"), 0, wx.ALL, 5)
         name_ctrl = wx.TextCtrl(dlg)
+        name_ctrl.SetName("Category name")
         sizer.Add(name_ctrl, 0, wx.EXPAND | wx.ALL, 5)
 
         parent_ctrl = None
