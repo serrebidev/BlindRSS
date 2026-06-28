@@ -88,6 +88,96 @@ def _feed_item_identity_keys(element) -> List[str]:
     return keys
 
 
+def _entry_text(entry, *names) -> str:
+    for name in names:
+        try:
+            value = entry.get(name)
+        except Exception:
+            value = None
+        if isinstance(value, dict):
+            value = value.get("value")
+        text = str(value or "").strip()
+        if text:
+            return text
+    return ""
+
+
+def _entry_content(entry) -> str:
+    try:
+        contents = entry.get("content")
+        if contents:
+            first = contents[0]
+            value = first.get("value") if isinstance(first, dict) else getattr(first, "value", None)
+            if value:
+                return str(value)
+    except Exception:
+        pass
+
+    return (
+        _entry_text(entry, "summary_detail")
+        or _entry_text(entry, "summary")
+        or _entry_text(entry, "description")
+    )
+
+
+def _entry_primary_link(entry) -> str:
+    try:
+        links = entry.get("links") or []
+    except Exception:
+        links = []
+
+    for wanted_rel in ("alternate", ""):
+        for link in links:
+            try:
+                rel = str(link.get("rel") or "")
+                href = str(link.get("href") or "").strip()
+            except Exception:
+                rel = str(getattr(link, "rel", "") or "")
+                href = str(getattr(link, "href", "") or "").strip()
+            if href and (not wanted_rel or rel == wanted_rel):
+                return href
+
+    return _entry_text(entry, "link")
+
+
+def _entry_raw_date(entry) -> str:
+    raw_date = _entry_text(entry, "published", "updated", "pubDate", "date", "created", "issued", "modified")
+    if raw_date:
+        return raw_date
+
+    try:
+        parsed = (
+            entry.get("published_parsed")
+            or entry.get("updated_parsed")
+            or entry.get("created_parsed")
+            or entry.get("expired_parsed")
+        )
+    except Exception:
+        parsed = None
+    if parsed:
+        try:
+            return time.strftime("%Y-%m-%d %H:%M:%S", parsed)
+        except Exception:
+            return ""
+    return ""
+
+
+def _entry_base_id(entry, feed_id: str, feed_url: str, content: Optional[str] = None) -> str:
+    identity = _entry_text(entry, "id") or _entry_text(entry, "guid") or _entry_primary_link(entry)
+    if identity:
+        return identity
+
+    title = _entry_text(entry, "title")
+    raw_date = _entry_raw_date(entry)
+    body = content if content is not None else _entry_content(entry)
+    body = " ".join(str(body or "").split())[:500]
+    if not any((title, raw_date, body)):
+        return ""
+
+    seed = "|".join([str(feed_id or ""), str(feed_url or ""), title, raw_date, body])
+    return f"blindrss:entry:{uuid.uuid5(uuid.NAMESPACE_URL, seed)}"
+
+
 def _parse_feed_chapter_metadata_soup(xml_text: str) -> Dict[str, Dict[str, Any]]:
     """Best-effort fallback for feeds that feedparser accepts despite malformed XML."""
     try:
@@ -408,6 +498,39 @@ def _retry_cloudflare_challenged_wordpress_feed(resp, url: str, *, headers: dict
     if _response_looks_feed_like(retry_resp):
         return retry_resp, candidate
     return resp, url
+
+
+def _retry_feed_not_acceptable(resp, url: str, *, headers: dict, timeout):
+    try:
+        status_code = int(getattr(resp, "status_code", 0) or 0)
+    except Exception:
+        status_code = 0
+    if status_code != 406:
+        return resp
+
+    retry_headers = dict(headers or {})
+    if (
+        str(retry_headers.get("Accept") or "").strip() == "*/*"
+        and str(retry_headers.get("User-Agent") or "").strip() == "BlindRSS/1.0"
+    ):
+        return resp
+    retry_headers["Accept"] = "*/*"
+    retry_headers["User-Agent"] = "BlindRSS/1.0"
+
+    try:
+        retry_resp = utils.safe_requests_get(url, headers=retry_headers, timeout=timeout)
+    except Exception:
+        log.debug("Feed header retry failed for %s", url, exc_info=True)
+        return resp
+
+    try:
+        retry_status = int(getattr(retry_resp, "status_code", 0) or 0)
+    except Exception:
+        retry_status = 0
+    if retry_status != 406:
+        log.info("Retried feed with generic feed-reader headers after HTTP 406: %s", url)
+        return retry_resp
+    return resp
 
 
 class LocalProvider(RSSProvider):
@@ -1282,6 +1405,12 @@ class LocalProvider(RSSProvider):
                 for attempt in range(1, attempts + 1):
                     try:
                         resp = utils.safe_requests_get(feed_url, headers=headers, timeout=direct_fetch_timeout)
+                        resp = _retry_feed_not_acceptable(
+                            resp,
+                            feed_url,
+                            headers=headers,
+                            timeout=direct_fetch_timeout,
+                        )
                         resp, effective_feed_url = _retry_cloudflare_challenged_wordpress_feed(
                             resp,
                             feed_url,
@@ -1447,7 +1576,8 @@ class LocalProvider(RSSProvider):
 
                 entry_ids = []
                 for entry in d.entries:
-                    base_id = entry.get('id') or entry.get('link')
+                    content = _entry_content(entry)
+                    base_id = _entry_base_id(entry, feed_id, feed_url, content)
                     if not base_id:
                         continue
                     scoped_id = f"{feed_id}:{base_id}"
@@ -1475,23 +1605,14 @@ class LocalProvider(RSSProvider):
                     image_exts = (".jpg", ".jpeg", ".png", ".gif", ".webp", ".bmp")
                     audio_exts = (".mp3", ".m4a", ".m4b", ".aac", ".ogg", ".opus", ".wav", ".flac")
 
-                    content = ""
-                    if 'content' in entry:
-                        content = entry.content[0].value
-                    elif 'summary_detail' in entry:
-                        content = entry.summary_detail.value
-                    elif 'summary' in entry:
-                        content = entry.summary
-                    elif 'description' in entry:
-                        content = entry.description
-                    
-                    base_id = entry.get('id') or entry.get('link', '')
+                    content = _entry_content(entry)
+                    base_id = _entry_base_id(entry, feed_id, feed_url, content)
                     if not base_id:
                         continue
                     scoped_id = f"{feed_id}:{base_id}"
                     article_id = base_id
 
-                    url = entry.get('link', '')
+                    url = _entry_primary_link(entry)
                     title = utils.enhance_activity_entry_title(entry.get('title', ''), url, content)
                     if not title or title.strip() == "No Title":
                          # Fallback: create title from content snippet (e.g. Bluesky/Mastodon)
@@ -1517,11 +1638,7 @@ class LocalProvider(RSSProvider):
                          else:
                              author = final_title
 
-                    raw_date = entry.get('published') or entry.get('updated') or entry.get('pubDate') or entry.get('date')
-                    if not raw_date:
-                            parsed = entry.get('published_parsed') or entry.get('updated_parsed')
-                            if parsed:
-                                raw_date = time.strftime("%Y-%m-%d %H:%M:%S", parsed)
+                    raw_date = _entry_raw_date(entry)
                     
                     date = utils.normalize_date(
                         str(raw_date) if raw_date else "", 
@@ -1611,7 +1728,7 @@ class LocalProvider(RSSProvider):
                         chapters_tag = entry.psc_chapters
                         chapter_url = getattr(chapters_tag, 'href', None) or getattr(chapters_tag, 'url', None) or getattr(chapters_tag, 'value', None)
 
-                    for key in (entry.get('guid'), entry.get('id'), entry.get('link')):
+                    for key in (entry.get('guid'), entry.get('id'), _entry_primary_link(entry), base_id):
                         if not key or key not in chapter_metadata:
                             continue
                         raw_metadata = chapter_metadata[key]
@@ -2261,6 +2378,7 @@ class LocalProvider(RSSProvider):
                 title = page_title or real_url
             else:
                 resp = utils.safe_requests_get(real_url, timeout=10)
+                resp = _retry_feed_not_acceptable(resp, real_url, headers={}, timeout=10)
                 resp, effective_url = _retry_cloudflare_challenged_wordpress_feed(
                     resp,
                     real_url,
