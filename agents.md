@@ -1,6 +1,8 @@
 # BlindRSS Architecture & Dev Guide
 
 ## Working Agreement (read first)
+- Treat this file as the project source of truth. If code and this guide disagree,
+  verify the code, fix the guide, and keep the operational rule here.
 - Install whatever you need to get the job done.
 - Debug and test your changes; add or extend tests in `tests/` for any behavior change.
 - Fix any warnings or errors you hit along the way.
@@ -65,12 +67,18 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 
 - `core/`
   - `db.py`: SQLite schema setup/migrations, WAL/busy timeout pragmas, connection helpers, retention cleanup.
-    - Includes tables: `feeds`, `articles`, `chapters`, `categories`, `playback_state`.
+    - Includes tables: `feeds`, `articles`, `chapters`, `chapter_cache`, `chapter_sources`, `categories`, `playback_state`.
+    - Category identity is the full path string (`Parent / Child`) in `categories.title` and `feeds.category`; the UI can display only the leaf, but storage must keep the full path so duplicate leaf names under different parents do not collide.
+    - Hosted-provider chapter rows do not belong in the local FK-backed `chapters` table; use provider-scoped cache keys in `chapter_cache` / `chapter_sources`.
   - `utils.py`: Critical helpers.
     - `HEADERS` and request helpers (`safe_requests_get` / `safe_requests_head`).
     - `html_to_text(html, include_images=False)`, `first_image_url(html)`, `content_has_images(html)`: HTML→text for the article pane. With `include_images`, each `<img>` becomes `[Image: alt]` (or `[Image]`) so screen readers announce images; the image URL is never inlined.
     - `normalize_date(raw, title, content, url)` with priority: title > URL > feed date > content.
-    - `get_chapters_batch(ids)` for list performance.
+    - `build_cache_id(article_id, feed_id, provider)` scopes article caches where provider/feed IDs can collide.
+    - Chapter helpers (`chapter_source_and_media`, `fetch_and_store_chapters`, `get_chapters_batch`, `build_chapter_cache_key`) handle Podcasting 2.0 JSON chapters, embedded ID3/MP4 chapters, conditional chapter revalidation, and hosted-provider cache isolation.
+    - `write_opml` preserves nested category paths as nested OPML outlines. Do not flatten `Parent / Child` into a single outline label on export.
+    - `get_chapters_batch(ids, cache_keys=...)` is required for list performance; hosted providers must pass provider-scoped `cache_keys`.
+  - `http_headers.py`: Converts per-channel HTTP metadata (`http-user-agent`, referrer, origin, cookie, authorization, accept, headers) into headers for players/casters/proxies. Keep this centralized so feeds with protected media work consistently.
   - `range_cache_proxy.py`: Local VLC HTTP range proxy/cache.
     - Uses isolated `requests.Session` per operation for thread safety.
     - Resolves redirects early, supports partial chunk persistence, and optimized seek behavior.
@@ -79,8 +87,13 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
     - Supports header forwarding and HLS remuxing via ffmpeg for compatibility.
   - `article_extractor.py`: Full-text extraction (trafilatura primary, BeautifulSoup fallback), pagination merge, boilerplate cleanup.
     - Ning handling: avoid pagination-follow on `*.ning.com`; prefer web full-text for forum/topic/article links, and prefer feed fragments only for profile-style activity links.
+    - Bot/interstitial handling should return the clear "open in browser" style failure rather than replacing good feed content with anti-bot boilerplate.
   - `casting.py`: Unified casting manager for Chromecast, DLNA/UPnP, and AirPlay.
+  - `browser_bridge.py`: Optional registered browser fetch hook used by extraction fallback paths. It must fail closed (`None`) so missing browser integration never breaks normal fetch.
+  - `translation.py`: Optional automatic article translation. Supports Grok/xAI, Groq, OpenAI, OpenRouter, Gemini, and Qwen; chunks text, caps total submitted text, retries alternate model candidates/endpoints on model-access failures, and stores API keys only in local `config.json`.
   - `discovery.py`: Feed/media discovery and yt-dlp URL support checks.
+    - Global yt-dlp search sites are discovered from the installed yt-dlp extractor registry; adult search extractors are filtered unless explicitly included.
+    - Quick title enrichment is intentionally bounded and mostly opt-in; do not add broad per-result network lookups to search result arrival paths.
     - Supports direct handling/discovery logic for YouTube, Rumble, and Odysee.
     - YouTube playback reliability: `YOUTUBE_PLAYER_CLIENTS` (default `("default", "android_vr")`) is the single source of truth for which yt-dlp player clients to extract from. `youtube_player_client_arg(clients=None)` (CLI `--extractor-args`) and `youtube_player_client_list(clients=None)` (Python `extractor_args`) are used by both playback paths in `gui/player.py` (CLI `_extract_ytdlp_info_via_cli` and embedded `yt_dlp`) and by the merged download in `mainframe._download_article_via_ytdlp`. Widening the client pool past a single client (YouTube throttles/blocks individual clients and now requires PO tokens for plain `android`) is what makes playback consistent; `default` tracks yt-dlp's maintained best clients and `android_vr` is the packaged-build workaround. Change the clients in one place.
     - Playback exhausts every method before giving up (in `_resolve_and_play`): for each cookie attempt it tries embedded `yt_dlp` then the on-disk CLI; if all fail it retries embedded+CLI with the wider `YOUTUBE_PLAYER_CLIENTS_FALLBACK` pool (anonymous + configured cookies.txt); only then, as a final last resort, it hands the original page URL to VLC directly (`vlc_direct` in `_finish_media_load` skips the range-cache/stream proxy and silence scan since the URL is a page, not a media stream, and lets VLC's own extractors/error surface). Pass the fallback pool via the `clients=` arg, not by editing the primary set.
@@ -99,6 +112,8 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
     - Platform-aware: picks a per-platform manifest (`BlindRSS-update.json` on Windows, `BlindRSS-update-macos.json`, `BlindRSS-update-linux.json`) and validates the asset extension (`.zip` Windows/macOS, `.tar.gz` Linux).
     - Windows: Authenticode-verifies the new exe and hands off to `update_helper.bat`.
     - macOS/Linux: hands off to `update_helper.sh` (bundled next to the executable). macOS swaps the whole `.app` bundle and relaunches with `open`; Linux swaps the install dir (preserving in-dir user data) and relaunches the binary. macOS does a best-effort `codesign --verify` of the staged bundle.
+  - `update_config.py`: Canonical app/repo/platform update manifest names and asset extensions. Keep updater, build scripts, manifests, and tests aligned here instead of hard-coding names in new code.
+  - `macos_integration.py`: macOS start-at-login support via per-user LaunchAgent plist, routed through the cross-platform startup helpers.
   - `windows_integration.py`: Windows startup registration and shortcut creation helpers.
   - `dependency_check.py`: Dependency/path handling and media tool availability logic.
     - Executable detection order in `_find_executable_path(name, extra_dirs=)`: (1) a user-chosen path from Settings via `set_user_tool_paths()` (`_USER_TOOL_PATHS`, fed from `custom_ffmpeg_path`/`custom_ffprobe_path`/`custom_ytdlp_path` at startup in `main.py` and on settings-save in `mainframe`), (2) `shutil.which` (PATH) before hard-coded package paths, (3) ordered bundled runtime roots when frozen, (4) Windows `where`, (5) `_collect_tool_candidates` dirs, (6) bounded `os.walk` of `search_roots` (WinGet Packages). Never blind-scans the whole drive or Downloads.
@@ -117,17 +132,24 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
     - Wiring full text only into the main-window `content_ctrl` leaves macOS users with feed snippets only. The main-window full-text path triggers on real keyboard focus of `content_ctrl` (`EVT_SET_FOCUS`), which VoiceOver cursor navigation does not fire — that's why the accessible browser triggers on selection AND prefetches.
   - `mainframe.py`: Main UI, feed refresh orchestration, list rendering, notifications, and menu actions.
     - Includes special views: All, Unread, Read, Favorites.
-    - Includes persistent search UI and remember-last-feed restore behavior.
+    - Includes persistent search UI, article sorting, and remember-last-feed restore behavior.
+    - Optional translation is triggered through the background full-text pipeline; translated full-text cache keys include a `::tr[provider:lang]` suffix and the cache is cleared when translation settings change.
+    - macOS uses standard wx menu role IDs (`ID_ABOUT`, `ID_PREFERENCES`, `ID_EXIT`) and an Edit menu so native relocation/accelerators and focused text-control copy/select-all keep working.
+    - Player chapter actions live in menus and shortcuts (`Ctrl+Shift+Left/Right` for previous/next). Keep menu labels screen-reader friendly and direction buttons disabled when unavailable.
   - `player.py`: VLC-backed player window with proxy integration and async chapter/media load.
   - `hotkeys.py`: `HoldRepeatHotkeys` — hold-to-repeat handler for Ctrl+key shortcuts (quick tap fires once; holding repeats), used by `mainframe.py`/`player.py` to avoid multi-seek on quick taps. Not a global/OS media-key hook.
+    - On macOS, Option/Alt+Arrow maps to the same seek/volume actions because Ctrl+Left/Right are often captured by Mission Control. Off macOS, Alt+Arrow must stay free for normal navigation.
   - `tray.py`: System tray icon and tray media controls.
   - `dialogs.py`: Add feed, settings, provider auth, feed discovery search, and notification controls.
+    - Settings has a Translate tab for automatic article translation. API keys are local config only; do not introduce cloud sync or logging of keys.
     - New-article notifications work on Windows (toast) AND macOS (Notification Center) via `wx.adv.NotificationMessage`. Gate everything on `core.utils.platform_supports_notifications()` (win+darwin), not `sys.platform.startswith("win")`; the config keys keep their `windows_notifications_*` names for back-compat. The Windows-only AppUserModelID prerequisite (`main.py`/`mainframe._ensure_notification_prerequisites`) stays Windows-gated — macOS needs no prerequisite.
 
 - `providers/`
   - `base.py`: `RSSProvider` interface.
   - `local.py`: Local RSS provider, parallel refresh (`ThreadPoolExecutor`), conditional GET, cache revalidation headers.
     - Retries Cloudflare-challenged WordPress-style `/feed` URLs with the canonical trailing slash and persists the working URL after success.
+    - Parses broad feed shapes: RSS 0.90/0.91/0.92/0.93/0.94/1.0/2.0, Atom 1.0, JSON Feed 1.x, WordPress `content:encoded`, and older feeds with no GUID/link. When an entry has no stable ID/link, generate a deterministic `blindrss:entry:{uuid5}` seed scoped by feed and content.
+    - Some servers reject normal RSS Accept headers. If a feed-like URL returns HTTP 406, retry once with `Accept: */*` and `User-Agent: BlindRSS/1.0`; keep that narrow so normal requests still use `core.utils.HEADERS`.
   - `miniflux.py`, `inoreader.py`, `theoldreader.py`, `bazqux.py`: Hosted provider implementations.
     - Miniflux refresh uses `PUT /v1/feeds/refresh` and `PUT /v1/feeds/{id}/refresh`; HTTP 204 is a successful refresh response and must update request-status tracking as success.
     - Miniflux per-feed refresh timeout/5xx retries are expected for some server-side feed failures and should stay at debug/backoff level; keep global API failures visible as warnings/errors.
@@ -149,8 +171,13 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
   - `chapter_url`: optional external chapter source (e.g. podcast chapters JSON) fetched lazily via `utils.fetch_and_store_chapters`.
   - Indexed for `feed_id`, `is_read`, `date`, plus composite indexes for common list/count paths.
 - `chapters`: `id`, `article_id`, `start`, `title`, `href`.
+- `chapter_cache`: `id`, `cache_key`, `start`, `title`, `href`.
+  - Used for hosted-provider chapter rows where the article is not in the local `articles` table.
+- `chapter_sources`: `cache_key`, `source_url`, `etag`, `last_modified`, `checked_at`, `fetched_at`.
+  - Stores the chapter-source revalidation clock and conditional headers. Source rows are the retention clock for hosted chapter cache cleanup.
 - `categories`: `id`, `title`, `parent_id`.
-  - `parent_id` references another `categories.id` to support nested subcategories (NULL = top-level).
+  - `title` stores the full category path (`Parent / Child`), not only the leaf; `parent_id` references another `categories.id` to support nested subcategories (NULL = top-level).
+  - Duplicate leaf names under different parents are valid because their full paths differ. Never "simplify" category identity back to the leaf title.
 - `playback_state`: `id`, `position_ms`, `duration_ms`, `updated_at`, `completed`, `seek_supported`, `title`.
 
 ## Key Workflows
@@ -164,12 +191,14 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 - Provider HTTP requests must use finite timeouts (`feed_timeout_seconds`).
 - When startup refresh is enabled, the first background refresh runs immediately. Whether it forces is decided per provider via `RSSProvider.should_force_startup_refresh()`: the local provider returns True (forcing is just one full GET per feed, so a fresh launch is never left stale by servers that return a spurious 304), while hosted providers such as Miniflux return False to avoid an expensive per-feed fan-out on startup. Manual full refresh remains `force=True`.
 - The `ignore_feed_cache` config (default False) makes the local provider treat every refresh (including periodic/background) as forced, so feeds whose servers return spurious 304s keep updating in the background. The startup refresh fetches fresh regardless; this setting only affects periodic refreshes. Exposed in Settings as "Always fetch full feeds in the background (ignore feed caching)".
+- Feed-format compatibility is part of refresh, not discovery only. Keep tests for legacy RSS/RDF, Atom, JSON Feed, WordPress `content:encoded`, 406 retry, and generated entry IDs when touching parser code.
 
 ### 2. UI & Threading
 - Startup refresh is backgrounded; tree/list updates are marshaled to main thread via `wx.CallAfter`.
 - Main window supports tray minimize/close-to-tray behavior with tray controls.
 - Remember-last-feed can restore the last selected feed/folder/special view on startup.
 - On macOS with VoiceOver running, the accessible browser fallback is the intended accessibility path. It runs the full-text extraction pipeline itself (see `gui/accessibility.py`), so any reading-pane behavior added to the main window must be mirrored there or macOS users won't get it.
+- Translation runs in the full-text worker, not the UI thread. If translation is enabled but fails, show/log the failure and fall back to the original rendered article text.
 
 ### 3. Media Playback & Caching
 - Player opens immediately; media/chapter loads continue asynchronously.
@@ -177,6 +206,7 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 - Partial downloaded media chunks are retained for faster rewind/reseek.
 - Skip-silence pipeline can analyze media and skip detected silent spans.
 - Casting path proxies media for external devices and remuxes when required.
+- Chapter data can come from Podcasting 2.0 JSON, hosted provider item APIs, or embedded ID3/MP4 metadata. Local articles use `chapters`; hosted providers use `chapter_cache` with provider/account/server-scoped keys.
 
 ### 4. Full Text & Discovery
 - Full-text extraction runs when feed content is missing/partial.
@@ -185,8 +215,15 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 - Discovery dialog aggregates multiple providers in parallel (Apple Podcasts, gPodder, Feedly, NewsBlur, Reddit, Fediverse, Feedsearch, local discovery).
 - URL-based media/feed support includes YouTube, Rumble, and Odysee handling.
 - Listing/search feeds (no native RSS) are scraped/enumerated on refresh in `providers/local.py` `_refresh_single_feed`: Rumble channels/search (`fetch_listing_items`; search URLs are forced to `sort=date`), Odysee listings, and YouTube search (`discovery.fetch_youtube_search_items`, stored as `video/youtube` articles so the yt-dlp playback path handles them). These branches run before generic feed parsing and store `etag`/`last_modified` as NULL.
+- The global yt-dlp search dialog is for user-initiated search. It should not auto-enrich every fallback title on result arrival; bounded quick-title prefetch exists for selected/supported rows so search stays responsive.
 
-### 5. Updates (packaged app, all platforms)
+### 5. Translation
+- Disabled by default (`translation_enabled=False`). Settings exposes provider, target language, model override, and API key for Grok/xAI, Groq, OpenAI, OpenRouter, Gemini, and Qwen.
+- Translation operates on rendered full-text output, splits into chunks (`translation_chunk_chars`, default 3500), and caps total submitted text at 50k characters.
+- Model defaults are intentionally current/provider-specific and tested. When updating model names, update `core/translation.py` and `tests/test_translation_multi_provider.py` together.
+- OpenRouter model listing uses `core.utils.safe_requests_get`; chat-completion providers use POST requests with finite timeouts and should not log request bodies or API keys.
+
+### 6. Updates (packaged app, all platforms)
 - Checks latest GitHub release + a per-platform manifest (`BlindRSS-update.json` / `-macos.json` / `-linux.json`).
 - Each platform's manifest is published by the build flow that produces that platform's asset, so its SHA-256 always matches the asset on the same release. The macOS/Linux manifests are uploaded by the dispatched GitHub Actions job, so there is a short window after a Windows release where the mac/Linux manifest is not yet present (the client just reports "manifest not found" until the workflow finishes).
 - Verifies asset SHA-256 before apply. Windows also verifies the signed executable (Authenticode); macOS does a best-effort `codesign --verify`; Linux relies on SHA-256.
@@ -196,7 +233,7 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 - Windows helper must close/wait for BlindRSS processes launched from the install directory, verify key install files are unlocked, and verify the old install was fully moved before applying staged files. If locks remain, abort before destructive overlay and roll back/restart cleanly.
 - POSIX helper waits for the app PID to exit, backs up the install target, swaps in the staged build (macOS `.app` bundle via `ditto`; Linux install dir, restoring in-dir user data such as `config.json`/`rss.db*`/`podcasts`/`sounds`), relaunches, and rolls back on failure. It is run from a temp copy so the swap cannot delete it mid-run. Covered by `tests/test_posix_update_helper.py` (static invariants + real-execution swap/restore/abort tests, skipped off POSIX).
 
-### 6. Cross-Platform Packaging
+### 7. Cross-Platform Packaging
 - `build.sh` bundles `yt-dlp`, `deno`, `ffmpeg`, and VLC runtime files outside Windows (macOS and Linux).
 - macOS builds are ad-hoc signed for free with `codesign` unless disabled.
 - Linux builds require system VLC (`vlc` + `libvlc-dev`) and ffmpeg; `portable.spec` bundles `libvlc.so*` and the VLC plugins dir, overridable via `BLINDRSS_VLC_LIB_DIR` / `BLINDRSS_VLC_PLUGINS`. Output is a `tar.gz` (preserves the executable bit), not a `.app`.
@@ -204,6 +241,16 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 ## Build Quality
 - When building, always fix any warnings, bugs, or errors you can before considering the build complete.
 - Pytest is configured by `pytest.ini` to use `.tmp_test/pytest` as its base temp directory. Keep this repo-local temp base so Windows machines with broken or inaccessible global pytest temp folders can still run the full suite reliably.
+
+## Blunt Things To Remember
+- BlindRSS is accessibility-first. A fix that works visually but regresses NVDA, JAWS, or VoiceOver is not done.
+- Do not block startup with network, dependency checks, yt-dlp extractor loading, translation, full-text extraction, or media probing. Use background workers and marshal GUI changes with `wx.CallAfter`.
+- Do not write mutable runtime data into Program Files installed builds. Installed Windows data goes to `%APPDATA%\BlindRSS`; runtime-managed `yt-dlp.exe` goes to `%LOCALAPPDATA%\BlindRSS\bin`; episode downloads default to `Downloads\BlindRSS`.
+- Do not invent new release steps. `.\build.bat release` is the release process.
+- Do not trust one provider shape. Local feeds, Miniflux, Inoreader, The Old Reader, and BazQux have different article IDs, chapter APIs, category behavior, and favorite support.
+- Do not replace fuller feed/article text with a shorter scrape, translation failure, or bot-interstitial page.
+- Do not add broad synchronous loops in the UI thread. Batch DB reads (`get_chapters_batch`), cap prefetch/enrichment work, and keep provider refreshes bounded.
+- Do not log secrets: provider API keys, cookies, Authorization headers, imported cookies.txt contents, and translation request text are user data.
 
 ## Operational Mandates
 1. User-Agent safety: always use `core.utils.safe_requests_get` / `core.utils.HEADERS` for network requests.
@@ -216,6 +263,7 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 8. Releases: cut every official release with `.\build.bat release` on Windows; never hand-pick the version or tag. Full mechanics and the publish/Latest guards are in **Build & Release** above.
 9. Release publication: a release MUST end up published and Latest or the updater never sees it. Do not remove the `build.bat release` guards (`--draft=false --latest`, no-drafts check, `/releases/latest` verify) or auto-delete releases. See **Build & Release** > Updater visibility.
 10. Tests: add/extend tests in `tests/` for behavior changes and regressions.
+11. Secrets: never print, log, commit, or include API keys/cookies/Authorization headers in tests or diagnostics.
 
 <!-- claude-memory:begin (managed by sync-claude-memory.py; canonical files live in C:\Users\admin\.claude - edit there, not here) -->
 ## Memories (shared from ~/.claude - project: C--Users-admin-git-BlindRSS)
