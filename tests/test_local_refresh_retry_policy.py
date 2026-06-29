@@ -244,6 +244,104 @@ def test_refresh_timeout_retries_once_then_succeeds(monkeypatch):
             core.db.DB_FILE = orig_db_file
 
 
+def test_refresh_skips_conditional_headers_when_article_cache_is_empty(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        orig_db_file = core.db.DB_FILE
+        core.db.DB_FILE = os.path.join(tmp, "rss.db")
+        try:
+            provider = LocalProvider(
+                {
+                    "providers": {"local": {}},
+                    "max_concurrent_refreshes": 1,
+                    "per_host_max_connections": 1,
+                    "feed_timeout_seconds": 2,
+                    "feed_retry_attempts": 0,
+                }
+            )
+            feed_id = _insert_feed("https://example.com/feed.xml")
+            conn = core.db.get_connection()
+            try:
+                conn.execute(
+                    "UPDATE feeds SET etag = ?, last_modified = ? WHERE id = ?",
+                    ('"stale"', "Wed, 24 Jun 2026 12:00:00 GMT", feed_id),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+
+            calls = []
+            states = []
+
+            def _fake_get(url, **kwargs):
+                calls.append((url, dict(kwargs or {})))
+                headers = kwargs.get("headers") or {}
+                if headers.get("If-None-Match") or headers.get("If-Modified-Since"):
+                    return _DummyResp("", status_code=304, headers={"ETag": '"stale"'})
+                return _DummyResp(_RSS_XML, headers={"ETag": '"fresh"'})
+
+            monkeypatch.setattr(local_mod.utils, "safe_requests_get", _fake_get)
+
+            assert provider.refresh(progress_cb=states.append, force=False) is True
+
+            assert len(calls) == 1
+            assert "If-None-Match" not in calls[0][1]["headers"]
+            assert "If-Modified-Since" not in calls[0][1]["headers"]
+            assert states[-1]["status"] == "ok"
+            articles = provider.get_articles(feed_id=feed_id)
+            assert len(articles) == 1
+            assert articles[0].title == "Episode 1"
+
+            conn = core.db.get_connection()
+            try:
+                c = conn.cursor()
+                c.execute("SELECT etag FROM feeds WHERE id = ?", (feed_id,))
+                assert c.fetchone()[0] == '"fresh"'
+            finally:
+                conn.close()
+        finally:
+            core.db.DB_FILE = orig_db_file
+
+
+def test_refresh_rejects_non_feed_html_zero_entry_response(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        orig_db_file = core.db.DB_FILE
+        core.db.DB_FILE = os.path.join(tmp, "rss.db")
+        try:
+            provider = LocalProvider(
+                {
+                    "providers": {"local": {}},
+                    "feed_timeout_seconds": 2,
+                    "feed_retry_attempts": 0,
+                }
+            )
+            feed_id = _insert_feed("https://example.com/feed.rss")
+            states = []
+
+            def _fake_get(url, **kwargs):
+                return _DummyResp(
+                    "<html><head><title>Just a moment</title></head><body>Blocked</body></html>",
+                    content_type="text/html; charset=utf-8",
+                    headers={"ETag": '"html"'},
+                )
+
+            monkeypatch.setattr(local_mod.utils, "safe_requests_get", _fake_get)
+
+            assert provider.refresh_feed(feed_id, progress_cb=states.append) is True
+
+            assert states[-1]["status"] == "error"
+            assert "did not look like a feed" in states[-1]["error"]
+            assert provider.get_articles(feed_id=feed_id) == []
+            conn = core.db.get_connection()
+            try:
+                c = conn.cursor()
+                c.execute("SELECT etag, last_modified FROM feeds WHERE id = ?", (feed_id,))
+                assert c.fetchone() == (None, None)
+            finally:
+                conn.close()
+        finally:
+            core.db.DB_FILE = orig_db_file
+
+
 def test_refresh_unresolved_homepage_uses_single_short_probe_and_caches_discovery_failure(monkeypatch):
     with tempfile.TemporaryDirectory() as tmp:
         orig_db_file = core.db.DB_FILE

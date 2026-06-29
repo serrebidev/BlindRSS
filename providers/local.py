@@ -1,4 +1,5 @@
 import feedparser
+import json
 import time
 import uuid
 import threading
@@ -53,6 +54,10 @@ _NAME_RESOLUTION_ERROR_MARKERS = (
     "getaddrinfo failed",
 )
 _CHAPTER_ELEMENT_RE = re.compile(r"<(?:[A-Za-z_][\w.-]*:)?chapters(?:\s|/?>)", re.IGNORECASE)
+_JSON_FEED_VERSIONS = {
+    "https://jsonfeed.org/version/1",
+    "https://jsonfeed.org/version/1.1",
+}
 
 
 def _xml_local_name(name) -> str:
@@ -141,7 +146,18 @@ def _entry_primary_link(entry) -> str:
 
 
 def _entry_raw_date(entry) -> str:
-    raw_date = _entry_text(entry, "published", "updated", "pubDate", "date", "created", "issued", "modified")
+    raw_date = _entry_text(
+        entry,
+        "published",
+        "updated",
+        "pubDate",
+        "date",
+        "created",
+        "issued",
+        "modified",
+        "date_published",
+        "date_modified",
+    )
     if raw_date:
         return raw_date
 
@@ -176,6 +192,192 @@ def _entry_base_id(entry, feed_id: str, feed_url: str, content: Optional[str] = 
 
     seed = "|".join([str(feed_id or ""), str(feed_url or ""), title, raw_date, body])
     return f"blindrss:entry:{uuid.uuid5(uuid.NAMESPACE_URL, seed)}"
+
+
+def _decode_feed_text(data, fallback_text: Optional[str] = None) -> str:
+    if fallback_text is not None:
+        return str(fallback_text or "")
+    if isinstance(data, bytes):
+        for encoding in ("utf-8-sig", "utf-8", "iso-8859-1"):
+            try:
+                return data.decode(encoding)
+            except UnicodeDecodeError:
+                continue
+        return data.decode("utf-8", errors="replace")
+    return str(data or "")
+
+
+def _json_feed_author_name(value) -> str:
+    if isinstance(value, dict):
+        return str(value.get("name") or value.get("url") or "").strip()
+    return str(value or "").strip()
+
+
+def _json_feed_authors(item: dict, fallback_author=None) -> str:
+    authors = item.get("authors")
+    if isinstance(authors, list):
+        names = [_json_feed_author_name(author) for author in authors]
+        names = [name for name in names if name]
+        if names:
+            return ", ".join(names)
+
+    author = _json_feed_author_name(item.get("author"))
+    if author:
+        return author
+
+    return _json_feed_author_name(fallback_author)
+
+
+def _json_feed_enclosure_links(item: dict) -> list:
+    links = []
+    attachments = item.get("attachments")
+    if not isinstance(attachments, list):
+        return links
+
+    for attachment in attachments:
+        if not isinstance(attachment, dict):
+            continue
+        href = str(attachment.get("url") or "").strip()
+        if not href:
+            continue
+        link = feedparser.FeedParserDict({"href": href, "rel": "enclosure"})
+        mime_type = str(attachment.get("mime_type") or "").strip()
+        if mime_type:
+            link["type"] = mime_type
+        title = str(attachment.get("title") or "").strip()
+        if title:
+            link["title"] = title
+        size = attachment.get("size_in_bytes")
+        if size is not None:
+            link["length"] = str(size)
+        duration = attachment.get("duration_in_seconds")
+        if duration is not None:
+            link["duration"] = duration
+        links.append(link)
+    return links
+
+
+def _parse_json_feed(text: str):
+    try:
+        payload = json.loads(str(text or ""))
+    except Exception:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    version = str(payload.get("version") or "").strip()
+    items = payload.get("items")
+    if version not in _JSON_FEED_VERSIONS or not isinstance(items, list):
+        return None
+
+    feed = feedparser.FeedParserDict()
+    title = str(payload.get("title") or "").strip()
+    if title:
+        feed["title"] = title
+    home_page_url = str(payload.get("home_page_url") or "").strip()
+    if home_page_url:
+        feed["link"] = home_page_url
+    feed_url = str(payload.get("feed_url") or "").strip()
+    if feed_url:
+        feed["href"] = feed_url
+    description = str(payload.get("description") or "").strip()
+    if description:
+        feed["subtitle"] = description
+    fallback_author = payload.get("author")
+    if not fallback_author and isinstance(payload.get("authors"), list) and payload["authors"]:
+        fallback_author = payload["authors"][0]
+    author = _json_feed_author_name(fallback_author)
+    if author:
+        feed["author"] = author
+
+    entries = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+
+        entry = feedparser.FeedParserDict()
+        item_id = str(item.get("id") or "").strip()
+        url = str(item.get("url") or item.get("external_url") or "").strip()
+        if item_id:
+            entry["id"] = item_id
+            entry["guid"] = item_id
+        if url:
+            entry["link"] = url
+            entry["links"] = [feedparser.FeedParserDict({"href": url, "rel": "alternate"})]
+        else:
+            entry["links"] = []
+
+        title = str(item.get("title") or "").strip()
+        if title:
+            entry["title"] = title
+
+        content_html = item.get("content_html")
+        content_text = item.get("content_text")
+        content_value = content_html if content_html is not None else content_text
+        if content_value is not None:
+            entry["content"] = [feedparser.FeedParserDict({"value": str(content_value)})]
+
+        summary = item.get("summary")
+        if summary is None and content_text is not None:
+            summary = content_text
+        if summary is not None:
+            entry["summary"] = str(summary)
+
+        published = str(item.get("date_published") or "").strip()
+        modified = str(item.get("date_modified") or "").strip()
+        if published:
+            entry["published"] = published
+            entry["date_published"] = published
+        if modified:
+            entry["updated"] = modified
+            entry["date_modified"] = modified
+
+        author = _json_feed_authors(item, fallback_author=fallback_author)
+        if author:
+            entry["author"] = author
+
+        tags = item.get("tags")
+        if isinstance(tags, list):
+            entry["tags"] = [
+                feedparser.FeedParserDict({"term": str(tag)})
+                for tag in tags
+                if str(tag or "").strip()
+            ]
+
+        enclosure_links = _json_feed_enclosure_links(item)
+        if enclosure_links:
+            entry["links"].extend(enclosure_links)
+
+        entries.append(entry)
+
+    parsed = feedparser.FeedParserDict()
+    parsed["feed"] = feed
+    parsed["entries"] = entries
+    parsed["bozo"] = False
+    return parsed
+
+
+def _parse_feed_document(data, text: Optional[str] = None, content_type: str = ""):
+    decoded_text = _decode_feed_text(data, text)
+    stripped = decoded_text.lstrip()
+    content_type = str(content_type or "").lower()
+    if stripped.startswith("{") or "json" in content_type:
+        json_feed = _parse_json_feed(decoded_text)
+        if json_feed is not None:
+            return json_feed
+
+    parsed = feedparser.parse(data)
+
+    # Resilience: if 0 entries, try parsing decoded text as fallback
+    # (Sometimes feedparser fails on bytes with certain encoding declarations vs actual content)
+    if len(parsed.entries) == 0 and parsed.bozo and decoded_text:
+        try:
+            parsed_text = feedparser.parse(decoded_text)
+            if len(parsed_text.entries) > 0:
+                return parsed_text
+        except Exception:
+            pass
+
+    return parsed
 
 
 def _parse_feed_chapter_metadata_soup(xml_text: str) -> Dict[str, Dict[str, Any]]:
@@ -460,6 +662,19 @@ def _response_looks_cloudflare_challenge(resp) -> bool:
     except Exception:
         snippet = ""
     return "challenges.cloudflare.com" in snippet and "just a moment" in snippet
+
+
+def _feed_has_stored_articles(feed_id: str) -> bool:
+    try:
+        conn = get_connection()
+        try:
+            c = conn.cursor()
+            c.execute("SELECT 1 FROM articles WHERE feed_id = ? LIMIT 1", (feed_id,))
+            return c.fetchone() is not None
+        finally:
+            conn.close()
+    except Exception:
+        return True
 
 
 def _wordpress_feed_slash_variant(url: str) -> Optional[str]:
@@ -900,6 +1115,14 @@ class LocalProvider(RSSProvider):
         # force=True and should fetch the feed body even when a server's validator
         # metadata is stale or incorrect.
         use_conditional = (not force) and (not is_npr_feed) and bool(etag or last_modified)
+        if use_conditional and not _feed_has_stored_articles(feed_id):
+            log.info(
+                "Skipping conditional headers for local feed with empty article cache id=%s title=%r url=%s",
+                feed_id,
+                final_title,
+                feed_url,
+            )
+            use_conditional = False
         if use_conditional:
             if etag:
                 headers['If-None-Match'] = etag
@@ -1512,18 +1735,12 @@ class LocalProvider(RSSProvider):
             if xml_data is None:
                 return
 
-            d = feedparser.parse(xml_data)
-            
-            # Resilience: if 0 entries, try parsing decoded text as fallback
-            # (Sometimes feedparser fails on bytes with certain encoding declarations vs actual content)
-            if len(d.entries) == 0 and d.bozo:
-                try:
-                    d_text = feedparser.parse(xml_text)
-                    if len(d_text.entries) > 0:
-                        d = d_text
-                        log.info(f"Fallback to text parsing successful for {feed_url}")
-                except Exception:
-                    pass
+            response_content_type = ""
+            try:
+                response_content_type = resp.headers.get("Content-Type", "")
+            except Exception:
+                response_content_type = ""
+            d = _parse_feed_document(xml_data, xml_text, response_content_type)
             entry_count = len(d.entries)
             log.info(
                 "Local feed parsed id=%s title=%r entries=%s bozo=%s url=%s",
@@ -1533,6 +1750,18 @@ class LocalProvider(RSSProvider):
                 bool(getattr(d, "bozo", False)),
                 feed_url,
             )
+            if entry_count == 0 and not _response_looks_feed_like(resp):
+                status = "error"
+                error_msg = f"Response from {feed_url} did not look like a feed"
+                failure_cooldown_seconds = _PERMANENT_FAILURE_COOLDOWN_SECONDS
+                log.info(
+                    "Local feed refresh rejected non-feed zero-entry response id=%s title=%r content_type=%r url=%s",
+                    feed_id,
+                    final_title,
+                    response_content_type,
+                    feed_url,
+                )
+                return
             
             # Parse only feeds that contain a local-name "chapters" element. Element
             # matching deliberately ignores namespace prefixes and namespace URIs.
@@ -2388,7 +2617,12 @@ class LocalProvider(RSSProvider):
                 if effective_url != real_url:
                     real_url = effective_url
                     title = real_url
-                d = feedparser.parse(resp.text)
+                content_type = ""
+                try:
+                    content_type = resp.headers.get("Content-Type", "")
+                except Exception:
+                    content_type = ""
+                d = _parse_feed_document(resp.content, resp.text, content_type)
                 title = d.feed.get('title', real_url)
         except Exception:
             title = title or real_url

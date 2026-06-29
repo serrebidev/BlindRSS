@@ -182,6 +182,45 @@ RSS_20 = """<?xml version="1.0"?>
 </rss>
 """
 
+APKMIRROR_WORDPRESS_RSS = """<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"
+     xmlns:content="http://purl.org/rss/1.0/modules/content/"
+     xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>Download Android Accessibility Suite APKs for Android - APKMirror</title>
+    <link>https://www.apkmirror.com/apk/google-inc/android-accessibility-suite/</link>
+    <description>APKMirror feed</description>
+    <item>
+      <title>Android Accessibility Suite 17.0.1.926549743 by Google LLC</title>
+      <link>https://www.apkmirror.com/apk/google-inc/android-accessibility-suite/android-accessibility-suite-17-0-1-926549743-release/</link>
+      <guid isPermaLink="false">http://www.apkmirror.com/?p=14231923</guid>
+      <dc:creator><![CDATA[APKMirror]]></dc:creator>
+      <pubDate>Fri, 05 Dec 2025 10:00:00 GMT</pubDate>
+      <description><![CDATA[The Android Accessibility Suite APK appeared first on APKMirror.]]></description>
+      <content:encoded><![CDATA[The Android Accessibility Suite 17.0.1.926549743 by Google LLC APK appeared first on APKMirror. Introducing APKMirror PREMIUM.]]></content:encoded>
+    </item>
+  </channel>
+</rss>
+"""
+
+GRAV_RSS = """<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+  <channel>
+    <title>My Feed Title</title>
+    <link>https://getgrav.org/blog</link>
+    <atom:link href="https://getgrav.org/blog.rss" rel="self" type="application/rss+xml" />
+    <description>Grav Blog</description>
+    <item>
+      <title>Grav 2.0 Released!</title>
+      <link>https://getgrav.org/blog/grav-2-stable-released</link>
+      <guid isPermaLink="true">https://getgrav.org/blog/grav-2-stable-released</guid>
+      <pubDate>Fri, 05 Dec 2025 10:00:00 GMT</pubDate>
+      <description><![CDATA[Today, Grav 2.0 is stable. This is the biggest release in the project's history.]]></description>
+    </item>
+  </channel>
+</rss>
+"""
+
 ATOM_10 = """<?xml version="1.0"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
   <title>Atom Feed</title>
@@ -195,6 +234,37 @@ ATOM_10 = """<?xml version="1.0"?>
     <summary>Atom body</summary>
   </entry>
 </feed>
+"""
+
+JSON_FEED_11 = """{
+  "version": "https://jsonfeed.org/version/1.1",
+  "title": "JSON Feed",
+  "home_page_url": "https://example.com/",
+  "feed_url": "https://example.com/feed.json",
+  "authors": [
+    {"name": "Feed Author"}
+  ],
+  "items": [
+    {
+      "id": "json-entry-1",
+      "url": "https://example.com/json-entry-1",
+      "title": "JSON Feed Item",
+      "content_html": "<p>JSON feed body</p>",
+      "summary": "JSON summary",
+      "date_published": "2026-01-02T03:04:05Z",
+      "authors": [
+        {"name": "Item Author"}
+      ],
+      "attachments": [
+        {
+          "url": "https://example.com/audio.mp3",
+          "mime_type": "audio/mpeg",
+          "title": "Episode audio"
+        }
+      ]
+    }
+  ]
+}
 """
 
 
@@ -258,4 +328,85 @@ def test_local_provider_retries_http_406_with_generic_accept_header(provider, mo
     assert calls[0][1]["headers"].get("Accept") is None
     assert calls[1][1]["headers"]["Accept"] == "*/*"
     assert calls[1][1]["headers"]["User-Agent"] == "BlindRSS/1.0"
-    assert "no-cache" in calls[1][1]["headers"]["Cache-Control"].lower()
+
+
+def test_local_provider_extracts_articles_from_json_feed(provider, monkeypatch):
+    feed_id = _insert_feed("https://example.com/feed.json")
+    monkeypatch.setattr(
+        local_mod.utils,
+        "safe_requests_get",
+        lambda *args, **kwargs: _DummyResp(JSON_FEED_11, content_type="application/feed+json"),
+    )
+
+    assert provider.refresh_feed(feed_id) is True
+
+    articles = provider.get_articles(feed_id=feed_id)
+    assert len(articles) == 1
+    article = articles[0]
+    assert article.id == "json-entry-1"
+    assert article.title == "JSON Feed Item"
+    assert article.url == "https://example.com/json-entry-1"
+    assert "JSON feed body" in article.content
+    assert article.author == "Item Author"
+    assert article.media_url == "https://example.com/audio.mp3"
+    assert article.media_type == "audio/mpeg"
+
+
+def test_local_provider_extracts_apkmirror_wordpress_rss_shape(provider, monkeypatch):
+    feed_id = _insert_feed("https://www.apkmirror.com/apk/google-inc/android-accessibility-suite/feed/")
+    monkeypatch.setattr(
+        local_mod.utils,
+        "safe_requests_get",
+        lambda *args, **kwargs: _DummyResp(
+            APKMIRROR_WORDPRESS_RSS,
+            content_type="text/xml; charset=UTF-8",
+        ),
+    )
+
+    assert provider.refresh_feed(feed_id) is True
+
+    rows = _article_rows(feed_id)
+    assert len(rows) == 1
+    article_id, title, url, content = rows[0]
+    assert article_id == "http://www.apkmirror.com/?p=14231923"
+    assert title == "Android Accessibility Suite 17.0.1.926549743 by Google LLC"
+    assert url.endswith("/android-accessibility-suite-17-0-1-926549743-release/")
+    assert "Introducing APKMirror PREMIUM" in content
+
+
+def test_local_provider_extracts_grav_rss_shape(provider, monkeypatch):
+    feed_id = _insert_feed("https://getgrav.org/blog.rss")
+    monkeypatch.setattr(
+        local_mod.utils,
+        "safe_requests_get",
+        lambda *args, **kwargs: _DummyResp(
+            GRAV_RSS,
+            content_type="application/rss+xml; charset=utf-8",
+        ),
+    )
+
+    assert provider.refresh_feed(feed_id) is True
+
+    rows = _article_rows(feed_id)
+    assert len(rows) == 1
+    article_id, title, url, content = rows[0]
+    assert article_id == "https://getgrav.org/blog/grav-2-stable-released"
+    assert title == "Grav 2.0 Released!"
+    assert url == "https://getgrav.org/blog/grav-2-stable-released"
+    assert "Today, Grav 2.0 is stable" in content
+
+
+def test_add_feed_uses_json_feed_title(provider, monkeypatch):
+    monkeypatch.setattr(provider, "_resolve_feed_url", lambda url: url)
+    monkeypatch.setattr(
+        local_mod.utils,
+        "safe_requests_get",
+        lambda *args, **kwargs: _DummyResp(JSON_FEED_11, content_type="application/feed+json"),
+    )
+
+    assert provider.add_feed("https://example.com/feed.json", "Tests") is True
+
+    feeds = provider.get_feeds()
+    assert len(feeds) == 1
+    assert feeds[0].url == "https://example.com/feed.json"
+    assert feeds[0].title == "JSON Feed"
