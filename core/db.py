@@ -3,6 +3,7 @@ import os
 import logging
 import time
 import uuid
+import json
 from core.config import APP_DIR, USER_DATA_DIR, get_data_dir
 
 log = logging.getLogger(__name__)
@@ -438,6 +439,12 @@ def init_db():
             c.execute("ALTER TABLE feeds ADD COLUMN show_images INTEGER")
         except sqlite3.OperationalError:
             pass
+        # Per-feed HTTP fetch overrides (issue #29): JSON blob with custom request
+        # headers, timeout, and browser-impersonation mode. See get_feed_settings().
+        try:
+            c.execute("ALTER TABLE feeds ADD COLUMN feed_settings TEXT")
+        except sqlite3.OperationalError:
+            pass
 
         # Migration: add parent_id to categories for subcategory support
         try:
@@ -664,6 +671,66 @@ def set_feed_show_images(feed_id, value):
     try:
         c = conn.cursor()
         c.execute("UPDATE feeds SET show_images = ? WHERE id = ?", (stored, str(feed_id)))
+        conn.commit()
+        return True
+    except sqlite3.Error:
+        return False
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+
+
+def get_feed_settings(feed_id) -> dict:
+    """Return the per-feed HTTP override settings as a dict (issue #29).
+
+    Schema (all keys optional)::
+
+        {
+            "custom_headers": {"Header-Name": "value", ...},
+            "timeout_seconds": <int> or None,
+            "impersonate": "auto" | "always" | "never",
+        }
+
+    Always returns a dict; returns {} for an unknown feed, a NULL value, or
+    malformed JSON.
+    """
+    if not feed_id:
+        return {}
+    conn = get_connection()
+    try:
+        c = conn.cursor()
+        c.execute("SELECT feed_settings FROM feeds WHERE id = ?", (str(feed_id),))
+        row = c.fetchone()
+    except sqlite3.Error:
+        return {}
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
+    if not row or row[0] is None:
+        return {}
+    try:
+        data = json.loads(row[0])
+    except (ValueError, TypeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def set_feed_settings(feed_id, settings: dict) -> bool:
+    """Persist the per-feed HTTP override settings (see get_feed_settings)."""
+    if not feed_id:
+        return False
+    try:
+        payload = json.dumps(settings if isinstance(settings, dict) else {})
+    except (ValueError, TypeError):
+        payload = "{}"
+    conn = get_connection()
+    try:
+        c = conn.cursor()
+        c.execute("UPDATE feeds SET feed_settings = ? WHERE id = ?", (payload, str(feed_id)))
         conn.commit()
         return True
     except sqlite3.Error:

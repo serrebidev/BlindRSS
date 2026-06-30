@@ -26,6 +26,21 @@ log = logging.getLogger(__name__)
 
 warnings.filterwarnings("ignore", category=UnknownTimezoneWarning)
 
+# Optional browser-TLS impersonation transport. Some anti-bot WAFs (e.g. APKMirror,
+# Grav -- issue #29) reset the TCP/TLS connection when a request's TLS/HTTP
+# fingerprint doesn't look like a real browser. When curl_cffi is installed we can
+# replay Chrome's fingerprint to get past them. The import is optional so the app
+# keeps working (via plain requests) when curl_cffi isn't available.
+IMPERSONATE_TARGET = "chrome"
+try:
+    from curl_cffi import requests as _curl_requests
+    _CURL_REQUESTS = _curl_requests
+    CURL_CFFI_AVAILABLE = True
+except Exception:
+    _curl_requests = None
+    _CURL_REQUESTS = None
+    CURL_CFFI_AVAILABLE = False
+
 
 def platform_supports_notifications() -> bool:
     """True on platforms where `wx.adv.NotificationMessage` shows native banners.
@@ -37,7 +52,21 @@ def platform_supports_notifications() -> bool:
 
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    'Accept': 'application/rss+xml,application/xml,application/atom+xml,text/xml;q=0.9,*/*;q=0.8'
+    'Accept': 'application/rss+xml,application/xml,application/atom+xml,text/xml;q=0.9,*/*;q=0.8',
+    # Full modern-Chrome request fingerprint so anti-bot WAFs that block "bot-like"
+    # requests (issue #29) accept the connection. The plain-requests path sends all
+    # of these; the curl_cffi impersonation path supplies its own matching set.
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Upgrade-Insecure-Requests': '1',
+    'sec-ch-ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+    'sec-ch-ua-mobile': '?0',
+    'sec-ch-ua-platform': '"Windows"',
+    'Sec-Fetch-Dest': 'document',
+    'Sec-Fetch-Mode': 'navigate',
+    'Sec-Fetch-Site': 'none',
+    'Sec-Fetch-User': '?1',
+    'Connection': 'keep-alive',
 }
 
 _FLAC_MIME_ALIASES = {
@@ -347,20 +376,88 @@ def build_playback_speeds(start: float = 0.5, stop: float = 4.0, step: float = 0
     return cleaned
 
 
-def safe_requests_get(url, **kwargs):
-    """Wrapper for requests.get with default browser headers."""
+_SENSITIVE_HEADER_KEYS = {"authorization", "cookie", "proxy-authorization", "set-cookie"}
+
+
+def referer_for_url(url: str) -> str:
+    """Return a site-root Referer (``scheme://host/``) for a URL, or "" if unparseable.
+
+    Sending the feed's own site as the Referer makes the request look like an
+    in-site navigation, which some anti-bot WAFs require (issue #29).
+    """
+    try:
+        parts = urllib.parse.urlsplit(str(url or ""))
+    except Exception:
+        return ""
+    if not parts.scheme or not parts.netloc:
+        return ""
+    return f"{parts.scheme}://{parts.netloc}/"
+
+
+def _redact_headers(headers: dict) -> dict:
+    """Copy of ``headers`` with sensitive values masked, for safe logging."""
+    redacted = {}
+    for key, value in (headers or {}).items():
+        if str(key).lower() in _SENSITIVE_HEADER_KEYS:
+            redacted[key] = "<redacted>"
+        else:
+            redacted[key] = value
+    return redacted
+
+
+def _log_http_request(method: str, url: str, headers: dict, transport: str) -> None:
+    """Log an outgoing request (headers redacted) at DEBUG for diagnostics (issue #29)."""
+    if not log.isEnabledFor(logging.DEBUG):
+        return
+    try:
+        log.debug("HTTP %s %s via %s headers=%s", method, url, transport, _redact_headers(headers))
+    except Exception:
+        pass
+
+
+def _impersonated_headers(headers: dict) -> dict:
+    """Headers to forward on the curl_cffi path.
+
+    curl_cffi supplies a self-consistent Chrome UA / Sec-CH-UA / Sec-Fetch set that
+    matches its impersonated TLS handshake, so we forward only the caller's
+    functional headers (Referer, conditional, cache-control) plus an Accept.
+    """
+    final_headers = dict(headers or {})
+    if not any(str(k).lower() == "accept" for k in final_headers):
+        final_headers["Accept"] = HEADERS["Accept"]
+    return final_headers
+
+
+def safe_requests_get(url, *, impersonate: bool = False, **kwargs):
+    """Wrapper for requests.get with default browser headers.
+
+    When ``impersonate`` is True and curl_cffi is installed, the request is sent
+    through curl_cffi with a real Chrome TLS/HTTP fingerprint to get past anti-bot
+    WAFs that reset non-browser connections (issue #29). Falls back to plain
+    ``requests`` when curl_cffi is unavailable, so behavior degrades gracefully.
+    """
     headers = kwargs.pop("headers", {})
+    if impersonate and CURL_CFFI_AVAILABLE:
+        final_headers = _impersonated_headers(headers)
+        _log_http_request("GET", url, final_headers, f"curl_cffi:{IMPERSONATE_TARGET}")
+        return _CURL_REQUESTS.get(url, headers=final_headers, impersonate=IMPERSONATE_TARGET, **kwargs)
     # Merge with defaults, preserving caller's headers if they exist
     final_headers = HEADERS.copy()
     final_headers.update(headers)
+    _log_http_request("GET", url, final_headers, "requests")
     return requests.get(url, headers=final_headers, **kwargs)
 
 
-def safe_requests_head(url, **kwargs):
-    """Wrapper for requests.head with default browser headers."""
+def safe_requests_head(url, *, impersonate: bool = False, **kwargs):
+    """Wrapper for requests.head with default browser headers (see safe_requests_get)."""
     headers = kwargs.pop("headers", {})
+    if impersonate and CURL_CFFI_AVAILABLE:
+        final_headers = _impersonated_headers(headers)
+        _log_http_request("HEAD", url, final_headers, f"curl_cffi:{IMPERSONATE_TARGET}")
+        return _CURL_REQUESTS.head(url, headers=final_headers, impersonate=IMPERSONATE_TARGET, **kwargs)
     final_headers = HEADERS.copy()
     final_headers.update(headers)
+    _log_http_request("HEAD", url, final_headers, "requests")
     return requests.head(url, headers=final_headers, **kwargs)
 
 

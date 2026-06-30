@@ -80,7 +80,7 @@ packages_to_collect = [
     'yt_dlp', 'aiohttp', 'zeroconf', 'pydantic', 'lxml', 
     'readability', 'sgmllib', 'six', 'soupsieve', 'xmltodict', 
     'defusedxml', 'didl_lite', 'ifaddr', 'langcodes', 'language_data',
-    'certifi'
+    'certifi', 'curl_cffi'
 ]
 
 datas = []

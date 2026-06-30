@@ -2478,10 +2478,19 @@ class SettingsDialog(wx.Dialog):
 
 class FeedPropertiesDialog(wx.Dialog):
     def __init__(self, parent, feed, categories, allow_url_edit: bool = True):
-        super().__init__(parent, title="Feed Properties", size=(500, 260))
+        super().__init__(parent, title="Feed Properties", size=(540, 560))
 
         self.feed = feed
         self.categories = categories
+        # Per-feed HTTP overrides (issue #29). Loaded here, saved in on_ok.
+        try:
+            from core import db as _db
+            self._feed_settings = _db.get_feed_settings(getattr(feed, "id", "") or "")
+        except Exception:
+            self._feed_settings = {}
+        if not isinstance(self._feed_settings, dict):
+            self._feed_settings = {}
+        self._impersonate_values = ["auto", "always", "never"]
 
         sizer = wx.BoxSizer(wx.VERTICAL)
 
@@ -2510,30 +2519,114 @@ class FeedPropertiesDialog(wx.Dialog):
         self.cat_ctrl.SetValue(feed.category or "Uncategorized")
         sizer.Add(self.cat_ctrl, 0, wx.EXPAND | wx.ALL, 5)
 
+        # --- Per-feed HTTP fetch overrides (issue #29) ---
+        sizer.Add(
+            wx.StaticText(self, label="Custom request headers (one per line, Name: Value):"),
+            0, wx.ALL, 5,
+        )
+        headers_value = ""
+        try:
+            existing_headers = self._feed_settings.get("custom_headers") or {}
+            if isinstance(existing_headers, dict):
+                headers_value = "\n".join(f"{k}: {v}" for k, v in existing_headers.items())
+        except Exception:
+            headers_value = ""
+        self.headers_ctrl = wx.TextCtrl(self, value=headers_value, style=wx.TE_MULTILINE, size=(-1, 110))
+        self.headers_ctrl.SetName("Custom request headers")
+        sizer.Add(self.headers_ctrl, 1, wx.EXPAND | wx.ALL, 5)
+
+        timeout_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        timeout_sizer.Add(
+            wx.StaticText(self, label="Request timeout in seconds (blank = default):"),
+            0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5,
+        )
+        timeout_value = ""
+        try:
+            ts = self._feed_settings.get("timeout_seconds")
+            if ts is not None:
+                timeout_value = str(int(ts))
+        except Exception:
+            timeout_value = ""
+        self.timeout_ctrl = wx.TextCtrl(self, value=timeout_value)
+        self.timeout_ctrl.SetName("Request timeout seconds")
+        timeout_sizer.Add(self.timeout_ctrl, 1, wx.ALL, 5)
+        sizer.Add(timeout_sizer, 0, wx.EXPAND)
+
+        sizer.Add(wx.StaticText(self, label="Browser impersonation:"), 0, wx.ALL, 5)
+        self.impersonate_ctrl = wx.Choice(self, choices=["Auto", "Always", "Never"])
+        self.impersonate_ctrl.SetName("Browser impersonation")
+        try:
+            current_imp = str(self._feed_settings.get("impersonate") or "auto").lower()
+            imp_idx = self._impersonate_values.index(current_imp) if current_imp in self._impersonate_values else 0
+        except Exception:
+            imp_idx = 0
+        self.impersonate_ctrl.SetSelection(imp_idx)
+        sizer.Add(self.impersonate_ctrl, 0, wx.EXPAND | wx.ALL, 5)
+
         btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
         sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 5)
 
         self.SetSizer(sizer)
         self.Centre()
 
-        # Fix tab order: Title -> URL -> Category -> OK -> Cancel
+        # Fix tab order: Title -> URL -> Category -> Headers -> Timeout -> Impersonate -> OK -> Cancel
         self.title_ctrl.SetFocus()
         if self.url_ctrl.AcceptsFocus():
             self.url_ctrl.MoveAfterInTabOrder(self.title_ctrl)
-        
+
         self.cat_ctrl.MoveAfterInTabOrder(self.url_ctrl)
-        
+        self.headers_ctrl.MoveAfterInTabOrder(self.cat_ctrl)
+        self.timeout_ctrl.MoveAfterInTabOrder(self.headers_ctrl)
+        self.impersonate_ctrl.MoveAfterInTabOrder(self.timeout_ctrl)
+
         ok_btn = self.FindWindow(wx.ID_OK)
         cancel_btn = self.FindWindow(wx.ID_CANCEL)
-        
+
         if ok_btn:
-            ok_btn.MoveAfterInTabOrder(self.cat_ctrl)
+            ok_btn.MoveAfterInTabOrder(self.impersonate_ctrl)
             ok_btn.Bind(wx.EVT_BUTTON, self.on_ok)
         if cancel_btn and ok_btn:
             cancel_btn.MoveAfterInTabOrder(ok_btn)
 
     def on_ok(self, event):
+        self._save_feed_settings()
         self.EndModal(wx.ID_OK)
+
+    def _save_feed_settings(self):
+        """Parse the per-feed HTTP override controls and persist them (issue #29)."""
+        settings = dict(self._feed_settings) if isinstance(getattr(self, "_feed_settings", None), dict) else {}
+
+        custom_headers = {}
+        try:
+            for line in (self.headers_ctrl.GetValue() or "").splitlines():
+                line = line.strip()
+                if not line or ":" not in line:
+                    continue
+                name, value = line.split(":", 1)
+                name = name.strip()
+                if name:
+                    custom_headers[name] = value.strip()
+        except Exception:
+            custom_headers = {}
+        settings["custom_headers"] = custom_headers
+
+        try:
+            raw_timeout = (self.timeout_ctrl.GetValue() or "").strip()
+            settings["timeout_seconds"] = int(raw_timeout) if raw_timeout else None
+        except (ValueError, TypeError):
+            settings["timeout_seconds"] = None
+
+        try:
+            sel = self.impersonate_ctrl.GetSelection()
+            settings["impersonate"] = self._impersonate_values[sel] if 0 <= sel < len(self._impersonate_values) else "auto"
+        except Exception:
+            settings["impersonate"] = "auto"
+
+        try:
+            from core import db as _db
+            _db.set_feed_settings(getattr(self.feed, "id", "") or "", settings)
+        except Exception:
+            logging.getLogger(__name__).debug("Failed to save per-feed settings", exc_info=True)
 
     def get_data(self):
         title = ""

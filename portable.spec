@@ -34,6 +34,7 @@ packages_to_collect = [
     "langcodes",
     "language_data",
     "certifi",
+    "curl_cffi",
 ]
 
 datas = []

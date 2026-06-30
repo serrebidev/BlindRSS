@@ -13,7 +13,7 @@ from collections import defaultdict
 from urllib.parse import urlparse
 from .base import RSSProvider
 from core.models import Feed, Article
-from core.db import get_connection, init_db
+from core.db import get_connection, init_db, get_feed_settings
 from core.discovery import discover_feed
 from core import utils
 from core import rumble as rumble_mod
@@ -46,6 +46,9 @@ _DISCOVERY_SUCCESS_CACHE_TTL_SECONDS = 86400.0
 _RETRYABLE_HTTP_STATUS_CODES = {408, 425, 429, 500, 502, 503, 504}
 _PERMANENT_FAILURE_COOLDOWN_SECONDS = 1800.0
 _TRANSIENT_FAILURE_COOLDOWN_SECONDS = 300.0
+# Upper bound for exponential retry backoff (issue #29): repeated failures back off
+# 1, 2, 4, 8s rather than hammering an unhappy/anti-bot server.
+_MAX_RETRY_BACKOFF_SECONDS = 8.0
 _NAME_RESOLUTION_ERROR_MARKERS = (
     "failed to resolve",
     "name resolution",
@@ -597,6 +600,20 @@ def _should_retry_refresh_error(error: Exception) -> bool:
     return False
 
 
+def _should_escalate_to_impersonation(error: Exception) -> bool:
+    """True for transport/connection failures a browser-TLS impersonation retry might
+    get past -- e.g. anti-bot WAFs that reset the connection (issue #29).
+
+    HTTP-status errors and DNS name-resolution failures are excluded: impersonation
+    cannot help those.
+    """
+    if _http_status_from_error(error) is not None:
+        return False
+    if isinstance(error, (requests.exceptions.ConnectionError, requests.exceptions.ChunkedEncodingError)):
+        return not _is_name_resolution_error(error)
+    return False
+
+
 def _retry_backoff_seconds(attempt: int, error: Optional[Exception] = None) -> float:
     response = getattr(error, "response", None) if error is not None else None
     retry_after = None
@@ -607,11 +624,14 @@ def _retry_backoff_seconds(attempt: int, error: Optional[Exception] = None) -> f
 
     if retry_after:
         try:
-            return max(0.0, min(5.0, float(retry_after)))
+            return max(0.0, min(_MAX_RETRY_BACKOFF_SECONDS, float(retry_after)))
         except (TypeError, ValueError):
             pass
 
-    return max(0.25, min(2.0, float(attempt or 1)))
+    # Exponential backoff (attempt is 1-based): 1s, 2s, 4s, 8s, capped. Honors a
+    # server Retry-After above; otherwise backs off progressively (issue #29).
+    delay = 2.0 ** max(0, int(attempt or 1) - 1)
+    return max(0.25, min(_MAX_RETRY_BACKOFF_SECONDS, delay))
 
 
 def _failure_cooldown_seconds_for_error(error: Exception) -> float:
@@ -1111,6 +1131,37 @@ class LocalProvider(RSSProvider):
         headers = utils.add_revalidation_headers({})
         is_npr_feed = npr_mod.is_npr_url(feed_url)
 
+        # Per-feed HTTP overrides (issue #29): custom request headers, a timeout
+        # override, and the browser-impersonation mode. A site-root Referer is added
+        # so the request looks like an in-site navigation past anti-bot WAFs.
+        try:
+            feed_settings = get_feed_settings(feed_id) or {}
+        except Exception:
+            feed_settings = {}
+        feed_impersonate_mode = str(feed_settings.get("impersonate") or "auto").lower()
+        if feed_impersonate_mode not in ("auto", "always", "never"):
+            feed_impersonate_mode = "auto"
+        feed_custom_headers = feed_settings.get("custom_headers")
+        if not isinstance(feed_custom_headers, dict):
+            feed_custom_headers = {}
+
+        def _apply_feed_http_overrides(hdrs: dict, url: str) -> None:
+            ref = utils.referer_for_url(url)
+            if ref and "Referer" not in hdrs:
+                hdrs["Referer"] = ref
+            for key, value in feed_custom_headers.items():
+                if key:
+                    hdrs[str(key)] = str(value)
+
+        _apply_feed_http_overrides(headers, feed_url)
+
+        try:
+            per_feed_timeout = feed_settings.get("timeout_seconds")
+            if per_feed_timeout is not None:
+                feed_timeout = max(1, int(per_feed_timeout))
+        except (TypeError, ValueError):
+            pass
+
         # Automatic refreshes can use validators. Manual/targeted refreshes are
         # force=True and should fetch the feed body even when a server's validator
         # metadata is stale or incorrect.
@@ -1602,6 +1653,7 @@ class LocalProvider(RSSProvider):
                     etag = None
                     last_modified = None
                     headers = utils.add_revalidation_headers({})
+                    _apply_feed_http_overrides(headers, feed_url)
                     host = urlparse(feed_url).hostname or feed_url
                     limiter = host_limits[host]
                 else:
@@ -1625,9 +1677,28 @@ class LocalProvider(RSSProvider):
                     # transport failures cheap retries without changing the
                     # configured retry behavior for HTTP status errors.
                     attempts += 9
-                for attempt in range(1, attempts + 1):
+                # Browser-TLS impersonation policy (issue #29): "always"/"never" honor
+                # the per-feed setting. "auto" gives plain requests their full retry
+                # budget first (so transient resets still recover), then makes ONE extra
+                # last-resort attempt with browser impersonation if a WAF reset the
+                # connection. do_impersonation_next flips on for that reserved attempt.
+                impersonation_fallback = feed_impersonate_mode == "auto" and utils.CURL_CFFI_AVAILABLE
+                attempts_total = attempts + (1 if impersonation_fallback else 0)
+                do_impersonation_next = False
+                for attempt in range(1, attempts_total + 1):
+                    if feed_impersonate_mode == "never":
+                        impersonate_now = False
+                    elif feed_impersonate_mode == "always":
+                        impersonate_now = True
+                    else:
+                        impersonate_now = do_impersonation_next
                     try:
-                        resp = utils.safe_requests_get(feed_url, headers=headers, timeout=direct_fetch_timeout)
+                        resp = utils.safe_requests_get(
+                            feed_url,
+                            headers=headers,
+                            timeout=direct_fetch_timeout,
+                            impersonate=impersonate_now,
+                        )
                         resp = _retry_feed_not_acceptable(
                             resp,
                             feed_url,
@@ -1721,12 +1792,34 @@ class LocalProvider(RSSProvider):
                                 feed_id,
                                 final_title,
                                 attempt,
-                                attempts,
+                                attempts_total,
                                 backoff,
                                 error_msg,
                                 feed_url,
                             )
                             time.sleep(backoff)
+                            continue
+                        # Plain retries are exhausted. If a WAF-style reset closed the
+                        # connection, spend the one reserved last-resort attempt on a
+                        # real browser TLS/HTTP fingerprint via curl_cffi (issue #29).
+                        if (
+                            impersonation_fallback
+                            and not do_impersonation_next
+                            and not impersonate_now
+                            and attempt < attempts_total
+                            and _should_escalate_to_impersonation(e)
+                        ):
+                            do_impersonation_next = True
+                            log.info(
+                                "Local feed refresh escalating to browser impersonation after reset "
+                                "id=%s title=%r attempt=%s/%s url=%s",
+                                feed_id,
+                                final_title,
+                                attempt,
+                                attempts_total,
+                                feed_url,
+                            )
+                            time.sleep(0.01)
                             continue
                         raise last_exc
 
