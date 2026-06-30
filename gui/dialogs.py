@@ -813,6 +813,51 @@ class SettingsDialog(wx.Dialog):
         tree_state_sizer.Add(self.tree_expand_ctrl, 0, wx.ALL, 5)
         general_sizer.Add(tree_state_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
+        # Article opening method (issue #31): default browser vs a custom command.
+        article_open_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        article_open_sizer.Add(
+            wx.StaticText(general_panel, label="Article opening method:"),
+            0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5,
+        )
+        self.article_open_method_map = {
+            "Default browser": "default",
+            "Custom command": "custom",
+        }
+        self.article_open_method_choices = list(self.article_open_method_map.keys())
+        self.article_open_method_ctrl = wx.Choice(general_panel, choices=self.article_open_method_choices)
+        self.article_open_method_ctrl.SetName("Article opening method")
+        current_open_method = str(config.get("article_open_method", "default") or "default").lower()
+        self.article_open_method_ctrl.SetStringSelection(
+            "Custom command" if current_open_method == "custom" else "Default browser"
+        )
+        article_open_sizer.Add(self.article_open_method_ctrl, 0, wx.ALL, 5)
+        general_sizer.Add(article_open_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
+        cmd_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        cmd_sizer.Add(
+            wx.StaticText(general_panel, label="Custom command:"),
+            0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5,
+        )
+        self.article_open_command_ctrl = wx.TextCtrl(
+            general_panel, value=str(config.get("article_open_command", "") or "")
+        )
+        self.article_open_command_ctrl.SetName("Custom article open command")
+        cmd_sizer.Add(self.article_open_command_ctrl, 1, wx.ALL, 5)
+        self.article_open_test_btn = wx.Button(general_panel, label="Test")
+        self.article_open_test_btn.SetName("Test custom article open command")
+        cmd_sizer.Add(self.article_open_test_btn, 0, wx.ALL, 5)
+        general_sizer.Add(cmd_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
+        self.article_open_help_lbl = wx.StaticText(
+            general_panel,
+            label="Use %1 for the article URL. Example: chrome --incognito %1",
+        )
+        general_sizer.Add(self.article_open_help_lbl, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        self.article_open_method_ctrl.Bind(wx.EVT_CHOICE, self._on_article_open_method_changed)
+        self.article_open_test_btn.Bind(wx.EVT_BUTTON, self.on_test_article_command)
+        self._sync_article_open_controls()
+
         general_panel.SetSizer(general_sizer)
         notebook.AddPage(general_panel, "General")
 
@@ -2370,6 +2415,50 @@ class SettingsDialog(wx.Dialog):
                 # Dialog may have been closed before detection finished.
                 pass
 
+    def _on_article_open_method_changed(self, event=None):
+        self._sync_article_open_controls()
+        if event is not None:
+            event.Skip()
+
+    def _sync_article_open_controls(self):
+        """Enable the custom-command field/Test button only in 'Custom command' mode (issue #31)."""
+        is_custom = self.article_open_method_ctrl.GetStringSelection() == "Custom command"
+        self.article_open_command_ctrl.Enable(is_custom)
+        self.article_open_test_btn.Enable(is_custom)
+
+    def on_test_article_command(self, event=None):
+        """Validate and launch the custom open-article command with a sample URL (issue #31)."""
+        template = (self.article_open_command_ctrl.GetValue() or "").strip()
+        if not template:
+            wx.MessageBox(
+                "Enter a command to test. Use %1 where the article URL should go.",
+                "Nothing to test", wx.ICON_INFORMATION, self,
+            )
+            return
+        test_url = "https://example.com/"
+        from core import utils as _utils
+        try:
+            argv = _utils.build_open_command(template, test_url)
+        except ValueError as exc:
+            wx.MessageBox(
+                f"The command could not be parsed:\n\n{exc}",
+                "Invalid command", wx.ICON_ERROR, self,
+            )
+            return
+        ok, err = _utils.launch_open_command(template, test_url)
+        if ok:
+            wx.MessageBox(
+                "Launched the test command with a sample URL:\n\n"
+                f"{' '.join(argv)}\n\n"
+                "Check that your browser opened https://example.com/ as expected.",
+                "Test launched", wx.ICON_INFORMATION, self,
+            )
+        else:
+            wx.MessageBox(
+                f"The command could not be run:\n\n{err}",
+                "Test failed", wx.ICON_ERROR, self,
+            )
+
     def get_data(self):
         # Parse speed back to float
         speed_str = self.speed_ctrl.GetValue().replace("x", "")
@@ -2429,6 +2518,8 @@ class SettingsDialog(wx.Dialog):
             "refresh_interval": self.refresh_map.get(self.refresh_ctrl.GetStringSelection(), 300),
             "search_mode": self.search_mode_map.get(self.search_mode_ctrl.GetStringSelection(), "title_content"),
             "category_tree_default_expanded": self.tree_expand_map.get(self.tree_expand_ctrl.GetStringSelection(), True),
+            "article_open_method": self.article_open_method_map.get(self.article_open_method_ctrl.GetStringSelection(), "default"),
+            "article_open_command": self.article_open_command_ctrl.GetValue().strip(),
             "max_concurrent_refreshes": self.concurrent_ctrl.GetValue(),
             "per_host_max_connections": self.per_host_ctrl.GetValue(),
             "feed_timeout_seconds": self.timeout_ctrl.GetValue(),

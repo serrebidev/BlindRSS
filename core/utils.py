@@ -21,6 +21,7 @@ from core.db import CATEGORY_PATH_SEP, get_connection, make_category_path, sanit
 import warnings
 import urllib.parse
 import sys
+import shlex
 
 log = logging.getLogger(__name__)
 
@@ -1831,3 +1832,70 @@ def normalize_url_for_vlc(url: str) -> str:
         return urllib.parse.urlunsplit((parts.scheme, parts.netloc, path, query, frag))
     except Exception:
         return url
+
+
+# ── Custom "open article" command (issue #31) ────────────────────────────────
+# Users can open article links with a custom browser/command instead of the OS
+# default, e.g. "chrome --incognito %1" or
+# '"C:\\Program Files\\Mozilla Firefox\\firefox.exe" --private-window %1'.
+# %1 is replaced with the article URL (appended if the template omits it).
+
+def build_open_command(template, url):
+    """Parse a custom open-article command template into an argv list (issue #31).
+
+    ``%1`` is replaced by ``url``; if the template contains no ``%1`` the URL is
+    appended as the final argument. Quoting is honored and backslashes are
+    preserved so Windows paths work. Raises ``ValueError`` for an empty or
+    unparseable template.
+    """
+    template = str(template or "").strip()
+    if not template:
+        raise ValueError("The command is empty.")
+    # On Windows, parse in non-POSIX mode so backslashes in paths survive; that
+    # mode keeps surrounding quotes on tokens, so strip them afterwards.
+    posix = not sys.platform.startswith("win")
+    try:
+        parts = shlex.split(template, posix=posix)
+    except ValueError as exc:
+        raise ValueError(f"Could not parse the command: {exc}")
+    cleaned = []
+    for part in parts:
+        if not posix and len(part) >= 2 and part[0] == '"' and part[-1] == '"':
+            part = part[1:-1]
+        cleaned.append(part)
+    if not cleaned:
+        raise ValueError("The command is empty.")
+
+    url = str(url or "")
+    argv = []
+    substituted = False
+    for part in cleaned:
+        if "%1" in part:
+            argv.append(part.replace("%1", url))
+            substituted = True
+        else:
+            argv.append(part)
+    if not substituted:
+        argv.append(url)
+    return argv
+
+
+def launch_open_command(template, url):
+    """Launch a custom open-article command (issue #31).
+
+    Returns ``(ok, error_message)``. ``ok`` is True when the process was
+    launched; on failure ``error_message`` describes why (empty/unparseable
+    command, executable not found, or OS error) for display to the user.
+    """
+    try:
+        argv = build_open_command(template, url)
+    except ValueError as exc:
+        return False, str(exc)
+    import subprocess
+    try:
+        subprocess.Popen(argv)
+        return True, ""
+    except FileNotFoundError:
+        return False, f"Command not found: {argv[0]}"
+    except OSError as exc:
+        return False, str(exc)

@@ -2228,7 +2228,7 @@ class MainFrame(wx.Frame):
             return
         url = str((payload or {}).get("url") or "").strip()
         if url:
-            webbrowser.open(url)
+            self._open_article_url(url)
 
     def _on_windows_notification_click(self, event) -> None:
         payload = self._consume_notification_payload(event, pop=True)
@@ -2905,7 +2905,7 @@ class MainFrame(wx.Frame):
 
         menu = wx.Menu()
         open_item = menu.Append(wx.ID_ANY, "Open Article")
-        open_browser_item = menu.Append(wx.ID_ANY, "Open in Browser")
+        open_browser_item = menu.Append(wx.ID_ANY, "Open in Default Browser")
         menu.AppendSeparator()
         mark_read_item = menu.Append(wx.ID_ANY, "Mark as &Read")
         mark_unread_item = menu.Append(wx.ID_ANY, "Mark as &Unread")
@@ -6168,7 +6168,7 @@ class MainFrame(wx.Frame):
 
             if not media_url:
                 if article_url:
-                    webbrowser.open(article_url)
+                    self._open_article_url(article_url)
                 return
 
             chapters = getattr(article, "chapters", None)
@@ -6226,7 +6226,35 @@ class MainFrame(wx.Frame):
 
         article_url = str(getattr(article, "url", "") or "").strip()
         if article_url:
-            webbrowser.open(article_url)
+            self._open_article_url(article_url)
+
+    def _open_article_url(self, url) -> None:
+        """Open an article link using the configured method (issue #31).
+
+        With the "custom" method, runs the user's command template (``%1`` ->
+        URL); on any failure it reports the error and falls back to the default
+        browser so the user still gets their article. The "Open in Default
+        Browser" action bypasses this and always uses the OS default.
+        """
+        url = str(url or "").strip()
+        if not url:
+            return
+        method = str(self.config_manager.get("article_open_method", "default") or "default").lower()
+        if method == "custom":
+            template = str(self.config_manager.get("article_open_command", "") or "").strip()
+            if template:
+                ok, err = utils.launch_open_command(template, url)
+                if ok:
+                    return
+                log.warning("Custom article-open command failed: %s", err)
+                wx.MessageBox(
+                    f"Could not open the article with your custom command:\n\n{err}\n\n"
+                    "Opening in the default browser instead. You can change this in "
+                    "Settings > General > Article opening method.",
+                    "Custom command failed",
+                    wx.ICON_WARNING,
+                )
+        webbrowser.open(url)
 
     def _fetch_chapters_for_player(self, article_id, media_url: str | None = None, media_type: str | None = None):
         chapters = []

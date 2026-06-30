@@ -252,6 +252,12 @@ DEFAULT_CONFIG = {
     # session is preserved and never overwritten by this setting on UI refreshes.
     "category_tree_default_expanded": True,
     "search_mode": "title_content",
+    # How "Open Article" / Enter opens an article link (issue #31):
+    # "default" = OS default browser (current behavior); "custom" = run
+    # article_open_command with %1 replaced by the URL. The separate
+    # "Open in Default Browser" action always ignores this and uses the OS default.
+    "article_open_method": "default",
+    "article_open_command": "",
     # Storage location for config.json (and, on next startup, rss.db).
     # "app_folder" = alongside the executable, "user_data" = OS user data folder.
     "data_location": _default_config_location(),
