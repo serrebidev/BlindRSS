@@ -684,6 +684,24 @@ def _response_looks_cloudflare_challenge(resp) -> bool:
     return "challenges.cloudflare.com" in snippet and "just a moment" in snippet
 
 
+def _response_looks_blocked(resp) -> bool:
+    """True if a response looks like an anti-bot block a real browser fingerprint
+    might get past (issue #29): a Cloudflare/JS challenge, or a 200 OK that returns
+    an HTML interstitial instead of a feed. Plain 4xx/5xx are intentionally excluded
+    so genuine forbidden/error responses are not retried needlessly."""
+    if _response_looks_cloudflare_challenge(resp):
+        return True
+    try:
+        status_code = int(getattr(resp, "status_code", 0) or 0)
+    except Exception:
+        status_code = 0
+    if status_code == 200 and not _response_looks_feed_like(resp):
+        content_type = str(getattr(resp, "headers", {}).get("Content-Type", "") or "").lower()
+        if "html" in content_type:
+            return True
+    return False
+
+
 def _feed_has_stored_articles(feed_id: str) -> bool:
     try:
         conn = get_connection()
@@ -712,7 +730,7 @@ def _wordpress_feed_slash_variant(url: str) -> Optional[str]:
     return urlunsplit((parts.scheme, parts.netloc, path + "/", parts.query, parts.fragment))
 
 
-def _retry_cloudflare_challenged_wordpress_feed(resp, url: str, *, headers: dict, timeout):
+def _retry_cloudflare_challenged_wordpress_feed(resp, url: str, *, headers: dict, timeout, proxies=None):
     """Retry WordPress-style /feed URLs with the canonical trailing slash after a challenge."""
     try:
         status_code = int(getattr(resp, "status_code", 0) or 0)
@@ -726,7 +744,7 @@ def _retry_cloudflare_challenged_wordpress_feed(resp, url: str, *, headers: dict
         return resp, url
 
     try:
-        retry_resp = utils.safe_requests_get(candidate, headers=headers, timeout=timeout)
+        retry_resp = utils.safe_requests_get(candidate, headers=headers, timeout=timeout, proxies=proxies)
     except Exception:
         return resp, url
 
@@ -735,7 +753,7 @@ def _retry_cloudflare_challenged_wordpress_feed(resp, url: str, *, headers: dict
     return resp, url
 
 
-def _retry_feed_not_acceptable(resp, url: str, *, headers: dict, timeout):
+def _retry_feed_not_acceptable(resp, url: str, *, headers: dict, timeout, proxies=None):
     try:
         status_code = int(getattr(resp, "status_code", 0) or 0)
     except Exception:
@@ -753,7 +771,7 @@ def _retry_feed_not_acceptable(resp, url: str, *, headers: dict, timeout):
     retry_headers["User-Agent"] = "BlindRSS/1.0"
 
     try:
-        retry_resp = utils.safe_requests_get(url, headers=retry_headers, timeout=timeout)
+        retry_resp = utils.safe_requests_get(url, headers=retry_headers, timeout=timeout, proxies=proxies)
     except Exception:
         log.debug("Feed header retry failed for %s", url, exc_info=True)
         return resp
@@ -1161,6 +1179,12 @@ class LocalProvider(RSSProvider):
                 feed_timeout = max(1, int(per_feed_timeout))
         except (TypeError, ValueError):
             pass
+
+        # Per-feed proxy (issue #29): the escape hatch for IP-reputation blocks that no
+        # header/TLS change can fix. Routed through both the plain and impersonation
+        # transports. None means a direct connection (the default).
+        feed_proxy = str(feed_settings.get("proxy") or "").strip()
+        feed_proxies = {"http": feed_proxy, "https": feed_proxy} if feed_proxy else None
 
         # Automatic refreshes can use validators. Manual/targeted refreshes are
         # force=True and should fetch the feed body even when a server's validator
@@ -1698,19 +1722,46 @@ class LocalProvider(RSSProvider):
                             headers=headers,
                             timeout=direct_fetch_timeout,
                             impersonate=impersonate_now,
+                            proxies=feed_proxies,
                         )
                         resp = _retry_feed_not_acceptable(
                             resp,
                             feed_url,
                             headers=headers,
                             timeout=direct_fetch_timeout,
+                            proxies=feed_proxies,
                         )
                         resp, effective_feed_url = _retry_cloudflare_challenged_wordpress_feed(
                             resp,
                             feed_url,
                             headers=headers,
                             timeout=direct_fetch_timeout,
+                            proxies=feed_proxies,
                         )
+                        # A challenge/interstitial block (not just a reset) also escalates
+                        # the reserved attempt to browser impersonation (issue #29). Skipped
+                        # for discovery probes, where an HTML page just means "not a feed".
+                        if (
+                            impersonation_fallback
+                            and not direct_feed_probe_only
+                            and not do_impersonation_next
+                            and not impersonate_now
+                            and attempt < attempts_total
+                            and _response_looks_blocked(resp)
+                        ):
+                            do_impersonation_next = True
+                            log.info(
+                                "Local feed refresh escalating to browser impersonation after block "
+                                "id=%s title=%r attempt=%s/%s status=%s url=%s",
+                                feed_id,
+                                final_title,
+                                attempt,
+                                attempts_total,
+                                getattr(resp, "status_code", None),
+                                feed_url,
+                            )
+                            time.sleep(0.01)
+                            continue
                         if effective_feed_url != feed_url:
                             log.info("Resolved challenged local feed URL during refresh: %s -> %s", feed_url, effective_feed_url)
                             feed_url = effective_feed_url

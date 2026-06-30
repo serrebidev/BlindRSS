@@ -2478,7 +2478,7 @@ class SettingsDialog(wx.Dialog):
 
 class FeedPropertiesDialog(wx.Dialog):
     def __init__(self, parent, feed, categories, allow_url_edit: bool = True):
-        super().__init__(parent, title="Feed Properties", size=(540, 560))
+        super().__init__(parent, title="Feed Properties", size=(540, 620))
 
         self.feed = feed
         self.categories = categories
@@ -2563,13 +2563,28 @@ class FeedPropertiesDialog(wx.Dialog):
         self.impersonate_ctrl.SetSelection(imp_idx)
         sizer.Add(self.impersonate_ctrl, 0, wx.EXPAND | wx.ALL, 5)
 
+        proxy_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        proxy_sizer.Add(
+            wx.StaticText(self, label="Proxy URL (optional, e.g. http://host:port):"),
+            0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5,
+        )
+        proxy_value = ""
+        try:
+            proxy_value = str(self._feed_settings.get("proxy") or "")
+        except Exception:
+            proxy_value = ""
+        self.proxy_ctrl = wx.TextCtrl(self, value=proxy_value)
+        self.proxy_ctrl.SetName("Proxy URL")
+        proxy_sizer.Add(self.proxy_ctrl, 1, wx.ALL, 5)
+        sizer.Add(proxy_sizer, 0, wx.EXPAND)
+
         btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
         sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 5)
 
         self.SetSizer(sizer)
         self.Centre()
 
-        # Fix tab order: Title -> URL -> Category -> Headers -> Timeout -> Impersonate -> OK -> Cancel
+        # Fix tab order: Title -> URL -> Category -> Headers -> Timeout -> Impersonate -> Proxy -> OK -> Cancel
         self.title_ctrl.SetFocus()
         if self.url_ctrl.AcceptsFocus():
             self.url_ctrl.MoveAfterInTabOrder(self.title_ctrl)
@@ -2578,12 +2593,13 @@ class FeedPropertiesDialog(wx.Dialog):
         self.headers_ctrl.MoveAfterInTabOrder(self.cat_ctrl)
         self.timeout_ctrl.MoveAfterInTabOrder(self.headers_ctrl)
         self.impersonate_ctrl.MoveAfterInTabOrder(self.timeout_ctrl)
+        self.proxy_ctrl.MoveAfterInTabOrder(self.impersonate_ctrl)
 
         ok_btn = self.FindWindow(wx.ID_OK)
         cancel_btn = self.FindWindow(wx.ID_CANCEL)
 
         if ok_btn:
-            ok_btn.MoveAfterInTabOrder(self.impersonate_ctrl)
+            ok_btn.MoveAfterInTabOrder(self.proxy_ctrl)
             ok_btn.Bind(wx.EVT_BUTTON, self.on_ok)
         if cancel_btn and ok_btn:
             cancel_btn.MoveAfterInTabOrder(ok_btn)
@@ -2621,6 +2637,11 @@ class FeedPropertiesDialog(wx.Dialog):
             settings["impersonate"] = self._impersonate_values[sel] if 0 <= sel < len(self._impersonate_values) else "auto"
         except Exception:
             settings["impersonate"] = "auto"
+
+        try:
+            settings["proxy"] = (self.proxy_ctrl.GetValue() or "").strip()
+        except Exception:
+            settings["proxy"] = ""
 
         try:
             from core import db as _db

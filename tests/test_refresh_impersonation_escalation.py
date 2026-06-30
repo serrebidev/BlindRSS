@@ -182,3 +182,79 @@ def test_per_feed_custom_headers_timeout_and_referer_applied(monkeypatch):
             assert float(seen["timeout"]) == 42.0
         finally:
             core.db.DB_FILE = orig
+
+
+_HTML_BLOCK = "<!doctype html><html><head><title>Access denied</title></head><body>Blocked</body></html>"
+
+
+def test_block_response_escalates_to_impersonation(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        orig = core.db.DB_FILE
+        core.db.DB_FILE = os.path.join(tmp, "rss.db")
+        try:
+            provider = _provider(retries=1)
+            feed_id = _insert_feed("https://example.com/feed.xml")
+            calls = []
+
+            def _fake_get(url, **kwargs):
+                impersonated = bool(kwargs.get("impersonate"))
+                calls.append(impersonated)
+                if not impersonated:
+                    # 200 OK HTML interstitial (a "soft" anti-bot block).
+                    return _DummyResp(_HTML_BLOCK, content_type="text/html; charset=utf-8")
+                return _DummyResp(_RSS_XML)
+
+            monkeypatch.setattr(local_mod.utils, "CURL_CFFI_AVAILABLE", True)
+            monkeypatch.setattr(local_mod.utils, "safe_requests_get", _fake_get)
+            monkeypatch.setattr(local_mod.time, "sleep", lambda *_a: None)
+
+            assert provider.refresh_feed(feed_id) is True
+            # Plain attempt got the HTML block; impersonation got the real feed.
+            assert calls[-1] is True
+            assert calls[:-1] and not any(calls[:-1])
+            assert len(provider.get_articles(feed_id=feed_id)) == 1
+        finally:
+            core.db.DB_FILE = orig
+
+
+def test_per_feed_proxy_passed_to_both_transports(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        orig = core.db.DB_FILE
+        core.db.DB_FILE = os.path.join(tmp, "rss.db")
+        try:
+            provider = _provider(retries=0)
+            feed_id = _insert_feed(
+                "https://news.example.com/rss",
+                settings={"proxy": "http://127.0.0.1:8888"},
+            )
+            seen = {}
+
+            def _fake_get(url, **kwargs):
+                seen["proxies"] = kwargs.get("proxies")
+                return _DummyResp(_RSS_XML)
+
+            monkeypatch.setattr(local_mod.utils, "safe_requests_get", _fake_get)
+
+            assert provider.refresh_feed(feed_id) is True
+            assert seen["proxies"] == {
+                "http": "http://127.0.0.1:8888",
+                "https": "http://127.0.0.1:8888",
+            }
+        finally:
+            core.db.DB_FILE = orig
+
+
+def test_response_looks_blocked_classification():
+    # Cloudflare challenge -> blocked.
+    cf = _DummyResp("just a moment", status_code=403, content_type="text/html",
+                    headers={"Cf-Mitigated": "challenge"})
+    assert local_mod._response_looks_blocked(cf) is True
+    # 200 OK HTML interstitial -> blocked.
+    html = _DummyResp(_HTML_BLOCK, status_code=200, content_type="text/html")
+    assert local_mod._response_looks_blocked(html) is True
+    # A real feed -> not blocked.
+    feed = _DummyResp(_RSS_XML, status_code=200, content_type="application/rss+xml")
+    assert local_mod._response_looks_blocked(feed) is False
+    # A plain 403 (no challenge) -> not treated as a block (avoid needless retries).
+    forbidden = _DummyResp("forbidden", status_code=403, content_type="text/plain")
+    assert local_mod._response_looks_blocked(forbidden) is False
