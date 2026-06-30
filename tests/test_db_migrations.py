@@ -195,3 +195,19 @@ def test_init_db_respects_explicit_db_file_override_without_migrating_app_db():
         finally:
             core.db.DB_FILE = orig_db_file
 
+
+def test_init_db_adds_article_description_column():
+    with tempfile.TemporaryDirectory() as tmp:
+        orig_db_file = core.db.DB_FILE
+        core.db.DB_FILE = os.path.join(tmp, "rss.db")
+        try:
+            core.db.init_db()
+            conn = core.db.get_connection()
+            try:
+                cols = [r[1] for r in conn.execute("PRAGMA table_info(articles)").fetchall()]
+            finally:
+                conn.close()
+            assert "description" in cols
+        finally:
+            core.db.DB_FILE = orig_db_file
+

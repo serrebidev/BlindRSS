@@ -151,6 +151,14 @@ def _entry_content(entry) -> str:
     )
 
 
+def _entry_description(entry) -> str:
+    return (
+        _entry_text(entry, "description")
+        or _entry_text(entry, "summary_detail")
+        or _entry_text(entry, "summary")
+    )
+
+
 def _entry_author(entry) -> str:
     author = _entry_text(entry, "dc_creator", "dcterms_creator", "creator")
     if author:
@@ -657,6 +665,95 @@ def _parse_feed_chapter_metadata(xml_text: str) -> Dict[str, Dict[str, Any]]:
         for key in _feed_item_identity_keys(item):
             metadata[key] = value
 
+    return metadata
+
+
+def _xml_direct_child_feed_description(element) -> str:
+    for wanted in ("description", "summary"):
+        for child in list(element):
+            if _xml_local_name(child.tag) != wanted:
+                continue
+            if wanted == "summary":
+                tag_text = str(child.tag or "").lower()
+                if "itunes.com" in tag_text:
+                    continue
+            try:
+                text = "".join(child.itertext())
+            except Exception:
+                text = child.text or ""
+            text = str(text or "").strip()
+            if text:
+                return text
+    return ""
+
+
+def _parse_feed_description_metadata_soup(xml_text: str) -> Dict[str, str]:
+    try:
+        soup = BS(xml_text, "xml")
+    except Exception as parser_exc:
+        log.debug("XML parser unavailable for description metadata fallback; using html.parser (%s)", parser_exc)
+        soup = BS(xml_text, "html.parser")
+    items = soup.find_all(lambda tag: _xml_local_name(getattr(tag, "name", "")) in {"item", "entry"})
+    if not items:
+        soup = BS(xml_text, "html.parser")
+        items = soup.find_all(lambda tag: _xml_local_name(getattr(tag, "name", "")) in {"item", "entry"})
+
+    metadata: Dict[str, str] = {}
+    for item in items:
+        description = ""
+        for wanted in ("description", "summary"):
+            for child in item.find_all(recursive=False):
+                local_name = _xml_local_name(getattr(child, "name", ""))
+                if local_name != wanted:
+                    continue
+                raw_name = str(getattr(child, "name", "") or "").lower()
+                if wanted == "summary" and raw_name.startswith("itunes:"):
+                    continue
+                value = child.get_text(" ", strip=True)
+                if value:
+                    description = value
+                    break
+            if description:
+                break
+        if not description:
+            continue
+
+        keys = []
+        for child in item.find_all(recursive=False):
+            local_name = _xml_local_name(getattr(child, "name", ""))
+            if local_name not in {"guid", "id", "link"}:
+                continue
+            value = child.get("href") if local_name == "link" else None
+            if not value:
+                value = child.get_text(strip=True)
+            if value and value not in keys:
+                keys.append(value)
+        for key in keys:
+            metadata[key] = description
+    return metadata
+
+
+def _parse_feed_description_metadata(xml_text: str) -> Dict[str, str]:
+    """Map feed item identities to the literal feed-provided description/summary."""
+    text = str(xml_text or "")
+    if not text:
+        return {}
+
+    try:
+        root = ET.fromstring(text)
+    except (ET.ParseError, ValueError) as e:
+        log.debug("Description metadata XML parse failed; using tolerant parser: %s", e)
+        return _parse_feed_description_metadata_soup(text)
+
+    metadata: Dict[str, str] = {}
+    for item in root.iter():
+        if _xml_local_name(item.tag) not in {"item", "entry"}:
+            continue
+        description = _xml_direct_child_feed_description(item)
+        if not description:
+            continue
+        for key in _feed_item_identity_keys(item):
+            metadata[key] = description
     return metadata
 
 
@@ -2086,6 +2183,7 @@ class LocalProvider(RSSProvider):
             # Parse only feeds that contain a local-name "chapters" element. Element
             # matching deliberately ignores namespace prefixes and namespace URIs.
             chapter_metadata = _parse_feed_chapter_metadata(xml_text)
+            description_metadata = _parse_feed_description_metadata(xml_text)
 
             conn = get_connection()
             try:
@@ -2155,9 +2253,14 @@ class LocalProvider(RSSProvider):
                     audio_exts = (".mp3", ".m4a", ".m4b", ".aac", ".ogg", ".opus", ".wav", ".flac")
 
                     content = _entry_content(entry)
+                    description = _entry_description(entry)
                     base_id = _entry_base_id(entry, feed_id, feed_url, content)
                     if not base_id:
                         continue
+                    for key in (entry.get('guid'), entry.get('id'), _entry_primary_link(entry), base_id):
+                        if key and key in description_metadata:
+                            description = description_metadata[key]
+                            break
                     scoped_id = f"{feed_id}:{base_id}"
                     article_id = base_id
 
@@ -2306,9 +2409,9 @@ class LocalProvider(RSSProvider):
 
                     if existing_article_id is not None:
                         c.execute(
-                            "UPDATE articles SET date = ?, media_url = ?, media_type = ?, chapter_url = ? "
+                            "UPDATE articles SET date = ?, description = ?, media_url = ?, media_type = ?, chapter_url = ? "
                             "WHERE id = ?",
-                            (date, media_url, media_type, chapter_url, existing_article_id),
+                            (date, description, media_url, media_type, chapter_url, existing_article_id),
                         )
                         if inline_chapters:
                             utils._replace_stored_chapters(
@@ -2326,8 +2429,8 @@ class LocalProvider(RSSProvider):
 
                     try:
                         c.execute(
-                            "INSERT INTO articles (id, feed_id, title, url, content, date, author, is_read, media_url, media_type, chapter_url) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
-                            (article_id, feed_id, title, url, content, date, author, media_url, media_type, chapter_url),
+                            "INSERT INTO articles (id, feed_id, title, url, content, description, date, author, is_read, media_url, media_type, chapter_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
+                            (article_id, feed_id, title, url, content, description, date, author, media_url, media_type, chapter_url),
                         )
                         new_items += 1
                         _record_new_article(
@@ -2364,8 +2467,8 @@ class LocalProvider(RSSProvider):
                                 if existing_feed_id == feed_id:
                                     c.execute(
                                         "UPDATE articles SET date = ?, media_url = ?, media_type = ?, "
-                                        "chapter_url = ? WHERE id = ?",
-                                        (date, media_url, media_type, chapter_url, base_id),
+                                        "chapter_url = ?, description = ? WHERE id = ?",
+                                        (date, media_url, media_type, chapter_url, description, base_id),
                                     )
                                     if inline_chapters:
                                         utils._replace_stored_chapters(
@@ -2377,8 +2480,8 @@ class LocalProvider(RSSProvider):
 
                                 try:
                                     c.execute(
-                                        "INSERT INTO articles (id, feed_id, title, url, content, date, author, is_read, media_url, media_type, chapter_url) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
-                                        (scoped_id, feed_id, title, url, content, date, author, media_url, media_type, chapter_url),
+                                        "INSERT INTO articles (id, feed_id, title, url, content, description, date, author, is_read, media_url, media_type, chapter_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?)",
+                                        (scoped_id, feed_id, title, url, content, description, date, author, media_url, media_type, chapter_url),
                                     )
                                     article_id = scoped_id
                                     new_items += 1
@@ -2563,7 +2666,10 @@ class LocalProvider(RSSProvider):
             # Determine filters
             real_feed_id, filter_read, filter_favorite = self._parse_article_view_filters(feed_id)
 
-            sql_parts = ["SELECT id, feed_id, title, url, content, date, author, is_read, is_favorite, media_url, media_type FROM articles"]
+            sql_parts = [
+                "SELECT id, feed_id, title, url, content, date, author, is_read, "
+                "is_favorite, media_url, media_type, description FROM articles"
+            ]
             where_clauses = []
             params = []
             
@@ -2578,7 +2684,7 @@ class LocalProvider(RSSProvider):
                 sub_cats = get_subcategory_titles(cat_name)
                 cat_names = [cat_name] + sub_cats
                 sql_parts = ["""
-                    SELECT a.id, a.feed_id, a.title, a.url, a.content, a.date, a.author, a.is_read, a.is_favorite, a.media_url, a.media_type
+                    SELECT a.id, a.feed_id, a.title, a.url, a.content, a.date, a.author, a.is_read, a.is_favorite, a.media_url, a.media_type, a.description
                     FROM articles a
                     JOIN feeds f ON a.feed_id = f.id
                 """]
@@ -2634,7 +2740,7 @@ class LocalProvider(RSSProvider):
                 
                 articles.append(Article(
                     id=row[0], feed_id=row[1], title=row[2], url=row[3], content=row[4], date=row[5], author=row[6], is_read=bool(row[7]),
-                    is_favorite=bool(row[8]), media_url=row[9], media_type=row[10], chapters=chs
+                    is_favorite=bool(row[8]), media_url=row[9], media_type=row[10], chapters=chs, description=row[11]
                 ))
             return articles
         finally:
@@ -2699,13 +2805,16 @@ class LocalProvider(RSSProvider):
             total = int(c.fetchone()[0] or 0)
 
             # 2. Fetch Page
-            sql_parts = ["SELECT id, feed_id, title, url, content, date, author, is_read, is_favorite, media_url, media_type FROM articles"]
+            sql_parts = [
+                "SELECT id, feed_id, title, url, content, date, author, is_read, "
+                "is_favorite, media_url, media_type, description FROM articles"
+            ]
             where_clauses = []
             params = []
 
             if is_category:
                 sql_parts = ["""
-                    SELECT a.id, a.feed_id, a.title, a.url, a.content, a.date, a.author, a.is_read, a.is_favorite, a.media_url, a.media_type
+                    SELECT a.id, a.feed_id, a.title, a.url, a.content, a.date, a.author, a.is_read, a.is_favorite, a.media_url, a.media_type, a.description
                     FROM articles a
                     JOIN feeds f ON a.feed_id = f.id
                 """]
@@ -2771,7 +2880,8 @@ class LocalProvider(RSSProvider):
                     is_favorite=bool(r[8]),
                     media_url=r[9],
                     media_type=r[10],
-                    chapters=chapters
+                    chapters=chapters,
+                    description=r[11],
                 ))
             return articles, total
         finally:
@@ -2786,7 +2896,7 @@ class LocalProvider(RSSProvider):
         try:
             c = conn.cursor()
             c.execute(
-                "SELECT id, feed_id, title, url, content, date, author, is_read, is_favorite, media_url, media_type "
+                "SELECT id, feed_id, title, url, content, date, author, is_read, is_favorite, media_url, media_type, description "
                 "FROM articles WHERE id = ? LIMIT 1",
                 (aid,),
             )
@@ -2813,6 +2923,7 @@ class LocalProvider(RSSProvider):
                 media_url=row[9],
                 media_type=row[10],
                 chapters=chapters,
+                description=row[11],
             )
         finally:
             conn.close()

@@ -353,7 +353,10 @@ class TheOldReaderProvider(RSSProvider):
             fallback_feed_id = real_feed_id or stream_id or feed_id
             for item in items:
                 content = ""
-                if "summary" in item: content = item["summary"]["content"]
+                summary_content = ""
+                if "summary" in item:
+                    summary_content = item["summary"]["content"]
+                    content = summary_content
                 if "content" in item: content = item["content"]["content"]
                 
                 media_url = None
@@ -418,6 +421,7 @@ class TheOldReaderProvider(RSSProvider):
                     media_type=media_type,
                     chapters=chapters,
                     cache_id=cache_id,
+                    description=summary_content or None,
                 ))
             log.info(f"TheOldReader: Returning {len(articles)} processed articles.")
             return articles

@@ -371,7 +371,10 @@ class BazQuxProvider(RSSProvider):
             fallback_feed_id = real_feed_id or feed_id
             for item in items:
                 content = ""
-                if "summary" in item: content = item["summary"]["content"]
+                summary_content = ""
+                if "summary" in item:
+                    summary_content = item["summary"]["content"]
+                    content = summary_content
                 if "content" in item: content = item["content"]["content"]
                 
                 media_url = None
@@ -427,6 +430,7 @@ class BazQuxProvider(RSSProvider):
                     media_type=media_type,
                     chapters=chapters,
                     cache_id=cache_id,
+                    description=summary_content or None,
                 ))
 
             return articles

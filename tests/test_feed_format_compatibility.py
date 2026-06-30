@@ -542,6 +542,7 @@ def test_local_provider_extracts_articles_from_json_feed(
     assert expected_content in article.content
     assert article.author == "Item Author"
     if expected_id == "json-entry-1":
+        assert article.description == "JSON summary"
         assert article.url == "https://example.com/json-entry-1"
         assert article.media_url == "https://example.com/audio.mp3"
         assert article.media_type == "audio/mpeg"
@@ -567,6 +568,8 @@ def test_local_provider_extracts_apkmirror_wordpress_rss_shape(provider, monkeyp
     assert title == "Android Accessibility Suite 17.0.1.926549743 by Google LLC"
     assert url.endswith("/android-accessibility-suite-17-0-1-926549743-release/")
     assert "Introducing APKMirror PREMIUM" in content
+    article = provider.get_articles(feed_id=feed_id)[0]
+    assert article.description == "The Android Accessibility Suite APK appeared first on APKMirror."
 
 
 def test_local_provider_extracts_grav_rss_shape(provider, monkeypatch):
@@ -644,6 +647,7 @@ def test_local_provider_normalizes_common_extension_namespaces(provider, monkeyp
     assert article.id == "extension-entry-1"
     assert article.author == "DC Author"
     assert "Full content from content encoded" in article.content
+    assert article.description == "Short description"
     assert article.media_url == "https://example.com/episode.mp4"
     assert article.media_type == "video/mp4"
     assert article.date == "2026-02-03 04:05:06"

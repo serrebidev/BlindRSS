@@ -789,7 +789,8 @@ class MinifluxProvider(RSSProvider):
             media_url = None
             media_type = None
             entry_url = entry.get("url") or ""
-            entry_content = entry.get("content") or entry.get("summary") or ""
+            entry_summary = entry.get("summary") or ""
+            entry_content = entry.get("content") or entry_summary or ""
             display_title = utils.enhance_activity_entry_title(entry.get("title") or "", entry_url, entry_content) or "Untitled"
 
             enclosures = entry.get("enclosures", []) or []
@@ -818,6 +819,7 @@ class MinifluxProvider(RSSProvider):
                 media_type=media_type,
                 chapters=chapters,
                 cache_id=cache_id,
+                description=entry_summary or None,
             ))
         return articles
 

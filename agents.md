@@ -133,6 +133,7 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
   - `mainframe.py`: Main UI, feed refresh orchestration, list rendering, notifications, and menu actions.
     - Includes special views: All, Unread, Read, Favorites.
     - Includes persistent search UI, article sorting, and remember-last-feed restore behavior.
+    - The article list includes a truncated Description column and the article context menu includes "View Feed Description..." so RSS item `<description>` / feed summary text remains available even when the reader pane loads extracted full text.
     - Optional translation is triggered through the background full-text pipeline; translated full-text cache keys include a `::tr[provider:lang]` suffix and the cache is cleared when translation settings change.
     - macOS uses standard wx menu role IDs (`ID_ABOUT`, `ID_PREFERENCES`, `ID_EXIT`) and an Edit menu so native relocation/accelerators and focused text-control copy/select-all keep working.
     - Player chapter actions live in menus and shortcuts (`Ctrl+Shift+Left/Right` for previous/next). Keep menu labels screen-reader friendly and direction buttons disabled when unavailable.
@@ -167,8 +168,9 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 - `feeds`: `id`, `url`, `title`, `title_is_custom`, `category`, `icon_url`, `etag`, `last_modified`, `show_images`.
   - `title_is_custom`: 1 when the user renamed the feed, so a refresh does not overwrite the custom title with the feed's own.
   - `show_images`: per-feed image-alt override. NULL = inherit the global `show_image_alt` setting, 0 = never, 1 = always. Resolved by `db.get_feed_show_images` / set by `db.set_feed_show_images`.
-- `articles`: `id`, `feed_id`, `title`, `url`, `content`, `date`, `author`, `is_read`, `is_favorite`, `media_url`, `media_type`, `chapter_url`.
+- `articles`: `id`, `feed_id`, `title`, `url`, `content`, `description`, `date`, `author`, `is_read`, `is_favorite`, `media_url`, `media_type`, `chapter_url`.
   - `chapter_url`: optional external chapter source (e.g. podcast chapters JSON) fetched lazily via `utils.fetch_and_store_chapters`.
+  - `description`: the feed-provided item description/summary when distinct from richer content (for example RSS `<description>` alongside `content:encoded`). UI may fall back to `content` for legacy rows/providers that do not expose a separate summary.
   - Indexed for `feed_id`, `is_read`, `date`, plus composite indexes for common list/count paths.
 - `chapters`: `id`, `article_id`, `start`, `title`, `href`.
 - `chapter_cache`: `id`, `cache_key`, `start`, `title`, `href`.

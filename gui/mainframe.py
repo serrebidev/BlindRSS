@@ -41,6 +41,13 @@ import core.discovery
 
 log = logging.getLogger(__name__)
 
+ARTICLE_COL_TITLE = 0
+ARTICLE_COL_AUTHOR = 1
+ARTICLE_COL_DATE = 2
+ARTICLE_COL_FEED = 3
+ARTICLE_COL_DESCRIPTION = 4
+ARTICLE_COL_STATUS = 5
+
 
 def should_show_add_shortcuts(platform=None):
     """Whether to offer the "Add Shortcuts..." File-menu item.
@@ -342,11 +349,12 @@ class MainFrame(wx.Frame):
         # Top Right: List (Articles)
         self.list_ctrl = wx.ListCtrl(right_splitter, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
         self.list_ctrl.SetName("Articles")
-        self.list_ctrl.InsertColumn(0, "Title", width=350)
-        self.list_ctrl.InsertColumn(1, "Author", width=120)
-        self.list_ctrl.InsertColumn(2, "Date", width=120)
-        self.list_ctrl.InsertColumn(3, "Feed", width=150)
-        self.list_ctrl.InsertColumn(4, "Status", width=80)
+        self.list_ctrl.InsertColumn(ARTICLE_COL_TITLE, "Title", width=320)
+        self.list_ctrl.InsertColumn(ARTICLE_COL_AUTHOR, "Author", width=110)
+        self.list_ctrl.InsertColumn(ARTICLE_COL_DATE, "Date", width=120)
+        self.list_ctrl.InsertColumn(ARTICLE_COL_FEED, "Feed", width=140)
+        self.list_ctrl.InsertColumn(ARTICLE_COL_DESCRIPTION, "Description", width=260)
+        self.list_ctrl.InsertColumn(ARTICLE_COL_STATUS, "Status", width=80)
         
         # Bottom Right: Content (No embedded player anymore)
         self.content_ctrl = wx.TextCtrl(right_splitter, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2)
@@ -575,20 +583,46 @@ class MainFrame(wx.Frame):
         valid = {"date", "name", "author", "description", "feed", "status"}
         return value if value in valid else "date"
 
-    def _article_description_for_sort(self, article) -> str:
-        content = ""
+    def _raw_article_description(self, article) -> str:
         try:
-            content = str(getattr(article, "content", "") or "")
+            value = getattr(article, "description", None)
         except Exception:
-            content = ""
-        if not content:
+            value = None
+        if value is None:
+            try:
+                value = getattr(article, "content", "")
+            except Exception:
+                value = ""
+        return str(value or "")
+
+    def _article_description_text(self, article, *, include_images=None) -> str:
+        raw = self._raw_article_description(article)
+        if not raw:
             return ""
+        if include_images is None:
+            include_images = self._show_images_for_feed(getattr(article, "feed_id", None))
         try:
-            text = re.sub(r"<[^>]+>", " ", content)
-            text = re.sub(r"\s+", " ", text).strip()
-            return text.lower()
+            text = self._strip_html(raw, include_images=bool(include_images)).strip()
         except Exception:
-            return content.lower()
+            text = raw.strip()
+        return re.sub(r"\s+([,.;:!?])", r"\1", text)
+
+    def _article_description_preview(self, article, max_len: int = 240) -> str:
+        try:
+            text = self._article_description_text(article, include_images=False)
+        except Exception:
+            text = self._raw_article_description(article)
+        text = re.sub(r"\s+", " ", str(text or "")).strip()
+        text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+        if max_len > 3 and len(text) > max_len:
+            return text[: max_len - 3].rstrip() + "..."
+        return text
+
+    def _article_description_for_sort(self, article) -> str:
+        try:
+            return self._article_description_preview(article, max_len=4000).lower()
+        except Exception:
+            return self._raw_article_description(article).lower()
 
     def _article_sort_primary_key(self, article):
         sort_by = getattr(self, "_article_sort_by", "date")
@@ -668,6 +702,7 @@ class MainFrame(wx.Frame):
             parts.append(getattr(article, "title", "") or "")
             if mode != "title_only":
                 parts.append(getattr(article, "content", "") or "")
+                parts.append(self._raw_article_description(article))
                 parts.append(getattr(article, "author", "") or "")
                 parts.append(getattr(article, "url", "") or "")
                 parts.append(getattr(article, "media_url", "") or "")
@@ -734,10 +769,11 @@ class MainFrame(wx.Frame):
                 if feed:
                     feed_title = feed.title or ""
 
-            self.list_ctrl.SetItem(idx, 1, article.author or "")
-            self.list_ctrl.SetItem(idx, 2, utils.humanize_article_date(article.date))
-            self.list_ctrl.SetItem(idx, 3, feed_title)
-            self.list_ctrl.SetItem(idx, 4, "Read" if article.is_read else "Unread")
+            self.list_ctrl.SetItem(idx, ARTICLE_COL_AUTHOR, article.author or "")
+            self.list_ctrl.SetItem(idx, ARTICLE_COL_DATE, utils.humanize_article_date(article.date))
+            self.list_ctrl.SetItem(idx, ARTICLE_COL_FEED, feed_title)
+            self.list_ctrl.SetItem(idx, ARTICLE_COL_DESCRIPTION, self._article_description_preview(article))
+            self.list_ctrl.SetItem(idx, ARTICLE_COL_STATUS, "Read" if article.is_read else "Unread")
         self.list_ctrl.Thaw()
 
     def _bind_search_tab_escape(self):
@@ -2919,6 +2955,8 @@ class MainFrame(wx.Frame):
             article_for_menu = self.current_articles[idx]
             copy_text_item = menu.Append(wx.ID_ANY, "Copy Text")
             self.Bind(wx.EVT_MENU, lambda e, i=idx: self.on_copy_text(i), copy_text_item)
+            view_description_item = menu.Append(wx.ID_ANY, "View Feed Description...")
+            self.Bind(wx.EVT_MENU, lambda e, i=idx: self.on_view_feed_description(i), view_description_item)
             if article_for_menu.media_url:
                 # Only offer "Copy Media Link" when media_url is a genuine direct
                 # media file. yt-dlp page items (YouTube, etc.) store the
@@ -3055,6 +3093,53 @@ class MainFrame(wx.Frame):
         if 0 <= idx < len(self.current_articles):
             article = self.current_articles[idx]
             self._copy_to_clipboard(self._compose_article_copy_text(article, idx))
+
+    def on_view_feed_description(self, idx=None):
+        if idx is None:
+            idx = self._get_selected_article_index()
+        if idx is None or idx < 0 or idx >= len(self.current_articles):
+            return
+
+        article = self.current_articles[idx]
+        description = self._article_description_text(article)
+        if not description:
+            description = "No feed description is available for this item."
+
+        dlg = wx.Dialog(self, title="Feed Description", size=(720, 520))
+        try:
+            sizer = wx.BoxSizer(wx.VERTICAL)
+            title = str(getattr(article, "title", "") or "Feed description")
+            title_lbl = wx.StaticText(dlg, label=title)
+            sizer.Add(title_lbl, 0, wx.ALL | wx.EXPAND, 8)
+
+            desc_ctrl = wx.TextCtrl(
+                dlg,
+                value=description,
+                style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2,
+            )
+            desc_ctrl.SetName("Feed description")
+            sizer.Add(desc_ctrl, 1, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 8)
+
+            btns = wx.BoxSizer(wx.HORIZONTAL)
+            copy_btn = wx.Button(dlg, label="Copy")
+            close_btn = wx.Button(dlg, id=wx.ID_CLOSE, label="Close")
+            btns.Add(copy_btn, 0, wx.RIGHT, 8)
+            btns.Add(close_btn, 0)
+            sizer.Add(btns, 0, wx.ALIGN_RIGHT | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+            copy_btn.Bind(wx.EVT_BUTTON, lambda _event: self._copy_to_clipboard(description))
+            close_btn.Bind(wx.EVT_BUTTON, lambda _event: dlg.EndModal(wx.ID_CLOSE))
+
+            dlg.SetSizer(sizer)
+            dlg.CentreOnParent()
+            try:
+                desc_ctrl.SetInsertionPoint(0)
+                wx.CallAfter(desc_ctrl.SetFocus)
+            except Exception:
+                pass
+            dlg.ShowModal()
+        finally:
+            dlg.Destroy()
 
     def _compose_article_reader_text(self, base_text: str, article=None, chapters=None) -> str:
         """Compose the reader text without letting chapter sections get lost or duplicated."""
@@ -4638,10 +4723,11 @@ class MainFrame(wx.Frame):
             return
         label = self._loading_label if loading else self._load_more_label
         idx = self.list_ctrl.InsertItem(self.list_ctrl.GetItemCount(), label)
-        self.list_ctrl.SetItem(idx, 1, "")
-        self.list_ctrl.SetItem(idx, 2, "")
-        self.list_ctrl.SetItem(idx, 3, "")
-        self.list_ctrl.SetItem(idx, 4, "")
+        self.list_ctrl.SetItem(idx, ARTICLE_COL_AUTHOR, "")
+        self.list_ctrl.SetItem(idx, ARTICLE_COL_DATE, "")
+        self.list_ctrl.SetItem(idx, ARTICLE_COL_FEED, "")
+        self.list_ctrl.SetItem(idx, ARTICLE_COL_DESCRIPTION, "")
+        self.list_ctrl.SetItem(idx, ARTICLE_COL_STATUS, "")
         self._loading_more_placeholder = True
 
     def _remove_loading_more_placeholder(self):
@@ -4660,11 +4746,12 @@ class MainFrame(wx.Frame):
             return
         label = text or self._load_more_label
         try:
-            self.list_ctrl.SetItem(count - 1, 0, label)
-            self.list_ctrl.SetItem(count - 1, 1, "")
-            self.list_ctrl.SetItem(count - 1, 2, "")
-            self.list_ctrl.SetItem(count - 1, 3, "")
-            self.list_ctrl.SetItem(count - 1, 4, "")
+            self.list_ctrl.SetItem(count - 1, ARTICLE_COL_TITLE, label)
+            self.list_ctrl.SetItem(count - 1, ARTICLE_COL_AUTHOR, "")
+            self.list_ctrl.SetItem(count - 1, ARTICLE_COL_DATE, "")
+            self.list_ctrl.SetItem(count - 1, ARTICLE_COL_FEED, "")
+            self.list_ctrl.SetItem(count - 1, ARTICLE_COL_DESCRIPTION, "")
+            self.list_ctrl.SetItem(count - 1, ARTICLE_COL_STATUS, "")
         except Exception:
             pass
     def _is_load_more_row(self, idx: int) -> bool:
@@ -5967,7 +6054,7 @@ class MainFrame(wx.Frame):
         if not article.is_read:
             threading.Thread(target=self.provider.mark_read, args=(article.id,), daemon=True).start()
             article.is_read = True
-            self.list_ctrl.SetItem(idx, 4, "Read")
+            self.list_ctrl.SetItem(idx, ARTICLE_COL_STATUS, "Read")
             self._update_feed_unread_count_ui(article.feed_id, -1)
 
     def mark_article_unread(self, idx):
@@ -5977,7 +6064,7 @@ class MainFrame(wx.Frame):
         if article.is_read:
             threading.Thread(target=self.provider.mark_unread, args=(article.id,), daemon=True).start()
             article.is_read = False
-            self.list_ctrl.SetItem(idx, 4, "Unread")
+            self.list_ctrl.SetItem(idx, ARTICLE_COL_STATUS, "Unread")
             self._update_feed_unread_count_ui(article.feed_id, 1)
 
     def toggle_selected_article_read_status(self):
@@ -6124,7 +6211,7 @@ class MainFrame(wx.Frame):
                     article.is_read = True
                     if not self._is_load_more_row(i):
                         try:
-                            self.list_ctrl.SetItem(i, 4, "Read")
+                            self.list_ctrl.SetItem(i, ARTICLE_COL_STATUS, "Read")
                         except Exception:
                             pass
         except Exception:

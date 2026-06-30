@@ -311,6 +311,7 @@ def init_db():
             title TEXT,
             url TEXT,
             content TEXT,
+            description TEXT,
             date TEXT,
             author TEXT,
             is_read INTEGER DEFAULT 0,
@@ -399,6 +400,11 @@ def init_db():
 
         try:
             c.execute("ALTER TABLE articles ADD COLUMN chapter_url TEXT")
+        except sqlite3.OperationalError:
+            pass
+
+        try:
+            c.execute("ALTER TABLE articles ADD COLUMN description TEXT")
         except sqlite3.OperationalError:
             pass
 

@@ -3,11 +3,12 @@ from datetime import datetime, timezone
 from core.utils import parse_datetime_utc
 
 class Article:
-    def __init__(self, title: str, url: str, content: str, date: str, author: str, feed_id: str, is_read: bool = False, id: str = None, media_url: str = None, media_type: str = None, chapters: list = None, is_favorite: bool = False, cache_id: str = None):
+    def __init__(self, title: str, url: str, content: str, date: str, author: str, feed_id: str, is_read: bool = False, id: str = None, media_url: str = None, media_type: str = None, chapters: list = None, is_favorite: bool = False, cache_id: str = None, description: str = None):
         self.id = id or url  # Use URL as ID if generic ID not provided
         self.title = title
         self.url = url
         self.content = content
+        self.description = description
         self.date = date
         self.author = author
         self.feed_id = feed_id

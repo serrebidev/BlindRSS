@@ -424,8 +424,10 @@ class InoreaderProvider(RSSProvider):
 
         for item in items:
             content = ""
+            summary_content = ""
             if "summary" in item:
-                content = (item.get("summary") or {}).get("content", "")
+                summary_content = (item.get("summary") or {}).get("content", "")
+                content = summary_content
             if "content" in item:
                 content = (item.get("content") or {}).get("content", "")
 
@@ -486,6 +488,7 @@ class InoreaderProvider(RSSProvider):
                 media_type=media_type,
                 chapters=chapters,
                 cache_id=cache_id,
+                description=summary_content or None,
             ))
 
         return articles

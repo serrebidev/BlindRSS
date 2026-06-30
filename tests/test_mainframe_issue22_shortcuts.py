@@ -387,6 +387,7 @@ def test_article_context_menu_includes_delete_for_supported_provider(monkeypatch
     assert "Delete Article\tDel" in labels
     assert "Mark as &Read" in labels
     assert "Mark as &Unread" in labels
+    assert "View Feed Description..." in labels
 
 
 def test_article_context_menu_exposes_accessible_chapter_link_commands(monkeypatch):
