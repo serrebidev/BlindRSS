@@ -91,6 +91,16 @@ class MainFrame(wx.Frame):
         self._critical_workers = set()
         self.feed_map = {}
         self.feed_nodes = {}
+        # Aggregated unread counts shown on category tree nodes (issue #34):
+        # cat_nodes/category_base_labels mirror feed_nodes for category labels,
+        # category_unread_totals is the recursive (direct feeds + nested
+        # subcategories) sum kept in sync by the incremental mark-read/unread
+        # path, and _category_hierarchy is the {category: parent_category} map
+        # needed to walk a feed's ancestor chain without a full tree rebuild.
+        self.cat_nodes = {}
+        self.category_base_labels = {}
+        self.category_unread_totals = {}
+        self._category_hierarchy = {}
         # Per-feed image-alt overrides change rarely but are consulted while rendering
         # every settled article selection. Cache the nullable override so arrow-key
         # navigation does not perform a synchronous SQLite read for each article.
@@ -3990,9 +4000,21 @@ class MainFrame(wx.Frame):
         # Update cached feed objects
         feed_obj = self.feed_map.get(feed_id)
         if feed_obj:
+            old_unread = int(getattr(feed_obj, "unread_count", 0) or 0)
+            old_category = getattr(feed_obj, "category", None)
             feed_obj.title = title or feed_obj.title
             feed_obj.unread_count = unread
             feed_obj.category = category
+
+            # Keep category aggregates live during a refresh instead of only
+            # catching up once the full tree rebuild fires at the end (issue
+            # #34). Handles a feed moving category mid-refresh by debiting the
+            # old chain and crediting the new one; same-category updates net
+            # out to the plain delta.
+            if old_category and old_unread:
+                self._update_category_unread_chain_ui(old_category, -old_unread)
+            if category and unread:
+                self._update_category_unread_chain_ui(category, unread)
 
         # Update tree label if present
         node = self.feed_nodes.get(feed_id)
@@ -4065,6 +4087,34 @@ class MainFrame(wx.Frame):
         if cat in collapsed_set:
             return False
         return bool(default_expanded)
+
+    @staticmethod
+    def _compute_category_unread_totals(cat_feeds_map: dict, children_of: dict) -> dict:
+        """Recursively sum unread counts per category (issue #34).
+
+        total_unread(cat) = sum(unread_count of direct feeds) + sum(total_unread
+        of child categories). Each category is summed once (memoized in
+        ``totals``) regardless of how many ancestors pull it in, so this is
+        O(categories + feeds) even for deep/wide hierarchies.
+        """
+        totals: dict = {}
+
+        def _sum(cat):
+            cached = totals.get(cat)
+            if cached is not None:
+                return cached
+            total = sum(
+                max(0, int(getattr(feed, "unread_count", 0) or 0))
+                for feed in cat_feeds_map.get(cat, [])
+            )
+            for child in children_of.get(cat, []):
+                total += _sum(child)
+            totals[cat] = total
+            return total
+
+        for cat in cat_feeds_map.keys():
+            _sum(cat)
+        return totals
 
     def _apply_tree_expansion(self, cat_node_map):
         """Set each category's expansion state on a freshly rebuilt tree (issue #33).
@@ -4199,8 +4249,14 @@ class MainFrame(wx.Frame):
 
             item_to_select = None
             cat_node_map = {}  # cat_title -> tree node
+            cat_base_labels = {}  # cat_title -> displayed label without the count suffix
 
             from core.db import category_display_leaf
+
+            # Recursive (direct feeds + nested subcategories) unread totals,
+            # computed once up front so each category is summed exactly once
+            # regardless of nesting depth (issue #34).
+            category_unread_totals = self._compute_category_unread_totals(cat_feeds_map, children_of)
 
             def _add_category_node(cat, parent_node):
                 nonlocal item_to_select
@@ -4210,10 +4266,13 @@ class MainFrame(wx.Frame):
                 # The node identity is the full path; nested nodes display only
                 # the leaf so the tree reads naturally for screen-reader users.
                 label = cat if parent_node is self.root else category_display_leaf(cat)
-                cat_node = self.tree.AppendItem(parent_node, label)
+                total_unread = category_unread_totals.get(cat, 0)
+                display_label = f"{label} ({total_unread})" if total_unread > 0 else label
+                cat_node = self.tree.AppendItem(parent_node, display_label)
                 cat_data = {"type": "category", "id": cat}
                 self.tree.SetItemData(cat_node, cat_data)
                 cat_node_map[cat] = cat_node
+                cat_base_labels[cat] = label
 
                 if selected_data and selected_data["type"] == "category" and selected_data["id"] == cat:
                     item_to_select = cat_node
@@ -4234,6 +4293,13 @@ class MainFrame(wx.Frame):
 
             for cat in top_level_cats:
                 _add_category_node(cat, self.root)
+
+            # Persist for the incremental mark-read/unread path, which patches a
+            # single feed's ancestor chain without rebuilding the whole tree.
+            self.cat_nodes = cat_node_map
+            self.category_base_labels = cat_base_labels
+            self.category_unread_totals = category_unread_totals
+            self._category_hierarchy = hierarchy
 
             self._accessible_view_entries = build_accessible_view_entries(
                 feeds,
@@ -6047,7 +6113,7 @@ class MainFrame(wx.Frame):
             
         new_count = max(0, old_count + delta)
         feed.unread_count = new_count
-        
+
         # Update tree node
         node = self.feed_nodes.get(feed_id)
         if node and node.IsOk():
@@ -6057,6 +6123,42 @@ class MainFrame(wx.Frame):
                 self.tree.SetItemText(node, label)
             except Exception:
                 pass
+
+        # Propagate the actually-applied change (clamping above can make this
+        # differ from the requested delta) up the category ancestor chain.
+        self._update_category_unread_chain_ui(getattr(feed, "category", None), new_count - old_count)
+
+    def _update_category_unread_chain_ui(self, category: str | None, delta: int) -> None:
+        """Patch the aggregated unread total on a category and every ancestor (issue #34).
+
+        Used by the single-feed mark-read/unread path so a click doesn't require
+        rebuilding the whole tree just to keep parent category counts honest.
+        Walks up via ``_category_hierarchy`` ({category: parent_category}, built
+        by the last full ``_update_tree``); a ``seen`` guard makes this a no-op
+        instead of an infinite loop if that map were ever inconsistent.
+        """
+        category = (category or "").strip() or "Uncategorized"
+        if delta == 0:
+            return
+
+        seen = set()
+        cat = category
+        while cat and cat not in seen:
+            seen.add(cat)
+            old_total = int(self.category_unread_totals.get(cat, 0) or 0)
+            new_total = max(0, old_total + delta)
+            self.category_unread_totals[cat] = new_total
+
+            node = self.cat_nodes.get(cat)
+            if node and node.IsOk():
+                base_label = self.category_base_labels.get(cat, cat)
+                label = f"{base_label} ({new_total})" if new_total > 0 else base_label
+                try:
+                    self.tree.SetItemText(node, label)
+                except Exception:
+                    pass
+
+            cat = self._category_hierarchy.get(cat)
 
     def mark_article_read(self, idx):
         if idx < 0 or idx >= len(self.current_articles):
