@@ -246,6 +246,11 @@ DEFAULT_CONFIG = {
     "article_retention": "Unlimited",
     "persistent_searches": [],
     "show_search_field": True,
+    # Default expansion state of the feed category tree on launch (issue #33):
+    # True = expand all categories/subcategories (legacy behavior); False = start
+    # collapsed, showing only top-level categories. Manual expand/collapse during a
+    # session is preserved and never overwritten by this setting on UI refreshes.
+    "category_tree_default_expanded": True,
     "search_mode": "title_content",
     # Storage location for config.json (and, on next startup, rss.db).
     # "app_folder" = alongside the executable, "user_data" = OS user data folder.

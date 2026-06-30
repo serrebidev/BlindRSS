@@ -122,6 +122,14 @@ class MainFrame(wx.Frame):
 
         self._unread_filter_enabled = False
         self._is_first_tree_load = True
+        # Category-tree expansion memory (issue #33). The tree is fully rebuilt on
+        # every refresh, so we track which category nodes the user explicitly
+        # expanded/collapsed (keyed by category id/path) and re-apply that across
+        # rebuilds. Categories the user never touched follow the configurable
+        # default (category_tree_default_expanded). Both empty on first load, so
+        # the whole tree follows the default until the user intervenes.
+        self._expanded_categories = set()
+        self._collapsed_categories = set()
         self._search_query = ""
         self._search_active = False
         self._base_articles = []
@@ -352,6 +360,9 @@ class MainFrame(wx.Frame):
         
         self.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_tree_select, self.tree)
         self.Bind(wx.EVT_CONTEXT_MENU, self.on_tree_context_menu, self.tree)
+        # Remember manual category expand/collapse so it survives tree rebuilds (issue #33).
+        self.Bind(wx.EVT_TREE_ITEM_EXPANDED, self.on_tree_item_expanded, self.tree)
+        self.Bind(wx.EVT_TREE_ITEM_COLLAPSED, self.on_tree_item_collapsed, self.tree)
         
         self.Bind(wx.EVT_LIST_ITEM_SELECTED, self.on_article_select, self.list_ctrl)
         self.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.on_article_activate, self.list_ctrl)
@@ -3916,6 +3927,72 @@ class MainFrame(wx.Frame):
         self._article_refresh_pending = False
         self._reload_selected_articles()
 
+    def on_tree_item_expanded(self, event):
+        """Remember that the user expanded a category (issue #33)."""
+        self._record_tree_expansion(event.GetItem(), expanded=True)
+        event.Skip()
+
+    def on_tree_item_collapsed(self, event):
+        """Remember that the user collapsed a category (issue #33)."""
+        self._record_tree_expansion(event.GetItem(), expanded=False)
+        event.Skip()
+
+    def _record_tree_expansion(self, item, expanded: bool):
+        # Ignore the expand/collapse events our own rebuild triggers; only real
+        # user actions should update the remembered state.
+        if getattr(self, "_updating_tree", False):
+            return
+        if not item or not item.IsOk():
+            return
+        data = self.tree.GetItemData(item)
+        if not data or data.get("type") != "category":
+            return
+        cat_id = data.get("id")
+        if cat_id is None:
+            return
+        if expanded:
+            self._expanded_categories.add(cat_id)
+            self._collapsed_categories.discard(cat_id)
+        else:
+            self._collapsed_categories.add(cat_id)
+            self._expanded_categories.discard(cat_id)
+
+    @staticmethod
+    def _resolve_category_expanded(cat, expanded_set, collapsed_set, default_expanded: bool) -> bool:
+        """Decide whether a category node should be expanded (issue #33).
+
+        A category the user explicitly expanded or collapsed keeps that choice;
+        one they never touched follows the configured default.
+        """
+        if cat in expanded_set:
+            return True
+        if cat in collapsed_set:
+            return False
+        return bool(default_expanded)
+
+    def _apply_tree_expansion(self, cat_node_map):
+        """Set each category's expansion state on a freshly rebuilt tree (issue #33).
+
+        Categories the user explicitly expanded/collapsed keep that state across
+        rebuilds; untouched categories follow the configured default
+        (category_tree_default_expanded). This runs while ``_updating_tree`` is
+        True, so the resulting expand/collapse events are ignored.
+        """
+        default_expanded = bool(self.config_manager.get("category_tree_default_expanded", True))
+        for cat, node in cat_node_map.items():
+            if not node or not node.IsOk():
+                continue
+            expand = self._resolve_category_expanded(
+                cat, self._expanded_categories, self._collapsed_categories, default_expanded
+            )
+            try:
+                if expand:
+                    self.tree.Expand(node)
+                else:
+                    self.tree.Collapse(node)
+            except Exception:
+                log.debug("Failed to set expansion for category %r", cat, exc_info=True)
+
     def _update_tree(self, feeds, all_cats, hierarchy=None):
         # Save selection to restore it later
         selected_item = self.tree.GetSelection()
@@ -4069,7 +4146,7 @@ class MainFrame(wx.Frame):
                 include_favorites=bool(self.favorites_node),
             )
 
-            self.tree.ExpandAll()
+            self._apply_tree_expansion(cat_node_map)
 
             # Restore selection (default to All Feeds on first load so the list populates)
             # If "remember last feed" is enabled and this is the first load, use the saved feed

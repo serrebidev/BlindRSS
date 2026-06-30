@@ -792,7 +792,27 @@ class SettingsDialog(wx.Dialog):
         self.remember_last_feed_chk = wx.CheckBox(general_panel, label="Remember last selected feed/folder on startup")
         self.remember_last_feed_chk.SetValue(bool(config.get("remember_last_feed", False)))
         general_sizer.Add(self.remember_last_feed_chk, 0, wx.ALL, 5)
-        
+
+        # Default expansion state of the feed category tree on launch (issue #33).
+        tree_state_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        tree_state_sizer.Add(
+            wx.StaticText(general_panel, label="Feed category tree on startup:"),
+            0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5,
+        )
+        self.tree_expand_map = {
+            "All items expanded": True,
+            "All items collapsed": False,
+        }
+        self.tree_expand_choices = list(self.tree_expand_map.keys())
+        self.tree_expand_ctrl = wx.Choice(general_panel, choices=self.tree_expand_choices)
+        self.tree_expand_ctrl.SetName("Feed category tree default state on startup")
+        current_tree_expanded = bool(config.get("category_tree_default_expanded", True))
+        self.tree_expand_ctrl.SetStringSelection(
+            "All items expanded" if current_tree_expanded else "All items collapsed"
+        )
+        tree_state_sizer.Add(self.tree_expand_ctrl, 0, wx.ALL, 5)
+        general_sizer.Add(tree_state_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
         general_panel.SetSizer(general_sizer)
         notebook.AddPage(general_panel, "General")
 
@@ -2408,6 +2428,7 @@ class SettingsDialog(wx.Dialog):
         return {
             "refresh_interval": self.refresh_map.get(self.refresh_ctrl.GetStringSelection(), 300),
             "search_mode": self.search_mode_map.get(self.search_mode_ctrl.GetStringSelection(), "title_content"),
+            "category_tree_default_expanded": self.tree_expand_map.get(self.tree_expand_ctrl.GetStringSelection(), True),
             "max_concurrent_refreshes": self.concurrent_ctrl.GetValue(),
             "per_host_max_connections": self.per_host_ctrl.GetValue(),
             "feed_timeout_seconds": self.timeout_ctrl.GetValue(),
