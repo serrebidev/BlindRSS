@@ -31,6 +31,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 import gui.mainframe as mainframe
+from gui.tray import MAX_TRAY_LABEL_LENGTH, format_tray_label
 
 
 def _sync_call_after(monkeypatch):
@@ -41,6 +42,17 @@ def _sync_call_after(monkeypatch):
 class _FakeTree:
     def GetSelection(self):
         return None
+
+
+class _FakeTray:
+    def __init__(self):
+        self.updates = []
+        self.label = "BlindRSS"
+
+    def update_status_label(self, unread_count=0, activity=""):
+        self.updates.append((unread_count, activity))
+        self.label = format_tray_label(unread_count, activity)
+        return True
 
 
 class _StatusBarHost:
@@ -54,18 +66,26 @@ class _StatusBarHost:
     _end_refresh_activity = mainframe.MainFrame._end_refresh_activity
     _set_feed_activity_status = mainframe.MainFrame._set_feed_activity_status
     _apply_feed_refresh_progress = mainframe.MainFrame._apply_feed_refresh_progress
+    _set_tray_activity_label = mainframe.MainFrame._set_tray_activity_label
+    _update_tray_status_label = mainframe.MainFrame._update_tray_status_label
+    _total_unread_count_for_tray = mainframe.MainFrame._total_unread_count_for_tray
 
     def __init__(self):
         self.fields = {0: "", 1: ""}
         self.field_history = {0: [], 1: []}
         self.feed_map = {}
         self.feed_nodes = {}
+        self.tray_icon = _FakeTray()
+        self._tray_activity_label = ""
         self.tree = _FakeTree()
 
     def SetStatusText(self, text, number=0):
         number = int(number)
         self.fields[number] = text
         self.field_history[number].append(text)
+
+    def _update_category_unread_chain_ui(self, _category, _delta):
+        return None
 
 
 # --- (a) field 0 / field 1 isolation ---------------------------------------
@@ -80,6 +100,7 @@ def test_activity_status_writes_only_field_1(monkeypatch):
     assert host.fields[1] == "Refreshing feeds..."
     assert host.fields[0] == ""
     assert host.field_history[0] == []
+    assert host.tray_icon.label == "BlindRSS (Refreshing feeds...)"
 
 
 def test_activity_status_does_not_clobber_existing_filter_count(monkeypatch):
@@ -164,6 +185,36 @@ def test_feed_activity_status_treats_error_field_as_error_even_without_status():
     host = _StatusBarHost()
     host._set_feed_activity_status({"id": "feed-1", "title": "Example Feed", "error": "boom"})
     assert host.fields[1] == "Error checking: Example Feed"
+
+
+def test_tray_label_formatter_includes_unread_and_activity():
+    assert format_tray_label(0, "") == "BlindRSS"
+    assert format_tray_label(103, "") == "BlindRSS (Unread: 103)"
+    assert format_tray_label(103, "Checked: Supernews") == "BlindRSS (Unread: 103, Checked: Supernews)"
+    assert len(format_tray_label(3, "Checked: " + ("Very Long Feed " * 20))) <= MAX_TRAY_LABEL_LENGTH
+
+
+def test_refresh_activity_updates_and_clears_tray_label(monkeypatch):
+    _sync_call_after(monkeypatch)
+    host = _StatusBarHost()
+    host.feed_map = {
+        "feed-1": SimpleNamespace(id="feed-1", title="Example Feed", category="News", unread_count=3),
+        "feed-2": SimpleNamespace(id="feed-2", title="Other Feed", category="News", unread_count=2),
+    }
+
+    host._update_tray_status_label()
+    assert host.tray_icon.label == "BlindRSS (Unread: 5)"
+
+    host._begin_refresh_activity()
+    assert host.tray_icon.label == "BlindRSS (Unread: 5, Refreshing feeds...)"
+
+    host._apply_feed_refresh_progress(
+        {"id": "feed-1", "title": "Example Feed", "unread_count": 4, "category": "News", "status": "ok"}
+    )
+    assert host.tray_icon.label == "BlindRSS (Unread: 6, Checked: Example Feed)"
+
+    host._end_refresh_activity()
+    assert host.tray_icon.label == "BlindRSS (Unread: 6)"
 
 
 # --- (c) downloads: begin -> success / begin -> failure ---------------------

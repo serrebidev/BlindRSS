@@ -240,6 +240,78 @@ class MinifluxProvider(RSSProvider):
         except Exception:
             pass
 
+    def _unread_count_from_map(self, unread_map: dict, feed_id: str, raw_id=None) -> int:
+        try:
+            return int(
+                unread_map.get(str(feed_id), None)
+                if unread_map.get(str(feed_id), None) is not None
+                else unread_map.get(raw_id, 0)
+            )
+        except Exception:
+            return 0
+
+    def _feed_progress_state_from_metadata(
+        self,
+        feed: Dict[str, Any],
+        unread_map: dict,
+        stale_cutoff,
+        *,
+        status_override: str | None = None,
+        error_override: str | None = None,
+    ) -> dict[str, Any]:
+        feed_id = str(feed.get("id") or "")
+        category = (feed.get("category") or {}).get("title", "Uncategorized")
+        unread = self._unread_count_from_map(unread_map or {}, feed_id, feed.get("id"))
+
+        status = "ok"
+        error_msg = None
+        if status_override is not None:
+            status = status_override
+            error_msg = error_override
+        else:
+            checked_dt = self._parse_checked_at(feed.get("checked_at"))
+            if (feed.get("parsing_error_count") or 0) > 0:
+                status = "error"
+                error_msg = feed.get("parsing_error_message")
+            elif checked_dt and checked_dt < stale_cutoff:
+                status = "stale"
+
+        return {
+            "id": feed_id,
+            "title": feed.get("title") or "",
+            "category": category,
+            "unread_count": unread,
+            "status": status,
+            "new_items": None,
+            "error": error_msg,
+        }
+
+    def _targeted_refresh_progress_state(
+        self,
+        feed_id: str,
+        info: dict[str, Any],
+        progress_states: dict[str, dict[str, Any]] | None,
+    ) -> dict[str, Any]:
+        fid = str(feed_id or "").strip()
+        state = dict((progress_states or {}).get(fid) or {})
+        if not state:
+            state = {
+                "id": fid,
+                "title": fid,
+                "category": "Uncategorized",
+                "unread_count": 0,
+                "new_items": None,
+            }
+
+        if bool((info or {}).get("ok", False)):
+            state["status"] = "ok"
+            state["error"] = None
+        else:
+            status_code = (info or {}).get("status_code")
+            state["status"] = "error"
+            state["error"] = f"HTTP {status_code}" if status_code else "Refresh request failed."
+        return state
+
     def get_name(self) -> str:
         return "Miniflux"
 
@@ -607,7 +679,14 @@ class MinifluxProvider(RSSProvider):
 
         return info
 
-    def _refresh_targeted_feeds(self, feed_ids, *, force: bool = False) -> dict[str, dict[str, Any]]:
+    def _refresh_targeted_feeds(
+        self,
+        feed_ids,
+        *,
+        force: bool = False,
+        progress_cb=None,
+        progress_states: dict[str, dict[str, Any]] | None = None,
+    ) -> dict[str, dict[str, Any]]:
         ordered_ids = []
         seen = set()
         for raw_id in list(feed_ids or []):
@@ -625,9 +704,22 @@ class MinifluxProvider(RSSProvider):
         results: dict[str, dict[str, Any]] = {}
         worker_count = self._targeted_refresh_worker_count(len(ordered_ids))
 
+        def _store_result(fid: str, info: dict[str, Any]) -> None:
+            results[fid] = info
+            self._record_targeted_refresh_attempt_result(
+                fid,
+                bool((info or {}).get("ok", False)),
+                (info or {}).get("status_code"),
+            )
+            if progress_cb is not None:
+                self._emit_progress(
+                    progress_cb,
+                    self._targeted_refresh_progress_state(fid, info, progress_states),
+                )
+
         if worker_count <= 1 or len(ordered_ids) == 1:
             for fid in ordered_ids:
-                results[fid] = self._request_targeted_refresh(fid)
+                _store_result(fid, self._request_targeted_refresh(fid))
         else:
             with concurrent.futures.ThreadPoolExecutor(
                 max_workers=worker_count,
@@ -640,10 +732,10 @@ class MinifluxProvider(RSSProvider):
                 for future in concurrent.futures.as_completed(futures):
                     fid = futures[future]
                     try:
-                        results[fid] = future.result()
+                        info = future.result()
                     except Exception as e:
                         log.debug("Miniflux targeted refresh worker failed for feed %s: %s", fid, e)
-                        results[fid] = {
+                        info = {
                             "ok": False,
                             "used_cache": False,
                             "status_code": None,
@@ -651,13 +743,7 @@ class MinifluxProvider(RSSProvider):
                             "method": "PUT",
                             "error_body": None,
                         }
-
-        for fid, info in results.items():
-            self._record_targeted_refresh_attempt_result(
-                fid,
-                bool((info or {}).get("ok", False)),
-                (info or {}).get("status_code"),
-            )
+                    _store_result(fid, info)
 
         return results
 
@@ -955,7 +1041,28 @@ class MinifluxProvider(RSSProvider):
             )
 
         if retry_budget > 0 and allow_targeted_refresh:
-            self._refresh_targeted_feeds(per_feed_retry_ids[:retry_budget], force=force)
+            progress_states = None
+            if progress_cb is not None and per_feed_retry_ids:
+                counters_for_progress = self._req("GET", "/v1/feeds/counters") or {}
+                unread_for_progress = (
+                    counters_for_progress.get("unreads", {})
+                    if isinstance(counters_for_progress, dict)
+                    else {}
+                )
+                progress_states = {
+                    str(feed.get("id") or ""): self._feed_progress_state_from_metadata(
+                        feed,
+                        unread_for_progress,
+                        stale_cutoff,
+                    )
+                    for feed in feeds or []
+                }
+            self._refresh_targeted_feeds(
+                per_feed_retry_ids[:retry_budget],
+                force=force,
+                progress_cb=progress_cb,
+                progress_states=progress_states,
+            )
 
         # Re-read feed/counter metadata after targeted refresh requests.
         feeds = self._req("GET", "/v1/feeds") or feeds
@@ -963,30 +1070,9 @@ class MinifluxProvider(RSSProvider):
         unread_map = counters_data.get("unreads", {}) if isinstance(counters_data, dict) else {}
 
         for feed in feeds:
-            feed_id = str(feed.get("id"))
-            category = (feed.get("category") or {}).get("title", "Uncategorized")
-            unread = unread_map.get(feed_id) or unread_map.get(int(feed.get("id", 0) or 0), 0) or 0
-
-            status = "ok"
-            error_msg = None
-            checked_dt = self._parse_checked_at(feed.get("checked_at"))
-            if (feed.get("parsing_error_count") or 0) > 0:
-                status = "error"
-                error_msg = feed.get("parsing_error_message")
-            elif checked_dt and checked_dt < stale_cutoff:
-                status = "stale"
-
             self._emit_progress(
                 progress_cb,
-                {
-                    "id": feed_id,
-                    "title": feed.get("title") or "",
-                    "category": category,
-                    "unread_count": unread,
-                    "status": status,
-                    "new_items": None,
-                    "error": error_msg,
-                },
+                self._feed_progress_state_from_metadata(feed, unread_map, stale_cutoff),
             )
 
         duration_s = (datetime.now(timezone.utc) - started_at).total_seconds()

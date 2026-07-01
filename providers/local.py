@@ -10,7 +10,7 @@ import re
 import mimetypes
 import requests
 from typing import Any, Dict, List, Optional, Tuple
-from collections import defaultdict
+from collections import defaultdict, deque
 from urllib.parse import urlparse, urljoin
 from .base import RSSProvider
 from core.models import Feed, Article
@@ -826,6 +826,47 @@ def _compute_refresh_limits(
     return max_workers, per_host_limit, adaptive_cap
 
 
+def _refresh_row_host(feed_row) -> str:
+    try:
+        raw_url = feed_row[1]
+    except Exception:
+        raw_url = ""
+    try:
+        return (urlparse(str(raw_url or "")).hostname or str(raw_url or "")).lower()
+    except Exception:
+        return str(raw_url or "").lower()
+
+
+def _interleave_feed_rows_by_host(feed_rows):
+    """Round-robin feed rows by host before submitting work to the executor.
+
+    Per-host semaphores are acquired inside worker tasks. If several same-host
+    feeds are queued together, blocked tasks can occupy worker slots while
+    unrelated hosts wait behind them. Interleaving keeps the worker pool useful.
+    """
+    buckets = {}
+    host_order = []
+    for row in list(feed_rows or []):
+        host = _refresh_row_host(row)
+        if host not in buckets:
+            buckets[host] = deque()
+            host_order.append(host)
+        buckets[host].append(row)
+
+    ordered = []
+    while True:
+        added = False
+        for host in host_order:
+            bucket = buckets.get(host)
+            if not bucket:
+                continue
+            ordered.append(bucket.popleft())
+            added = True
+        if not added:
+            break
+    return ordered
+
+
 def _url_looks_feed_like(url: str) -> bool:
     low = str(url or "").strip().lower()
     if not low:
@@ -1283,8 +1324,9 @@ class LocalProvider(RSSProvider):
                 respect_failure_cooldown=True,
             )
 
+        ordered_feed_rows = _interleave_feed_rows_by_host(feed_rows)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = {executor.submit(task, feed_row): feed_row for feed_row in feed_rows}
+            futures = {executor.submit(task, feed_row): feed_row for feed_row in ordered_feed_rows}
             for future in concurrent.futures.as_completed(futures):
                 try:
                     future.result()

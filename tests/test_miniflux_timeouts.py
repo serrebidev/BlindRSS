@@ -149,8 +149,10 @@ def test_miniflux_successful_204_global_refresh_clears_stale_failure_state(monke
 
 def test_miniflux_refresh_force_refreshes_each_feed(monkeypatch):
     p = _provider(feed_timeout_seconds=10)
+    p.config["miniflux_targeted_refresh_workers"] = 1
     calls = []
     targeted_calls = []
+    states = []
     now = datetime.now(timezone.utc)
     recent = now.isoformat()
 
@@ -178,9 +180,11 @@ def test_miniflux_refresh_force_refreshes_each_feed(monkeypatch):
             "method": "PUT",
         },
     )
-    p.refresh(force=True)
+    p.refresh(progress_cb=states.append, force=True)
 
     assert set(targeted_calls) == {"1", "2"}
+    assert [state["id"] for state in states[:2]] == ["1", "2"]
+    assert states[0]["status"] == "ok"
 
 
 def test_miniflux_refresh_feeds_by_ids_refreshes_subset_and_emits_progress(monkeypatch):

@@ -11,7 +11,7 @@ REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
-from providers.local import LocalProvider
+from providers.local import LocalProvider, _interleave_feed_rows_by_host
 from core.db import init_db, get_connection
 
 
@@ -211,6 +211,22 @@ class LocalProviderParallelTests(unittest.TestCase):
         self.assertGreaterEqual(fast_count, 1)
         self.assertGreaterEqual(slow_count, 1)
         self.assertEqual(fail_count, 0)
+
+    def test_refresh_rows_are_interleaved_by_host_before_submission(self):
+        rows = [
+            ("slow-1", "https://slow.example/feed-1", "Slow 1", "Tests", None, None, 0),
+            ("slow-2", "https://slow.example/feed-2", "Slow 2", "Tests", None, None, 0),
+            ("slow-3", "https://slow.example/feed-3", "Slow 3", "Tests", None, None, 0),
+            ("fast-1", "https://fast.example/rss", "Fast 1", "Tests", None, None, 0),
+            ("other-1", "https://other.example/rss", "Other 1", "Tests", None, None, 0),
+        ]
+
+        ordered = _interleave_feed_rows_by_host(rows)
+
+        self.assertEqual(
+            [row[0] for row in ordered],
+            ["slow-1", "fast-1", "other-1", "slow-2", "slow-3"],
+        )
 
 
 if __name__ == "__main__":

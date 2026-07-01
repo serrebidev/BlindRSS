@@ -169,6 +169,7 @@ class MainFrame(wx.Frame):
         self._accessible_browser = None
         self._accessible_view_entries = []
         self._voiceover_browser_attempted = False
+        self._tray_activity_label = ""
 
         self.init_ui()
         self.init_menus()
@@ -177,6 +178,7 @@ class MainFrame(wx.Frame):
         self._load_persistent_searches()
         
         self.tray_icon = BlindRSSTrayIcon(self)
+        self._update_tray_status_label()
         
         self.Bind(wx.EVT_CLOSE, self.on_close)
         self.Bind(wx.EVT_ICONIZE, self.on_iconize)
@@ -3977,6 +3979,42 @@ class MainFrame(wx.Frame):
             self.SetStatusText(text or "", 1)
         except Exception:
             log.debug("Failed to set activity status text", exc_info=True)
+        update_tray = getattr(self, "_set_tray_activity_label", None)
+        if callable(update_tray):
+            try:
+                update_tray(text)
+            except Exception:
+                log.debug("Failed to update tray activity label", exc_info=True)
+
+    def _total_unread_count_for_tray(self) -> int:
+        total = 0
+        try:
+            feeds = getattr(self, "feed_map", {}) or {}
+            for feed in feeds.values():
+                total += max(0, int(getattr(feed, "unread_count", 0) or 0))
+        except Exception:
+            return 0
+        return total
+
+    def _set_tray_activity_label(self, text: str | None) -> None:
+        activity = " ".join(str(text or "").split())
+        if activity == "Refresh complete":
+            activity = ""
+        self._tray_activity_label = activity
+        self._update_tray_status_label()
+
+    def _update_tray_status_label(self) -> None:
+        tray = getattr(self, "tray_icon", None)
+        update_label = getattr(tray, "update_status_label", None)
+        if not callable(update_label):
+            return
+        try:
+            update_label(
+                self._total_unread_count_for_tray(),
+                getattr(self, "_tray_activity_label", ""),
+            )
+        except Exception:
+            log.debug("Failed to update tray status label", exc_info=True)
 
     def _post_activity_status(self, text: str) -> None:
         """Marshal an activity-status update from any (likely background) thread."""
@@ -4081,6 +4119,9 @@ class MainFrame(wx.Frame):
                 self._update_category_unread_chain_ui(old_category, -old_unread)
             if category and unread:
                 self._update_category_unread_chain_ui(category, unread)
+            update_tray = getattr(self, "_update_tray_status_label", None)
+            if callable(update_tray):
+                update_tray()
 
         # Update tree label if present
         node = self.feed_nodes.get(feed_id)
@@ -4414,6 +4455,9 @@ class MainFrame(wx.Frame):
                 except Exception:
                     pass
             self._updating_tree = False
+            update_tray = getattr(self, "_update_tray_status_label", None)
+            if callable(update_tray):
+                update_tray()
 
         # Ensure article list refreshes after auto/remote refresh.
         # Re-selecting items on a rebuilt tree does not always emit EVT_TREE_SEL_CHANGED,
@@ -6193,6 +6237,9 @@ class MainFrame(wx.Frame):
         # Propagate the actually-applied change (clamping above can make this
         # differ from the requested delta) up the category ancestor chain.
         self._update_category_unread_chain_ui(getattr(feed, "category", None), new_count - old_count)
+        update_tray = getattr(self, "_update_tray_status_label", None)
+        if callable(update_tray):
+            update_tray()
 
     def _update_category_unread_chain_ui(self, category: str | None, delta: int) -> None:
         """Patch the aggregated unread total on a category and every ancestor (issue #34).

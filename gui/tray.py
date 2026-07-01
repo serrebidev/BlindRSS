@@ -1,10 +1,49 @@
 import wx
 import wx.adv
 
+
+TRAY_LABEL_BASE = "BlindRSS"
+MAX_TRAY_LABEL_LENGTH = 120
+
+
+def _clean_label_part(value) -> str:
+    return " ".join(str(value or "").split())
+
+
+def _truncate_label(text: str, max_len: int = MAX_TRAY_LABEL_LENGTH) -> str:
+    text = str(text or "")
+    max_len = max(1, int(max_len or 1))
+    if len(text) <= max_len:
+        return text
+    if max_len <= 3:
+        return text[:max_len]
+    return text[: max_len - 3].rstrip() + "..."
+
+
+def format_tray_label(unread_count=0, activity: str = "") -> str:
+    try:
+        unread = max(0, int(unread_count or 0))
+    except Exception:
+        unread = 0
+    activity = _clean_label_part(activity)
+
+    parts = []
+    if unread > 0:
+        parts.append(f"Unread: {unread}")
+    if activity:
+        parts.append(activity)
+
+    if not parts:
+        return TRAY_LABEL_BASE
+    return _truncate_label(f"{TRAY_LABEL_BASE} ({', '.join(parts)})")
+
+
 class BlindRSSTrayIcon(wx.adv.TaskBarIcon):
     def __init__(self, frame):
         super().__init__()
         self.frame = frame
+        self._icon = None
+        self._label = None
         
         # Set Icon
         self.set_default_icon()
@@ -29,7 +68,22 @@ class BlindRSSTrayIcon(wx.adv.TaskBarIcon):
         
         icon = wx.Icon()
         icon.CopyFromBitmap(bmp)
-        self.SetIcon(icon, "BlindRSS")
+        self._icon = icon
+        self.update_status_label()
+
+    def update_status_label(self, unread_count=0, activity: str = "") -> bool:
+        label = format_tray_label(unread_count, activity)
+        if label == self._label:
+            return True
+        try:
+            if self._icon is not None:
+                ok = bool(self.SetIcon(self._icon, label))
+                if ok:
+                    self._label = label
+                return ok
+        except Exception:
+            return False
+        return False
 
     def CreatePopupMenu(self):
         menu = wx.Menu()
