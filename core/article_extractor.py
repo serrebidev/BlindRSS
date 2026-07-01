@@ -925,13 +925,82 @@ def _soup_extract_text(html: str) -> str:
         return ""
 
 
+def _extract_article_paragraph_text(html: str) -> str:
+    """Return visible article paragraphs suitable for JSON-LD lead comparison."""
+    if not html:
+        return ""
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        node = soup.find("article") or soup.find("main")
+        if node is None:
+            return ""
+        paras: List[str] = []
+        for p in node.find_all("p"):
+            text = _normalize_whitespace(p.get_text(" ", strip=True))
+            text = re.sub(r"\s+([,.;:!?])", r"\1", text)
+            if text:
+                paras.append(text)
+        return "\n\n".join(paras)
+    except Exception:
+        return ""
+
+
+_LEAD_PATCH_MAX_SCAN_PARAS = 4
+_LEAD_PATCH_MAX_LEAD_PARAS = 2
+_LEAD_PATCH_ALIGN_SNIPPET_LEN = 60
+_LEAD_PATCH_BASE_HEAD_CHARS = 400
+
+
+def _prepend_missing_lead(base: str, alt: str) -> str:
+    """Prepend lead paragraph(s) that only `alt` captured to `base`.
+
+    `base` is the text we decided to keep (e.g. JSON-LD articleBody) and `alt` is the
+    competing extraction (e.g. trafilatura). When `alt` opens with a couple of paragraphs
+    that `base` lacks anywhere and then lines up with the very start of `base`, those
+    opening paragraphs are a lede that `base`'s source dropped; re-attach them.
+    """
+    base_norm = _normalize_for_match(base)
+    if not base_norm:
+        return base
+    base_head = base_norm[:_LEAD_PATCH_BASE_HEAD_CHARS]
+
+    leads: List[str] = []
+    aligned = False
+    for p in _split_paragraphs(alt)[:_LEAD_PATCH_MAX_SCAN_PARAS]:
+        pn = _normalize_for_match(p)
+        if not pn:
+            continue
+        if pn[:_LEAD_PATCH_ALIGN_SNIPPET_LEN] in base_head:
+            aligned = True
+            break
+        if pn in base_norm:
+            # Present deeper in base, so base isn't simply missing its head; don't guess.
+            break
+        if len(leads) >= _LEAD_PATCH_MAX_LEAD_PARAS:
+            break
+        if not _is_reasonable_lead_paragraph(p):
+            break
+        leads.append(p)
+
+    if not aligned or not leads:
+        return base
+    return _normalize_whitespace("\n\n".join(leads + [base]))
+
+
+def _patch_json_ld_missing_lead(json_text: str, *alts: str) -> str:
+    patched = _normalize_whitespace(json_text)
+    for alt in alts:
+        if alt:
+            patched = _prepend_missing_lead(patched, _normalize_whitespace(alt))
+    return patched
+
+
 def _extract_text_any(html: str, url: str = "") -> str:
-    # 1. Try JSON-LD first (often high quality on major sites like Wired)
+    # 1. JSON-LD articleBody (often high quality on major sites), but never trusted alone:
+    # some CMSes omit paragraphs from articleBody. Wired/Conde Nast drops the entire first
+    # paragraph whenever the lede uses styled lead-in markup, so trafilatura always runs
+    # and gets to supply a lede that JSON-LD is missing.
     json_txt = _extract_json_ld_text(html)
-    
-    # Optimization: if JSON-LD gave us a substantial article, skip expensive Trafilatura
-    if json_txt and len(json_txt) > 1000:
-        return _normalize_whitespace(json_txt)
 
     # 2. Try Trafilatura
     txt = _trafilatura_extract_text(html, url=url)
@@ -939,13 +1008,18 @@ def _extract_text_any(html: str, url: str = "") -> str:
     if txt and json_txt:
         txt_norm = _normalize_whitespace(txt)
         json_norm = _normalize_whitespace(json_txt)
-        # If JSON-LD is significantly longer, prefer it
+        # If JSON-LD is significantly longer, prefer it, but re-attach any lead
+        # paragraphs that only trafilatura captured.
         if len(json_norm) > len(txt_norm) * 1.1:
-            return json_norm
+            return _patch_json_ld_missing_lead(
+                json_norm,
+                txt_norm,
+                _extract_article_paragraph_text(html),
+            )
         return txt_norm
 
     if json_txt:
-        return _normalize_whitespace(json_txt)
+        return _patch_json_ld_missing_lead(json_txt, _extract_article_paragraph_text(html))
     if txt:
         return _normalize_whitespace(txt)
     
