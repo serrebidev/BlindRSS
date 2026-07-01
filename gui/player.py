@@ -46,8 +46,16 @@ _SEEKABLE_EXTENSIONS = (
 )
 
 # Prefer AAC/M4A for broader compatibility with older/bundled VLC builds.
-# Fall back to the previous bestaudio behavior when M4A is unavailable.
-_YTDLP_VLC_AUDIO_FORMAT = "bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio/best"
+# Fall back to the previous bestaudio behavior when M4A is unavailable. Some
+# live streams expose no audio-only rendition at all (yt-dlp's "bestaudio" then
+# falls back to the single best combined format, which for a live broadcast can
+# mean the highest-bitrate 1080p+ variant -- several Mbps just to get its audio
+# track, which stalls/buffers on ordinary connections). height<=480 caps that
+# fallback to a much lighter combined stream; verified against a real live
+# broadcast that this keeps the identical AAC audio profile as the 1080p pick
+# while cutting required bandwidth roughly 3.5x. "worst" is a last-resort catch
+# if nothing is under that height at all.
+_YTDLP_VLC_AUDIO_FORMAT = "bestaudio[ext=m4a]/bestaudio[ext=mp4]/bestaudio/best[height<=480]/worst"
 
 
 def _normalize_chapter_start(value) -> float:
