@@ -1,9 +1,11 @@
 import os
 import sys
 import uuid
+import warnings
 
 import pytest
 import requests
+from bs4 import MarkupResemblesLocatorWarning
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if REPO_ROOT not in sys.path:
@@ -410,6 +412,20 @@ ITUNES_ONLY_RSS = """<?xml version="1.0"?>
 </rss>
 """
 
+URL_ONLY_ITEM_RSS = """<?xml version="1.0"?>
+<rss version="2.0">
+  <channel>
+    <title>URL-only item feed</title>
+    <link>https://example.com/</link>
+    <description>URL-only item coverage</description>
+    <item>
+      <guid>url-only-item-1</guid>
+      <description>https://example.com/plain-url-body</description>
+    </item>
+  </channel>
+</rss>
+"""
+
 MESSY_RSS_20 = """<?xml version="1.0"?>
 <rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
   <channel>
@@ -670,6 +686,27 @@ def test_local_provider_maps_itunes_author_summary_and_enclosure(provider, monke
     assert article.content == "Podcast summary from iTunes."
     assert article.media_url == "https://example.com/podcast/1.mp3"
     assert article.media_type == "audio/mpeg"
+
+
+def test_url_only_item_content_does_not_emit_locator_warning(provider, monkeypatch):
+    feed_id = _insert_feed("https://example.com/url-only.xml")
+    monkeypatch.setattr(
+        local_mod.utils,
+        "safe_requests_get",
+        lambda *args, **kwargs: _DummyResp(URL_ONLY_ITEM_RSS),
+    )
+
+    with warnings.catch_warnings(record=True) as captured:
+        warnings.simplefilter("always", MarkupResemblesLocatorWarning)
+        assert provider.refresh_feed(feed_id) is True
+
+    assert [
+        warning for warning in captured
+        if issubclass(warning.category, MarkupResemblesLocatorWarning)
+    ] == []
+    article = provider.get_articles(feed_id=feed_id)[0]
+    assert article.title == "https://example.com/plain-url-body"
+    assert article.content == "https://example.com/plain-url-body"
 
 
 def test_local_provider_tolerates_messy_rss_20_reader_cases(provider, monkeypatch):

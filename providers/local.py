@@ -27,7 +27,7 @@ from core import utils
 from core import rumble as rumble_mod
 from core import odysee as odysee_mod
 from core import npr as npr_mod
-from bs4 import BeautifulSoup as BS, XMLParsedAsHTMLWarning
+from bs4 import BeautifulSoup as BS, MarkupResemblesLocatorWarning, XMLParsedAsHTMLWarning
 import xml.etree.ElementTree as ET
 import logging
 import warnings
@@ -35,6 +35,7 @@ from urllib.parse import urlsplit, urlunsplit
 
 # Avoid noisy warnings when falling back to HTML parser for XML content
 warnings.filterwarnings("ignore", category=XMLParsedAsHTMLWarning)
+warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
 
 log = logging.getLogger(__name__)
 
@@ -218,6 +219,23 @@ def _feed_urljoin(feed_url: str, value: str) -> str:
         return urljoin(str(feed_url or ""), text)
     except Exception:
         return text
+
+
+def _plain_text_preview(raw_text: Any, limit: Optional[int] = None) -> str:
+    text = str(raw_text or "").strip()
+    if not text:
+        return ""
+
+    if "<" in text and ">" in text:
+        try:
+            text = BS(text, "html.parser").get_text(" ", strip=True)
+        except Exception:
+            pass
+
+    text = " ".join(text.split())
+    if limit is not None and len(text) > limit:
+        text = text[: max(0, limit - 3)].rstrip() + "..."
+    return text
 
 
 def _url_path_lower(value: str) -> str:
@@ -1431,17 +1449,7 @@ class LocalProvider(RSSProvider):
                 return
 
         def _preview_for_notification(raw_text):
-            text = str(raw_text or "").strip()
-            if not text:
-                return ""
-            try:
-                text = BS(text, "html.parser").get_text(" ", strip=True)
-            except Exception:
-                pass
-            text = " ".join(text.split())
-            if len(text) > 180:
-                text = text[:177].rstrip() + "..."
-            return text
+            return _plain_text_preview(raw_text, limit=180)
 
         def _record_new_article(article_id, title, author, preview="", url="", media_url="", media_type=""):
             if len(new_article_summaries) >= 500:
@@ -2311,14 +2319,7 @@ class LocalProvider(RSSProvider):
                     if not title or title.strip() == "No Title":
                          # Fallback: create title from content snippet (e.g. Bluesky/Mastodon)
                          snippet = content or ""
-                         # Strip HTML
-                         if snippet:
-                             try:
-                                 snippet = BS(snippet, "html.parser").get_text(" ", strip=True)
-                             except Exception:
-                                 pass
-                         if len(snippet) > 80:
-                             snippet = snippet[:80] + "..."
+                         snippet = _plain_text_preview(snippet, limit=83)
                          title = snippet or "No Title"
                     author = _entry_author(entry) or 'Unknown'
                     
