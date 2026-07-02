@@ -4502,6 +4502,30 @@ class MainFrame(wx.Frame):
         keys.discard(None)
         return key in keys
 
+    def _is_tree_navigation_key(self, key) -> bool:
+        # Any plain keyboard tree navigation (arrows/paging/home/end, incl. numpad)
+        # defers the article-load commit so rapid arrowing keeps the UI thread free
+        # for NVDA announcements. Mouse-click/programmatic selection never routes
+        # through on_tree_key_down, so it sets no defer window and still commits now.
+        if self._is_tree_home_end_key(key):
+            return True
+        keys = {
+            getattr(wx, "WXK_UP", None),
+            getattr(wx, "WXK_DOWN", None),
+            getattr(wx, "WXK_LEFT", None),
+            getattr(wx, "WXK_RIGHT", None),
+            getattr(wx, "WXK_PAGEUP", None),
+            getattr(wx, "WXK_PAGEDOWN", None),
+            getattr(wx, "WXK_NUMPAD_UP", None),
+            getattr(wx, "WXK_NUMPAD_DOWN", None),
+            getattr(wx, "WXK_NUMPAD_LEFT", None),
+            getattr(wx, "WXK_NUMPAD_RIGHT", None),
+            getattr(wx, "WXK_NUMPAD_PAGEUP", None),
+            getattr(wx, "WXK_NUMPAD_PAGEDOWN", None),
+        }
+        keys.discard(None)
+        return key in keys
+
     def on_tree_key_down(self, event: wx.KeyEvent) -> None:
         try:
             key = event.GetKeyCode()
@@ -4518,7 +4542,7 @@ class MainFrame(wx.Frame):
         except Exception:
             plain = True
 
-        if plain and self._is_tree_home_end_key(key):
+        if plain and self._is_tree_navigation_key(key):
             try:
                 ms = int(getattr(self, "_tree_selection_debounce_ms", 120))
             except Exception:

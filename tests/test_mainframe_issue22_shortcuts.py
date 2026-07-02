@@ -271,6 +271,7 @@ class _TreeNavHost:
     on_tree_select = mainframe.MainFrame.on_tree_select
     _tree_selection_feed_id = mainframe.MainFrame._tree_selection_feed_id
     _is_tree_home_end_key = mainframe.MainFrame._is_tree_home_end_key
+    _is_tree_navigation_key = mainframe.MainFrame._is_tree_navigation_key
     _should_defer_tree_selection = mainframe.MainFrame._should_defer_tree_selection
     _schedule_tree_selection_commit = mainframe.MainFrame._schedule_tree_selection_commit
     _cancel_tree_selection_commit = mainframe.MainFrame._cancel_tree_selection_commit
@@ -400,6 +401,33 @@ def test_tree_home_end_selection_is_deferred(monkeypatch):
     assert host.config_manager.get("last_selected_feed") == "feed-2"
 
 
+def test_tree_arrow_selection_is_deferred(monkeypatch):
+    # Up/Down arrow keydown must arm the defer window and route the ensuing
+    # selection through the debounce timer, mirroring Home/End behavior so rapid
+    # arrowing never commits a synchronous article load on every keystroke.
+    for key in (mainframe.wx.WXK_UP, mainframe.wx.WXK_DOWN):
+        scheduled = _install_fake_call_later(monkeypatch)
+        host = _TreeNavHost()
+
+        key_evt = _DummyKeyEvent(key)
+        host.on_tree_key_down(key_evt)
+
+        assert key_evt.skipped is True
+        assert host._tree_keyboard_nav_defer_until > 0.0
+
+        host.on_tree_select(_DummyTreeEvent(host.tree.GetSelection()))
+
+        assert host.selected_views == []
+        assert host._tree_pending_feed_id == "feed-2"
+        assert len(scheduled) == 1
+        assert scheduled[0].delay_ms == 120
+
+        scheduled[0].callback()
+
+        assert host.selected_views == ["feed-2"]
+        assert host.config_manager.get("last_selected_feed") == "feed-2"
+
+
 def test_tree_home_end_variants_mark_selection_for_defer():
     keys = [
         getattr(mainframe.wx, "WXK_HOME", None),
@@ -419,6 +447,36 @@ def test_tree_home_end_variants_mark_selection_for_defer():
 
         assert evt.skipped is True
         assert host._is_tree_home_end_key(key) is True
+        assert host._tree_keyboard_nav_defer_until > 0.0
+
+
+def test_tree_navigation_variants_mark_selection_for_defer():
+    keys = [
+        getattr(mainframe.wx, "WXK_UP", None),
+        getattr(mainframe.wx, "WXK_DOWN", None),
+        getattr(mainframe.wx, "WXK_LEFT", None),
+        getattr(mainframe.wx, "WXK_RIGHT", None),
+        getattr(mainframe.wx, "WXK_PAGEUP", None),
+        getattr(mainframe.wx, "WXK_PAGEDOWN", None),
+        getattr(mainframe.wx, "WXK_NUMPAD_UP", None),
+        getattr(mainframe.wx, "WXK_NUMPAD_DOWN", None),
+        getattr(mainframe.wx, "WXK_NUMPAD_LEFT", None),
+        getattr(mainframe.wx, "WXK_NUMPAD_RIGHT", None),
+        getattr(mainframe.wx, "WXK_NUMPAD_PAGEUP", None),
+        getattr(mainframe.wx, "WXK_NUMPAD_PAGEDOWN", None),
+    ]
+    keys = [key for key in keys if key is not None]
+    assert keys
+
+    host = _TreeNavHost()
+    for key in keys:
+        host._tree_keyboard_nav_defer_until = 0.0
+        evt = _DummyKeyEvent(key)
+
+        host.on_tree_key_down(evt)
+
+        assert evt.skipped is True
+        assert host._is_tree_navigation_key(key) is True
         assert host._tree_keyboard_nav_defer_until > 0.0
 
 
@@ -459,9 +517,38 @@ def test_tree_home_end_second_selection_cancels_first_timer(monkeypatch):
     assert host.config_manager.get("last_selected_feed") == "feed-home"
 
 
-def test_tree_selection_without_home_end_commits_immediately(monkeypatch):
+def test_tree_rapid_arrow_navigation_commits_only_final_selection(monkeypatch):
+    # Rapid arrowing: each arrow keydown re-arms the defer window and each
+    # resulting selection reschedules the commit, stopping the prior timer, so
+    # only the final resting selection ever renders (one commit, not per keystroke).
+    scheduled = _install_fake_call_later(monkeypatch)
+    host = _TreeNavHost()
+    host.current_feed_id = "feed-start"
+
+    host.on_tree_key_down(_DummyKeyEvent(mainframe.wx.WXK_DOWN))
+    host.feed_id_for_event = "feed-a"
+    host.on_tree_select(_DummyTreeEvent(host.tree.GetSelection()))
+
+    host.on_tree_key_down(_DummyKeyEvent(mainframe.wx.WXK_DOWN))
+    host.feed_id_for_event = "feed-b"
+    host.on_tree_select(_DummyTreeEvent(host.tree.GetSelection()))
+
+    assert len(scheduled) == 2
+    assert scheduled[0].stopped is True
+    assert host.selected_views == []
+
+    scheduled[1].callback()
+
+    assert host.selected_views == ["feed-b"]
+    assert host.config_manager.get("last_selected_feed") == "feed-b"
+
+
+def test_tree_mouse_click_selection_commits_immediately(monkeypatch):
+    # A selection with NO preceding navigation keydown (mouse click or
+    # programmatic selection) never sets a defer window, so it must commit
+    # synchronously without scheduling a CallLater.
     def _unexpected_call_later(*args, **kwargs):
-        raise AssertionError("normal tree selection should not schedule CallLater")
+        raise AssertionError("mouse-click tree selection should not schedule CallLater")
 
     monkeypatch.setattr(mainframe.wx, "CallLater", _unexpected_call_later)
     host = _TreeNavHost()
@@ -471,6 +558,26 @@ def test_tree_selection_without_home_end_commits_immediately(monkeypatch):
     assert host.selected_views == ["feed-2"]
     assert host.config_manager.get("last_selected_feed") == "feed-2"
     assert host._tree_pending_feed_id is None
+
+
+def test_tree_arrow_keydown_before_selection_defers_commit(monkeypatch):
+    # Companion to the mouse-click case: the same selection, but preceded by an
+    # arrow keydown, must be deferred through the debounce timer rather than
+    # committing immediately.
+    scheduled = _install_fake_call_later(monkeypatch)
+    host = _TreeNavHost()
+
+    host.on_tree_key_down(_DummyKeyEvent(mainframe.wx.WXK_UP))
+    host.on_tree_select(_DummyTreeEvent(host.tree.GetSelection()))
+
+    assert host.selected_views == []
+    assert host._tree_pending_feed_id == "feed-2"
+    assert len(scheduled) == 1
+
+    scheduled[0].callback()
+
+    assert host.selected_views == ["feed-2"]
+    assert host.config_manager.get("last_selected_feed") == "feed-2"
 
 
 def test_tree_pending_selection_is_not_committed_if_tree_selection_changed(monkeypatch):
