@@ -177,6 +177,10 @@ class _FakeListCtrl:
     def GetFirstSelected(self):
         return 0
 
+    def GetNextSelected(self, idx):
+        _ = idx
+        return -1
+
     def GetFocusedItem(self):
         return 0
 
@@ -192,6 +196,8 @@ class _FakeListCtrl:
 class _DummyContextMenuHost:
     on_list_context_menu = mainframe.MainFrame.on_list_context_menu
     _get_selected_article_index = mainframe.MainFrame._get_selected_article_index
+    _get_selected_indices_raw = mainframe.MainFrame._get_selected_indices_raw
+    _get_selected_article_indices = mainframe.MainFrame._get_selected_article_indices
     _supports_article_delete = mainframe.MainFrame._supports_article_delete
     _supports_favorites = mainframe.MainFrame._supports_favorites
     _article_chapter_links = mainframe.MainFrame._article_chapter_links
@@ -342,6 +348,9 @@ class _DeleteHost:
     def _get_selected_article_index(self):
         return 0
 
+    def _get_selected_article_indices(self):
+        return [0]
+
     def _is_load_more_row(self, idx):
         _ = idx
         return False
@@ -356,7 +365,7 @@ class _DeleteHost:
     def _article_cache_id(self, article):
         return article.id
 
-    def _delete_article_thread(self, *args):
+    def _delete_articles_thread(self, *args):
         self.delete_thread_args = args
 
 
@@ -718,7 +727,7 @@ def test_delete_article_skips_confirmation_when_setting_disabled(monkeypatch):
     host.on_delete_article()
 
     assert len(started) == 1
-    assert started[0][1] == ("article-1", "article-1", "article:0")
+    assert started[0][1] == ([("article-1", "article-1", "article:0")], 0)
 
 
 def test_delete_article_can_explicitly_bypass_confirmation(monkeypatch):

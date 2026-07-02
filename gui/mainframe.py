@@ -377,7 +377,9 @@ class MainFrame(wx.Frame):
         right_splitter = wx.SplitterWindow(right_panel)
         
         # Top Right: List (Articles)
-        self.list_ctrl = wx.ListCtrl(right_splitter, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
+        # No LC_SINGLE_SEL: allow multiple articles to be selected (e.g. Shift+Up/Down
+        # to extend a range) so bulk actions like Delete/Copy work on the whole selection.
+        self.list_ctrl = wx.ListCtrl(right_splitter, style=wx.LC_REPORT)
         self.list_ctrl.SetName("Articles")
         self.list_ctrl.InsertColumn(ARTICLE_COL_TITLE, "Title", width=320)
         self.list_ctrl.InsertColumn(ARTICLE_COL_AUTHOR, "Author", width=110)
@@ -3112,7 +3114,11 @@ class MainFrame(wx.Frame):
                 hit_idx = hit[0] if isinstance(hit, tuple) else hit
                 if hit_idx != wx.NOT_FOUND:
                     idx = int(hit_idx)
-                    self.list_ctrl.Select(idx)
+                    # Right-clicking a row outside the current selection collapses to
+                    # just that row; right-clicking inside a multi-selection keeps it.
+                    if not self.list_ctrl.IsSelected(idx):
+                        self._clear_list_selection()
+                        self.list_ctrl.Select(idx)
                     self.list_ctrl.Focus(idx)
             except Exception:
                 pass
@@ -3123,22 +3129,41 @@ class MainFrame(wx.Frame):
 
         valid_article_idx = idx != wx.NOT_FOUND and 0 <= idx < len(self.current_articles) and not self._is_load_more_row(idx)
 
+        # When the clicked/focused row is part of a multi-selection, bulk actions
+        # (delete, copy, mark read/unread) act on the whole selection. Otherwise
+        # they act on just this row.
+        sel_indices = self._get_selected_article_indices()
+        if valid_article_idx and idx in sel_indices and len(sel_indices) > 1:
+            menu_indices = list(sel_indices)
+        elif valid_article_idx:
+            menu_indices = [idx]
+        else:
+            menu_indices = []
+        count = len(menu_indices)
+        multi = count > 1
+
         menu = wx.Menu()
         open_item = menu.Append(wx.ID_ANY, "Open Article")
         open_browser_item = menu.Append(wx.ID_ANY, "Open in Default Browser")
         menu.AppendSeparator()
-        mark_read_item = menu.Append(wx.ID_ANY, "Mark as &Read")
-        mark_unread_item = menu.Append(wx.ID_ANY, "Mark as &Unread")
+        if multi:
+            mark_read_item = menu.Append(wx.ID_ANY, f"Mark {count} as &Read")
+            mark_unread_item = menu.Append(wx.ID_ANY, f"Mark {count} as &Unread")
+        else:
+            mark_read_item = menu.Append(wx.ID_ANY, "Mark as &Read")
+            mark_unread_item = menu.Append(wx.ID_ANY, "Mark as &Unread")
         delete_item = None
         if valid_article_idx and self._supports_article_delete():
-            delete_item = menu.Append(wx.ID_ANY, "Delete Article\tDel")
+            delete_label = f"Delete {count} Articles\tDel" if multi else "Delete Article\tDel"
+            delete_item = menu.Append(wx.ID_ANY, delete_label)
         menu.AppendSeparator()
-        copy_item = menu.Append(wx.ID_ANY, "Copy Link")
+        copy_item = menu.Append(wx.ID_ANY, "Copy Links" if multi else "Copy Link")
         download_item = None
         if valid_article_idx:
             article_for_menu = self.current_articles[idx]
-            copy_text_item = menu.Append(wx.ID_ANY, "Copy Text")
-            self.Bind(wx.EVT_MENU, lambda e, i=idx: self.on_copy_text(i), copy_text_item)
+            copy_text_label = f"Copy Text ({count} articles)" if multi else "Copy Text"
+            copy_text_item = menu.Append(wx.ID_ANY, copy_text_label)
+            self.Bind(wx.EVT_MENU, lambda e, ii=list(menu_indices): self.on_copy_texts(ii), copy_text_item)
             view_description_item = menu.Append(wx.ID_ANY, "View Feed Description...")
             self.Bind(wx.EVT_MENU, lambda e, i=idx: self.on_view_feed_description(i), view_description_item)
             if article_for_menu.media_url:
@@ -3189,13 +3214,14 @@ class MainFrame(wx.Frame):
         # Bindings for list menu items need to use the current idx or selected article
         # on_article_activate (event) needs an event object, but I can re-create one or just call its core logic
         # For simplicity, pass idx to lambda
+        mark_targets = list(menu_indices) if menu_indices else ([idx] if valid_article_idx else [])
         self.Bind(wx.EVT_MENU, lambda e: self.on_article_activate(event=self._make_list_activate_event(idx)), open_item)
         self.Bind(wx.EVT_MENU, lambda e: self.on_open_in_browser(idx), open_browser_item)
-        self.Bind(wx.EVT_MENU, lambda e: self.mark_article_read(idx), mark_read_item)
-        self.Bind(wx.EVT_MENU, lambda e: self.mark_article_unread(idx), mark_unread_item)
+        self.Bind(wx.EVT_MENU, lambda e, ii=list(mark_targets): self._mark_indices(ii, True), mark_read_item)
+        self.Bind(wx.EVT_MENU, lambda e, ii=list(mark_targets): self._mark_indices(ii, False), mark_unread_item)
         if delete_item is not None:
             self.Bind(wx.EVT_MENU, lambda e: self.on_delete_article(), delete_item)
-        self.Bind(wx.EVT_MENU, lambda e: self.on_copy_link(idx), copy_item)
+        self.Bind(wx.EVT_MENU, lambda e, ii=list(mark_targets): self.on_copy_links(ii), copy_item)
 
         self.list_ctrl.PopupMenu(menu, menu_pos)
         menu.Destroy()
@@ -3226,6 +3252,17 @@ class MainFrame(wx.Frame):
                 wx.TheClipboard.SetData(wx.TextDataObject(article.url))
                 wx.TheClipboard.Flush()
                 wx.TheClipboard.Close()
+
+    def on_copy_links(self, indices):
+        """Copy the URLs of the given articles, one per line."""
+        urls = []
+        for idx in list(indices or []):
+            if 0 <= idx < len(self.current_articles):
+                url = str(getattr(self.current_articles[idx], "url", "") or "")
+                if url:
+                    urls.append(url)
+        if urls:
+            self._copy_to_clipboard("\n".join(urls))
 
     def _has_direct_media_link(self, article) -> bool:
         """True only when the article's media_url is a direct, copyable media file.
@@ -3277,6 +3314,17 @@ class MainFrame(wx.Frame):
         if 0 <= idx < len(self.current_articles):
             article = self.current_articles[idx]
             self._copy_to_clipboard(self._compose_article_copy_text(article, idx))
+
+    def on_copy_texts(self, indices):
+        """Copy the readable text of several articles, separated by a divider."""
+        parts = []
+        for idx in list(indices or []):
+            if 0 <= idx < len(self.current_articles):
+                article = self.current_articles[idx]
+                parts.append(self._compose_article_copy_text(article, idx))
+        if parts:
+            separator = "\n\n" + ("=" * 40) + "\n\n"
+            self._copy_to_clipboard(separator.join(parts))
 
     def on_view_feed_description(self, idx=None):
         if idx is None:
@@ -3534,6 +3582,49 @@ class MainFrame(wx.Frame):
                 idx = wx.NOT_FOUND
         return idx
 
+    def _get_selected_indices_raw(self) -> list[int]:
+        """All currently selected row indices, in list order."""
+        indices: list[int] = []
+        try:
+            i = self.list_ctrl.GetFirstSelected()
+            while i != wx.NOT_FOUND:
+                indices.append(i)
+                i = self.list_ctrl.GetNextSelected(i)
+        except Exception:
+            log.exception("Error enumerating selected list rows")
+            indices = []
+        return indices
+
+    def _get_selected_article_indices(self) -> list[int]:
+        """Selected rows that map to real articles (excludes the Load More row)."""
+        result: list[int] = []
+        for i in self._get_selected_indices_raw():
+            if i is None or i < 0 or i >= len(self.current_articles):
+                continue
+            if self._is_load_more_row(i):
+                continue
+            result.append(i)
+        return result
+
+    def _clear_list_selection(self) -> None:
+        """Deselect every currently selected row."""
+        for i in self._get_selected_indices_raw():
+            try:
+                self.list_ctrl.SetItemState(i, 0, wx.LIST_STATE_SELECTED)
+            except Exception:
+                pass
+
+    def _mark_indices(self, indices, read: bool) -> None:
+        """Mark each of the given article rows read/unread."""
+        for idx in list(indices or []):
+            try:
+                if read:
+                    self.mark_article_read(idx)
+                else:
+                    self.mark_article_unread(idx)
+            except Exception:
+                log.exception("Error marking article read/unread at index %s", idx)
+
     def _is_favorites_view(self, view_id: str) -> bool:
         view_id = view_id or ""
         return view_id.startswith("favorites:") or view_id.startswith("fav:")
@@ -3654,31 +3745,20 @@ class MainFrame(wx.Frame):
             log.exception("Error removing article from cached views")
 
     def on_delete_article(self, event=None, *, confirm: bool | None = None):
-        idx = self._get_selected_article_index()
-        if idx == wx.NOT_FOUND:
-            return
-        if self._is_load_more_row(idx):
-            return
-        if idx < 0 or idx >= len(self.current_articles):
-            return
-
-        article = self.current_articles[idx]
-        if confirm is None:
-            try:
-                confirm = bool(self.config_manager.get("confirm_article_delete", True))
-            except Exception:
-                confirm = True
-        if confirm:
-            try:
-                ok = wx.MessageBox(
-                    "Delete this article? This cannot be undone.",
-                    "Confirm Delete",
-                    wx.YES_NO | wx.ICON_WARNING,
-                )
-            except Exception:
-                ok = wx.NO
-            if ok != wx.YES:
+        # Operate on the whole selection so several articles can be deleted at
+        # once (e.g. Shift+Up/Down to select a range, then Delete). Fall back to
+        # the focused row when nothing is explicitly selected.
+        indices = self._get_selected_article_indices()
+        if not indices:
+            idx = self._get_selected_article_index()
+            if (
+                idx == wx.NOT_FOUND
+                or self._is_load_more_row(idx)
+                or idx < 0
+                or idx >= len(self.current_articles)
+            ):
                 return
+            indices = [idx]
 
         if not self._supports_article_delete():
             wx.MessageBox(
@@ -3688,61 +3768,103 @@ class MainFrame(wx.Frame):
             )
             return
 
-        cache_key, _url, _aid = self._fulltext_cache_key_for_article(article, idx)
+        count = len(indices)
+        if confirm is None:
+            try:
+                confirm = bool(self.config_manager.get("confirm_article_delete", True))
+            except Exception:
+                confirm = True
+        if confirm:
+            prompt = (
+                "Delete this article? This cannot be undone."
+                if count == 1
+                else f"Delete {count} articles? This cannot be undone."
+            )
+            try:
+                ok = wx.MessageBox(prompt, "Confirm Delete", wx.YES_NO | wx.ICON_WARNING)
+            except Exception:
+                ok = wx.NO
+            if ok != wx.YES:
+                return
+
+        # Snapshot identifiers up front so shifting indices during removal can't
+        # affect which articles get deleted.
+        items = []
+        for idx in indices:
+            article = self.current_articles[idx]
+            cache_key, _url, _aid = self._fulltext_cache_key_for_article(article, idx)
+            items.append((article.id, self._article_cache_id(article), cache_key))
+        anchor_idx = min(indices)
+
         threading.Thread(
-            target=self._delete_article_thread,
-            args=(article.id, self._article_cache_id(article), cache_key),
+            target=self._delete_articles_thread,
+            args=(items, anchor_idx),
             daemon=True,
         ).start()
 
-    def _delete_article_thread(self, article_id: str, article_cache_id: str, cache_key: str) -> None:
-        ok = False
-        err = ""
-        try:
-            ok = bool(self.provider.delete_article(article_id))
-        except Exception as e:
-            err = str(e) or "Unknown error"
-        wx.CallAfter(self._post_delete_article, article_id, article_cache_id, cache_key, ok, err)
+    def _delete_articles_thread(self, items, anchor_idx: int) -> None:
+        results = []
+        for article_id, article_cache_id, cache_key in items:
+            ok = False
+            err = ""
+            try:
+                ok = bool(self.provider.delete_article(article_id))
+            except Exception as e:
+                err = str(e) or "Unknown error"
+            results.append((article_id, article_cache_id, cache_key, ok, err))
+        wx.CallAfter(self._post_delete_articles, results, anchor_idx)
 
-    def _post_delete_article(self, article_id: str, article_cache_id: str, cache_key: str, ok: bool, err: str) -> None:
-        if not ok:
-            msg = "Could not delete article."
-            if err:
-                msg += f"\n\n{err}"
-            wx.MessageBox(msg, "Error", wx.ICON_ERROR)
-            return
+    def _post_delete_articles(self, results, anchor_idx: int = 0) -> None:
+        deleted_any = False
+        failures = []
+        for article_id, article_cache_id, cache_key, ok, err in results:
+            if not ok:
+                failures.append((article_id, err))
+                continue
+            deleted_any = True
+            try:
+                self._fulltext_cache.pop(cache_key, None)
+            except Exception:
+                pass
+            try:
+                self._fulltext_cache_source.pop(cache_key, None)
+            except Exception:
+                pass
 
-        try:
-            self._fulltext_cache.pop(cache_key, None)
-        except Exception:
-            pass
-        try:
-            self._fulltext_cache_source.pop(cache_key, None)
-        except Exception:
-            pass
+            idx = None
+            for i, a in enumerate(self.current_articles):
+                if self._article_cache_id(a) == article_cache_id:
+                    idx = i
+                    break
+            if idx is not None:
+                self._remove_article_from_current_list(idx)
+            self._remove_article_from_cached_views(article_cache_id)
 
-        idx = None
-        for i, a in enumerate(self.current_articles):
-            if self._article_cache_id(a) == article_cache_id:
-                idx = i
-                break
-
-        if idx is not None:
-            self._remove_article_from_current_list(idx)
-
-        self._remove_article_from_cached_views(article_cache_id)
+        if failures:
+            n = len(failures)
+            first_err = next((e for _id, e in failures if e), "")
+            msg = "Could not delete article." if n == 1 else f"Could not delete {n} articles."
+            if first_err:
+                msg += f"\n\n{first_err}"
+            try:
+                wx.MessageBox(msg, "Error", wx.ICON_ERROR)
+            except Exception:
+                pass
 
         if not self.current_articles:
             self._show_empty_articles_state()
             return
 
+        if not deleted_any:
+            return
+
         # Select the next closest item to keep navigation smooth.
-        next_idx = 0
-        if idx is not None:
-            next_idx = min(idx, len(self.current_articles) - 1)
+        next_idx = min(max(0, int(anchor_idx)), len(self.current_articles) - 1)
         try:
+            self._clear_list_selection()
             self.list_ctrl.Select(next_idx)
             self.list_ctrl.Focus(next_idx)
+            self.list_ctrl.EnsureVisible(next_idx)
         except Exception:
             pass
 
