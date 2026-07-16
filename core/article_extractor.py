@@ -136,7 +136,7 @@ _BOT_INTERSTITIAL_MARKERS = (
 # discarded. Only treat a post-extraction body as a gate when it is small.
 _BOT_INTERSTITIAL_MAX_BODY_LEN = 1500
 
-_BLOCKED_INTERSTITIAL_MESSAGE = (
+_BLOCKED_INTERSTITIAL_MESSAGE = _(
     "This page is behind an anti-bot / human-verification check "
     "(e.g. Cloudflare or a \"you're not a robot\" page), so the full text can't be fetched "
     "automatically. Open the original link in your browser to read it."
@@ -152,7 +152,7 @@ _LINK_LIST_MAX_LINE_LEN = 90
 _LINK_LIST_MIN_FRACTION = 0.6
 _LINK_LIST_SENTENCE_END_RE = re.compile(r"[.!?…](\s|$)")
 
-_LINK_LIST_ONLY_MESSAGE = (
+_LINK_LIST_ONLY_MESSAGE = _(
     "The page has no readable article text — only navigation or related-story links were "
     "found (common for video-only pages). Open the original link in your browser to view it."
 )
@@ -214,7 +214,7 @@ _PAYWALL_CTA_RE = re.compile(
     r")"
 )
 
-_PAYWALL_MESSAGE = (
+_PAYWALL_MESSAGE = _(
     "This article is behind a paywall (subscription required), so the full text can't be "
     "fetched automatically. Open the original link in your browser to read it."
 )
@@ -1477,7 +1477,7 @@ _GOOGLE_NEWS_LOCALE_QUERY = "hl=en-US&gl=US&ceid=US:en"
 _GOOGLE_NEWS_OPAQUE_ID_RE = re.compile(r"[A-Za-z0-9_-]{12,}")
 _GOOGLE_NEWS_MAX_TIMESTAMP = 99_999_999_999
 _GOOGLE_NEWS_MAX_SIGNATURE_LENGTH = 4096
-_GOOGLE_NEWS_RESOLUTION_MESSAGE = (
+_GOOGLE_NEWS_RESOLUTION_MESSAGE = _(
     "Google News could not resolve the original publisher link. "
     "Open the original link in your browser to read it."
 )
@@ -2562,7 +2562,7 @@ def extract_full_article(
     if not url or _looks_like_media_url(url):
         return None
     if trafilatura is None:
-        raise ExtractionError("trafilatura is not installed or failed to import. Reinstall requirements.")
+        raise ExtractionError(_("trafilatura is not installed or failed to import. Reinstall requirements."))
 
     visited: Set[str] = set()
     page_texts: List[str] = []
@@ -2643,7 +2643,7 @@ def extract_full_article(
     if not downloaded_any:
         if blocked:
             raise ExtractionError(_BLOCKED_INTERSTITIAL_MESSAGE)
-        raise ExtractionError("Download failed (site blocked, offline, or connection problem).")
+        raise ExtractionError(_("Download failed (site blocked, offline, or connection problem)."))
 
     merged = _merge_texts(page_texts)
     merged = _postprocess_extracted_text(merged, extraction_url)
@@ -2660,7 +2660,7 @@ def extract_full_article(
     if merged and _looks_like_paywall_stub(merged):
         raise ExtractionError(_PAYWALL_MESSAGE)
     if not merged:
-        raise ExtractionError("Downloaded page, but could not extract readable text (empty result).")
+        raise ExtractionError(_("Downloaded page, but could not extract readable text (empty result)."))
 
     return FullArticle(url=url, title=title or "", author=author or "", text=merged)
 
@@ -2749,7 +2749,7 @@ def render_full_article(
         # Remember why so we can surface it if there's no usable feed fallback either.
         extraction_error = e
     except Exception as e:
-        raise ExtractionError(str(e) or "Unknown extraction error")
+        raise ExtractionError(str(e) or _("Unknown extraction error"))
 
     # If URL extraction returned None, try fallback content.
     art = extract_from_html(fallback_html, url, title=fallback_title, author=fallback_author)
@@ -2758,7 +2758,7 @@ def render_full_article(
 
     if extraction_error is not None:
         raise extraction_error
-    raise ExtractionError("Could not extract full text from the webpage or from feed content.")
+    raise ExtractionError(_("Could not extract full text from the webpage or from feed content."))
 
 
 def _should_prefer_feed_content(url: str, html: str) -> bool:
