@@ -1497,10 +1497,6 @@ msgstr ""
 msgid "&Browse..."
 msgstr "Обзор..."
 
-#: gui/dialogs.py:557
-msgid "Text files (*.txt)|*.txt|All files (*.*)|*.*"
-msgstr "Текстовые файлы (*.txt)|*.txt|Все файлы (*.*)|*.*"
-
 #: gui/dialogs.py:574
 msgid ""
 "No supported browser profiles were found.\n"
@@ -3164,8 +3160,8 @@ msgstr "Не удалось выполнить импорт"
 msgid "Executables"
 msgstr "Исполняемые файлы"
 
-#: gui/dialogs.py:3137 gui/dialogs.py:3139 gui/dialogs.py:2982
-#: gui/dialogs.py:3100
+#: gui/dialogs.py:3137 gui/dialogs.py:3139 gui/dialogs.py:557
+#: gui/dialogs.py:2982
 msgid "All files"
 msgstr "Все файлы"
 
@@ -3290,6 +3286,10 @@ msgstr "{sign}{v} дБ"
 msgid "&Preset:"
 msgstr "&Предустановка:"
 
+#: gui/dialogs.py:557 gui/dialogs.py:2982 gui/dialogs.py:3100
+msgid "Cookies"
+msgstr "Cookies"
+
 #: gui/dialogs.py:1612
 msgid "Inoreader App ID:"
 msgstr "Идентификатор приложения Inoreader:"
@@ -3309,10 +3309,6 @@ msgid ""
 msgstr ""
 "Проверка объявлений BlindRSS. Если вы слышите или читаете это, значит, "
 "объявления работают."
-
-#: gui/dialogs.py:2982 gui/dialogs.py:3100
-msgid "Cookies"
-msgstr "Cookies"
 
 #: gui/dialogs.py:3013
 msgid "The playback cache is already empty."
@@ -5247,6 +5243,3 @@ msgstr "Непрочитано: {count}"
 #: main.py:267
 msgid "BlindRSS is already running."
 msgstr "BlindRSS уже запущен."
-
-#~ msgid "Show/Hide &Player (Ctrl+Shift+P)"
-#~ msgstr "Показать/скрыть про&игрыватель (Ctrl+Shift+P)"

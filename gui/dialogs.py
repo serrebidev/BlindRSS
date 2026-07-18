@@ -554,7 +554,7 @@ class ImportSiteCookiesDialog(wx.Dialog):
         dlg = wx.FileDialog(
             self,
             _("Choose the exported cookies.txt"),
-            wildcard=_("Text files (*.txt)|*.txt|All files (*.*)|*.*"),
+            wildcard=f'{_("Cookies")} (*.txt)|*.txt|{_("All files")} (*.*)|*.*',
             style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
         )
         try:

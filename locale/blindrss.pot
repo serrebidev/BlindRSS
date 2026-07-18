@@ -1513,10 +1513,6 @@ msgstr ""
 msgid "&Browse..."
 msgstr ""
 
-#: gui/dialogs.py:557
-msgid "Text files (*.txt)|*.txt|All files (*.*)|*.*"
-msgstr ""
-
 #: gui/dialogs.py:574
 msgid "No supported browser profiles were found.\n\nCookies can be read directly from Firefox-based browsers (Firefox, LibreWolf, Waterfox, Floorp, Zen). Chrome-based browsers encrypt their cookies; use the \"Get cookies.txt LOCALLY\" extension linked above and import the exported file instead."
 msgstr ""
@@ -3077,8 +3073,8 @@ msgstr ""
 
 #: gui/dialogs.py:3137
 #: gui/dialogs.py:3139
+#: gui/dialogs.py:557
 #: gui/dialogs.py:2982
-#: gui/dialogs.py:3100
 msgid "All files"
 msgstr ""
 
@@ -3192,6 +3188,12 @@ msgstr ""
 msgid "&Preset:"
 msgstr ""
 
+#: gui/dialogs.py:557
+#: gui/dialogs.py:2982
+#: gui/dialogs.py:3100
+msgid "Cookies"
+msgstr ""
+
 #: gui/dialogs.py:1612
 msgid "Inoreader App ID:"
 msgstr ""
@@ -3206,11 +3208,6 @@ msgstr ""
 
 #: gui/dialogs.py:2578
 msgid "BlindRSS announcement test. If you can hear or read this, announcements are working."
-msgstr ""
-
-#: gui/dialogs.py:2982
-#: gui/dialogs.py:3100
-msgid "Cookies"
 msgstr ""
 
 #: gui/dialogs.py:3013
