@@ -695,6 +695,7 @@ class SettingsDialog(wx.Dialog):
             (_("Czech"), "cs"),
             (_("Danish"), "da"),
             (_("Divehi"), "dv"),
+            (_("Dutch (Belgium)"), "nl-BE"),
             (_("Dutch"), "nl"),
             (_("Dzongkha"), "dz"),
             (_("English"), "en"),
