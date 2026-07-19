@@ -3899,18 +3899,19 @@ class FeedErrorsDialog(wx.Dialog):
         n = len(self._errors)
         if n == 0:
             return _("No feeds reported errors during their most recent update.")
-        if n == 1:
-            return _("1 feed failed to update during its most recent attempt:")
-        return f"{n} feeds failed to update during their most recent attempt:"
+        return ngettext(
+            "{n} feed failed to update during its most recent attempt:",
+            "{n} feeds failed to update during their most recent attempt:",
+            n).format(n=n)
 
     @staticmethod
     def _format_timestamp(ts) -> str:
         if ts is None:
-            return "Unknown"
+            return _("Unknown")
         try:
             return time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(float(ts)))
         except (ValueError, TypeError, OverflowError, OSError):
-            return "Unknown"
+            return _("Unknown")
 
     @staticmethod
     def _one_line(text: str, limit: int = 220) -> str:
@@ -3951,19 +3952,36 @@ class FeedErrorsDialog(wx.Dialog):
     def _build_detail_text(self, err) -> str:
         failures = int(err.get("consecutive_failures") or 0)
         if failures <= 1:
-            failures_line = "1 failed attempt so far (this may be a one-off glitch)."
+            failures_line = _("1 failed attempt so far (this may be a one-off glitch).")
         else:
-            failures_line = f"{failures} consecutive failed attempts (likely a persistent problem)."
+            failures_line = ngettext(
+                "{n} consecutive failed attempt (likely a persistent problem).",
+                "{n} consecutive failed attempts (likely a persistent problem).",
+                failures).format(n=failures)
         last_success = err.get("last_success_at")
-        success_line = self._format_timestamp(last_success) if last_success else "No successful update recorded."
-        return (
-            f"Feed: {err.get('title') or 'Untitled feed'}\n"
-            f"URL: {err.get('url') or '(unknown)'}\n"
-            f"Category: {category_display_name(err.get('category') or UNCATEGORIZED)}\n"
-            f"Last update attempt: {self._format_timestamp(err.get('last_error_at'))}\n"
-            f"Last successful update: {success_line}\n"
-            f"{failures_line}\n\n"
-            f"Error:\n{err.get('last_error') or 'Unknown error'}"
+        title = err.get('title') or _("Untitled feed")
+        url = err.get('url') or _("(unknown)")
+        category = category_display_name(err.get('category') or UNCATEGORIZED)
+        attempt = self._format_timestamp(err.get('last_error_at'))
+        successful = self._format_timestamp(last_success) if last_success else _("No successful update recorded.")
+        description = failures_line
+        error = err.get('last_error') or _("Unknown error")
+        return _(
+            "Feed: {title}\n"
+            "URL: {url}\n"
+            "Category: {category}\n"
+            "Last update attempt: {attempt}\n"
+            "Last successful update: {successful}\n"
+            "{description}\n\n"
+            "Error:\n{error}"
+        ).format(
+            title=title,
+            url=url,
+            category=category,
+            attempt=attempt,
+            successful=successful,
+            description=description,
+            error=error
         )
 
     def on_select(self, event=None):
