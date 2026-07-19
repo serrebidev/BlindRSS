@@ -622,7 +622,7 @@ class ImportSiteCookiesDialog(wx.Dialog):
         if ua:
             self.ua_ctrl.SetValue(ua)
             self._site_cookies.set_user_agent(ua)
-        message = _("Imported {count} cookies from {browser}.").format(
+        message = ngettext("Imported {count} cookies from {browser}.", "Imported {count} cookies from {browser}.", count).format(
             count=count, browser=chosen["browser"]
         )
         self.status_lbl.SetLabel(message)
