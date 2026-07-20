@@ -6463,15 +6463,15 @@ class YtdlpGlobalSearchDialog(wx.Dialog):
                         return
                     st = str(status_text or "").strip()
                     if st.lower() in ("playing",):
-                        lbl.SetLabel(f"Playing: {title_str}" if title_str else "Playing")
+                        lbl.SetLabel(_("Playing: {title}").format(title=title_str) if title_str else _("Playing"))
                     elif st.lower() in ("paused",):
-                        lbl.SetLabel(f"Paused: {title_str}" if title_str else "Paused")
+                        lbl.SetLabel(_("Paused: {title}").format(title=title_str) if title_str else _("Paused"))
                     elif st.lower() in ("stopped",):
                         lbl.SetLabel(_("Ready."))
                     elif st.lower().startswith("buffering"):
-                        lbl.SetLabel(f"Buffering: {title_str}" if title_str else "Buffering...")
+                        lbl.SetLabel(_("Buffering: {title}").format(title=title_str) if title_str else _("Buffering..."))
                     elif st.lower().startswith("connecting"):
-                        lbl.SetLabel(f"Connecting: {title_str}" if title_str else "Connecting...")
+                        lbl.SetLabel(_("Connecting: {title}").format(title=title_str) if title_str else _("Connecting..."))
                 except Exception:
                     pass
 

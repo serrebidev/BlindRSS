@@ -1353,7 +1353,7 @@ msgstr "Тип"
 msgid "Close"
 msgstr "Закрыть"
 
-#: gui/dialogs.py:6364 gui/player.py:2023
+#: gui/dialogs.py:6364 gui/player.py:2023 gui/player.py:5448
 msgid "Play"
 msgstr "Воспроизведение"
 
@@ -3463,6 +3463,11 @@ msgstr "Путь к {tool}:"
 msgid "WAV files"
 msgstr "WAV файлы"
 
+#: gui/dialogs.py:6466 gui/mainframe.py:1729 gui/player.py:3947
+#: gui/player.py:6322
+msgid "Playing"
+msgstr "Воспроизводимое"
+
 #: gui/dialogs.py:6523
 msgid "Could not start playback: {error}"
 msgstr "Не удалось запустить воспроизведение: {error}"
@@ -3474,6 +3479,35 @@ msgid ""
 msgstr ""
 "{accel} уже назначено на «{other}».\n"
 "Переназначить его на «{this}»?"
+
+#: gui/dialogs.py:6468 gui/mainframe.py:1729 gui/player.py:6378
+#: gui/player.py:6395
+msgid "Paused"
+msgstr "Приостановлено"
+
+#: gui/dialogs.py:6466
+msgid "Playing: {title}"
+msgstr "Воспроизведение: {title}"
+
+#: gui/dialogs.py:6468
+msgid "Paused: {title}"
+msgstr "Приостановлен: {title}"
+
+#: gui/dialogs.py:6472 gui/player.py:4008 gui/player.py:4414
+msgid "Buffering..."
+msgstr "Буферизация..."
+
+#: gui/dialogs.py:6474 gui/player.py:4145
+msgid "Connecting..."
+msgstr "Подключение..."
+
+#: gui/dialogs.py:6472
+msgid "Buffering: {title}"
+msgstr "Буферизация: {title}"
+
+#: gui/dialogs.py:6474
+msgid "Connecting: {title}"
+msgstr "Подключение: {title}"
 
 #: gui/mainframe.py:3931
 msgid "New article available."
@@ -4432,15 +4466,6 @@ msgstr ""
 msgid "Success"
 msgstr "Успешно"
 
-#: gui/mainframe.py:1729 gui/player.py:3947 gui/player.py:6322
-#: gui/player.py:6014
-msgid "Playing"
-msgstr "Воспроизводимое"
-
-#: gui/mainframe.py:1729 gui/player.py:6378 gui/player.py:6395
-msgid "Paused"
-msgstr "Приостановлено"
-
 #: gui/mainframe.py:2876
 msgid "End of play queue."
 msgstr "Конец очереди воспроизведения."
@@ -5130,15 +5155,11 @@ msgstr "&Отключить трансляцию"
 msgid "&Cast to Device..."
 msgstr "&Трансляция на устройство..."
 
-#: gui/player.py:4145
-msgid "Connecting..."
-msgstr "Подключение..."
-
 #: gui/player.py:5327
 msgid "Elapsed Time"
 msgstr "Прошло времени"
 
-#: gui/player.py:6434 gui/player.py:6546
+#: gui/player.py:6434 gui/player.py:6546 gui/player.py:4420
 msgid "Stopped"
 msgstr "Остановлено"
 
@@ -5219,10 +5240,6 @@ msgstr "Не удалось загрузить мультимедиа"
 msgid "VLC is not initialized. Playback is unavailable."
 msgstr "VLC не инициализирован. Воспроизведение недоступно."
 
-#: gui/player.py:4008
-msgid "Buffering..."
-msgstr "Буферизация..."
-
 #: gui/player.py:4205
 msgid "Downloading for playback..."
 msgstr "Загрузка для воспроизведения..."
@@ -5259,6 +5276,10 @@ msgstr "Загрузка мультимедиа..."
 msgid "Elapsed {elapsed}"
 msgstr "Прошло {elapsed}"
 
+#: gui/player.py:5448
+msgid "Pause"
+msgstr "Пауза"
+
 #: gui/player.py:494
 msgid "Could not start pairing: {error}"
 msgstr "Не удалось запустить сопряжение: {error}"
@@ -5270,6 +5291,10 @@ msgstr "Ошибка сопряжения: {error}"
 #: gui/player.py:2268
 msgid "Open Link for {chapter}"
 msgstr "Открыть ссылку на {chapter}"
+
+#: gui/player.py:2282
+msgid "[Current]"
+msgstr "[Текущий]"
 
 #: gui/player.py:2492
 msgid "Casting failed: {error}"

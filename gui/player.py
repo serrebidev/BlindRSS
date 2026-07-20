@@ -2279,7 +2279,7 @@ class PlayerFrame(wx.Frame):
                 for i, ch in enumerate(chapters):
                     label = self._format_chapter_menu_label(ch)
                     if int(i) == int(active_idx):
-                        label = f"[Current] {label}"
+                        label = f'{_("[Current]")} {label}'
                     item = menu.Append(wx.ID_ANY, label)
                     menu.Bind(wx.EVT_MENU, lambda evt, idx=i: self._jump_to_chapter_index(idx), item)
             apply_menu_mnemonics(menu)
@@ -4411,13 +4411,13 @@ class PlayerFrame(wx.Frame):
         status = None
         try:
             if state in (vlc.State.Opening, vlc.State.Buffering):
-                status = "Buffering..."
+                status = _("Buffering...")
             elif playing_now:
-                status = "Playing"
+                status = _("Playing")
             elif state == vlc.State.Paused:
-                status = "Paused"
+                status = _("Paused")
             elif state in (vlc.State.Ended, vlc.State.Stopped, vlc.State.Error):
-                status = "Stopped"
+                status = _("Stopped")
         except Exception:
             status = None
 
@@ -5445,7 +5445,7 @@ class PlayerFrame(wx.Frame):
     def _set_play_button_label(self, playing: bool) -> None:
         try:
             if getattr(self, "play_btn", None):
-                self.play_btn.SetLabel("Pause" if playing else "Play")
+                self.play_btn.SetLabel(_("Pause") if playing else _("Play"))
         except Exception:
             pass
 

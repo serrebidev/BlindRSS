@@ -1379,6 +1379,7 @@ msgstr ""
 
 #: gui/dialogs.py:6364
 #: gui/player.py:2023
+#: gui/player.py:5448
 msgid "Play"
 msgstr ""
 
@@ -3326,12 +3327,53 @@ msgstr ""
 msgid "WAV files"
 msgstr ""
 
+#: gui/dialogs.py:6466
+#: gui/mainframe.py:1729
+#: gui/player.py:3947
+#: gui/player.py:6322
+msgid "Playing"
+msgstr ""
+
 #: gui/dialogs.py:6523
 msgid "Could not start playback: {error}"
 msgstr ""
 
 #: gui/dialogs.py:7171
 msgid "{accel} is already assigned to “{other}”.\nReassign it to “{this}”?"
+msgstr ""
+
+#: gui/dialogs.py:6468
+#: gui/mainframe.py:1729
+#: gui/player.py:6378
+#: gui/player.py:6395
+msgid "Paused"
+msgstr ""
+
+#: gui/dialogs.py:6466
+msgid "Playing: {title}"
+msgstr ""
+
+#: gui/dialogs.py:6468
+msgid "Paused: {title}"
+msgstr ""
+
+#: gui/dialogs.py:6472
+#: gui/player.py:4008
+#: gui/player.py:4414
+msgid "Buffering..."
+msgstr ""
+
+#: gui/dialogs.py:6474
+#: gui/player.py:4145
+msgid "Connecting..."
+msgstr ""
+
+#: gui/dialogs.py:6472
+msgid "Buffering: {title}"
+msgstr ""
+
+#: gui/dialogs.py:6474
+msgid "Connecting: {title}"
 msgstr ""
 
 #: gui/mainframe.py:3931
@@ -4273,19 +4315,6 @@ msgstr ""
 msgid "Success"
 msgstr ""
 
-#: gui/mainframe.py:1729
-#: gui/player.py:3947
-#: gui/player.py:6322
-#: gui/player.py:6014
-msgid "Playing"
-msgstr ""
-
-#: gui/mainframe.py:1729
-#: gui/player.py:6378
-#: gui/player.py:6395
-msgid "Paused"
-msgstr ""
-
 #: gui/mainframe.py:2876
 msgid "End of play queue."
 msgstr ""
@@ -4918,16 +4947,13 @@ msgstr ""
 msgid "&Cast to Device..."
 msgstr ""
 
-#: gui/player.py:4145
-msgid "Connecting..."
-msgstr ""
-
 #: gui/player.py:5327
 msgid "Elapsed Time"
 msgstr ""
 
 #: gui/player.py:6434
 #: gui/player.py:6546
+#: gui/player.py:4420
 msgid "Stopped"
 msgstr ""
 
@@ -5009,10 +5035,6 @@ msgstr ""
 msgid "VLC is not initialized. Playback is unavailable."
 msgstr ""
 
-#: gui/player.py:4008
-msgid "Buffering..."
-msgstr ""
-
 #: gui/player.py:4205
 msgid "Downloading for playback..."
 msgstr ""
@@ -5049,6 +5071,10 @@ msgstr ""
 msgid "Elapsed {elapsed}"
 msgstr ""
 
+#: gui/player.py:5448
+msgid "Pause"
+msgstr ""
+
 #: gui/player.py:494
 msgid "Could not start pairing: {error}"
 msgstr ""
@@ -5059,6 +5085,10 @@ msgstr ""
 
 #: gui/player.py:2268
 msgid "Open Link for {chapter}"
+msgstr ""
+
+#: gui/player.py:2282
+msgid "[Current]"
 msgstr ""
 
 #: gui/player.py:2492
