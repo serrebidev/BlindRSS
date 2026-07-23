@@ -139,24 +139,24 @@ msgstr ""
 msgid "Google News could not resolve the original publisher link. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:4242
+#: core/article_extractor.py:4266
 #: gui/dialogs.py:4227
 msgid "(unknown)"
 msgstr ""
 
-#: core/article_extractor.py:4300
+#: core/article_extractor.py:4324
 msgid "Could not extract full text from the webpage or from feed content."
 msgstr ""
 
-#: core/article_extractor.py:4075
+#: core/article_extractor.py:4099
 msgid "trafilatura is not installed or failed to import. Reinstall requirements."
 msgstr ""
 
-#: core/article_extractor.py:4168
+#: core/article_extractor.py:4192
 msgid "Download failed (site blocked, offline, or connection problem)."
 msgstr ""
 
-#: core/article_extractor.py:4188
+#: core/article_extractor.py:4212
 msgid "Downloaded page, but could not extract readable text (empty result)."
 msgstr ""
 
@@ -164,19 +164,24 @@ msgstr ""
 msgid "This page is behind an anti-bot / human-verification check, and the access BlindRSS had for this site has expired — these checks only stay valid for a short time. Open the page in {browser} and BlindRSS will pick the access back up automatically within a minute."
 msgstr ""
 
-#: core/article_extractor.py:4243
+#: core/article_extractor.py:4267
 #: gui/dialogs.py:3596
 msgid "Title:"
 msgstr ""
 
-#: core/article_extractor.py:4244
+#: core/article_extractor.py:4268
 #: gui/accessibility.py:1476
 #: gui/mainframe.py:5732
 #: gui/mainframe.py:9565
 msgid "Author:"
 msgstr ""
 
-#: core/article_extractor.py:4291
+#: core/article_extractor.py:4085
+#: core/article_extractor.py:4096
+msgid "Could not retrieve YouTube video details."
+msgstr ""
+
+#: core/article_extractor.py:4315
 msgid "Unknown extraction error"
 msgstr ""
 

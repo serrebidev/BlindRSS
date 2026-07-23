@@ -4071,6 +4071,30 @@ def extract_full_article(
     url = (url or "").strip()
     if not url or _looks_like_media_url(url):
         return None
+
+    # YouTube's browser page progressively hydrates its description and
+    # comments, collapses reply branches, and exposes subtitles separately.
+    # Reconstruct the complete accessible document through yt-dlp before the
+    # generic HTML extractor gets a chance to return navigation boilerplate.
+    try:
+        from core import youtube_fulltext
+
+        if youtube_fulltext.is_youtube_video_url(url):
+            fields = youtube_fulltext.extract_article(url, timeout=timeout)
+            if not fields or not fields.get("text"):
+                raise ExtractionError(_("Could not retrieve YouTube video details."))
+            return FullArticle(
+                url=url,
+                title=fields.get("title") or "",
+                author=fields.get("author") or "",
+                text=fields["text"],
+            )
+    except ExtractionError:
+        raise
+    except Exception as exc:
+        LOG.debug("Structured YouTube extraction failed for %s", url, exc_info=True)
+        raise ExtractionError(str(exc) or _("Could not retrieve YouTube video details."))
+
     if trafilatura is None:
         raise ExtractionError(_("trafilatura is not installed or failed to import. Reinstall requirements."))
 

@@ -116,6 +116,7 @@ def test_json_chapters_normalize_sort_dedupe_and_preserve_metadata(monkeypatch, 
 )
 def test_json_chapters_require_standard_structure_and_compatible_mime(
     monkeypatch,
+    chapter_db,
     payload,
     content_type,
 ):
@@ -184,7 +185,7 @@ def test_external_chapter_cache_conditionally_revalidates_and_keeps_304_data(
     assert seen_headers[1]["Cache-Control"] == "no-cache, max-age=0"
 
 
-def test_chapter_redirect_rejects_private_target_before_following(monkeypatch):
+def test_chapter_redirect_rejects_private_target_before_following(monkeypatch, chapter_db):
     calls = []
 
     def fake_get(url, **_kwargs):
@@ -239,7 +240,7 @@ def test_hosted_chapter_cache_is_provider_scoped_without_local_article(
     ) == {"shared-id": chapters}
 
 
-def test_json_chapter_fetch_rejects_non_http_url_without_request(monkeypatch):
+def test_json_chapter_fetch_rejects_non_http_url_without_request(monkeypatch, chapter_db):
     monkeypatch.setattr(
         utils,
         "safe_requests_get",

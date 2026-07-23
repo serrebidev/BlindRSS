@@ -2001,6 +2001,32 @@ def chapter_source_and_media(item):
             if url and not media_url:
                 media_url = url
                 media_type = mime
+
+    # Hosted reader APIs often expose YouTube Atom items as ordinary article
+    # links with no enclosure. Treat only strict YouTube video links as media
+    # so their structured player chapters work through the provider-neutral
+    # chapter cache too.
+    if not media_url:
+        link_candidates = [item.get("url"), item.get("canonical")]
+        alternates = item.get("alternate") or item.get("alternates") or []
+        if isinstance(alternates, Mapping):
+            alternates = [alternates]
+        if isinstance(alternates, (list, tuple)):
+            link_candidates.extend(
+                alt.get("href") or alt.get("url")
+                for alt in alternates
+                if isinstance(alt, Mapping)
+            )
+        try:
+            from core import youtube_fulltext
+
+            for candidate in link_candidates:
+                if isinstance(candidate, str) and youtube_fulltext.is_youtube_video_url(candidate):
+                    media_url = candidate.strip()
+                    media_type = "video/youtube"
+                    break
+        except Exception:
+            pass
     return chapter_url, media_url, media_type
 
 
@@ -2294,6 +2320,29 @@ def fetch_and_store_chapters(
 
     if existing:
         return existing
+
+    # YouTube chapters are structured player metadata, not embedded in the
+    # watch-page HTML or the RSS enclosure. Store them through the same cache as
+    # podcast chapters so every GUI (including the accessible reader/player)
+    # sees one consistent chapter list.
+    if media_url:
+        try:
+            from core import youtube_fulltext
+
+            if youtube_fulltext.is_youtube_video_url(media_url):
+                parsed_chapters = _normalize_chapters(
+                    youtube_fulltext.extract_chapters(media_url)
+                )
+                if parsed_chapters:
+                    _replace_stored_chapters(
+                        article_key,
+                        parsed_chapters,
+                        cursor=cursor,
+                        cache_key=cache_key,
+                    )
+                return parsed_chapters
+        except Exception as e:
+            log.info("YouTube chapter extraction failed for %s: %s", media_url, e)
 
     if not allow_id3:
         return []

@@ -5491,7 +5491,7 @@ class LocalProvider(RSSProvider):
         try:
             c = conn.cursor()
             c.execute(
-                "SELECT media_url, media_type, chapter_url FROM articles WHERE id = ? LIMIT 1",
+                "SELECT media_url, media_type, chapter_url, url FROM articles WHERE id = ? LIMIT 1",
                 (article_id,),
             )
             row = c.fetchone()
@@ -5501,5 +5501,7 @@ class LocalProvider(RSSProvider):
         if not row:
             return []
 
-        media_url, media_type, chapter_url = row
+        media_url, media_type, chapter_url, article_url = row
+        if not media_url:
+            media_url = article_url
         return utils.fetch_and_store_chapters(article_id, media_url, media_type, chapter_url=chapter_url)

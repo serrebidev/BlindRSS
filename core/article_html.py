@@ -868,6 +868,22 @@ def _feed_fallback_html(fallback_html: str, url: str) -> str:
     return paras
 
 
+def _structured_youtube_text_html(text: str) -> str:
+    """Turn the shared YouTube text document into semantic rich-reader HTML."""
+    blocks = [block.strip() for block in re.split(r"\n{2,}", str(text or "")) if block.strip()]
+    output = []
+    for block in blocks:
+        if block in {"Description", "Chapters", "Subtitles", "Comments"} or re.fullmatch(
+            r"Subtitles \(.+\)", block
+        ):
+            output.append(f"<h2>{_html.escape(block)}</h2>")
+        elif re.fullmatch(r"(?:Comment|Reply level \d+) by .+:", block):
+            output.append(f"<h3>{_html.escape(block)}</h3>")
+        else:
+            output.append(f"<p>{_html.escape(block)}</p>")
+    return "".join(output)
+
+
 def render_full_article_html(
     url: str,
     *,
@@ -905,8 +921,28 @@ def render_full_article_html(
     page_lang = None  # source page's <html lang>, when the fetch succeeds
     display_url = url  # publisher URL once a Google News redirect is resolved
     metered_preview = False  # page served only the free excerpt (e.g. NYT)
+    structured_youtube = False
 
     if url and not ae._looks_like_media_url(url):
+        # Use the exact same complete YouTube reconstruction as classic full
+        # text. Cleaning the watch-page DOM would lose subtitles, comments, and
+        # collapsed replies in Rich View even though the plain reader had them.
+        try:
+            from core import youtube_fulltext
+
+            structured_youtube = youtube_fulltext.is_youtube_video_url(url)
+        except Exception:
+            structured_youtube = False
+        if structured_youtube:
+            try:
+                article = ae.extract_full_article(url, max_pages=1, timeout=timeout)
+            except Exception:
+                article = None
+            if article:
+                title = article.title or title
+                author = article.author or author
+                body = _structured_youtube_text_html(article.text)
+
         # Google News feed items are signed redirects, not publisher pages.
         # Resolve to the real article URL first (same as the plain-text path),
         # or the fetch below would clean Google's redirect/consent shell.
@@ -917,7 +953,7 @@ def render_full_article_html(
             if resolved:
                 display_url = resolved
 
-        if fetch_url:
+        if fetch_url and not structured_youtube:
             # Follow simple pagination (rel=next / "next page" controls) and
             # concatenate each page's cleaned body — the same _find_next_page
             # the plain-text extractor uses, so host exclusions and next-STORY
@@ -987,7 +1023,7 @@ def render_full_article_html(
     # Some publishers (e.g. fraservalleytoday.ca) serve a truncated web page but
     # syndicate the complete story in the feed. Prefer whichever body is fuller,
     # never downgrading below the feed content the user could already see.
-    if fallback_html:
+    if fallback_html and not structured_youtube:
         feed_body = clean_article_html(fallback_html, display_url, use_traf_prune=False)
         if feed_body:
             body_len = len(_norm(BeautifulSoup(body or "", "html.parser").get_text(" ", strip=True)))

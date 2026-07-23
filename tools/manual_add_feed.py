@@ -1,12 +1,15 @@
 """
-Test feed addition workflow to verify articles appear after adding a feed.
+Manual feed addition diagnostic to verify articles appear after adding a feed.
 
 This test validates that when a feed is added:
 1. The feed is added to the database
 2. Articles are fetched during refresh
 3. Articles are visible when querying
 
-Bug being tested: Race condition where refresh_feeds() was called before 
+This is intentionally outside tests/: it uses a real network feed and the
+active application database, so it must never run during default pytest.
+
+Bug being diagnosed: Race condition where refresh_feeds() was called before 
 articles were fetched, causing the empty article list to be cached with
 fully_loaded=True.
 """
