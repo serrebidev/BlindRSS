@@ -192,6 +192,45 @@ def test_miniflux_refresh_force_refreshes_each_feed(monkeypatch):
     assert states[0]["status"] == "ok"
 
 
+def test_miniflux_scheduled_refresh_only_polls_server_metadata(monkeypatch):
+    p = _provider(feed_timeout_seconds=10)
+    calls = []
+    targeted_calls = []
+    now = datetime.now(timezone.utc).isoformat()
+    feeds_payload = [
+        {
+            "id": 1,
+            "title": "Broken feed",
+            "category": {"title": "Podcasts"},
+            "checked_at": now,
+            "parsing_error_count": 5,
+            "parsing_error_message": "still broken",
+        }
+    ]
+
+    def _fake_req(method, endpoint, json=None, params=None):
+        calls.append((method, endpoint))
+        if endpoint == "/v1/feeds":
+            return feeds_payload
+        if endpoint == "/v1/feeds/counters":
+            return {"unreads": {"1": 0}}
+        raise AssertionError(f"Unexpected scheduled request: {method} {endpoint}")
+
+    monkeypatch.setattr(p, "_req", _fake_req)
+    monkeypatch.setattr(
+        p,
+        "_request_targeted_refresh",
+        lambda fid, cancel_event=None: targeted_calls.append(str(fid)),
+    )
+
+    assert p.refresh(progress_cb=lambda _state: None, scheduled=True) is True
+    assert calls == [
+        ("GET", "/v1/feeds"),
+        ("GET", "/v1/feeds/counters"),
+    ]
+    assert targeted_calls == []
+
+
 def test_miniflux_refresh_feeds_by_ids_refreshes_subset_and_emits_progress(monkeypatch):
     p = _provider(feed_timeout_seconds=10)
     calls = []

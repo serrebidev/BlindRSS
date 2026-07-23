@@ -37,7 +37,12 @@ def _isolated_site_cookie_jar(tmp_path_factory, monkeypatch):
         from core import site_cookies
     except Exception:
         return
-    jar_dir = tmp_path_factory.mktemp("site-cookies")
+    # All tests can share one suite-scoped empty location because the managed
+    # jar is invalidated before and after every case below.  mktemp() here used
+    # to create almost two thousand directories during a full run, adding
+    # avoidable filesystem/antivirus CPU overhead on Windows.
+    jar_dir = tmp_path_factory.getbasetemp() / "site-cookies"
+    jar_dir.mkdir(exist_ok=True)
     monkeypatch.setattr(site_cookies.config_mod, "get_data_dir", lambda: str(jar_dir))
     # Profile discovery is independent of the jar path, and the gate-recovery
     # path reads it: without this a test would copy and parse the developer's

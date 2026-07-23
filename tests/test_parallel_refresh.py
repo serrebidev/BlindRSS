@@ -82,7 +82,9 @@ def start_test_server():
     # Bind to an ephemeral port on localhost
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), FeedHandler)
     port = httpd.server_address[1]
-    thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    thread = threading.Thread(
+        target=lambda: httpd.serve_forever(poll_interval=0.01), daemon=True
+    )
     thread.start()
     return httpd, thread, port
 

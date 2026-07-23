@@ -37,8 +37,9 @@ class TestDependencyLogic(unittest.TestCase):
         else:
             os.environ["PATH"] = self._original_path
     
+    @patch('core.dependency_check._broadcast_env_change')
     @patch('core.dependency_check.platform.system', return_value='windows')
-    def test_add_bin_to_user_path_append(self, mock_platform):
+    def test_add_bin_to_user_path_append(self, mock_platform, _mock_broadcast):
         mock_key = MagicMock()
         self.mock_winreg.OpenKey.return_value.__enter__.return_value = mock_key
         existing_path = r"C:\Existing\Path"
@@ -51,8 +52,9 @@ class TestDependencyLogic(unittest.TestCase):
             mock_key, "PATH", 0, self.mock_winreg.REG_SZ, expected_path
         )
 
+    @patch('core.dependency_check._broadcast_env_change')
     @patch('core.dependency_check.platform.system', return_value='windows')
-    def test_add_bin_to_user_path_empty(self, mock_platform):
+    def test_add_bin_to_user_path_empty(self, mock_platform, _mock_broadcast):
         mock_key = MagicMock()
         self.mock_winreg.OpenKey.return_value.__enter__.return_value = mock_key
         self.mock_winreg.QueryValueEx.side_effect = OSError("Not found")
@@ -77,9 +79,10 @@ class TestDependencyLogic(unittest.TestCase):
     @patch('core.dependency_check._has_winget')
     @patch('core.dependency_check._winget_install')
     @patch('core.dependency_check._wait_for_executable')
+    @patch('core.dependency_check._ensure_yt_dlp_cli')
     @patch('core.dependency_check._ensure_tool_on_path')
     @patch('core.dependency_check._maybe_add_windows_path')
-    def test_install_media_tools_winget_success(self, mock_mawp, mock_etop, mock_wait, mock_install, mock_has_winget, mock_platform):
+    def test_install_media_tools_winget_success(self, mock_mawp, mock_etop, mock_dlp_cli, mock_wait, mock_install, mock_has_winget, mock_platform):
         mock_has_winget.return_value = True
         mock_install.return_value = True
         mock_wait.return_value = True # Executable found after install
@@ -135,7 +138,20 @@ class TestDependencyLogic(unittest.TestCase):
     @patch('core.dependency_check._install_vlc_fallback')
     @patch('core.dependency_check._install_ffmpeg_fallback')
     @patch('core.dependency_check._ensure_yt_dlp_cli')
-    def test_install_media_tools_winget_success_but_exe_missing(self, mock_dlp_cli, mock_ff_fb, mock_vlc_fb, mock_wait, mock_install, mock_has_winget, mock_platform):
+    @patch('core.dependency_check._ensure_tool_on_path')
+    @patch('core.dependency_check._maybe_add_windows_path')
+    def test_install_media_tools_winget_success_but_exe_missing(
+        self,
+        mock_mawp,
+        mock_etop,
+        mock_dlp_cli,
+        mock_ff_fb,
+        mock_vlc_fb,
+        mock_wait,
+        mock_install,
+        mock_has_winget,
+        mock_platform,
+    ):
         mock_has_winget.return_value = True
         mock_install.return_value = True
         # Executable NOT found after winget install

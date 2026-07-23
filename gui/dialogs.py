@@ -322,6 +322,51 @@ class AddShortcutsDialog(wx.Dialog):
         }
 
 
+class TakeoutImportSelectionDialog(wx.Dialog):
+    """Accessible checkbox selection for YouTube Takeout content types.
+
+    wx.MultiChoiceDialog uses an owner-drawn checklist on Windows, so NVDA
+    announces only the focused text and cannot expose whether an item is
+    checked.  CheckListCtrl is backed by the native ListView checkbox state;
+    NVDA therefore announces checked/not checked and Space toggles the item.
+    """
+
+    def __init__(self, parent, labels):
+        super().__init__(parent, title=_("Import YouTube Takeout"))
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        prompt = wx.StaticText(
+            self,
+            label=_(
+                "Select what to import from this YouTube Takeout file. "
+                "Press Space to check or uncheck an item:"
+            ),
+        )
+        sizer.Add(prompt, 0, wx.ALL, 10)
+
+        self.items = CheckListCtrl(self)
+        self.items.SetName(_("YouTube Takeout items to import"))
+        self.items.Set(labels)
+        for index in range(self.items.GetCount()):
+            self.items.Check(index, True)
+        if self.items.GetCount():
+            self.items.SetSelection(0)
+        sizer.Add(self.items, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+
+        buttons = self.CreateStdDialogButtonSizer(wx.OK | wx.CANCEL)
+        sizer.Add(buttons, 0, wx.EXPAND | wx.ALL, 10)
+        self.SetSizerAndFit(sizer)
+        self.SetMinSize((520, 300))
+        self.CentreOnParent()
+        wx.CallAfter(self.items.SetFocus)
+
+    def GetSelections(self):
+        return [
+            index
+            for index in range(self.items.GetCount())
+            if self.items.IsChecked(index)
+        ]
+
+
 class ExcludeNotificationFeedsDialog(wx.Dialog):
     def __init__(self, parent, feed_entries=None, excluded_ids=None):
         super().__init__(parent, title=_("Exclude Feeds from Notifications"), size=(480, 420))

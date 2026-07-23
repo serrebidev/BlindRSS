@@ -1377,6 +1377,13 @@ class MinifluxProvider(RSSProvider):
             # background refresh and only retry stale/errored feeds individually.
             if force:
                 global_refresh_ok = True
+            elif scheduled:
+                # Miniflux already owns feed polling on its server-side
+                # scheduler.  A short BlindRSS UI interval should poll the
+                # resulting metadata, not repeatedly enqueue all feeds on the
+                # server (which becomes very expensive for large accounts).
+                global_refresh_ok = True
+                log.info("Miniflux scheduled refresh using server poller; global trigger skipped")
             else:
                 # Kick off a global refresh on the Miniflux server.
                 self._req("PUT", "/v1/feeds/refresh")
@@ -1451,7 +1458,9 @@ class MinifluxProvider(RSSProvider):
                 elif status in ("error", "stale"):
                     per_feed_retry_ids.append(feed_id)
 
-            allow_targeted_refresh = bool(global_refresh_ok and (not feeds_from_cache))
+            allow_targeted_refresh = bool(
+                global_refresh_ok and (not feeds_from_cache) and not scheduled
+            )
             log.info(
                 "Miniflux refresh feed metadata force=%s feeds=%s feeds_from_cache=%s targeted_candidates=%s chronic_skipped=%s retry_budget=%s allow_targeted=%s",
                 force,
@@ -1554,8 +1563,13 @@ class MinifluxProvider(RSSProvider):
                     if self._refresh_cancelled(cancel_event):
                         return _stopped(len(feeds or []))
 
-            # Re-read feed/counter metadata after targeted refresh requests.
-            feeds = self._req("GET", "/v1/feeds") or feeds
+            # A scheduled UI poll has not changed server state, so reuse the
+            # metadata already fetched above instead of downloading and
+            # decoding thousands of feeds twice every interval.  Startup and
+            # manual refreshes retain the second read because they may have
+            # issued refresh requests immediately above.
+            if not scheduled:
+                feeds = self._req("GET", "/v1/feeds") or feeds
             if self._refresh_cancelled(cancel_event):
                 return _stopped(len(feeds or []))
             counters_data = self._req("GET", "/v1/feeds/counters") or {}

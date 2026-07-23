@@ -72,12 +72,12 @@ def _provider(deadline_s, slow_feed_delay_s, slow_feed_id="4"):
 
 
 def test_manual_refresh_returns_before_slow_feed_and_streams_it():
-    # Fast feeds finish instantly; feed "4" blocks for 3.0s -- far past the 0.4s
+    # Fast feeds finish instantly; feed "4" blocks well past the soft deadline.
     # soft deadline. The manual refresh must report complete near the deadline while
     # feed 4 finishes in the background and is NOT dropped. Margins are wide so the
     # assertion stays robust under load (thread wakeup / wait() timeout granularity).
-    deadline = 0.4
-    slow_delay = 3.0
+    deadline = 0.05
+    slow_delay = 0.5
     p, _calls = _provider(deadline, slow_delay)
 
     progress_lock = threading.Lock()
@@ -98,17 +98,17 @@ def test_manual_refresh_returns_before_slow_feed_and_streams_it():
     assert result is True
     # Returned well before the slow feed's 3.0s server fetch would finish (wide
     # margin: proves it did not block on the straggler without being flaky).
-    assert elapsed < 1.5, f"refresh blocked on straggler ({elapsed:.2f}s)"
+    assert elapsed < 0.3, f"refresh blocked on straggler ({elapsed:.2f}s)"
     # And it did wait at least the soft-deadline window (not an instant no-op).
-    assert elapsed >= deadline - 0.1
+    assert elapsed >= deadline * 0.5
 
     # The slow feed streams in afterward and is recorded -- no content dropped.
-    assert slow_seen.wait(timeout=3.0), "straggler feed never emitted its result"
+    assert slow_seen.wait(timeout=1.0), "straggler feed never emitted its result"
     with progress_lock:
         assert seen.get("4") == "ok"
 
     # The background daemon releases the cancel scope once stragglers finish.
-    deadline_at = time.monotonic() + 3.0
+    deadline_at = time.monotonic() + 1.0
     while p._current_refresh_cancel_event() is not None and time.monotonic() < deadline_at:
         time.sleep(0.02)
     assert p._current_refresh_cancel_event() is None
@@ -127,7 +127,7 @@ def test_manual_refresh_all_fast_has_no_stragglers_and_releases_scope():
 def test_streaming_disabled_when_deadline_zero_blocks_until_done():
     # soft_deadline=0 restores classic blocking behavior: refresh only returns after
     # the slow feed completes.
-    slow_delay = 0.6
+    slow_delay = 0.1
     p, _calls = _provider(deadline_s=0.0, slow_feed_delay_s=slow_delay)
 
     t0 = time.monotonic()

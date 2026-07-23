@@ -301,6 +301,24 @@ def test_column_layout_panel_is_named_and_reorders(parent):
         panel.Destroy()
 
 
+def test_takeout_selection_uses_named_native_checkboxes(parent):
+    dlg = dialogs.TakeoutImportSelectionDialog(
+        parent,
+        ["Subscribed channels (12)", "Playlists (3)"],
+    )
+    try:
+        assert isinstance(dlg.items, dialogs.CheckListCtrl)
+        assert dlg.items.GetName() == "YouTube Takeout items to import"
+        assert dlg.GetSelections() == [0, 1]
+
+        # This is the same state exposed through the native Windows ListView
+        # accessibility object and announced by NVDA when Space toggles it.
+        dlg.items.Check(1, False)
+        assert dlg.GetSelections() == [0]
+    finally:
+        dlg.Destroy()
+
+
 def test_column_layout_panel_inherit_mode_disables_editing(parent):
     """The per-feed tab's 'use global' checkbox must return None (inherit) and
     grey out the editor, so a feed cannot silently freeze today's global layout."""

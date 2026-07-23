@@ -71,7 +71,9 @@ def _make_origin(redirect_delay_s=0.0, reveal_total=True):
             self.end_headers()
 
     server = HTTPServer(("127.0.0.1", 0), Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    threading.Thread(
+        target=lambda: server.serve_forever(poll_interval=0.01), daemon=True
+    ).start()
     return server
 
 
@@ -87,9 +89,9 @@ def _make_proxy(cache_dir):
 
 def test_slow_redirect_chain_still_reports_real_total(monkeypatch):
     # Make the redirect outlast the short probe wait, like a tracker chain.
-    monkeypatch.setattr(rcp, "_PROBE_WAIT_S", 0.3)
+    monkeypatch.setattr(rcp, "_PROBE_WAIT_S", 0.03)
     monkeypatch.setattr(rcp, "_PROBE_RESOLVE_WAIT_S", 10.0)
-    server = _make_origin(redirect_delay_s=1.2)
+    server = _make_origin(redirect_delay_s=0.15)
     port = server.server_address[1]
     proxy = None
     try:
@@ -156,7 +158,9 @@ def test_probe_does_not_take_total_from_206_content_length():
             self.wfile.write(b"\x00")
 
     server = HTTPServer(("127.0.0.1", 0), Handler)
-    threading.Thread(target=server.serve_forever, daemon=True).start()
+    threading.Thread(
+        target=lambda: server.serve_forever(poll_interval=0.01), daemon=True
+    ).start()
     port = server.server_address[1]
     try:
         with tempfile.TemporaryDirectory() as cache_dir:

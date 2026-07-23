@@ -73,11 +73,23 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
     large refresh inside the frame constructor can starve Windows activation/
     ALT+Tab before the window first appears. Do not gate this on `IsShown()`:
     tray-only launches still need their background refresh.
+  - Scheduled hosted-provider ticks must remain lightweight at large account
+    sizes. Miniflux already polls feeds server-side, so scheduled BlindRSS
+    ticks read metadata/counters without issuing a global refresh or targeted
+    retries; startup and explicit manual refreshes retain their active refresh
+    behavior. Suppress unchanged per-feed GUI progress states, and run local
+    retention/chapter-cache maintenance no more than hourly on scheduled ticks.
   - The start_in_system_tray setting suppresses the initial main-window show
     while leaving the tray icon and background refresh active. It applies to
     manual and start-at-login launches and takes precedence over
     start_maximized.
   - When debug mode is enabled, configures rotating `blindrss.log` in the active data/config directory. This file log should capture DEBUG and above from app and third-party Python loggers; when debug mode is disabled, do not create or attach the file log.
+
+- `tests/`
+  - Default pytest collection must be deterministic and offline. Real network,
+    yt-dlp, VLC, ffmpeg, or interactive GUI diagnostics are manual tools, not
+    `test_*.py` modules: import-time execution can add tens of seconds and make
+    ordinary regression runs depend on external services.
 
 - `core/`
   - `user_agents.py`: the browser identity every outbound request presents — installed-browser detection, built-in Chrome/Edge/Firefox presets, custom strings, and the `sec-ch-ua*` hints that must travel with each. Owns `utils.HEADERS["User-Agent"]`; see "Browser identity" under Full Text & Discovery.

@@ -26,6 +26,7 @@ from .dialogs import (
     CategoryPropertiesDialog,
     AboutDialog,
     PersistentSearchDialog,
+    TakeoutImportSelectionDialog,
 )
 from .accessibility import AccessibleBrowserFrame, build_accessible_view_entries, voiceover_is_running
 from .player import PlayerFrame
@@ -4291,8 +4292,17 @@ class MainFrame(wx.Frame):
         provider_result = False
         try:
             log.info("Refresh run acquired guard provider=%s force=%s", provider_name, force)
-            # Perform retention cleanup before refresh to avoid resurrecting old articles
-            self._perform_retention_cleanup()
+            # Maintenance is useful at startup/manual refresh, but running the
+            # same SQLite cleanup every short scheduled interval creates
+            # needless CPU and disk churn.  Hourly is sufficient for periodic
+            # retention while preserving immediate manual/startup behavior.
+            maintenance_now = time.monotonic()
+            last_maintenance = float(
+                getattr(self, "_last_retention_cleanup_monotonic", 0.0) or 0.0
+            )
+            if not scheduled or maintenance_now - last_maintenance >= 3600.0:
+                self._perform_retention_cleanup()
+                self._last_retention_cleanup_monotonic = maintenance_now
             
             unread_snapshot = self._capture_unread_snapshot()
             new_items_total = 0
@@ -4317,7 +4327,26 @@ class MainFrame(wx.Frame):
                         suppressed,
                         fallback_new_count=detected_new_items,
                     )
-                self._on_feed_refresh_progress(state, batch_token=refresh_ui_batch_token)
+                # Hosted providers can report thousands of unchanged feed
+                # states on every scheduled metadata poll.  They still pass
+                # through notification accounting above, but do not need a
+                # native ListView/TreeCtrl update (and accessibility event) if
+                # the visible title/category/count is identical.
+                queue_ui_state = True
+                if scheduled:
+                    feed_id = str((state or {}).get("id") or "")
+                    cached_feed = (getattr(self, "feed_map", {}) or {}).get(feed_id)
+                    if cached_feed is not None:
+                        queue_ui_state = not (
+                            (str((state or {}).get("title") or "") or str(getattr(cached_feed, "title", "") or ""))
+                            == str(getattr(cached_feed, "title", "") or "")
+                            and str((state or {}).get("category") or UNCATEGORIZED)
+                            == str(getattr(cached_feed, "category", UNCATEGORIZED) or UNCATEGORIZED)
+                            and int((state or {}).get("unread_count", 0) or 0)
+                            == int(getattr(cached_feed, "unread_count", 0) or 0)
+                        )
+                if queue_ui_state:
+                    self._on_feed_refresh_progress(state, batch_token=refresh_ui_batch_token)
 
             provider_result = self.provider.refresh(progress_cb, force=force, scheduled=scheduled)
             log.info(
@@ -7827,9 +7856,8 @@ class MainFrame(wx.Frame):
             has_new_items
             or bool(state.get("content_changed"))
             or bool(state.get("feed_metadata_changed"))
-            or bool(state.get("error"))
-            or state.get("status") == "error"
         )
+        visible_feed_changed = False
 
         # Update cached feed objects
         feed_obj = self.feed_map.get(feed_id)
@@ -7838,9 +7866,10 @@ class MainFrame(wx.Frame):
             old_category = getattr(feed_obj, "category", None)
             old_title = getattr(feed_obj, "title", "")
             next_title = title or old_title
-            model_changed = model_changed or (
+            visible_feed_changed = (
                 next_title != old_title or unread != old_unread or category != old_category
             )
+            model_changed = model_changed or visible_feed_changed
             feed_obj.title = next_title
             feed_obj.unread_count = unread
             feed_obj.category = category
@@ -7850,12 +7879,12 @@ class MainFrame(wx.Frame):
             # #34). Handles a feed moving category mid-refresh by debiting the
             # old chain and crediting the new one; same-category updates net
             # out to the plain delta.
-            if old_category == category:
+            if old_category == category and unread != old_unread:
                 # The common case is an unchanged feed category.  Applying the
                 # net delta once avoids two full ancestor-chain TreeCtrl writes
                 # (and their screen-reader events) for every completed feed.
                 self._update_category_unread_chain_ui(category, unread - old_unread)
-            else:
+            elif old_category != category:
                 if old_category and old_unread:
                     self._update_category_unread_chain_ui(old_category, -old_unread)
                 if category and unread:
@@ -7872,7 +7901,7 @@ class MainFrame(wx.Frame):
 
         # Update tree label if present
         node = self.feed_nodes.get(feed_id)
-        if node and node.IsOk():
+        if visible_feed_changed and node and node.IsOk():
             label = f"{title} ({unread})" if unread > 0 else title
             try:
                 current_label = self.tree.GetItemText(node)
@@ -12848,14 +12877,10 @@ class MainFrame(wx.Frame):
             for source, count, label in available_sources
             if count
         ]
-        select_dlg = wx.MultiChoiceDialog(
-            self,
-            _("Select what to import from this YouTube Takeout file:"),
-            _("Import YouTube Takeout"),
-            [label for _source, label in source_options],
+        select_dlg = TakeoutImportSelectionDialog(
+            self, [label for _source, label in source_options]
         )
         try:
-            select_dlg.SetSelections(list(range(len(source_options))))
             if select_dlg.ShowModal() != wx.ID_OK:
                 return
             selected_indexes = list(select_dlg.GetSelections())
