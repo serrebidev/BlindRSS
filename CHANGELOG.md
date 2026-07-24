@@ -6,7 +6,9 @@ same fix stream, they are combined with a version range such as
 
 ## v1.121.3 - 2026-07-24
 
-- Maintenance update.
+- License BlindRSS under MIT, with an SPDX header on every source file (#92).
+- Ship the license text with the app, as MIT requires.
+- Bring the README's capability list up to date.
 
 ## v1.121.2 - 2026-07-24
 
