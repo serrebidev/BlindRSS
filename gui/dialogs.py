@@ -924,7 +924,9 @@ class SettingsDialog(wx.Dialog):
         feeds_sizer = wx.BoxSizer(wx.VERTICAL)
         downloads_panel = wx.Panel(notebook)
         downloads_sizer = wx.BoxSizer(wx.VERTICAL)
-        startup_panel = wx.Panel(notebook)
+        # Startup/tray settings are a group inside General, not their own tab,
+        # so this panel is a child of general_panel rather than the notebook.
+        startup_panel = wx.Panel(general_panel)
         startup_sizer = wx.BoxSizer(wx.VERTICAL)
         youtube_panel = wx.Panel(notebook)
         youtube_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -1492,33 +1494,47 @@ class SettingsDialog(wx.Dialog):
         self.article_open_test_btn.Bind(wx.EVT_BUTTON, self.on_test_article_command)
         self._sync_article_open_controls()
 
+        # Fourteen tabs meant a lot of Ctrl+Tab to reach anything, and five of
+        # them held only a handful of controls. Thin tabs are now labelled
+        # groups on the page they belong to: a StaticBox gives a screen reader a
+        # group name on entry, so the heading is still spoken, but it is one
+        # arrow key away instead of a separate tab.
+        #
+        # Each absorbed tab keeps its original label string, so every locale
+        # already has it translated and no new message was introduced. Surviving
+        # tabs stay in their previous relative order.
+        startup_panel.SetSizer(startup_sizer)
+        startup_group = wx.StaticBoxSizer(
+            wx.StaticBox(general_panel, label=_("Startup && Tray")), wx.VERTICAL
+        )
+        startup_group.Add(startup_panel, 1, wx.EXPAND)
+        general_sizer.Add(startup_group, 0, wx.EXPAND | wx.ALL, 8)
+
         general_panel.SetSizer(general_sizer)
         notebook.AddPage(general_panel, _("General"))
         feeds_panel.SetSizer(feeds_sizer)
         notebook.AddPage(feeds_panel, _("Feeds && Articles"))
-        downloads_panel.SetSizer(downloads_sizer)
-        notebook.AddPage(downloads_panel, _("Downloads"))
-        startup_panel.SetSizer(startup_sizer)
-        notebook.AddPage(startup_panel, _("Startup && Tray"))
         youtube_panel.SetSizer(youtube_sizer)
         notebook.AddPage(youtube_panel, _("YouTube"))
 
-        self._register_lazy_page(notebook, "Groups.io", self._build_groups_io_page)
+        # Built in the eager block above but shown inside Media Player, which is
+        # built lazily; _build_media_page reparents it once that page exists.
+        downloads_panel.SetSizer(downloads_sizer)
+        downloads_panel.Hide()
+        self._downloads_panel = downloads_panel
 
-        # Media Player Tab
+        # Media Player Tab (absorbs Downloads and Sounds)
         self._register_lazy_page(notebook, _("Media Player"), self._build_media_page)
-        
-        # Provider Tab
+
+        # Provider Tab (absorbs Groups.io)
         self._register_lazy_page(notebook, _("Provider"), self._build_provider_page)
-        
-        # Sounds Tab
-        self._register_lazy_page(notebook, _("Sounds"), self._build_sounds_page)
 
-        # Notifications Tab
-        self._register_lazy_page(notebook, _("Notifications"), self._build_notifications_page)
-
-        # Announcements Tab (issue #67): per-event screen-reader announcement mode.
-        self._register_lazy_page(notebook, _("Announcements"), self._build_announcements_page, widget=wx.ScrolledWindow)
+        # Notifications Tab (absorbs Announcements, issue #67). A ScrolledWindow
+        # because the announcements group is a long list of per-event choices.
+        self._register_lazy_page(
+            notebook, _("Notifications"), self._build_notifications_page,
+            widget=wx.ScrolledWindow,
+        )
 
         # Translate Tab (automatic article translation via Grok/Groq/OpenAI/OpenRouter/Gemini/Qwen)
         self._register_lazy_page(notebook, _("Translate"), self._build_translate_page)
@@ -2748,6 +2764,25 @@ class SettingsDialog(wx.Dialog):
         media_sizer.Add(tools_box, 0, wx.EXPAND | wx.ALL, 5)
         threading.Thread(target=self._detect_media_tools_async, daemon=True).start()
 
+        # Downloads was its own tab; it is built eagerly in __init__ (its code is
+        # interleaved with the other early pages), so it is moved here rather
+        # than rebuilt.
+        downloads_panel = getattr(self, "_downloads_panel", None)
+        if downloads_panel is not None:
+            downloads_panel.Reparent(panel)
+            downloads_panel.Show()
+            downloads_group = wx.StaticBoxSizer(
+                wx.StaticBox(panel, label=_("Downloads")), wx.VERTICAL
+            )
+            downloads_group.Add(downloads_panel, 1, wx.EXPAND)
+            sizer.Add(downloads_group, 0, wx.EXPAND | wx.ALL, 8)
+
+        # Sounds was its own tab; its builder creates controls on whatever panel
+        # and sizer it is handed, so it needs no change to live here.
+        sounds_group = wx.StaticBoxSizer(wx.StaticBox(panel, label=_("Sounds")), wx.VERTICAL)
+        self._build_sounds_page(panel, sounds_group)
+        sizer.Add(sounds_group, 0, wx.EXPAND | wx.ALL, 8)
+
     def _build_provider_page(self, panel, sizer):
         """Built on first view; see _register_lazy_page."""
         config = self.config
@@ -2904,6 +2939,14 @@ class SettingsDialog(wx.Dialog):
         self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_choice)
         self._update_provider_panels()
 
+        # Groups.io was its own tab for three controls; it is provider
+        # configuration, so it belongs here as a group.
+        groups_io_group = wx.StaticBoxSizer(
+            wx.StaticBox(panel, label="Groups.io"), wx.VERTICAL
+        )
+        self._build_groups_io_page(panel, groups_io_group)
+        sizer.Add(groups_io_group, 0, wx.EXPAND | wx.ALL, 8)
+
     def _build_sounds_page(self, panel, sizer):
         """Built on first view; see _register_lazy_page."""
         config = self.config
@@ -3009,6 +3052,14 @@ class SettingsDialog(wx.Dialog):
 
         self.windows_notifications_chk.Bind(wx.EVT_CHECKBOX, self._on_toggle_windows_notifications)
         self._update_notification_controls()
+
+        # Announcements (issue #67) was its own tab. Both tabs configure what the
+        # app tells the user about, so they are one page with two groups.
+        announcements_group = wx.StaticBoxSizer(
+            wx.StaticBox(panel, label=_("Announcements")), wx.VERTICAL
+        )
+        self._build_announcements_page(panel, announcements_group)
+        sizer.Add(announcements_group, 1, wx.EXPAND | wx.ALL, 8)
 
     def _build_announcements_page(self, panel, sizer):
         """Built on first view; see _register_lazy_page."""

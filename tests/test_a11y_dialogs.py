@@ -187,15 +187,30 @@ def test_settings_dialog_field_names(parent):
             dlg.notebook.GetPageText(index).replace("&&", "&")
             for index in range(dlg.notebook.GetPageCount())
         ]
+        # Thin tabs (Downloads, Startup & Tray, Sounds, Announcements,
+        # Groups.io) are labelled groups on the page they belong to now, not
+        # tabs of their own; the surviving tabs kept their relative order.
         assert page_labels[:5] == [
             "General",
             "Feeds & Articles",
-            "Downloads",
-            "Startup & Tray",
             "YouTube",
+            "Media Player",
+            "Provider",
         ]
-        assert dlg.refresh_ctrl.GetParent() is dlg.notebook.GetPage(1)
-        assert dlg.automatic_refresh_workload_ctrl.GetParent() is dlg.notebook.GetPage(1)
+        # Controls inside an absorbed tab's group sit on a nested panel, so ask
+        # which page a control lives on rather than who its parent is.
+        pages = {dlg.notebook.GetPage(i): i for i in range(dlg.notebook.GetPageCount())}
+
+        def page_of(ctrl):
+            window = ctrl
+            while window is not None:
+                if window in pages:
+                    return pages[window]
+                window = window.GetParent()
+            return None
+
+        assert page_of(dlg.refresh_ctrl) == page_labels.index("Feeds & Articles")
+        assert page_of(dlg.automatic_refresh_workload_ctrl) == page_labels.index("Feeds & Articles")
         assert dlg.automatic_refresh_workload_ctrl.GetName() == "Local RSS automatic feed refresh workload"
         selected_workload = dlg.automatic_refresh_workload_map.get(
             dlg.automatic_refresh_workload_ctrl.GetStringSelection()
@@ -203,12 +218,10 @@ def test_settings_dialog_field_names(parent):
         settings = dlg.get_data()
         assert settings["automatic_feed_refresh_workload"] == selected_workload
         assert settings["ignore_feed_cache"] is (selected_workload == "always_full")
-        assert dlg.dl_path_ctrl.GetParent() is dlg.notebook.GetPage(2)
-        assert dlg.start_in_tray_chk.GetParent() is dlg.notebook.GetPage(3)
-        assert dlg.ytdlp_cookies_ctrl.GetParent() is dlg.notebook.GetPage(4)
-        assert dlg.install_updates_automatically_chk.GetParent() is dlg.notebook.GetPage(
-            page_labels.index("Advanced")
-        )
+        assert page_of(dlg.dl_path_ctrl) == page_labels.index("Media Player")
+        assert page_of(dlg.start_in_tray_chk) == page_labels.index("General")
+        assert page_of(dlg.ytdlp_cookies_ctrl) == page_labels.index("YouTube")
+        assert page_of(dlg.install_updates_automatically_chk) == page_labels.index("Advanced")
         assert (
             dlg.install_updates_automatically_chk.GetLabel()
             == "Automatically install updates without confirmation"

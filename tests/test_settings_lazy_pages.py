@@ -49,8 +49,12 @@ def test_pages_are_deferred_at_open(parent):
         dlg.Destroy()
 
 
-def test_tab_titles_and_order_are_unchanged(parent):
-    """Tab order is muscle memory and what a screen reader announces."""
+def test_tab_titles_and_order(parent):
+    """Tab order is muscle memory and what a screen reader announces.
+
+    Five thin tabs became labelled groups on the page they belong to; the
+    surviving tabs keep their previous relative order.
+    """
     dlg = _dialog(parent)
     try:
         titles = [dlg.notebook.GetPageText(i) for i in range(dlg.notebook.GetPageCount())]
@@ -59,19 +63,42 @@ def test_tab_titles_and_order_are_unchanged(parent):
             # Literal ampersands stay doubled; wx eats a lone '&' as a mnemonic
             # (issue #66), and GetPageText returns the stored text.
             "Feeds && Articles",
-            "Downloads",
-            "Startup && Tray",
             "YouTube",
-            "Groups.io",
             "Media Player",
             "Provider",
-            "Sounds",
             "Notifications",
-            "Announcements",
             "Translate",
             "List Headers",
             "Advanced",
         ]
+    finally:
+        dlg.Destroy()
+
+
+def test_absorbed_sections_reuse_their_original_labels(parent):
+    """Merged-away tabs survive as StaticBox groups under the SAME string.
+
+    Reusing the existing msgid is what keeps this change free of translation
+    debt: every locale already has these words.
+    """
+    dlg = _dialog(parent)
+    try:
+        dlg._ensure_all_pages_built()
+
+        labels = set()
+
+        def collect(window):
+            for child in window.GetChildren():
+                if isinstance(child, wx.StaticBox):
+                    # wxMSW keeps the literal "&&"; wxOSX collapses it.
+                    labels.add(child.GetLabel().replace("&&", "&"))
+                collect(child)
+
+        for i in range(dlg.notebook.GetPageCount()):
+            collect(dlg.notebook.GetPage(i))
+
+        for expected in ("Startup & Tray", "Downloads", "Sounds", "Announcements", "Groups.io"):
+            assert expected in labels, f"missing group for absorbed tab: {expected}"
     finally:
         dlg.Destroy()
 
