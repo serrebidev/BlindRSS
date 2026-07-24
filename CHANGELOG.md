@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.120.5 - 2026-07-24
+
+- Stop stale article text sticking in the reader pane.
+
 ## v1.120.4 - 2026-07-24
 
 - Complete YouTube Takeout translations in all 15 locales.
