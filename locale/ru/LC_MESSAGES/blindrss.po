@@ -1455,6 +1455,26 @@ msgstr "Проверочное уведомление BlindRSS"
 msgid "If you can read this, notifications are working."
 msgstr "Если вы можете прочитать это, значит, уведомления работают."
 
+#: gui/dialogs.py:3073
+msgid ""
+"Windows toast notifications for new articles.\n"
+"Disabled by default."
+msgstr ""
+"Всплывающие уведомления Windows о новых статьях.\n"
+"По умолчанию отключено."
+
+#: gui/dialogs.py:3152
+msgid ""
+"Screen-reader announcements for key keyboard actions.\n"
+"Each event can announce via speech, Braille, both, or neither.\n"
+"Braille output is most reliable on Windows with NVDA or JAWS."
+msgstr ""
+"Программа экранного доступа объявляет ключевые действия, выполняемые "
+"клавиатурными командами.\n"
+"Каждое событтие может быть объявлено  через речь, брайль,обоими способами "
+"или никак.\n"
+"Брайлевский вывод наиболее надёжен на Windows с NVDA или JAWS."
+
 #: gui/dialogs.py:107
 msgid "Article list columns"
 msgstr "Столбцы списка статей"
@@ -3574,6 +3594,10 @@ msgstr "Переводы обновлены. Перезапустите для �
 msgid "Translations are up to date."
 msgstr "Переводы актуальны."
 
+#: gui/dialogs.py:1949
+msgid "Excluded feeds: {excluded} of {total}"
+msgstr "Исключено каналов: {excluded} из {total}"
+
 #: gui/dialogs.py:2143
 msgid "Inoreader Authorization"
 msgstr "Авторизация Inoreader"
@@ -3900,6 +3924,13 @@ msgstr "Результаты фильтрации:"
 msgid "Sort by:"
 msgstr "Сортировка по:"
 
+#: gui/dialogs.py:6750
+msgid "{action} {n} site..."
+msgid_plural "{action} {n} sites..."
+msgstr[0] "{action} {n} сайт..."
+msgstr[1] "{action} {n} сайта..."
+msgstr[2] "{action} {n} сайтов..."
+
 #: gui/dialogs.py:7146
 msgid "Subscribe Error"
 msgstr "Ошибка подписки"
@@ -3928,6 +3959,13 @@ msgstr "&Предустановка:"
 msgid "Cookies"
 msgstr "Cookies"
 
+#: gui/dialogs.py:1883
+msgid "Loaded {n} OpenRouter model."
+msgid_plural "Loaded {n} OpenRouter models."
+msgstr[0] "Загрузка {n} модели OpenRouter."
+msgstr[1] "Загрузка {n} моделей OpenRouter."
+msgstr[2] "Загрузка {n} моделей OpenRouter."
+
 #: gui/dialogs.py:2030
 msgid ""
 "BlindRSS announcement test. If you can hear or read this, announcements are "
@@ -3947,9 +3985,21 @@ msgstr[0] "Удалить {n} кэшированный файл ({size})?"
 msgstr[1] "Удалить {n} кэшированных файла ({size})?"
 msgstr[2] "Удалить {n} кэшированных файлов ({size})?"
 
+#: gui/dialogs.py:2632
+msgid "Detected {nm}: not found"
+msgstr "Обнаруженный {nm}: не найден"
+
 #: gui/dialogs.py:2664
 msgid "(not set)"
 msgstr "(не задано)"
+
+#: gui/dialogs.py:2831
+msgid "{label} executable path override"
+msgstr "Переопределение пути к исполняемому файлу {label}"
+
+#: gui/dialogs.py:2841
+msgid "Detected {label}"
+msgstr "Обнаруженный {label}"
 
 #: gui/dialogs.py:2856
 msgid "Downloads"
@@ -3967,17 +4017,43 @@ msgstr "Ключ приложения Inoreader:"
 msgid "Redirect URI:"
 msgstr "URI перенаправления:"
 
+#: gui/dialogs.py:3050
+msgid "Browse for {name}"
+msgstr "Укажите путь к {name}"
+
 #: gui/dialogs.py:4623
 msgid "feed"
 msgstr "канал"
+
+#: gui/dialogs.py:4948
+msgid "Searching {label}..."
+msgstr "Поиск {label}..."
 
 #: gui/dialogs.py:5215
 msgid "News topic feed"
 msgstr "Тематический новостной канал"
 
+#: gui/dialogs.py:5602
+msgid "Found {n} result."
+msgid_plural "Found {n} results."
+msgstr[0] "Найден {n} результат."
+msgstr[1] "Найдено {n} результата."
+msgstr[2] "Найдено {n} результатов."
+
+#: gui/dialogs.py:6918
+msgid "Stopped. {n} result."
+msgid_plural "Stopped. {n} results."
+msgstr[0] "Остановлено. {n} результат."
+msgstr[1] "Остановлено. {n} результата."
+msgstr[2] "Остановлено. {n} результатов."
+
 #: gui/dialogs.py:7120
 msgid "Playback Error"
 msgstr "Ошибка воспроизведения"
+
+#: gui/dialogs.py:7124 gui/dialogs.py:7062
+msgid "Playing: {title}"
+msgstr "Воспроизведение: {title}"
 
 #: gui/dialogs.py:7426
 msgid "{index}. {title}, from {source}"
@@ -4018,6 +4094,22 @@ msgstr "Удалить предустановку \"{name}\"?"
 msgid "Could not read cookies from {browser}."
 msgstr "Не удалось прочитать cookie-файлы из {browser}."
 
+#: gui/dialogs.py:1846
+msgid "OpenRouter model load failed: {error}"
+msgstr "Не удалось загрузить модель OpenRouter: {error}"
+
+#: gui/dialogs.py:2634
+msgid "Detected {nm}: {path} (failed version check)"
+msgstr "Обнаруженный {nm}: {path} (не удалось проверить версию)"
+
+#: gui/dialogs.py:2636
+msgid "Detected {nm}: {path}"
+msgstr "Обнаруженный {nm}: {path}"
+
+#: gui/dialogs.py:2840
+msgid "Detected {label}: checking…"
+msgstr "Обнаруженный {label}: проверка…"
+
 #: gui/dialogs.py:3599
 msgid ""
 "User Data Folder path:\n"
@@ -4033,6 +4125,20 @@ msgid ""
 msgstr ""
 "Путь к папке установки приложения:\n"
 "  {path}"
+
+#: gui/dialogs.py:6921
+msgid "Loaded more. {n} result."
+msgid_plural "Loaded more. {n} results."
+msgstr[0] "Загружено больше. {n} результат."
+msgstr[1] "Загружено больше. {n} результата."
+msgstr[2] "Загружено больше. {n} результатов."
+
+#: gui/dialogs.py:6923
+msgid "{n} result."
+msgid_plural "{n} results."
+msgstr[0] "{n} результат."
+msgstr[1] "{n} результата."
+msgstr[2] "{n} результатов."
 
 #: gui/dialogs.py:7145
 msgid "Could not subscribe: {error}"
@@ -4071,10 +4177,6 @@ msgstr ""
 #: gui/player.py:6466
 msgid "Paused"
 msgstr "Приостановлено"
-
-#: gui/dialogs.py:7062
-msgid "Playing: {title}"
-msgstr "Воспроизведение: {title}"
 
 #: gui/dialogs.py:7064
 msgid "Paused: {title}"
