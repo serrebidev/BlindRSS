@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Generate locale/blindrss.pot from _("...") calls in the source tree (issue #44).
 
 Walks gui/, core/, and main.py with the ast module (no external tooling

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Tests for subscribing to YouTube and Rumble search results as feeds."""
 
 import json

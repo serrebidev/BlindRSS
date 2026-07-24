@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """The persistent-search dropdown menu must never be freed twice.
 
 wx.SearchCtrl.SetMenu transfers ownership of the menu to the control: the

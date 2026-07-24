@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Offline tests for SoundCloud/Mixcloud URL classifiers and site registration."""
 
 import os

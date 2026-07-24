@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Runtime access-key (mnemonic) assignment for menus.
 
 Every menu item should carry an access key — the underlined letter that

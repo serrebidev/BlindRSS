@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Settings notebook pages build on first view (open time 1.2s -> ~0.3s).
 
 The dangerous failure mode is not a slow dialog but a silent one: get_data()

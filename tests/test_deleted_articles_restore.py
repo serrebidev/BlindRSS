@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Deleted Articles view + restore (local provider).
 
 Covers the snapshot-on-delete tombstone, the 'deleted:all' virtual view, and the

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Range-cache proxy re-resolves an expired signed URL mid-stream.
 
 Reproduces the megaphone/podtrac podcast bug: the origin redirects to a

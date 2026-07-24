@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 import sqlite3
 
 conn = sqlite3.connect(r'C:\Users\admin\Portable\BlindRSS\rss.db')

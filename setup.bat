@@ -1,4 +1,8 @@
 @echo off
+@REM Copyright (c) serrebidev and contributors
+@REM This file is part of BlindRSS
+@REM SPDX-License-Identifier: MIT
+
 setlocal
 
 echo [BlindRss Setup] Checking system requirements...

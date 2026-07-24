@@ -65,6 +65,10 @@ I only speak English, so I got several languages started with AI-assisted transl
 
 If you speak one of the supported languages and something reads wrong, awkward, or just off, please open a PR to fix it — I can't judge the wording myself, so I'll almost certainly accept it. See [`locale/README.md`](locale/README.md) for how the translation files are laid out and how to update them.
 
+## License
+
+BlindRSS is distributed under the [MIT license](LICENSE) — use it, modify it, redistribute it, package it for your distro. Source files carry an `SPDX-License-Identifier: MIT` header; the full text and copyright notice live in [`LICENSE`](LICENSE).
+
 ## Community and support
 
 Report bugs and request features in [Issues](https://github.com/serrebidev/BlindRSS/issues). For questions, feedback, and release news, join the [SerrebiProjects Telegram group](https://t.me/SerrebiProjects).

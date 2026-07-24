@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Debug script to test mark all as read + refresh behavior"""
 import sqlite3
 import os

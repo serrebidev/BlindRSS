@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Default collapse/expand state of the feed category tree (issue #33).
 
 The tree is rebuilt on every refresh, so the app must (a) apply the configured

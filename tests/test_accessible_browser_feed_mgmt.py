@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Feed/category management, Deleted view, and restore in the macOS accessible
 browser — the view-list context menu and the deleted-articles workflow.
 """

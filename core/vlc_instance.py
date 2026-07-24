@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Shared libVLC instance, created once and warmed on a background thread.
 
 libVLC instance creation scans and loads every plugin DLL (BlindRSS passes

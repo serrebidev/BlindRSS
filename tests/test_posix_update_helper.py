@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Coverage for the POSIX update helper (macOS + Linux), `update_helper.sh`.
 
 The Windows `.bat` helper is covered by test_update_helper_script.py; the POSIX

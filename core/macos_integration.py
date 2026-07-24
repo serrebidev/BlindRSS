@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """macOS startup registration via a per-user LaunchAgent.
 
 Pure stdlib (no pyobjc). Enabling writes a LaunchAgent plist to

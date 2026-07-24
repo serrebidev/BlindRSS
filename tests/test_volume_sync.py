@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Startup volume application (first-adjustment volume jump bug).
 
 libvlc silently drops audio_set_volume calls made before the audio output

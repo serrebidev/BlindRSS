@@ -1,4 +1,8 @@
-﻿"""
+﻿# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
+"""
 Range-aware local HTTP proxy with on-disk caching to improve seek performance on
 high-latency remote HTTP/HTTPS audio files.
 

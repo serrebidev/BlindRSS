@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Configurable screen-reader announcements for key events (issue #67).
 
 BlindRSS confirms critical keyboard actions (filter change, read/unread toggle,

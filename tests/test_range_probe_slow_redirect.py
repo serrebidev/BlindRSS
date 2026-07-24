@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """The proxy must not advertise the inline window as the whole file.
 
 Reproduces the Simplecast/WNYC bug: podcast enclosures sit behind several

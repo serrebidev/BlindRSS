@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Tests for the embed-preserving rich-reader HTML cleaner (core.article_html)."""
 
 import os

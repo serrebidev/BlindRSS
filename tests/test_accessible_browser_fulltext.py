@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Full-text extraction in the macOS accessible browser.
 
 On macOS with VoiceOver the AccessibleBrowserFrame is the primary reading surface

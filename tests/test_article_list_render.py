@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """GUI-free tests for chunked + memoized article-list rendering.
 
 These exercise MainFrame._render_articles_list and its helpers without a real

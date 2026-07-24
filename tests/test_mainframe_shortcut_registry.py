@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """GUI-free tests for MainFrame's shortcut/speed/queue helper wiring.
 
 Binds the real methods onto a lightweight host (same pattern as

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Tests for graceful degradation when a page is an anti-bot / verification interstitial.
 
 We never try to defeat these gates; we only detect them so the UI falls back to the feed snippet

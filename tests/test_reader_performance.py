@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 from gui.reader_performance import (
     LARGE_READER_TEXT_CHARS,
     replace_text_control_value,

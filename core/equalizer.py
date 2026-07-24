@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Pure helpers for the media-player equalizer config.
 
 The libVLC calls live in the GUI/player layer; this module only normalizes and

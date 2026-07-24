@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Compile gettext .po catalogs to .mo files for BlindRSS builds.
 
 The parser/writer live in core/po_compile.py so the frozen app can reuse them

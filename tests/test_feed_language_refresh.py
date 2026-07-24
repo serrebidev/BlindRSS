@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """The refresh path persists the feed's declared <language> (issue #72).
 
 Drives the real LocalRSSProvider._refresh_single_feed with the network stubbed

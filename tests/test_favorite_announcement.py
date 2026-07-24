@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Ctrl+D announces the new favorite state (issue #70).
 
 Ctrl+D changes no visible row text, so without an announcement the action is

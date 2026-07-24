@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Refresh the baked-in User-Agent versions in core/user_agents.py.
 
 Run from build.bat at release time. The build machine's installed browsers are

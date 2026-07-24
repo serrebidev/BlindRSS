@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Reader bodies read one paragraph per line, with no blank lines between them.
 
 Reported against the Axios feed: when full-text extraction fails and the reader

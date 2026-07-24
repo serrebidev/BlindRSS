@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Central registry of user-editable keyboard shortcuts (NVDA-gestures style).
 
 This module is deliberately pure (no wx) so the command table and the

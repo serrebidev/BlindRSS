@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Tests for the full-text fetch fallback services (Jina -> Smry.ai -> Wayback Machine).
 
 Live proxies are tried before the Wayback Machine because the user wants the CURRENT page text;

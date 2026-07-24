@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Issue #75: per-feed encoding overrides and the automatic detection chain.
 
 Covers core.text_encoding (the shared decode helper), the feed refresh decode

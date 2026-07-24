@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Copy Link must never hand out a bare homepage for a playable episode.
 
 Podcast feeds like Simplecast's (e.g. Double Tap) set every item's <link> to

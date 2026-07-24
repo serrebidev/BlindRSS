@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Provider-level tests for impersonation escalation and per-feed HTTP overrides (issue #29)."""
 
 import os

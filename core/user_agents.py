@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """The browser identity BlindRSS presents on outbound HTTP requests.
 
 A stale User-Agent is a bot signal by itself. `core.utils.HEADERS` used to carry

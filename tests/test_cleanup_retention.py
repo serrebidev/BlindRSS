@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Retention sweep (cleanup_old_articles): old articles are removed, but
 articles whose date could not be parsed (sentinel/empty date) must never be
 deleted — their real age is unknown and they may have arrived seconds ago."""

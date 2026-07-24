@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Over-the-air translation catalog updates (no app release required).
 
 The risk these guard against is not "did it download" but "can a bad download

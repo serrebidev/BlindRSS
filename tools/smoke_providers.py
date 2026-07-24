@@ -1,4 +1,8 @@
 #!/usr/bin/env python
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Quick provider smoke test using a BlindRSS config.json.
 
 This script is intentionally read-only. It performs:

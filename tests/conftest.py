@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Shared test-suite guards.
 
 The full-text and feed paths both escalate to `core.browser_feed`, which starts a

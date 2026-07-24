@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Article actions in the macOS accessible browser: favorites, delete, view
 history, feed description, and find-in-article — parity with the main window's
 per-article commands, driven from THIS window's selected article.

@@ -1,4 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
 
 import glob
 import importlib.util
@@ -208,6 +211,8 @@ except Exception:
 
 add_data(ROOT / "sounds", "sounds")
 add_data(ROOT / "README.md", ".")
+# MIT requires the notice to travel with every copy of the software (issue #92).
+add_data(ROOT / "LICENSE", ".")
 
 # UI translation catalogs (issue #44): locale/<lang>/LC_MESSAGES/blindrss.mo.
 _locale_root = ROOT / "locale"

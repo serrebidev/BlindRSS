@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Forum-thread full-text and rich-view regressions (FluxBB and Drupal).
 
 A thread page is a flat list of sibling post/comment blocks with no single node

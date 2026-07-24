@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 from pathlib import Path
 from urllib.parse import urlparse
 from xml.etree import ElementTree as ET

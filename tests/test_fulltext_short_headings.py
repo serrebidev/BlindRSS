@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Classic full-text view must keep short standalone lines (issue: Android Authority).
 
 _merge_texts had a sub-25-char paragraph floor that ran on EVERY extraction,

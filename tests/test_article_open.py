@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Custom 'Article Opening Method' command parsing and the Settings UI (issue #31).
 
 Users can open article links with a custom browser/command (e.g.

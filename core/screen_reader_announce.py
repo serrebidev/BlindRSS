@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Best-effort direct speech adapters for screen readers.
 
 This module is intentionally small and GUI-free. Standard accessibility events

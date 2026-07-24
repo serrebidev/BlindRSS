@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Regression: repeated extraction of the same article must not shrink.
 
 trafilatura's ``deduplicate`` option counts paragraph sightings in a

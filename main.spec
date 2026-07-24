@@ -1,4 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
 
 import os
 import re
@@ -236,6 +239,11 @@ datas.append((os.path.join(vlc_path, 'plugins'), 'plugins'))
 
 # Add sounds
 datas.append(('sounds', 'sounds'))
+
+# Ship the license text with the build; MIT requires the notice to travel with
+# every copy of the software (issue #92).
+if os.path.isfile('LICENSE'):
+    datas.append(('LICENSE', '.'))
 
 # Add UI translation catalogs (issue #44): locale/<lang>/LC_MESSAGES/blindrss.mo.
 # Coexists with VLC's locale tree below (different .mo domain names).

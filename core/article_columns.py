@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Article-list column layout: which columns show, and in what order (article list columns).
 
 The layout is a list of ``{"key": <column key>, "visible": <bool>}`` entries in

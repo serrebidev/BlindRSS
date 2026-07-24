@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Embed-preserving article HTML cleaning for the opt-in rich reader.
 
 The plain-text reader uses trafilatura, which deliberately strips everything

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Test that open-ended range requests are limited to inline_window_bytes."""
 import sys
 import os

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Tests for opt-in article structure markers (headings/lists/quotes) and the
 block-aware HTML-to-text conversion (issue: preserve rich formatting)."""
 

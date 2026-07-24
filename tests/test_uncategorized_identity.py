@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Stable identity and display-only localization for Uncategorized."""
 
 from types import SimpleNamespace

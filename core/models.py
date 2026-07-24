@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime, timezone
 from core.categories import UNCATEGORIZED

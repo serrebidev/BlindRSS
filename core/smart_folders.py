@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Smart Folders: user-defined, rule-based virtual folders over local articles.
 
 A rule is a boolean tree of groups and leaf conditions:

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """wx <-> canonical accelerator-string bridge for the shortcut registry.
 
 Keeps all wx-specific keycode knowledge in one place so ``core.shortcuts``

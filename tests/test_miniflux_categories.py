@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Miniflux category management (issue #86).
 
 On Miniflux every feed must have a category, so "Uncategorized" is a real,

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Sky News article helpers.
 
 Sky's RSS feeds use image enclosures even for podcast articles.  Those items

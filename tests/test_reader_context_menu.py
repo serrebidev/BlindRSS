@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Reader context menu key handling (issue #73).
 
 The reader is a TE_RICH2 control, and on MSW the native rich-edit raises its own

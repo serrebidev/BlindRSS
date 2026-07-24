@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Unit tests for the play-queue / media-time helpers that don't need a wx.App.
 
 Both helpers under test are staticmethods on MainFrame, so they can be exercised

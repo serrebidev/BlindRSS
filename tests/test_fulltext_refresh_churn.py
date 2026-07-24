@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Regressions for full-text extraction racing refresh top-up merges.
 
 During a refresh, _quick_merge_articles rebuilds the article list every

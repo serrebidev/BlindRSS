@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Management for the YouTube playback download cache (`ytplay_cache`).
 
 When the bundled VLC cannot stream a resolved googlevideo URL, BlindRSS downloads

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Category Properties: rename and re-parent a category (issue #86).
 
 The GUI half of the feature, in two layers. The dispatch tests swap

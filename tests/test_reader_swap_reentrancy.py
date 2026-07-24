@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Regressions for the large-reader control swap (issue #91).
 
 _swap_focused_large_reader hands NVDA a fully populated RichEdit by building a

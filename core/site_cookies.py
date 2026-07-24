@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Per-site cookie jar for the HTTP fetch layer (issue #79).
 
 Sites behind an interactive bot check (Cloudflare's "Just a moment..."

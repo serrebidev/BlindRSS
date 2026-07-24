@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Issue #76: detect feeds on a webpage via <link rel="alternate"> scanning."""
 
 import types

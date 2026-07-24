@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Resolve the language to mark article content with (issue #72).
 
 The rich reader used to render every article as ``<html lang="en">``, so a

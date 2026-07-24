@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """DB-backed tests for the categorization feature: filter-rule storage, article
 labels/moves, configurable delete behavior, and category-view membership."""
 import pytest

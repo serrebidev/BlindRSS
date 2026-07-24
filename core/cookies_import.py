@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Helpers for importing a browser-exported cookies.txt (Netscape jar).
 
 Chromium v127+ App-Bound Encryption blocks BlindRSS and yt-dlp from reading

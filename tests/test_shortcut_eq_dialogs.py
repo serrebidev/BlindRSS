@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Construction + handler smoke tests for the new dialogs (needs a wx.App)."""
 import pytest
 

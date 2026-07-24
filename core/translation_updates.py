@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Over-the-air UI translation updates.
 
 Translations change far more often than the app does: a translator PR lands and,

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Stable category identities and display-time localization helpers.
 
 ``Uncategorized`` is persisted in SQLite, provider APIs, OPML logic, filter

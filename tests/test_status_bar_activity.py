@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Status bar activity field (issue: status bar shows nothing while feed
 refresh / downloads are in progress).
 

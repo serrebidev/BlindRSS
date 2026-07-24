@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Screen-reader announcement config + emit logic (issue #67).
 
 Covers per-event mode resolution/normalization and the Announcer emit paths

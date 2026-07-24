@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Interface internationalization via gettext (issue #44).
 
 English source strings are the message keys (gettext convention), so with no

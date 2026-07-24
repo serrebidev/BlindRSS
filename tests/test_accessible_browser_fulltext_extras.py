@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Peripheral full-text features in the macOS accessible browser: per-feed
 encoding override (issue #75), automatic translation, and structured-metadata
 enrichment — parity with the main window's reader pipeline.

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Change-history versions + opened/viewed activity tracking (DB layer)."""
 import pytest
 

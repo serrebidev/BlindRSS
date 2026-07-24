@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Leaked <script>/<style> source must never reach the reader as article text.
 
 Some CMSes build the JSON-LD ``articleBody`` by running a naive tag-stripper over the rendered

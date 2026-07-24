@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Persistent per-feed update error tracking and the Feeds with Errors view (issue #32).
 
 Feeds break over time (dead URLs, HTTP 404/500, timeouts, anti-bot blocks,

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Issue #61: RSSApp.OnInit must initialize i18n before showing any UI text,
 including the single-instance-already-running MessageBox. A real wx.App
 single-instance race is impractical to exercise in a unit test, so this

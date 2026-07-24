@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """
 Profile the full media loading pipeline to identify all bottlenecks.
 Measures actual time from user action to GUI responsiveness and playback start.

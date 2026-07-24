@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Site-specific full-text extraction: Reuters, simonwillison.net, and the
 hard-paywall stub guard. All fixtures are static HTML/text — no network."""
 

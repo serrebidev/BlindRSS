@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Tests for the link-list junk guard: video-only/index pages extract as a stack of
 navigation and related-story headlines, which must not be shown as the article body.
 The extractor raises so the UI falls back to the feed snippet plus the original link.

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Non-ASCII feed URLs (issue #41) and SSL certificate tolerance (issue #42).
 
 #41: IDN hostnames must be converted to Punycode and non-ASCII path/query

@@ -1,3 +1,7 @@
+; Copyright (c) serrebidev and contributors
+; This file is part of BlindRSS
+; SPDX-License-Identifier: MIT
+
 #define MyAppName "BlindRSS"
 #ifndef MyAppVersion
   #define MyAppVersion "0.0.0"

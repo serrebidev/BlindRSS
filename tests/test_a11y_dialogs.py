@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Accessibility (VoiceOver / screen-reader) checks for gui.dialogs.
 
 The primary user is a blind VoiceOver user on macOS. On macOS wx maps to

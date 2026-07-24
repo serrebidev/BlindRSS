@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Smart Folders: rule engine (pure predicate), SQL compilation via the local
 provider against a real SQLite DB, and folder CRUD."""
 import pytest

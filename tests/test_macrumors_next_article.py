@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Regression: MacRumors full text must not merge the next-article teaser (issue: full-text
 view showed the real article followed by text from OTHER articles).
 

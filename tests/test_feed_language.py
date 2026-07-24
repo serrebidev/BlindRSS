@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Feeds remember the language they declare (issue #72, rule 3).
 
 The rich reader marks content with the feed's declared language when the source

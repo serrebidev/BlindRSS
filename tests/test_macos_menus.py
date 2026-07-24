@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """macOS native-menu and cross-platform startup parity.
 
 The frame's menubar uses the standard role IDs (ID_ABOUT / ID_PREFERENCES /

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Per-site cookie jar for challenge-protected sites (issue #79)."""
 import os
 import sys

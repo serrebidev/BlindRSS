@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Rich (HTML) full-text view in the macOS accessible browser.
 
 MainFrame has an opt-in "Rich Full-Text View" (WebView) but the accessible

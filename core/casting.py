@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Unified casting module for Chromecast, DLNA/UPnP, and AirPlay.
 
 Provides a simple interface to discover and cast to network media devices.

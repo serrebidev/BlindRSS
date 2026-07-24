@@ -1,4 +1,8 @@
 @echo off
+@REM Copyright (c) serrebidev and contributors
+@REM This file is part of BlindRSS
+@REM SPDX-License-Identifier: MIT
+
 setlocal enabledelayedexpansion
 
 rem Always log updater output so failures aren't silent when running hidden.

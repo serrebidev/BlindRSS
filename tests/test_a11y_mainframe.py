@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Main-window accessibility behavior.
 
 Covers the platform-gated "Add Shortcuts..." File-menu item. Desktop/Start

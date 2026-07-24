@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Last-resort real-browser retrieval for feeds that normal HTTP cannot fetch.
 
 SeleniumBase is imported lazily and is never involved in the normal refresh

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 # core/stream_proxy.py
 #
 # Lightweight HTTP proxy and local file server used by BlindRSS for:

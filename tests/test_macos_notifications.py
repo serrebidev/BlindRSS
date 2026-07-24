@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """macOS notification parity.
 
 New-article notifications were hard-gated to Windows even though

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Structured-metadata enrichment (core.metadata_enrich): extruct JSON-LD /
 OpenGraph parsing, trafilatura fallback, tag merging, and the DB update that
 fills author/tags for Filter Rules matching."""

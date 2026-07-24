@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Pure-logic tests for the Filter Rules categorization engine (core.filters).
 
 These exercise the pipeline evaluation, action normalization, and delete-behavior

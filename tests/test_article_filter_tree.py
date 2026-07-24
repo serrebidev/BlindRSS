@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Global All/Unread/Read filter and category-tree pruning (issue #36).
 
 The View > Article Filter setting must wrap every article view id with the

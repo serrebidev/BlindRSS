@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Direct-browser fallback companion for self-hosted Miniflux.
 
 This optional localhost service keeps Miniflux as the authoritative provider.

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Regression coverage for Google News RSS redirect resolution.
 
 Google News feed items hold a signed JavaScript redirect URL.  These tests keep the resolver fully

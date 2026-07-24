@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """
 Manual feed addition diagnostic to verify articles appear after adding a feed.
 

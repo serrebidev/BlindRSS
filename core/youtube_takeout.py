@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Parse Google Takeout YouTube exports into subscribable RSS feeds.
 
 The parser is GUI-free so archive validation and source discovery remain easy to

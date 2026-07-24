@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """End-to-end check that MainFrame._update_tree renders aggregated category
 unread counts correctly (issue #34) through the real wx.TreeCtrl widget.
 

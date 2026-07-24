@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Byte-stream decoding with explicit user overrides and a strict detection chain (issue #75).
 
 Both the feed fetcher and the full-text extractor decode raw HTTP bodies here so

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """gettext internationalization plumbing (issue #44).
 
 Verifies the identity fallback (no catalogs -> English passthrough, the state

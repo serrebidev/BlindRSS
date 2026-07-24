@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """GUI-free tests for the media filter and the play-queue play/pause helpers.
 
 Binds the real MainFrame methods onto lightweight hosts (same pattern as

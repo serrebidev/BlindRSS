@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 from core.config import DEFAULT_CONFIG
 from core.vlc_options import build_vlc_instance_args
 

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """GSMArena bodies must keep their section headings and specs list.
 
 Trafilatura drops every <h3> and the specs <ul> from GSMArena's #review-body

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Synthetic feeds and complete-thread readers for web discussion services.
 
 Google Groups no longer publishes RSS, so its group landing page is treated as

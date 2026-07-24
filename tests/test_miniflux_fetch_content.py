@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Miniflux server-side fetch-content must use GET.
 
 The endpoint is GET /v1/entries/{id}/fetch-content; the old PUT form returns 405 on

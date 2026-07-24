@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Tests for Stop Refresh: cooperative cancellation of an in-flight batch refresh."""
 
 import os

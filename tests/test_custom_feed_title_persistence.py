@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Custom channel names must survive refreshes (issue #43).
 
 The article list's Feed column reads the stored feed title, so the stored

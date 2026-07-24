@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Feed Description dialog behavior (issue #30 follow-up).
 
 The dialog opened by "View Feed Description..." must close on Escape, not

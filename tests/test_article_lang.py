@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Language resolution for the rich reader (issue #72).
 
 The rich view marked every article ``lang="en"``, so a screen reader read

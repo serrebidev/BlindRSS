@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Tests for the feed-tree rebuild fast path (skip/patch on unchanged ticks)."""
 
 import os

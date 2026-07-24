@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Program Files install model: program in Program Files, mutable data elsewhere.
 
 These lock in that an installed (Program Files) build never writes to its own

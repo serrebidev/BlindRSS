@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Tests for the browser-header / TLS-impersonation HTTP transport (issue #29)."""
 
 import logging

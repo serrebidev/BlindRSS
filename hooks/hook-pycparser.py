@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Shadow of pyinstaller-hooks-contrib's hook-pycparser.
 
 The contrib hook unconditionally declares ``pycparser.lextab`` and

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Shadow of yt-dlp's bundled PyInstaller hook (yt_dlp/__pyinstaller/hook-yt_dlp.py).
 
 The upstream hook calls ``collect_submodules('urllib3')``, which tries to

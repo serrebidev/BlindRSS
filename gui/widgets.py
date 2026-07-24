@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Shared accessible custom controls.
 
 CheckListCtrl exists because wx.CheckListBox is invisible to screen readers on

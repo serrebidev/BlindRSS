@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Shared helpers for building HTTP header dictionaries from channel metadata."""
 
 from typing import Dict, Optional

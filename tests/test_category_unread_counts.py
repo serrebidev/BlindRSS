@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Aggregated unread counts on category tree nodes (issue #34).
 
 total_unread(category) = sum(unread_count of direct feeds)

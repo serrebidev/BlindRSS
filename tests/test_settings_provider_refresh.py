@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Regression coverage for preserving the article list after Settings."""
 
 import gui.mainframe as mainframe

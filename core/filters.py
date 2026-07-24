@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Filter Rules: an ordered pipeline of user-defined rules over incoming (and
 existing) articles — BlindRSS's article-categorization engine.
 

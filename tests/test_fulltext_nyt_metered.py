@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """New York Times (DataDome + metered paywall) full-text and rich-view regressions.
 
 NYT refuses every plain and TLS-impersonated request with a DataDome 403 and is

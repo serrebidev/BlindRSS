@@ -1,4 +1,8 @@
 #!/bin/sh
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 # BlindRSS POSIX update helper (macOS + Linux).
 #
 # Mirrors update_helper.bat: wait for the running app to exit, swap the install

@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Regression tests for the accessible browser Download button (issue #24)."""
 
 from types import SimpleNamespace

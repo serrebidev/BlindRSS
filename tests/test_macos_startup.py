@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """macOS start-at-login (LaunchAgent) support.
 
 The start-at-login checkbox used to be hard-disabled off Windows and

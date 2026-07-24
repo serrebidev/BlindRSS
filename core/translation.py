@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 import logging
 from typing import Iterable, List
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit

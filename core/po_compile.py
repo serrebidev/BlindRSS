@@ -1,3 +1,7 @@
+# Copyright (c) serrebidev and contributors
+# This file is part of BlindRSS
+# SPDX-License-Identifier: MIT
+
 """Compile gettext .po catalogs to .mo, with no GNU gettext dependency.
 
 Lives in core/ (not tools/) because the frozen app needs it too: only compiled
