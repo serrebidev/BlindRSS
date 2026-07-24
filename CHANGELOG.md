@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.120.3 - 2026-07-24
+
+- Recover Sky News podcast content.
+
 ## v1.120.2 - 2026-07-24
 
 - Reduce NVDA lag in YouTube readers.
