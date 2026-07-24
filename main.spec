@@ -149,6 +149,11 @@ binaries = [
 hiddenimports = [
     'vlc',
     'trafilatura',
+    # Over-the-air translation updates. Imported lazily inside functions (so a
+    # missing module would degrade to "no updates" in silence), so name them
+    # explicitly rather than relying on bytecode scanning of lazy imports.
+    'core.po_compile',
+    'core.translation_updates',
 ]
 
 try:

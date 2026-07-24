@@ -94,6 +94,9 @@ hiddenimports = [
     # Imported lazily at runtime, so name it explicitly rather than relying on
     # bytecode scanning of lazy imports.
     "wx.html2",
+    # Over-the-air translation updates, imported lazily inside functions.
+    "core.po_compile",
+    "core.translation_updates",
 ]
 
 
