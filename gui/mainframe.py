@@ -1577,6 +1577,7 @@ class MainFrame(wx.Frame):
             self.selected_article_id = None
             try:
                 self.content_ctrl.SetValue("")
+                self._invalidate_reader_text_tracking()
             except Exception:
                 pass
 
@@ -1625,6 +1626,7 @@ class MainFrame(wx.Frame):
             self.selected_article_id = None
             try:
                 self.content_ctrl.SetValue("")
+                self._invalidate_reader_text_tracking()
             except Exception:
                 pass
 
@@ -1682,6 +1684,7 @@ class MainFrame(wx.Frame):
             self.selected_article_id = None
             try:
                 self.content_ctrl.SetValue("")
+                self._invalidate_reader_text_tracking()
             except Exception:
                 pass
 
@@ -1948,6 +1951,7 @@ class MainFrame(wx.Frame):
 
         self.current_feed_id = feed_id
         self.content_ctrl.Clear()
+        self._invalidate_reader_text_tracking()
         self.selected_article_id = None
 
         # If we have cached articles for this view, render them immediately.
@@ -5208,7 +5212,17 @@ class MainFrame(wx.Frame):
         """Expose a fully populated RichEdit to NVDA in one focus transition."""
         if not sys.platform.startswith("win") or len(displayed) < LARGE_READER_TEXT_CHARS:
             return False
+        # new.SetFocus() below delivers EVT_SET_FOCUS synchronously, and
+        # on_content_focus re-enters _set_article_reader_text through the
+        # full-text cache-hit path. Left unguarded that re-entry starts another
+        # swap, and so on without bound, until the recursion unwinds through the
+        # handlers here and strands a stale control on screen (issue #91).
+        if getattr(self, "_reader_swap_active", False):
+            return False
         old = self.content_ctrl
+        new = None
+        swapped = False
+        self._reader_swap_active = True
         try:
             if wx.Window.FindFocus() is not old or not old.IsShown():
                 return False
@@ -5227,6 +5241,7 @@ class MainFrame(wx.Frame):
             if not self._reader_sizer.Replace(old, new):
                 new.Destroy()
                 return False
+            swapped = True
             self.content_ctrl = new
             self._update_search_tab_order()
             new.Show()
@@ -5237,12 +5252,24 @@ class MainFrame(wx.Frame):
             return True
         except Exception:
             log.debug("Large reader control swap failed", exc_info=True)
+            # Undo a half-applied swap. Leaving it in place keeps the old
+            # control visible and parented while content_ctrl points at the new
+            # one, so every later write lands on a control the user cannot see
+            # and the reader stays frozen on this article until the app is
+            # restarted (issue #91).
             try:
-                if "new" in locals() and new is not self.content_ctrl:
+                if swapped and new is not None and self._reader_sizer.Replace(new, old):
+                    self.content_ctrl = old
+                    old.Show()
+                    self._update_search_tab_order()
+                    self.reader_panel.Layout()
+                if new is not None and new is not self.content_ctrl:
                     new.Destroy()
             except Exception:
-                pass
+                log.debug("Large reader swap rollback failed", exc_info=True)
             return False
+        finally:
+            self._reader_swap_active = False
 
     def _set_article_reader_text(self, article, base_text: str, *, reset_insertion: bool = False) -> str:
         """Set the main reader from chapter-free base text and return the displayed text."""
@@ -5253,9 +5280,13 @@ class MainFrame(wx.Frame):
                 if reset_insertion:
                     self.content_ctrl.SetInsertionPoint(0)
                 return displayed
+            # Record before swapping, not after: _swap_focused_large_reader
+            # installs a control that already holds this text and then moves
+            # focus to it, which re-enters this method synchronously. The
+            # re-entrant call has to see the memo to stop here (issue #91).
+            self._reader_displayed_text = displayed
             swapper = getattr(self, "_swap_focused_large_reader", None)
             if callable(swapper) and swapper(displayed, reset_insertion):
-                self._reader_displayed_text = displayed
                 return displayed
             changed = replace_text_control_value(self.content_ctrl, displayed)
             if changed:
@@ -5265,10 +5296,22 @@ class MainFrame(wx.Frame):
                 force_ltr_reading(self.content_ctrl)
             if reset_insertion and changed:
                 self.content_ctrl.SetInsertionPoint(0)
-            self._reader_displayed_text = displayed
         except Exception:
-            pass
+            # Never leave the memo asserting text the control may not hold; a
+            # wrong "already displayed" answer skips the next write entirely.
+            self._reader_displayed_text = None
+            log.debug("Setting article reader text failed", exc_info=True)
         return displayed
+
+    def _invalidate_reader_text_tracking(self) -> None:
+        """Forget what the reader was last given, after a direct write to it.
+
+        _set_article_reader_text skips the rewrite when asked for the text it
+        last wrote. Anything that writes content_ctrl directly must clear that
+        record, or the next request for the remembered text is skipped and the
+        direct write stays on screen instead (issue #91).
+        """
+        self._reader_displayed_text = None
 
     # -- Rich (WebView) reader -------------------------------------------------
 
@@ -7008,6 +7051,7 @@ class MainFrame(wx.Frame):
             label = "No matches." if (self._is_search_active() and getattr(self, "_base_articles", None)) else _("No articles found.")
             self.list_ctrl.InsertItem(0, label)
             self.content_ctrl.Clear()
+            self._invalidate_reader_text_tracking()
             self.selected_article_id = None
         except Exception:
             log.exception("Error showing empty articles state")
@@ -8749,6 +8793,7 @@ class MainFrame(wx.Frame):
             self.list_ctrl.DeleteAllItems()
             self.list_ctrl.InsertItem(0, "Loading...")
             self.content_ctrl.Clear()
+            self._invalidate_reader_text_tracking()
 
         # Use a request ID to handle race conditions (if user clicks fast / auto-refresh overlaps).
         request_id = self._next_articles_request_id()
@@ -9591,6 +9636,7 @@ class MainFrame(wx.Frame):
             # Keep focus on placeholder; do not try to load content
             self.selected_article_id = None
             self.content_ctrl.SetValue("")
+            self._invalidate_reader_text_tracking()
             return
         if 0 <= idx < len(self.current_articles):
             article = self.current_articles[idx]
@@ -9607,6 +9653,7 @@ class MainFrame(wx.Frame):
             
             # Immediate feedback (fast)
             self.content_ctrl.SetValue("Loading...")
+            self._invalidate_reader_text_tracking()
 
             # Debounce heavy operations (HTML parsing, marking read, etc.)
             if getattr(self, "_content_debounce", None):
@@ -11098,6 +11145,9 @@ class MainFrame(wx.Frame):
             except Exception:
                 pass
             self.content_ctrl.SetValue(displayed)
+            # Writing the reader directly: keep the memo describing what the
+            # control actually holds (issue #91).
+            self._reader_displayed_text = displayed
             force_ltr_reading(self.content_ctrl)
             try:
                 if selection is not None:
@@ -13574,6 +13624,7 @@ class MainFrame(wx.Frame):
                     self._set_base_articles([], None)
                     self.list_ctrl.DeleteAllItems()
                     self.content_ctrl.SetValue("")
+                    self._invalidate_reader_text_tracking()
                 except Exception:
                     pass
                 try:
