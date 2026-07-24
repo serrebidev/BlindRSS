@@ -254,6 +254,9 @@ def test_settings_dialog_provider_credential_fields_named(parent):
     except TypeError:
         dlg = dialogs.SettingsDialog(parent, config)
     try:
+        # Notebook pages build on first view, so a test inspecting a page's
+        # controls has to realise them first (get_data does the same).
+        dlg._ensure_all_pages_built()
         panels = getattr(dlg, "_provider_panels", {})
 
         miniflux_ctrls = panels.get("miniflux", (None, {}))[1]

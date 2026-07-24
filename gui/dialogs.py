@@ -912,7 +912,10 @@ class SettingsDialog(wx.Dialog):
         
         notebook = wx.Notebook(self)
         self.notebook = notebook
-        
+        # panel -> builder, for pages whose contents are not constructed yet.
+        self._lazy_pages = {}
+        notebook.Bind(wx.EVT_NOTEBOOK_PAGE_CHANGED, self._on_settings_page_changed)
+
         # General Tab
         general_panel = wx.Panel(notebook)
         general_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -1500,803 +1503,25 @@ class SettingsDialog(wx.Dialog):
         youtube_panel.SetSizer(youtube_sizer)
         notebook.AddPage(youtube_panel, _("YouTube"))
 
-        groups_io_panel = wx.Panel(notebook)
-        groups_io_sizer = wx.BoxSizer(wx.VERTICAL)
-        groups_io_sizer.Add(wx.StaticText(groups_io_panel, label=_(
-            "Groups.io API key (optional). Public groups and RSS work without a key; "
-            "the key enables complete paginated topics and member-only archives. "
-            "Create one at groups.io/settings/apikeys."
-        )), 0, wx.ALL, 8)
-        self.groups_io_api_key_ctrl = wx.TextCtrl(
-            groups_io_panel, value=str(config.get("groups_io_api_key", "") or ""), style=wx.TE_PASSWORD
-        )
-        self.groups_io_api_key_ctrl.SetName("Groups.io API key")
-        self.groups_io_api_key_ctrl.SetHint(_("Paste your Groups.io API key"))
-        groups_io_sizer.Add(self.groups_io_api_key_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-        groups_io_sizer.Add(wx.StaticText(groups_io_panel, label=_(
-            "Search subscriptions keep the search URL and refresh results in the background. "
-            "Browser cookies are imported only from Groups.io domains."
-        )), 0, wx.ALL, 8)
-        groups_io_panel.SetSizer(groups_io_sizer)
-        notebook.AddPage(groups_io_panel, "Groups.io")
+        self._register_lazy_page(notebook, "Groups.io", self._build_groups_io_page)
 
         # Media Player Tab
-        media_panel = wx.Panel(notebook)
-        media_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        # Preferred soundcard (enumerated in background to avoid blocking dialog open)
-        soundcard_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        soundcard_sizer.Add(wx.StaticText(media_panel, label=_("Preferred Soundcard:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
-        self._current_soundcard = str(config.get("preferred_soundcard", "") or "")
-        self._soundcard_choices = [(_("System Default"), "")]
-        self._soundcard_labels = [_("Loading soundcards...")]
-        self.soundcard_ctrl = wx.Choice(media_panel, choices=self._soundcard_labels)
-        self.soundcard_ctrl.SetSelection(0)
-        soundcard_sizer.Add(self.soundcard_ctrl, 1, wx.ALL, 5)
-        media_sizer.Add(soundcard_sizer, 0, wx.EXPAND | wx.ALL, 5)
-        threading.Thread(target=self._load_soundcards_async, daemon=True).start()
-
-        self.skip_silence_chk = wx.CheckBox(media_panel, label=_("Skip Silence (Experimental)"))
-        self.skip_silence_chk.SetValue(config.get("skip_silence", False))
-        media_sizer.Add(self.skip_silence_chk, 0, wx.ALL, 5)
-
-        # Playback speed
-        speed_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        speed_sizer.Add(wx.StaticText(media_panel, label=_("Default Playback Speed:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
-
-        # Build speed choices using utils
-        speeds = utils.build_playback_speeds()
-        self.speed_choices = [f"{s:.2f}x" for s in speeds]
-        current_speed = float(config.get("playback_speed", 1.0))
-
-        self.speed_ctrl = wx.ComboBox(media_panel, choices=self.speed_choices, style=wx.CB_READONLY)
-
-        # Find nearest selection
-        sel_idx = 0
-        min_diff = 999.0
-        for i, s in enumerate(speeds):
-            diff = abs(s - current_speed)
-            if diff < min_diff:
-                min_diff = diff
-                sel_idx = i
-        self.speed_ctrl.SetSelection(sel_idx)
-
-        speed_sizer.Add(self.speed_ctrl, 0, wx.ALL, 5)
-        media_sizer.Add(speed_sizer, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Player window behavior
-        self.show_player_on_play_chk = wx.CheckBox(media_panel, label=_("Show player window when starting playback"))
-        self.show_player_on_play_chk.SetValue(bool(config.get("show_player_on_play", True)))
-        media_sizer.Add(self.show_player_on_play_chk, 0, wx.ALL, 5)
-
-        # VLC network caching (helps on high latency streams)
-        cache_net_sizer = wx.BoxSizer(wx.HORIZONTAL)
-        cache_net_sizer.Add(wx.StaticText(media_panel, label=_("Network Cache (ms):")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
-        self.vlc_cache_ctrl = wx.SpinCtrl(media_panel, min=500, max=60000, initial=int(config.get("vlc_network_caching_ms", 5000)))
-        cache_net_sizer.Add(self.vlc_cache_ctrl, 0, wx.ALL, 5)
-        media_sizer.Add(cache_net_sizer, 0, wx.EXPAND | wx.ALL, 5)
-
-        self.range_cache_debug_chk = wx.CheckBox(media_panel, label=_("Verbose range-cache proxy debug logs"))
-        self.range_cache_debug_chk.SetValue(bool(config.get("range_cache_debug", False)))
-        media_sizer.Add(self.range_cache_debug_chk, 0, wx.ALL, 5)
-
-        # Media tool executables: detected paths plus optional manual overrides.
-        # Leaving a field blank auto-detects (PATH, Scoop/Choco/WinGet, portable
-        # layouts, etc.). Detection runs in the background to keep the dialog snappy.
-        tools_box = wx.StaticBoxSizer(
-            wx.VERTICAL, media_panel, _("Media tools (ffmpeg, ffprobe, yt-dlp)")
-        )
-        tools_box.Add(
-            wx.StaticText(
-                media_panel,
-                label=_("Leave a path blank to auto-detect. A set path overrides detection."),
-            ),
-            0, wx.ALL, 4,
-        )
-        self._media_tool_path_ctrls = {}
-        self._media_tool_detected_lbls = {}
-        _media_tool_specs = [
-            ("ffmpeg", "FFmpeg", "custom_ffmpeg_path"),
-            ("ffprobe", "FFprobe", "custom_ffprobe_path"),
-            ("yt-dlp", "yt-dlp", "custom_ytdlp_path"),
-        ]
-        for tool_key, tool_label, cfg_key in _media_tool_specs:
-            row = wx.BoxSizer(wx.HORIZONTAL)
-            row.Add(
-                wx.StaticText(media_panel, label=_("{tool} path:").format(tool=tool_label)),
-                0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4,
-            )
-            ctrl = wx.TextCtrl(media_panel, value=str(config.get(cfg_key, "") or ""))
-            ctrl.SetName(f"{tool_label} executable path override")
-            row.Add(ctrl, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
-            browse = wx.Button(media_panel, label=_("Browse..."))
-            browse.Bind(
-                wx.EVT_BUTTON,
-                lambda evt, c=ctrl, lbl=tool_label: self._on_browse_media_tool(c, lbl),
-            )
-            row.Add(browse, 0)
-            tools_box.Add(row, 0, wx.EXPAND | wx.ALL, 2)
-            detected = wx.StaticText(media_panel, label=f"Detected {tool_label}: checking…")
-            detected.SetName(f"Detected {tool_label}")
-            tools_box.Add(detected, 0, wx.LEFT | wx.BOTTOM, 12)
-            self._media_tool_path_ctrls[cfg_key] = ctrl
-            self._media_tool_detected_lbls[tool_key] = detected
-        media_sizer.Add(tools_box, 0, wx.EXPAND | wx.ALL, 5)
-        threading.Thread(target=self._detect_media_tools_async, daemon=True).start()
-
-        media_panel.SetSizer(media_sizer)
-        notebook.AddPage(media_panel, _("Media Player"))
+        self._register_lazy_page(notebook, _("Media Player"), self._build_media_page)
         
         # Provider Tab
-        provider_panel = wx.Panel(notebook)
-        provider_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        provider_sizer.Add(wx.StaticText(provider_panel, label=_("Active Provider:")), 0, wx.ALL, 5)
-
-        # Build provider list from config (keeps future providers visible).
-        cfg_providers = list((config.get("providers") or {}).keys()) if isinstance(config, dict) else []
-        if not cfg_providers:
-            cfg_providers = ["local", "miniflux", "bazqux", "theoldreader", "inoreader"]
-        preferred_order = ["local", "miniflux", "bazqux", "theoldreader", "inoreader"]
-        providers_sorted = [p for p in preferred_order if p in cfg_providers] + [p for p in cfg_providers if p not in preferred_order]
-
-        self.provider_choice = wx.Choice(provider_panel, choices=providers_sorted)
-        self.provider_choice.SetStringSelection(config.get("active_provider", "local"))
-        provider_sizer.Add(self.provider_choice, 0, wx.EXPAND | wx.ALL, 5)
-
-        # Provider-specific settings panels
-        self._provider_panels = {}  # name -> (panel, controls_dict)
-
-        def _add_simple_info_panel(name: str, info_text: str):
-            pnl = wx.Panel(provider_panel)
-            s = wx.BoxSizer(wx.VERTICAL)
-            # Read-only text control instead of a StaticText: it participates
-            # in the tab order, so keyboard/screen-reader users reach the
-            # explanation without object navigation.
-            info = wx.TextCtrl(
-                pnl,
-                value=info_text,
-                style=wx.TE_MULTILINE | wx.TE_READONLY,
-                size=(-1, 60),
-            )
-            info.SetName(_("Provider information"))
-            s.Add(info, 0, wx.EXPAND | wx.ALL, 5)
-            pnl.SetSizer(s)
-            provider_sizer.Add(pnl, 0, wx.EXPAND | wx.ALL, 5)
-            self._provider_panels[name] = (pnl, {})
-            pnl.Hide()
-
-        def _add_fields_panel(name: str, fields):
-            # fields: [(label, key, style)]
-            pnl = wx.Panel(provider_panel)
-            fg = wx.FlexGridSizer(cols=2, hgap=8, vgap=8)
-            fg.AddGrowableCol(1, 1)
-            ctrls = {}
-            p_cfg = (config.get("providers") or {}).get(name, {}) if isinstance(config, dict) else {}
-            for label, key, style in fields:
-                fg.Add(wx.StaticText(pnl, label=label), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 2)
-                tc = wx.TextCtrl(pnl, style=style)
-                tc.SetName(label.rstrip(":").strip())
-                tc.SetValue(str(p_cfg.get(key, "") or ""))
-                fg.Add(tc, 1, wx.EXPAND | wx.ALL, 2)
-                ctrls[key] = tc
-            pnl.SetSizer(fg)
-            provider_sizer.Add(pnl, 0, wx.EXPAND | wx.ALL, 5)
-            self._provider_panels[name] = (pnl, ctrls)
-            pnl.Hide()
-
-        def _add_inoreader_panel(name: str):
-            pnl = wx.Panel(provider_panel)
-            outer = wx.BoxSizer(wx.VERTICAL)
-            fg = wx.FlexGridSizer(cols=2, hgap=8, vgap=8)
-            fg.AddGrowableCol(1, 1)
-            ctrls = {}
-            p_cfg = (config.get("providers") or {}).get(name, {}) if isinstance(config, dict) else {}
-
-            fg.Add(wx.StaticText(pnl, label=_("Inoreader App ID:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 2)
-            app_id_ctrl = wx.TextCtrl(pnl)
-            app_id_ctrl.SetName("Inoreader App ID")
-            app_id_ctrl.SetValue(str(p_cfg.get("app_id", "") or ""))
-            fg.Add(app_id_ctrl, 1, wx.EXPAND | wx.ALL, 2)
-            ctrls["app_id"] = app_id_ctrl
-
-            fg.Add(wx.StaticText(pnl, label=_("Inoreader App Key:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 2)
-            app_key_ctrl = wx.TextCtrl(pnl, style=wx.TE_PASSWORD)
-            app_key_ctrl.SetName("Inoreader App Key")
-            app_key_ctrl.SetValue(str(p_cfg.get("app_key", "") or ""))
-            fg.Add(app_key_ctrl, 1, wx.EXPAND | wx.ALL, 2)
-            ctrls["app_key"] = app_key_ctrl
-
-            default_redirect_uri = inoreader_oauth.get_redirect_uri(scheme="https")
-            redirect_uri_ctrl = wx.TextCtrl(pnl)
-            redirect_uri_ctrl.SetName("Redirect URI")
-            redirect_uri_ctrl.SetValue(str(p_cfg.get("redirect_uri", "") or "").strip() or default_redirect_uri)
-            fg.Add(wx.StaticText(pnl, label=_("Redirect URI:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 2)
-            fg.Add(redirect_uri_ctrl, 1, wx.EXPAND | wx.ALL, 2)
-            ctrls["redirect_uri"] = redirect_uri_ctrl
-
-            outer.Add(fg, 0, wx.EXPAND | wx.ALL, 2)
-
-            help_lbl = wx.StaticText(
-                pnl,
-                label=_(
-                    "Note: If your Redirect URI uses HTTPS (common/required), your browser may fail to load\n"
-                    "localhost after authorization. Copy the full redirected URL from the address bar and paste it\n"
-                    "when prompted."
-                ),
-            )
-            outer.Add(help_lbl, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 2)
-
-            status_lbl = wx.StaticText(pnl, label="")
-            outer.Add(status_lbl, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 2)
-
-            btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
-            auth_btn = wx.Button(pnl, label=_("Authorize Inoreader"))
-            clear_btn = wx.Button(pnl, label=_("Clear Authorization"))
-            btn_sizer.Add(auth_btn, 0, wx.ALL, 2)
-            btn_sizer.Add(clear_btn, 0, wx.ALL, 2)
-            outer.Add(btn_sizer, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 2)
-
-            pnl.SetSizer(outer)
-            provider_sizer.Add(pnl, 0, wx.EXPAND | wx.ALL, 5)
-            self._provider_panels[name] = (pnl, ctrls)
-            pnl.Hide()
-
-            self._inoreader_app_id_ctrl = app_id_ctrl
-            self._inoreader_app_key_ctrl = app_key_ctrl
-            self._inoreader_redirect_uri_ctrl = redirect_uri_ctrl
-            self._inoreader_status_lbl = status_lbl
-            self._inoreader_authorize_btn = auth_btn
-            self._inoreader_clear_btn = clear_btn
-            self._inoreader_tokens = None
-            self._inoreader_auth_original = {
-                "app_id": str(p_cfg.get("app_id", "") or ""),
-                "app_key": str(p_cfg.get("app_key", "") or ""),
-            }
-
-            has_token = bool((p_cfg.get("token") or "") or (p_cfg.get("refresh_token") or ""))
-            self._set_inoreader_status(
-                "Authorized" if has_token else "Not authorized",
-                ok=has_token,
-            )
-
-            auth_btn.Bind(wx.EVT_BUTTON, self._start_inoreader_authorize)
-            clear_btn.Bind(wx.EVT_BUTTON, self._clear_inoreader_authorization)
-
-        _add_simple_info_panel("local", _("Local provider uses the feeds you add inside the app (Add Feed / Import OPML)."))
-        _add_fields_panel("miniflux", [
-            ("Miniflux URL:", "url", 0),
-            ("Miniflux API Key:", "api_key", 0),
-        ])
-        _add_fields_panel("theoldreader", [
-            ("The Old Reader Email:", "email", 0),
-            ("The Old Reader Password:", "password", wx.TE_PASSWORD),
-        ])
-        _add_inoreader_panel("inoreader")
-        _add_fields_panel("bazqux", [
-            ("BazQux Email:", "email", 0),
-            ("BazQux Password:", "password", wx.TE_PASSWORD),
-        ])
-
-        self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_choice)
-        self._update_provider_panels()
-
-        provider_panel.SetSizer(provider_sizer)
-        notebook.AddPage(provider_panel, _("Provider"))
+        self._register_lazy_page(notebook, _("Provider"), self._build_provider_page)
         
         # Sounds Tab
-        sounds_panel = wx.Panel(notebook)
-        sounds_sizer = wx.BoxSizer(wx.VERTICAL)
-        
-        self.sounds_enabled_chk = wx.CheckBox(sounds_panel, label=_("Enable Sound Notifications"))
-        self.sounds_enabled_chk.SetValue(config.get("sounds_enabled", True))
-        sounds_sizer.Add(self.sounds_enabled_chk, 0, wx.ALL, 5)
-        
-        def _add_sound_field(label, key):
-            field_name = label.rstrip(":").strip()
-            s = wx.BoxSizer(wx.HORIZONTAL)
-            s.Add(wx.StaticText(sounds_panel, label=label), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
-            val = config.get(key, "")
-            ctrl = wx.TextCtrl(sounds_panel, value=str(val))
-            ctrl.SetName(field_name)
-            s.Add(ctrl, 1, wx.ALL, 5)
-            browse_btn = wx.Button(sounds_panel, label=_("Browse..."))
-            browse_btn.SetName(f"Browse for {field_name}")
-
-            def _on_browse(evt):
-                dlg = wx.FileDialog(self, f"Choose {label}", defaultFile=ctrl.GetValue(), wildcard=f'{_("WAV files")} (*.wav)|*.wav|{_("All files")} (*.*)|*.*', style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
-                if dlg.ShowModal() == wx.ID_OK:
-                    ctrl.SetValue(dlg.GetPath())
-                dlg.Destroy()
-            
-            browse_btn.Bind(wx.EVT_BUTTON, _on_browse)
-            s.Add(browse_btn, 0, wx.ALL, 5)
-            sounds_sizer.Add(s, 0, wx.EXPAND | wx.ALL, 5)
-            return ctrl
-            
-        self.sound_complete_ctrl = _add_sound_field(_("Refresh Complete Sound:"), "sound_refresh_complete")
-        self.sound_error_ctrl = _add_sound_field(_("Refresh Error Sound:"), "sound_refresh_error")
-        
-        sounds_panel.SetSizer(sounds_sizer)
-        notebook.AddPage(sounds_panel, _("Sounds"))
+        self._register_lazy_page(notebook, _("Sounds"), self._build_sounds_page)
 
         # Notifications Tab
-        notifications_panel = wx.Panel(notebook)
-        notifications_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        notice_txt = (
-            "Windows toast notifications for new articles.\n"
-            "Disabled by default."
-        )
-        notifications_sizer.Add(wx.StaticText(notifications_panel, label=notice_txt), 0, wx.ALL, 8)
-
-        self.windows_notifications_chk = wx.CheckBox(
-            notifications_panel,
-            label=_("Enable notifications for new articles"),
-        )
-        self.windows_notifications_chk.SetValue(bool(config.get("windows_notifications_enabled", False)))
-        if not utils.platform_supports_notifications():
-            self.windows_notifications_chk.Disable()
-        notifications_sizer.Add(self.windows_notifications_chk, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        self.windows_notifications_feed_chk = wx.CheckBox(
-            notifications_panel,
-            label=_("Include feed name in notification text"),
-        )
-        self.windows_notifications_feed_chk.SetValue(
-            bool(config.get("windows_notifications_include_feed_name", True))
-        )
-        notifications_sizer.Add(self.windows_notifications_feed_chk, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        cap_row = wx.BoxSizer(wx.HORIZONTAL)
-        cap_row.Add(
-            wx.StaticText(notifications_panel, label=_("Max notifications per refresh (0 = no limit):")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        self.windows_notifications_max_ctrl = wx.SpinCtrl(
-            notifications_panel,
-            min=0,
-            max=200,
-            initial=int(config.get("windows_notifications_max_per_refresh", 0)),
-        )
-        cap_row.Add(self.windows_notifications_max_ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
-        notifications_sizer.Add(cap_row, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        self.windows_notifications_summary_chk = wx.CheckBox(
-            notifications_panel,
-            label=_("Show a summary notification when notification cap is reached"),
-        )
-        self.windows_notifications_summary_chk.SetValue(
-            bool(config.get("windows_notifications_show_summary_when_capped", True))
-        )
-        notifications_sizer.Add(self.windows_notifications_summary_chk, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        self.test_notification_btn = wx.Button(notifications_panel, label=_("Test Notification"))
-        self.test_notification_btn.Bind(wx.EVT_BUTTON, self.on_test_notification)
-        notifications_sizer.Add(self.test_notification_btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        self.exclude_feeds_btn = wx.Button(notifications_panel, label=_("Exclude Feeds..."))
-        self.exclude_feeds_btn.Bind(wx.EVT_BUTTON, self.on_exclude_notification_feeds)
-        notifications_sizer.Add(self.exclude_feeds_btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        self.exclude_feeds_lbl = wx.StaticText(notifications_panel, label="")
-        notifications_sizer.Add(self.exclude_feeds_lbl, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-        self._update_excluded_feeds_label()
-
-        self.windows_notifications_chk.Bind(wx.EVT_CHECKBOX, self._on_toggle_windows_notifications)
-        self._update_notification_controls()
-
-        notifications_panel.SetSizer(notifications_sizer)
-        notebook.AddPage(notifications_panel, _("Notifications"))
+        self._register_lazy_page(notebook, _("Notifications"), self._build_notifications_page)
 
         # Announcements Tab (issue #67): per-event screen-reader announcement mode.
-        announcements_panel = wx.ScrolledWindow(notebook)
-        announcements_panel.SetScrollRate(0, 12)
-        announcements_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        announce_note = (
-            "Screen-reader announcements for key keyboard actions.\n"
-            "Each event can announce via speech, Braille, both, or neither.\n"
-            "Braille output is most reliable on Windows with NVDA or JAWS."
-        )
-        announcements_sizer.Add(
-            wx.StaticText(announcements_panel, label=announce_note), 0, wx.ALL, 8
-        )
-
-        mode_labels = [_(label) for _mode, label in announcements_mod.mode_choices()]
-        mode_values = [mode for mode, _label in announcements_mod.mode_choices()]
-        current_modes = announcements_mod.normalize_modes(
-            config.get("announcements", {})
-        )
-        self._announcement_mode_values = mode_values
-        self._announcement_choice_ctrls = {}
-
-        announce_grid = wx.FlexGridSizer(0, 2, 6, 10)
-        announce_grid.AddGrowableCol(0, 1)
-        for event in announcements_mod.iter_events():
-            label = wx.StaticText(announcements_panel, label=_(event.label))
-            label.SetToolTip(_(event.help))
-            choice = wx.Choice(announcements_panel, choices=mode_labels)
-            choice.SetName(_(event.label))
-            choice.SetToolTip(_(event.help))
-            try:
-                sel = mode_values.index(current_modes.get(event.id, event.default))
-            except ValueError:
-                sel = mode_values.index(announcements_mod.DEFAULT_MODE)
-            choice.SetSelection(sel)
-            self._announcement_choice_ctrls[event.id] = choice
-            announce_grid.Add(label, 0, wx.ALIGN_CENTER_VERTICAL)
-            announce_grid.Add(choice, 0, wx.EXPAND)
-        announcements_sizer.Add(announce_grid, 0, wx.EXPAND | wx.ALL, 8)
-
-        # Test button (issue #71), mirroring "Test Notification" on the
-        # Notifications tab. Speaks and brailles regardless of the per-event
-        # modes above -- see Announcer.announce_test.
-        self.test_announcement_btn = wx.Button(announcements_panel, label=_("Test Announcement"))
-        self.test_announcement_btn.SetName(_("Test Announcement"))
-        self.test_announcement_btn.SetToolTip(
-            _("Send a test announcement to your screen reader via speech and Braille.")
-        )
-        self.test_announcement_btn.Bind(wx.EVT_BUTTON, self.on_test_announcement)
-        announcements_sizer.Add(self.test_announcement_btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        announcements_panel.SetSizer(announcements_sizer)
-        notebook.AddPage(announcements_panel, _("Announcements"))
+        self._register_lazy_page(notebook, _("Announcements"), self._build_announcements_page, widget=wx.ScrolledWindow)
 
         # Translate Tab (automatic article translation via Grok/Groq/OpenAI/OpenRouter/Gemini/Qwen)
-        translate_panel = wx.Panel(notebook)
-        translate_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        translate_note = (
-            "Configure automatic article translation.\n"
-            "Your API key is stored locally in config.json."
-        )
-        translate_sizer.Add(wx.StaticText(translate_panel, label=translate_note), 0, wx.ALL, 8)
-
-        self.translation_enabled_chk = wx.CheckBox(
-            translate_panel,
-            label=_("Enable automatic translation for article content"),
-        )
-        self.translation_enabled_chk.SetValue(bool(config.get("translation_enabled", False)))
-        translate_sizer.Add(self.translation_enabled_chk, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        # Display name → internal config key mapping for translation providers.
-        self._translation_provider_display_to_key = {
-            "Grok (xAI)": "grok",
-            "Groq (LLaMA, Mistral)": "groq",
-            "OpenAI (GPT)": "openai",
-            "OpenRouter": "openrouter",
-            "Gemini (Google)": "gemini",
-            "Qwen (Alibaba)": "qwen",
-        }
-        self._translation_provider_key_to_display = {
-            v: k for k, v in self._translation_provider_display_to_key.items()
-        }
-        _provider_display_names = list(self._translation_provider_display_to_key.keys())
-
-        provider_row = wx.BoxSizer(wx.HORIZONTAL)
-        provider_row.Add(wx.StaticText(translate_panel, label=_("Provider:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
-        self.translation_provider_ctrl = wx.Choice(translate_panel, choices=_provider_display_names)
-        _saved_provider = str(config.get("translation_provider", "grok") or "grok").strip().lower()
-        _saved_display = self._translation_provider_key_to_display.get(_saved_provider, _provider_display_names[0])
-        if not self.translation_provider_ctrl.SetStringSelection(_saved_display):
-            self.translation_provider_ctrl.SetSelection(0)
-        provider_row.Add(self.translation_provider_ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(provider_row, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        self._translation_language_label_to_code = {
-            str(label): str(code)
-            for label, code in self._TRANSLATION_LANGUAGE_PRESETS
-        }
-        self._translation_language_code_to_label = {
-            str(code).lower(): str(label)
-            for label, code in self._TRANSLATION_LANGUAGE_PRESETS
-        }
-
-        target_row = wx.BoxSizer(wx.HORIZONTAL)
-        target_row.Add(
-            wx.StaticText(translate_panel, label=_("Target language:")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        choices = [f"{label} ({_code})" for label, _code in self._TRANSLATION_LANGUAGE_PRESETS]
-        choices.sort()
-        self.translation_target_language_ctrl = wx.ComboBox(
-            translate_panel,
-            choices=choices,
-            style=wx.CB_DROPDOWN,
-        )
-        self.translation_target_language_ctrl.SetName("Target language")
-        self.translation_target_language_ctrl.SetValue(
-            self._translation_language_display_value(
-                str(config.get("translation_target_language", "en") or "en")
-            )
-        )
-        target_row.Add(self.translation_target_language_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(target_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-        translate_sizer.Add(
-            wx.StaticText(
-                translate_panel,
-                label=_("Choose a language or type a code (e.g. en, es, fr, pt-BR)."),
-            ),
-            0,
-            wx.LEFT | wx.RIGHT | wx.BOTTOM,
-            8,
-        )
-
-        model_row = wx.BoxSizer(wx.HORIZONTAL)
-        model_row.Add(
-            wx.StaticText(translate_panel, label=_("Grok (xAI) model (optional):")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        model_choices = [
-            str(m)
-            for m in getattr(translation_mod, "_DEFAULT_MODEL_CANDIDATES", ())
-            if str(m or "").strip()
-        ]
-        self.translation_grok_model_ctrl = wx.ComboBox(
-            translate_panel,
-            choices=list(dict.fromkeys(model_choices)),
-            style=wx.CB_DROPDOWN,
-        )
-        self.translation_grok_model_ctrl.SetName("Grok (xAI) model")
-        self.translation_grok_model_ctrl.SetValue(str(config.get("translation_grok_model", "") or ""))
-        model_row.Add(self.translation_grok_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-        self.translation_grok_model_hint_lbl = wx.StaticText(
-            translate_panel,
-            label=_("Grok is by xAI. Get a key at console.x.ai. For Groq (LLaMA/Mistral), select 'Groq (LLaMA, Mistral)' instead."),
-        )
-        translate_sizer.Add(
-            self.translation_grok_model_hint_lbl,
-            0,
-            wx.LEFT | wx.RIGHT | wx.BOTTOM,
-            8,
-        )
-
-        api_key_row = wx.BoxSizer(wx.HORIZONTAL)
-        api_key_row.Add(wx.StaticText(translate_panel, label=_("Grok (xAI) API key (starts with xai-):")), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
-        self.translation_grok_api_key_ctrl = wx.TextCtrl(
-            translate_panel,
-            value=str(config.get("translation_grok_api_key", "") or ""),
-            style=wx.TE_PASSWORD,
-        )
-        self.translation_grok_api_key_ctrl.SetName("Grok (xAI) API key")
-        api_key_row.Add(self.translation_grok_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        groq_model_row = wx.BoxSizer(wx.HORIZONTAL)
-        groq_model_row.Add(
-            wx.StaticText(translate_panel, label=_("Groq model (optional) - hosts LLaMA and Mistral:")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        groq_model_choices = [
-            str(m)
-            for m in getattr(translation_mod, "_DEFAULT_GROQ_MODEL_CANDIDATES", ())
-            if str(m or "").strip()
-        ]
-        self.translation_groq_model_ctrl = wx.ComboBox(
-            translate_panel,
-            choices=list(dict.fromkeys(groq_model_choices)),
-            style=wx.CB_DROPDOWN,
-        )
-        self.translation_groq_model_ctrl.SetName("Groq model")
-        self.translation_groq_model_ctrl.SetValue(str(config.get("translation_groq_model", "") or ""))
-        groq_model_row.Add(self.translation_groq_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(groq_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        groq_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
-        groq_api_key_row.Add(
-            wx.StaticText(translate_panel, label=_("Groq API key (starts with gsk_):")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        self.translation_groq_api_key_ctrl = wx.TextCtrl(
-            translate_panel,
-            value=str(config.get("translation_groq_api_key", "") or ""),
-            style=wx.TE_PASSWORD,
-        )
-        self.translation_groq_api_key_ctrl.SetName("Groq API key")
-        groq_api_key_row.Add(self.translation_groq_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(groq_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-        self.translation_groq_hint_lbl = wx.StaticText(
-            translate_panel,
-            label=_("Groq is NOT Grok. Get a free Groq key at console.groq.com/keys (runs LLaMA and Mistral models)."),
-        )
-        translate_sizer.Add(
-            self.translation_groq_hint_lbl,
-            0,
-            wx.LEFT | wx.RIGHT | wx.BOTTOM,
-            8,
-        )
-
-        openai_model_row = wx.BoxSizer(wx.HORIZONTAL)
-        openai_model_row.Add(
-            wx.StaticText(translate_panel, label=_("OpenAI model (optional):")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        openai_model_choices = [
-            str(m)
-            for m in getattr(translation_mod, "_DEFAULT_OPENAI_MODEL_CANDIDATES", ())
-            if str(m or "").strip()
-        ]
-        self.translation_openai_model_ctrl = wx.ComboBox(
-            translate_panel,
-            choices=list(dict.fromkeys(openai_model_choices)),
-            style=wx.CB_DROPDOWN,
-        )
-        self.translation_openai_model_ctrl.SetName("OpenAI model")
-        self.translation_openai_model_ctrl.SetValue(str(config.get("translation_openai_model", "") or ""))
-        openai_model_row.Add(self.translation_openai_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(openai_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        openai_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
-        openai_api_key_row.Add(
-            wx.StaticText(translate_panel, label=_("OpenAI API key:")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        self.translation_openai_api_key_ctrl = wx.TextCtrl(
-            translate_panel,
-            value=str(config.get("translation_openai_api_key", "") or ""),
-            style=wx.TE_PASSWORD,
-        )
-        self.translation_openai_api_key_ctrl.SetName("OpenAI API key")
-        openai_api_key_row.Add(self.translation_openai_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(openai_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        openrouter_model_row = wx.BoxSizer(wx.HORIZONTAL)
-        openrouter_model_row.Add(
-            wx.StaticText(translate_panel, label=_("OpenRouter model (optional):")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        openrouter_model_choices = [
-            str(m)
-            for m in getattr(translation_mod, "_DEFAULT_OPENROUTER_MODEL_CANDIDATES", ())
-            if str(m or "").strip()
-        ]
-        self.translation_openrouter_model_ctrl = wx.ComboBox(
-            translate_panel,
-            choices=list(dict.fromkeys(openrouter_model_choices)),
-            style=wx.CB_DROPDOWN,
-        )
-        self.translation_openrouter_model_ctrl.SetName("OpenRouter model")
-        self.translation_openrouter_model_ctrl.SetValue(str(config.get("translation_openrouter_model", "") or ""))
-        openrouter_model_row.Add(self.translation_openrouter_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(openrouter_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        openrouter_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
-        openrouter_api_key_row.Add(
-            wx.StaticText(translate_panel, label=_("OpenRouter API key:")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        self.translation_openrouter_api_key_ctrl = wx.TextCtrl(
-            translate_panel,
-            value=str(config.get("translation_openrouter_api_key", "") or ""),
-            style=wx.TE_PASSWORD,
-        )
-        self.translation_openrouter_api_key_ctrl.SetName("OpenRouter API key")
-        openrouter_api_key_row.Add(self.translation_openrouter_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(openrouter_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        openrouter_tools_row = wx.BoxSizer(wx.HORIZONTAL)
-        self.translation_openrouter_load_models_btn = wx.Button(translate_panel, label=_("Load OpenRouter Models"))
-        openrouter_tools_row.Add(self.translation_openrouter_load_models_btn, 0, wx.RIGHT, 8)
-        self.translation_openrouter_models_status_lbl = wx.StaticText(
-            translate_panel,
-            label=_("Loads all available model IDs from OpenRouter."),
-        )
-        openrouter_tools_row.Add(self.translation_openrouter_models_status_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(openrouter_tools_row, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        gemini_model_row = wx.BoxSizer(wx.HORIZONTAL)
-        gemini_model_row.Add(
-            wx.StaticText(translate_panel, label=_("Gemini model (optional):")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        gemini_model_choices = [
-            str(m)
-            for m in getattr(translation_mod, "_DEFAULT_GEMINI_MODEL_CANDIDATES", ())
-            if str(m or "").strip()
-        ]
-        self.translation_gemini_model_ctrl = wx.ComboBox(
-            translate_panel,
-            choices=list(dict.fromkeys(gemini_model_choices)),
-            style=wx.CB_DROPDOWN,
-        )
-        self.translation_gemini_model_ctrl.SetName("Gemini model")
-        self.translation_gemini_model_ctrl.SetValue(str(config.get("translation_gemini_model", "") or ""))
-        gemini_model_row.Add(self.translation_gemini_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(gemini_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        gemini_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
-        gemini_api_key_row.Add(
-            wx.StaticText(translate_panel, label=_("Gemini API key:")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        self.translation_gemini_api_key_ctrl = wx.TextCtrl(
-            translate_panel,
-            value=str(config.get("translation_gemini_api_key", "") or ""),
-            style=wx.TE_PASSWORD,
-        )
-        self.translation_gemini_api_key_ctrl.SetName("Gemini API key")
-        gemini_api_key_row.Add(self.translation_gemini_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(gemini_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        qwen_model_row = wx.BoxSizer(wx.HORIZONTAL)
-        qwen_model_row.Add(
-            wx.StaticText(translate_panel, label=_("Qwen model (optional):")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        qwen_model_choices = [
-            str(m)
-            for m in getattr(translation_mod, "_DEFAULT_QWEN_MODEL_CANDIDATES", ())
-            if str(m or "").strip()
-        ]
-        self.translation_qwen_model_ctrl = wx.ComboBox(
-            translate_panel,
-            choices=list(dict.fromkeys(qwen_model_choices)),
-            style=wx.CB_DROPDOWN,
-        )
-        self.translation_qwen_model_ctrl.SetName("Qwen model")
-        self.translation_qwen_model_ctrl.SetValue(str(config.get("translation_qwen_model", "") or ""))
-        qwen_model_row.Add(self.translation_qwen_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(qwen_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        qwen_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
-        qwen_api_key_row.Add(
-            wx.StaticText(translate_panel, label=_("Qwen API key:")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
-            8,
-        )
-        self.translation_qwen_api_key_ctrl = wx.TextCtrl(
-            translate_panel,
-            value=str(config.get("translation_qwen_api_key", "") or ""),
-            style=wx.TE_PASSWORD,
-        )
-        self.translation_qwen_api_key_ctrl.SetName("Qwen API key")
-        qwen_api_key_row.Add(self.translation_qwen_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
-        translate_sizer.Add(qwen_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
-
-        self._translation_layout_panel = translate_panel
-        self._translation_layout_sizer = translate_sizer
-        self._translation_provider_rows = {
-            "grok": [model_row, self.translation_grok_model_hint_lbl, api_key_row],
-            "groq": [groq_model_row, groq_api_key_row, self.translation_groq_hint_lbl],
-            "openai": [openai_model_row, openai_api_key_row],
-            "openrouter": [openrouter_model_row, openrouter_api_key_row, openrouter_tools_row],
-            "gemini": [gemini_model_row, gemini_api_key_row],
-            "qwen": [qwen_model_row, qwen_api_key_row],
-        }
-        self.translation_provider_ctrl.Bind(wx.EVT_CHOICE, self.on_translation_provider_choice)
-        self.translation_openrouter_load_models_btn.Bind(wx.EVT_BUTTON, self.on_load_openrouter_models)
-        self._openrouter_models_loading = False
-        self._update_translation_provider_controls()
-
-        translate_panel.SetSizer(translate_sizer)
-        notebook.AddPage(translate_panel, _("Translate"))
+        self._register_lazy_page(notebook, _("Translate"), self._build_translate_page)
 
         # Global article-list column layout (article list columns); individual feeds can
         # override it from their Feed Properties dialog. Appended near the end
@@ -2309,169 +1534,7 @@ class SettingsDialog(wx.Dialog):
         notebook.AddPage(self.columns_panel, _("List Headers"))
 
         # Advanced Tab
-        advanced_panel = wx.Panel(notebook)
-        advanced_sizer = wx.BoxSizer(wx.VERTICAL)
-
-        storage_group = wx.StaticBox(advanced_panel, label=_("Data Storage Location"))
-        storage_sizer = wx.StaticBoxSizer(storage_group, wx.VERTICAL)
-
-        storage_help = wx.StaticText(
-            advanced_panel,
-            label=_(
-                "Where BlindRSS stores config.json and rss.db.\n"
-                "User Data Folder keeps your settings and feeds across app upgrades,\n"
-                "especially on macOS where the installed app bundle is replaced."
-            ),
-        )
-        storage_sizer.Add(storage_help, 0, wx.ALL, 6)
-
-        self._storage_location_map = {
-            _("User Data Folder"): "user_data",
-            _("App Install Folder"): "app_folder",
-        }
-        storage_choices = list(self._storage_location_map.keys())
-        storage_row = wx.BoxSizer(wx.HORIZONTAL)
-        storage_row.Add(
-            wx.StaticText(advanced_panel, label=_("Storage Location:")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.ALL,
-            5,
-        )
-        self.storage_location_ctrl = wx.Choice(advanced_panel, choices=storage_choices)
-        current_storage = str(config.get("data_location", "app_folder") or "app_folder")
-        selected_label = "App Install Folder"
-        for lbl, val in self._storage_location_map.items():
-            if val == current_storage:
-                selected_label = lbl
-                break
-        self.storage_location_ctrl.SetStringSelection(selected_label)
-        storage_row.Add(self.storage_location_ctrl, 0, wx.ALL, 5)
-        storage_sizer.Add(storage_row, 0, wx.EXPAND | wx.ALL, 4)
-
-        try:
-            paths = config_mod.ConfigManager.location_paths()
-        except Exception:
-            paths = {"user_data": "", "app_folder": ""}
-        paths_lbl = wx.StaticText(
-            advanced_panel,
-            label=(
-                _("User Data Folder path:\n  {path}\n").format(path=paths.get('user_data', ''))
-                + _("App Install Folder path:\n  {path}").format(path=paths.get('app_folder', ''))
-            ),
-        )
-        storage_sizer.Add(paths_lbl, 0, wx.ALL, 6)
-
-        self._initial_storage_location = current_storage
-        advanced_sizer.Add(storage_sizer, 0, wx.EXPAND | wx.ALL, 8)
-
-        updates_group = wx.StaticBox(advanced_panel, label=_("Updates"))
-        updates_sizer = wx.StaticBoxSizer(updates_group, wx.VERTICAL)
-        self.install_updates_automatically_chk = wx.CheckBox(
-            advanced_panel,
-            label=_("Automatically install updates without confirmation"),
-        )
-        self.install_updates_automatically_chk.SetValue(
-            bool(config.get("install_updates_automatically", False))
-        )
-        updates_sizer.Add(self.install_updates_automatically_chk, 0, wx.ALL, 6)
-        advanced_sizer.Add(updates_sizer, 0, wx.EXPAND | wx.ALL, 8)
-
-        # Browser identity (core/user_agents.py). Sites behind a bot check
-        # reject a User-Agent that has aged out of the current-browser window,
-        # which is what put forum.audiogames.net permanently behind "Just a
-        # moment..." for full-text extraction.
-        ua_group = wx.StaticBox(advanced_panel, label=_("Browser Identification"))
-        ua_sizer = wx.StaticBoxSizer(ua_group, wx.VERTICAL)
-        ua_sizer.Add(
-            wx.StaticText(
-                advanced_panel,
-                label=_(
-                    "The browser BlindRSS reports itself as when fetching feeds and articles.\n"
-                    "Automatic uses a browser installed on this computer, at its real version,\n"
-                    "which is what sites with bot protection are most likely to accept."
-                ),
-            ),
-            0,
-            wx.ALL,
-            6,
-        )
-
-        self._user_agent_choices = list(user_agents.choices())
-        self._user_agent_choices.append(
-            user_agents.Identity(user_agents.CUSTOM_MODE, _("Custom (type it below)"), "", {}, "custom")
-        )
-        ua_row = wx.BoxSizer(wx.HORIZONTAL)
-        ua_row.Add(
-            wx.StaticText(advanced_panel, label=_("Identify as:")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.ALL,
-            5,
-        )
-        self.user_agent_mode_ctrl = wx.Choice(
-            advanced_panel, choices=[c.label for c in self._user_agent_choices]
-        )
-        self.user_agent_mode_ctrl.SetName("Identify as")
-        current_mode = str(config.get("user_agent_mode", user_agents.AUTO_MODE) or user_agents.AUTO_MODE)
-        selected_index = 0
-        for index, choice in enumerate(self._user_agent_choices):
-            if choice.key == current_mode:
-                selected_index = index
-                break
-        self.user_agent_mode_ctrl.SetSelection(selected_index)
-        self.user_agent_mode_ctrl.Bind(wx.EVT_CHOICE, self._on_user_agent_mode_changed)
-        ua_row.Add(self.user_agent_mode_ctrl, 1, wx.ALL, 5)
-        ua_sizer.Add(ua_row, 0, wx.EXPAND | wx.ALL, 4)
-
-        custom_row = wx.BoxSizer(wx.HORIZONTAL)
-        custom_row.Add(
-            wx.StaticText(advanced_panel, label=_("Custom User-Agent:")),
-            0,
-            wx.ALIGN_CENTER_VERTICAL | wx.ALL,
-            5,
-        )
-        self.user_agent_custom_ctrl = wx.TextCtrl(
-            advanced_panel, value=str(config.get("user_agent_custom", "") or "")
-        )
-        self.user_agent_custom_ctrl.SetName("Custom User-Agent")
-        custom_row.Add(self.user_agent_custom_ctrl, 1, wx.ALL, 5)
-        ua_sizer.Add(custom_row, 0, wx.EXPAND | wx.ALL, 4)
-
-        # The resolved string, so the choice is verifiable without leaving the
-        # dialog — a screen reader reads it on demand rather than guessing what
-        # "Automatic" picked.
-        self.user_agent_effective_lbl = wx.StaticText(advanced_panel, label="")
-        self.user_agent_effective_lbl.SetName("Current User-Agent")
-        ua_sizer.Add(self.user_agent_effective_lbl, 0, wx.ALL, 6)
-
-        advanced_sizer.Add(ua_sizer, 0, wx.EXPAND | wx.ALL, 8)
-        self._on_user_agent_mode_changed(None)
-
-        # Video Search content controls.
-        search_group = wx.StaticBox(advanced_panel, label=_("Video Search"))
-        search_sizer = wx.StaticBoxSizer(search_group, wx.VERTICAL)
-        self.enable_adult_search_chk = wx.CheckBox(
-            advanced_panel,
-            label=_("Enable adult sites in Video Search"),
-        )
-        self.enable_adult_search_chk.SetValue(bool(config.get("enable_adult_search", False)))
-        self.enable_adult_search_chk.SetName("Enable adult sites in Video Search")
-        search_sizer.Add(self.enable_adult_search_chk, 0, wx.ALL, 6)
-        search_sizer.Add(
-            wx.StaticText(
-                advanced_panel,
-                label=_(
-                    "When off, adult sites never appear in the Video Search site list.\n"
-                    "When on, adult sites are added and must still be selected explicitly to search them."
-                ),
-            ),
-            0,
-            wx.LEFT | wx.RIGHT | wx.BOTTOM,
-            6,
-        )
-        advanced_sizer.Add(search_sizer, 0, wx.EXPAND | wx.ALL, 8)
-
-        advanced_panel.SetSizer(advanced_sizer)
-        notebook.AddPage(advanced_panel, _("Advanced"))
+        self._register_lazy_page(notebook, _("Advanced"), self._build_advanced_page)
 
         # Main Sizer
         main_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -2484,6 +1547,57 @@ class SettingsDialog(wx.Dialog):
         self.Centre()
         
         wx.CallAfter(self.refresh_ctrl.SetFocus)
+
+    # -- Lazy notebook pages ---------------------------------------------------
+    #
+    # Building all fourteen pages up front cost 1.2-1.5s before the dialog even
+    # appeared, and 61% of that was populating the long Choice/ComboBox lists
+    # (the language pickers alone are ~300ms). Pages are registered with their
+    # tab title immediately, so tab order and every name a screen reader
+    # announces are unchanged, but a page's controls are only created the first
+    # time it is shown.
+    #
+    # get_data() reads controls from every page directly, so it MUST see a fully
+    # built dialog: _ensure_all_pages_built() runs before it reads anything.
+    # Without that, a page the user never opened would contribute no values and
+    # silently reset those settings to their defaults.
+
+    def _register_lazy_page(self, notebook, title, builder, widget=None):
+        """Add a page whose contents are built on first view."""
+        panel = (widget or wx.Panel)(notebook)
+        panel.SetSizer(wx.BoxSizer(wx.VERTICAL))
+        notebook.AddPage(panel, title)
+        self._lazy_pages[panel] = builder
+        return panel
+
+    def _build_page_if_needed(self, panel):
+        builder = self._lazy_pages.pop(panel, None)
+        if builder is None:
+            return False
+        try:
+            builder(panel, panel.GetSizer())
+        except Exception:
+            # Put it back so a later attempt (or _ensure_all_pages_built) can
+            # retry rather than leaving the page permanently blank.
+            self._lazy_pages[panel] = builder
+            log.exception("Failed to build settings page")
+            return False
+        panel.Layout()
+        return True
+
+    def _ensure_all_pages_built(self):
+        """Build every page still pending. Required before reading values."""
+        for panel in list(self._lazy_pages):
+            self._build_page_if_needed(panel)
+
+    def _on_settings_page_changed(self, event):
+        try:
+            index = event.GetSelection()
+            if index != wx.NOT_FOUND:
+                self._build_page_if_needed(self.notebook.GetPage(index))
+        except Exception:
+            log.debug("Lazy settings page build failed", exc_info=True)
+        event.Skip()
 
     def _build_translation_updates_group(self, panel, parent_sizer, config):
         """Controls for over-the-air interface-translation updates."""
@@ -3507,7 +2621,970 @@ class SettingsDialog(wx.Dialog):
                 continue
         return announcements_mod.normalize_modes(modes)
 
+    def _build_groups_io_page(self, panel, sizer):
+        """Built on first view; see _register_lazy_page."""
+        config = self.config
+        groups_io_panel = panel
+        groups_io_sizer = sizer
+        groups_io_sizer.Add(wx.StaticText(groups_io_panel, label=_(
+            "Groups.io API key (optional). Public groups and RSS work without a key; "
+            "the key enables complete paginated topics and member-only archives. "
+            "Create one at groups.io/settings/apikeys."
+        )), 0, wx.ALL, 8)
+        self.groups_io_api_key_ctrl = wx.TextCtrl(
+            groups_io_panel, value=str(config.get("groups_io_api_key", "") or ""), style=wx.TE_PASSWORD
+        )
+        self.groups_io_api_key_ctrl.SetName("Groups.io API key")
+        self.groups_io_api_key_ctrl.SetHint(_("Paste your Groups.io API key"))
+        groups_io_sizer.Add(self.groups_io_api_key_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+        groups_io_sizer.Add(wx.StaticText(groups_io_panel, label=_(
+            "Search subscriptions keep the search URL and refresh results in the background. "
+            "Browser cookies are imported only from Groups.io domains."
+        )), 0, wx.ALL, 8)
+
+    def _build_media_page(self, panel, sizer):
+        """Built on first view; see _register_lazy_page."""
+        config = self.config
+        media_panel = panel
+        media_sizer = sizer
+
+        # Preferred soundcard (enumerated in background to avoid blocking dialog open)
+        soundcard_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        soundcard_sizer.Add(wx.StaticText(media_panel, label=_("Preferred Soundcard:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        self._current_soundcard = str(config.get("preferred_soundcard", "") or "")
+        self._soundcard_choices = [(_("System Default"), "")]
+        self._soundcard_labels = [_("Loading soundcards...")]
+        self.soundcard_ctrl = wx.Choice(media_panel, choices=self._soundcard_labels)
+        self.soundcard_ctrl.SetSelection(0)
+        soundcard_sizer.Add(self.soundcard_ctrl, 1, wx.ALL, 5)
+        media_sizer.Add(soundcard_sizer, 0, wx.EXPAND | wx.ALL, 5)
+        threading.Thread(target=self._load_soundcards_async, daemon=True).start()
+
+        self.skip_silence_chk = wx.CheckBox(media_panel, label=_("Skip Silence (Experimental)"))
+        self.skip_silence_chk.SetValue(config.get("skip_silence", False))
+        media_sizer.Add(self.skip_silence_chk, 0, wx.ALL, 5)
+
+        # Playback speed
+        speed_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        speed_sizer.Add(wx.StaticText(media_panel, label=_("Default Playback Speed:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
+        # Build speed choices using utils
+        speeds = utils.build_playback_speeds()
+        self.speed_choices = [f"{s:.2f}x" for s in speeds]
+        current_speed = float(config.get("playback_speed", 1.0))
+
+        self.speed_ctrl = wx.ComboBox(media_panel, choices=self.speed_choices, style=wx.CB_READONLY)
+
+        # Find nearest selection
+        sel_idx = 0
+        min_diff = 999.0
+        for i, s in enumerate(speeds):
+            diff = abs(s - current_speed)
+            if diff < min_diff:
+                min_diff = diff
+                sel_idx = i
+        self.speed_ctrl.SetSelection(sel_idx)
+
+        speed_sizer.Add(self.speed_ctrl, 0, wx.ALL, 5)
+        media_sizer.Add(speed_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
+        # Player window behavior
+        self.show_player_on_play_chk = wx.CheckBox(media_panel, label=_("Show player window when starting playback"))
+        self.show_player_on_play_chk.SetValue(bool(config.get("show_player_on_play", True)))
+        media_sizer.Add(self.show_player_on_play_chk, 0, wx.ALL, 5)
+
+        # VLC network caching (helps on high latency streams)
+        cache_net_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        cache_net_sizer.Add(wx.StaticText(media_panel, label=_("Network Cache (ms):")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        self.vlc_cache_ctrl = wx.SpinCtrl(media_panel, min=500, max=60000, initial=int(config.get("vlc_network_caching_ms", 5000)))
+        cache_net_sizer.Add(self.vlc_cache_ctrl, 0, wx.ALL, 5)
+        media_sizer.Add(cache_net_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
+        self.range_cache_debug_chk = wx.CheckBox(media_panel, label=_("Verbose range-cache proxy debug logs"))
+        self.range_cache_debug_chk.SetValue(bool(config.get("range_cache_debug", False)))
+        media_sizer.Add(self.range_cache_debug_chk, 0, wx.ALL, 5)
+
+        # Media tool executables: detected paths plus optional manual overrides.
+        # Leaving a field blank auto-detects (PATH, Scoop/Choco/WinGet, portable
+        # layouts, etc.). Detection runs in the background to keep the dialog snappy.
+        tools_box = wx.StaticBoxSizer(
+            wx.VERTICAL, media_panel, _("Media tools (ffmpeg, ffprobe, yt-dlp)")
+        )
+        tools_box.Add(
+            wx.StaticText(
+                media_panel,
+                label=_("Leave a path blank to auto-detect. A set path overrides detection."),
+            ),
+            0, wx.ALL, 4,
+        )
+        self._media_tool_path_ctrls = {}
+        self._media_tool_detected_lbls = {}
+        _media_tool_specs = [
+            ("ffmpeg", "FFmpeg", "custom_ffmpeg_path"),
+            ("ffprobe", "FFprobe", "custom_ffprobe_path"),
+            ("yt-dlp", "yt-dlp", "custom_ytdlp_path"),
+        ]
+        for tool_key, tool_label, cfg_key in _media_tool_specs:
+            row = wx.BoxSizer(wx.HORIZONTAL)
+            row.Add(
+                wx.StaticText(media_panel, label=_("{tool} path:").format(tool=tool_label)),
+                0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4,
+            )
+            ctrl = wx.TextCtrl(media_panel, value=str(config.get(cfg_key, "") or ""))
+            ctrl.SetName(f"{tool_label} executable path override")
+            row.Add(ctrl, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
+            browse = wx.Button(media_panel, label=_("Browse..."))
+            browse.Bind(
+                wx.EVT_BUTTON,
+                lambda evt, c=ctrl, lbl=tool_label: self._on_browse_media_tool(c, lbl),
+            )
+            row.Add(browse, 0)
+            tools_box.Add(row, 0, wx.EXPAND | wx.ALL, 2)
+            detected = wx.StaticText(media_panel, label=f"Detected {tool_label}: checking…")
+            detected.SetName(f"Detected {tool_label}")
+            tools_box.Add(detected, 0, wx.LEFT | wx.BOTTOM, 12)
+            self._media_tool_path_ctrls[cfg_key] = ctrl
+            self._media_tool_detected_lbls[tool_key] = detected
+        media_sizer.Add(tools_box, 0, wx.EXPAND | wx.ALL, 5)
+        threading.Thread(target=self._detect_media_tools_async, daemon=True).start()
+
+    def _build_provider_page(self, panel, sizer):
+        """Built on first view; see _register_lazy_page."""
+        config = self.config
+        provider_panel = panel
+        provider_sizer = sizer
+
+        provider_sizer.Add(wx.StaticText(provider_panel, label=_("Active Provider:")), 0, wx.ALL, 5)
+
+        # Build provider list from config (keeps future providers visible).
+        cfg_providers = list((config.get("providers") or {}).keys()) if isinstance(config, dict) else []
+        if not cfg_providers:
+            cfg_providers = ["local", "miniflux", "bazqux", "theoldreader", "inoreader"]
+        preferred_order = ["local", "miniflux", "bazqux", "theoldreader", "inoreader"]
+        providers_sorted = [p for p in preferred_order if p in cfg_providers] + [p for p in cfg_providers if p not in preferred_order]
+
+        self.provider_choice = wx.Choice(provider_panel, choices=providers_sorted)
+        self.provider_choice.SetStringSelection(config.get("active_provider", "local"))
+        provider_sizer.Add(self.provider_choice, 0, wx.EXPAND | wx.ALL, 5)
+
+        # Provider-specific settings panels
+        self._provider_panels = {}  # name -> (panel, controls_dict)
+
+        def _add_simple_info_panel(name: str, info_text: str):
+            pnl = wx.Panel(provider_panel)
+            s = wx.BoxSizer(wx.VERTICAL)
+            # Read-only text control instead of a StaticText: it participates
+            # in the tab order, so keyboard/screen-reader users reach the
+            # explanation without object navigation.
+            info = wx.TextCtrl(
+                pnl,
+                value=info_text,
+                style=wx.TE_MULTILINE | wx.TE_READONLY,
+                size=(-1, 60),
+            )
+            info.SetName(_("Provider information"))
+            s.Add(info, 0, wx.EXPAND | wx.ALL, 5)
+            pnl.SetSizer(s)
+            provider_sizer.Add(pnl, 0, wx.EXPAND | wx.ALL, 5)
+            self._provider_panels[name] = (pnl, {})
+            pnl.Hide()
+
+        def _add_fields_panel(name: str, fields):
+            # fields: [(label, key, style)]
+            pnl = wx.Panel(provider_panel)
+            fg = wx.FlexGridSizer(cols=2, hgap=8, vgap=8)
+            fg.AddGrowableCol(1, 1)
+            ctrls = {}
+            p_cfg = (config.get("providers") or {}).get(name, {}) if isinstance(config, dict) else {}
+            for label, key, style in fields:
+                fg.Add(wx.StaticText(pnl, label=label), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 2)
+                tc = wx.TextCtrl(pnl, style=style)
+                tc.SetName(label.rstrip(":").strip())
+                tc.SetValue(str(p_cfg.get(key, "") or ""))
+                fg.Add(tc, 1, wx.EXPAND | wx.ALL, 2)
+                ctrls[key] = tc
+            pnl.SetSizer(fg)
+            provider_sizer.Add(pnl, 0, wx.EXPAND | wx.ALL, 5)
+            self._provider_panels[name] = (pnl, ctrls)
+            pnl.Hide()
+
+        def _add_inoreader_panel(name: str):
+            pnl = wx.Panel(provider_panel)
+            outer = wx.BoxSizer(wx.VERTICAL)
+            fg = wx.FlexGridSizer(cols=2, hgap=8, vgap=8)
+            fg.AddGrowableCol(1, 1)
+            ctrls = {}
+            p_cfg = (config.get("providers") or {}).get(name, {}) if isinstance(config, dict) else {}
+
+            fg.Add(wx.StaticText(pnl, label=_("Inoreader App ID:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 2)
+            app_id_ctrl = wx.TextCtrl(pnl)
+            app_id_ctrl.SetName("Inoreader App ID")
+            app_id_ctrl.SetValue(str(p_cfg.get("app_id", "") or ""))
+            fg.Add(app_id_ctrl, 1, wx.EXPAND | wx.ALL, 2)
+            ctrls["app_id"] = app_id_ctrl
+
+            fg.Add(wx.StaticText(pnl, label=_("Inoreader App Key:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 2)
+            app_key_ctrl = wx.TextCtrl(pnl, style=wx.TE_PASSWORD)
+            app_key_ctrl.SetName("Inoreader App Key")
+            app_key_ctrl.SetValue(str(p_cfg.get("app_key", "") or ""))
+            fg.Add(app_key_ctrl, 1, wx.EXPAND | wx.ALL, 2)
+            ctrls["app_key"] = app_key_ctrl
+
+            default_redirect_uri = inoreader_oauth.get_redirect_uri(scheme="https")
+            redirect_uri_ctrl = wx.TextCtrl(pnl)
+            redirect_uri_ctrl.SetName("Redirect URI")
+            redirect_uri_ctrl.SetValue(str(p_cfg.get("redirect_uri", "") or "").strip() or default_redirect_uri)
+            fg.Add(wx.StaticText(pnl, label=_("Redirect URI:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 2)
+            fg.Add(redirect_uri_ctrl, 1, wx.EXPAND | wx.ALL, 2)
+            ctrls["redirect_uri"] = redirect_uri_ctrl
+
+            outer.Add(fg, 0, wx.EXPAND | wx.ALL, 2)
+
+            help_lbl = wx.StaticText(
+                pnl,
+                label=_(
+                    "Note: If your Redirect URI uses HTTPS (common/required), your browser may fail to load\n"
+                    "localhost after authorization. Copy the full redirected URL from the address bar and paste it\n"
+                    "when prompted."
+                ),
+            )
+            outer.Add(help_lbl, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 2)
+
+            status_lbl = wx.StaticText(pnl, label="")
+            outer.Add(status_lbl, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 2)
+
+            btn_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            auth_btn = wx.Button(pnl, label=_("Authorize Inoreader"))
+            clear_btn = wx.Button(pnl, label=_("Clear Authorization"))
+            btn_sizer.Add(auth_btn, 0, wx.ALL, 2)
+            btn_sizer.Add(clear_btn, 0, wx.ALL, 2)
+            outer.Add(btn_sizer, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 2)
+
+            pnl.SetSizer(outer)
+            provider_sizer.Add(pnl, 0, wx.EXPAND | wx.ALL, 5)
+            self._provider_panels[name] = (pnl, ctrls)
+            pnl.Hide()
+
+            self._inoreader_app_id_ctrl = app_id_ctrl
+            self._inoreader_app_key_ctrl = app_key_ctrl
+            self._inoreader_redirect_uri_ctrl = redirect_uri_ctrl
+            self._inoreader_status_lbl = status_lbl
+            self._inoreader_authorize_btn = auth_btn
+            self._inoreader_clear_btn = clear_btn
+            self._inoreader_tokens = None
+            self._inoreader_auth_original = {
+                "app_id": str(p_cfg.get("app_id", "") or ""),
+                "app_key": str(p_cfg.get("app_key", "") or ""),
+            }
+
+            has_token = bool((p_cfg.get("token") or "") or (p_cfg.get("refresh_token") or ""))
+            self._set_inoreader_status(
+                "Authorized" if has_token else "Not authorized",
+                ok=has_token,
+            )
+
+            auth_btn.Bind(wx.EVT_BUTTON, self._start_inoreader_authorize)
+            clear_btn.Bind(wx.EVT_BUTTON, self._clear_inoreader_authorization)
+
+        _add_simple_info_panel("local", _("Local provider uses the feeds you add inside the app (Add Feed / Import OPML)."))
+        _add_fields_panel("miniflux", [
+            ("Miniflux URL:", "url", 0),
+            ("Miniflux API Key:", "api_key", 0),
+        ])
+        _add_fields_panel("theoldreader", [
+            ("The Old Reader Email:", "email", 0),
+            ("The Old Reader Password:", "password", wx.TE_PASSWORD),
+        ])
+        _add_inoreader_panel("inoreader")
+        _add_fields_panel("bazqux", [
+            ("BazQux Email:", "email", 0),
+            ("BazQux Password:", "password", wx.TE_PASSWORD),
+        ])
+
+        self.provider_choice.Bind(wx.EVT_CHOICE, self.on_provider_choice)
+        self._update_provider_panels()
+
+    def _build_sounds_page(self, panel, sizer):
+        """Built on first view; see _register_lazy_page."""
+        config = self.config
+        sounds_panel = panel
+        sounds_sizer = sizer
+        
+        self.sounds_enabled_chk = wx.CheckBox(sounds_panel, label=_("Enable Sound Notifications"))
+        self.sounds_enabled_chk.SetValue(config.get("sounds_enabled", True))
+        sounds_sizer.Add(self.sounds_enabled_chk, 0, wx.ALL, 5)
+        
+        def _add_sound_field(label, key):
+            field_name = label.rstrip(":").strip()
+            s = wx.BoxSizer(wx.HORIZONTAL)
+            s.Add(wx.StaticText(sounds_panel, label=label), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+            val = config.get(key, "")
+            ctrl = wx.TextCtrl(sounds_panel, value=str(val))
+            ctrl.SetName(field_name)
+            s.Add(ctrl, 1, wx.ALL, 5)
+            browse_btn = wx.Button(sounds_panel, label=_("Browse..."))
+            browse_btn.SetName(f"Browse for {field_name}")
+
+            def _on_browse(evt):
+                dlg = wx.FileDialog(self, f"Choose {label}", defaultFile=ctrl.GetValue(), wildcard=f'{_("WAV files")} (*.wav)|*.wav|{_("All files")} (*.*)|*.*', style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
+                if dlg.ShowModal() == wx.ID_OK:
+                    ctrl.SetValue(dlg.GetPath())
+                dlg.Destroy()
+            
+            browse_btn.Bind(wx.EVT_BUTTON, _on_browse)
+            s.Add(browse_btn, 0, wx.ALL, 5)
+            sounds_sizer.Add(s, 0, wx.EXPAND | wx.ALL, 5)
+            return ctrl
+            
+        self.sound_complete_ctrl = _add_sound_field(_("Refresh Complete Sound:"), "sound_refresh_complete")
+        self.sound_error_ctrl = _add_sound_field(_("Refresh Error Sound:"), "sound_refresh_error")
+        
+
+    def _build_notifications_page(self, panel, sizer):
+        """Built on first view; see _register_lazy_page."""
+        config = self.config
+        notifications_panel = panel
+        notifications_sizer = sizer
+
+        notice_txt = (
+            "Windows toast notifications for new articles.\n"
+            "Disabled by default."
+        )
+        notifications_sizer.Add(wx.StaticText(notifications_panel, label=notice_txt), 0, wx.ALL, 8)
+
+        self.windows_notifications_chk = wx.CheckBox(
+            notifications_panel,
+            label=_("Enable notifications for new articles"),
+        )
+        self.windows_notifications_chk.SetValue(bool(config.get("windows_notifications_enabled", False)))
+        if not utils.platform_supports_notifications():
+            self.windows_notifications_chk.Disable()
+        notifications_sizer.Add(self.windows_notifications_chk, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        self.windows_notifications_feed_chk = wx.CheckBox(
+            notifications_panel,
+            label=_("Include feed name in notification text"),
+        )
+        self.windows_notifications_feed_chk.SetValue(
+            bool(config.get("windows_notifications_include_feed_name", True))
+        )
+        notifications_sizer.Add(self.windows_notifications_feed_chk, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        cap_row = wx.BoxSizer(wx.HORIZONTAL)
+        cap_row.Add(
+            wx.StaticText(notifications_panel, label=_("Max notifications per refresh (0 = no limit):")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        self.windows_notifications_max_ctrl = wx.SpinCtrl(
+            notifications_panel,
+            min=0,
+            max=200,
+            initial=int(config.get("windows_notifications_max_per_refresh", 0)),
+        )
+        cap_row.Add(self.windows_notifications_max_ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
+        notifications_sizer.Add(cap_row, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        self.windows_notifications_summary_chk = wx.CheckBox(
+            notifications_panel,
+            label=_("Show a summary notification when notification cap is reached"),
+        )
+        self.windows_notifications_summary_chk.SetValue(
+            bool(config.get("windows_notifications_show_summary_when_capped", True))
+        )
+        notifications_sizer.Add(self.windows_notifications_summary_chk, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        self.test_notification_btn = wx.Button(notifications_panel, label=_("Test Notification"))
+        self.test_notification_btn.Bind(wx.EVT_BUTTON, self.on_test_notification)
+        notifications_sizer.Add(self.test_notification_btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        self.exclude_feeds_btn = wx.Button(notifications_panel, label=_("Exclude Feeds..."))
+        self.exclude_feeds_btn.Bind(wx.EVT_BUTTON, self.on_exclude_notification_feeds)
+        notifications_sizer.Add(self.exclude_feeds_btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        self.exclude_feeds_lbl = wx.StaticText(notifications_panel, label="")
+        notifications_sizer.Add(self.exclude_feeds_lbl, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+        self._update_excluded_feeds_label()
+
+        self.windows_notifications_chk.Bind(wx.EVT_CHECKBOX, self._on_toggle_windows_notifications)
+        self._update_notification_controls()
+
+    def _build_announcements_page(self, panel, sizer):
+        """Built on first view; see _register_lazy_page."""
+        config = self.config
+        announcements_panel = panel
+        announcements_sizer = sizer
+        announcements_panel.SetScrollRate(0, 12)
+
+        announce_note = (
+            "Screen-reader announcements for key keyboard actions.\n"
+            "Each event can announce via speech, Braille, both, or neither.\n"
+            "Braille output is most reliable on Windows with NVDA or JAWS."
+        )
+        announcements_sizer.Add(
+            wx.StaticText(announcements_panel, label=announce_note), 0, wx.ALL, 8
+        )
+
+        mode_labels = [_(label) for _mode, label in announcements_mod.mode_choices()]
+        mode_values = [mode for mode, _label in announcements_mod.mode_choices()]
+        current_modes = announcements_mod.normalize_modes(
+            config.get("announcements", {})
+        )
+        self._announcement_mode_values = mode_values
+        self._announcement_choice_ctrls = {}
+
+        announce_grid = wx.FlexGridSizer(0, 2, 6, 10)
+        announce_grid.AddGrowableCol(0, 1)
+        for event in announcements_mod.iter_events():
+            label = wx.StaticText(announcements_panel, label=_(event.label))
+            label.SetToolTip(_(event.help))
+            choice = wx.Choice(announcements_panel, choices=mode_labels)
+            choice.SetName(_(event.label))
+            choice.SetToolTip(_(event.help))
+            try:
+                sel = mode_values.index(current_modes.get(event.id, event.default))
+            except ValueError:
+                sel = mode_values.index(announcements_mod.DEFAULT_MODE)
+            choice.SetSelection(sel)
+            self._announcement_choice_ctrls[event.id] = choice
+            announce_grid.Add(label, 0, wx.ALIGN_CENTER_VERTICAL)
+            announce_grid.Add(choice, 0, wx.EXPAND)
+        announcements_sizer.Add(announce_grid, 0, wx.EXPAND | wx.ALL, 8)
+
+        # Test button (issue #71), mirroring "Test Notification" on the
+        # Notifications tab. Speaks and brailles regardless of the per-event
+        # modes above -- see Announcer.announce_test.
+        self.test_announcement_btn = wx.Button(announcements_panel, label=_("Test Announcement"))
+        self.test_announcement_btn.SetName(_("Test Announcement"))
+        self.test_announcement_btn.SetToolTip(
+            _("Send a test announcement to your screen reader via speech and Braille.")
+        )
+        self.test_announcement_btn.Bind(wx.EVT_BUTTON, self.on_test_announcement)
+        announcements_sizer.Add(self.test_announcement_btn, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+    def _build_translate_page(self, panel, sizer):
+        """Built on first view; see _register_lazy_page."""
+        config = self.config
+        translate_panel = panel
+        translate_sizer = sizer
+
+        translate_note = (
+            "Configure automatic article translation.\n"
+            "Your API key is stored locally in config.json."
+        )
+        translate_sizer.Add(wx.StaticText(translate_panel, label=translate_note), 0, wx.ALL, 8)
+
+        self.translation_enabled_chk = wx.CheckBox(
+            translate_panel,
+            label=_("Enable automatic translation for article content"),
+        )
+        self.translation_enabled_chk.SetValue(bool(config.get("translation_enabled", False)))
+        translate_sizer.Add(self.translation_enabled_chk, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        # Display name → internal config key mapping for translation providers.
+        self._translation_provider_display_to_key = {
+            "Grok (xAI)": "grok",
+            "Groq (LLaMA, Mistral)": "groq",
+            "OpenAI (GPT)": "openai",
+            "OpenRouter": "openrouter",
+            "Gemini (Google)": "gemini",
+            "Qwen (Alibaba)": "qwen",
+        }
+        self._translation_provider_key_to_display = {
+            v: k for k, v in self._translation_provider_display_to_key.items()
+        }
+        _provider_display_names = list(self._translation_provider_display_to_key.keys())
+
+        provider_row = wx.BoxSizer(wx.HORIZONTAL)
+        provider_row.Add(wx.StaticText(translate_panel, label=_("Provider:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        self.translation_provider_ctrl = wx.Choice(translate_panel, choices=_provider_display_names)
+        _saved_provider = str(config.get("translation_provider", "grok") or "grok").strip().lower()
+        _saved_display = self._translation_provider_key_to_display.get(_saved_provider, _provider_display_names[0])
+        if not self.translation_provider_ctrl.SetStringSelection(_saved_display):
+            self.translation_provider_ctrl.SetSelection(0)
+        provider_row.Add(self.translation_provider_ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(provider_row, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        self._translation_language_label_to_code = {
+            str(label): str(code)
+            for label, code in self._TRANSLATION_LANGUAGE_PRESETS
+        }
+        self._translation_language_code_to_label = {
+            str(code).lower(): str(label)
+            for label, code in self._TRANSLATION_LANGUAGE_PRESETS
+        }
+
+        target_row = wx.BoxSizer(wx.HORIZONTAL)
+        target_row.Add(
+            wx.StaticText(translate_panel, label=_("Target language:")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        choices = [f"{label} ({_code})" for label, _code in self._TRANSLATION_LANGUAGE_PRESETS]
+        choices.sort()
+        self.translation_target_language_ctrl = wx.ComboBox(
+            translate_panel,
+            choices=choices,
+            style=wx.CB_DROPDOWN,
+        )
+        self.translation_target_language_ctrl.SetName("Target language")
+        self.translation_target_language_ctrl.SetValue(
+            self._translation_language_display_value(
+                str(config.get("translation_target_language", "en") or "en")
+            )
+        )
+        target_row.Add(self.translation_target_language_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(target_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+        translate_sizer.Add(
+            wx.StaticText(
+                translate_panel,
+                label=_("Choose a language or type a code (e.g. en, es, fr, pt-BR)."),
+            ),
+            0,
+            wx.LEFT | wx.RIGHT | wx.BOTTOM,
+            8,
+        )
+
+        model_row = wx.BoxSizer(wx.HORIZONTAL)
+        model_row.Add(
+            wx.StaticText(translate_panel, label=_("Grok (xAI) model (optional):")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        model_choices = [
+            str(m)
+            for m in getattr(translation_mod, "_DEFAULT_MODEL_CANDIDATES", ())
+            if str(m or "").strip()
+        ]
+        self.translation_grok_model_ctrl = wx.ComboBox(
+            translate_panel,
+            choices=list(dict.fromkeys(model_choices)),
+            style=wx.CB_DROPDOWN,
+        )
+        self.translation_grok_model_ctrl.SetName("Grok (xAI) model")
+        self.translation_grok_model_ctrl.SetValue(str(config.get("translation_grok_model", "") or ""))
+        model_row.Add(self.translation_grok_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+        self.translation_grok_model_hint_lbl = wx.StaticText(
+            translate_panel,
+            label=_("Grok is by xAI. Get a key at console.x.ai. For Groq (LLaMA/Mistral), select 'Groq (LLaMA, Mistral)' instead."),
+        )
+        translate_sizer.Add(
+            self.translation_grok_model_hint_lbl,
+            0,
+            wx.LEFT | wx.RIGHT | wx.BOTTOM,
+            8,
+        )
+
+        api_key_row = wx.BoxSizer(wx.HORIZONTAL)
+        api_key_row.Add(wx.StaticText(translate_panel, label=_("Grok (xAI) API key (starts with xai-):")), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        self.translation_grok_api_key_ctrl = wx.TextCtrl(
+            translate_panel,
+            value=str(config.get("translation_grok_api_key", "") or ""),
+            style=wx.TE_PASSWORD,
+        )
+        self.translation_grok_api_key_ctrl.SetName("Grok (xAI) API key")
+        api_key_row.Add(self.translation_grok_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        groq_model_row = wx.BoxSizer(wx.HORIZONTAL)
+        groq_model_row.Add(
+            wx.StaticText(translate_panel, label=_("Groq model (optional) - hosts LLaMA and Mistral:")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        groq_model_choices = [
+            str(m)
+            for m in getattr(translation_mod, "_DEFAULT_GROQ_MODEL_CANDIDATES", ())
+            if str(m or "").strip()
+        ]
+        self.translation_groq_model_ctrl = wx.ComboBox(
+            translate_panel,
+            choices=list(dict.fromkeys(groq_model_choices)),
+            style=wx.CB_DROPDOWN,
+        )
+        self.translation_groq_model_ctrl.SetName("Groq model")
+        self.translation_groq_model_ctrl.SetValue(str(config.get("translation_groq_model", "") or ""))
+        groq_model_row.Add(self.translation_groq_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(groq_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        groq_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
+        groq_api_key_row.Add(
+            wx.StaticText(translate_panel, label=_("Groq API key (starts with gsk_):")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        self.translation_groq_api_key_ctrl = wx.TextCtrl(
+            translate_panel,
+            value=str(config.get("translation_groq_api_key", "") or ""),
+            style=wx.TE_PASSWORD,
+        )
+        self.translation_groq_api_key_ctrl.SetName("Groq API key")
+        groq_api_key_row.Add(self.translation_groq_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(groq_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+        self.translation_groq_hint_lbl = wx.StaticText(
+            translate_panel,
+            label=_("Groq is NOT Grok. Get a free Groq key at console.groq.com/keys (runs LLaMA and Mistral models)."),
+        )
+        translate_sizer.Add(
+            self.translation_groq_hint_lbl,
+            0,
+            wx.LEFT | wx.RIGHT | wx.BOTTOM,
+            8,
+        )
+
+        openai_model_row = wx.BoxSizer(wx.HORIZONTAL)
+        openai_model_row.Add(
+            wx.StaticText(translate_panel, label=_("OpenAI model (optional):")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        openai_model_choices = [
+            str(m)
+            for m in getattr(translation_mod, "_DEFAULT_OPENAI_MODEL_CANDIDATES", ())
+            if str(m or "").strip()
+        ]
+        self.translation_openai_model_ctrl = wx.ComboBox(
+            translate_panel,
+            choices=list(dict.fromkeys(openai_model_choices)),
+            style=wx.CB_DROPDOWN,
+        )
+        self.translation_openai_model_ctrl.SetName("OpenAI model")
+        self.translation_openai_model_ctrl.SetValue(str(config.get("translation_openai_model", "") or ""))
+        openai_model_row.Add(self.translation_openai_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(openai_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        openai_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
+        openai_api_key_row.Add(
+            wx.StaticText(translate_panel, label=_("OpenAI API key:")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        self.translation_openai_api_key_ctrl = wx.TextCtrl(
+            translate_panel,
+            value=str(config.get("translation_openai_api_key", "") or ""),
+            style=wx.TE_PASSWORD,
+        )
+        self.translation_openai_api_key_ctrl.SetName("OpenAI API key")
+        openai_api_key_row.Add(self.translation_openai_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(openai_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        openrouter_model_row = wx.BoxSizer(wx.HORIZONTAL)
+        openrouter_model_row.Add(
+            wx.StaticText(translate_panel, label=_("OpenRouter model (optional):")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        openrouter_model_choices = [
+            str(m)
+            for m in getattr(translation_mod, "_DEFAULT_OPENROUTER_MODEL_CANDIDATES", ())
+            if str(m or "").strip()
+        ]
+        self.translation_openrouter_model_ctrl = wx.ComboBox(
+            translate_panel,
+            choices=list(dict.fromkeys(openrouter_model_choices)),
+            style=wx.CB_DROPDOWN,
+        )
+        self.translation_openrouter_model_ctrl.SetName("OpenRouter model")
+        self.translation_openrouter_model_ctrl.SetValue(str(config.get("translation_openrouter_model", "") or ""))
+        openrouter_model_row.Add(self.translation_openrouter_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(openrouter_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        openrouter_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
+        openrouter_api_key_row.Add(
+            wx.StaticText(translate_panel, label=_("OpenRouter API key:")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        self.translation_openrouter_api_key_ctrl = wx.TextCtrl(
+            translate_panel,
+            value=str(config.get("translation_openrouter_api_key", "") or ""),
+            style=wx.TE_PASSWORD,
+        )
+        self.translation_openrouter_api_key_ctrl.SetName("OpenRouter API key")
+        openrouter_api_key_row.Add(self.translation_openrouter_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(openrouter_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        openrouter_tools_row = wx.BoxSizer(wx.HORIZONTAL)
+        self.translation_openrouter_load_models_btn = wx.Button(translate_panel, label=_("Load OpenRouter Models"))
+        openrouter_tools_row.Add(self.translation_openrouter_load_models_btn, 0, wx.RIGHT, 8)
+        self.translation_openrouter_models_status_lbl = wx.StaticText(
+            translate_panel,
+            label=_("Loads all available model IDs from OpenRouter."),
+        )
+        openrouter_tools_row.Add(self.translation_openrouter_models_status_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(openrouter_tools_row, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        gemini_model_row = wx.BoxSizer(wx.HORIZONTAL)
+        gemini_model_row.Add(
+            wx.StaticText(translate_panel, label=_("Gemini model (optional):")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        gemini_model_choices = [
+            str(m)
+            for m in getattr(translation_mod, "_DEFAULT_GEMINI_MODEL_CANDIDATES", ())
+            if str(m or "").strip()
+        ]
+        self.translation_gemini_model_ctrl = wx.ComboBox(
+            translate_panel,
+            choices=list(dict.fromkeys(gemini_model_choices)),
+            style=wx.CB_DROPDOWN,
+        )
+        self.translation_gemini_model_ctrl.SetName("Gemini model")
+        self.translation_gemini_model_ctrl.SetValue(str(config.get("translation_gemini_model", "") or ""))
+        gemini_model_row.Add(self.translation_gemini_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(gemini_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        gemini_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
+        gemini_api_key_row.Add(
+            wx.StaticText(translate_panel, label=_("Gemini API key:")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        self.translation_gemini_api_key_ctrl = wx.TextCtrl(
+            translate_panel,
+            value=str(config.get("translation_gemini_api_key", "") or ""),
+            style=wx.TE_PASSWORD,
+        )
+        self.translation_gemini_api_key_ctrl.SetName("Gemini API key")
+        gemini_api_key_row.Add(self.translation_gemini_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(gemini_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        qwen_model_row = wx.BoxSizer(wx.HORIZONTAL)
+        qwen_model_row.Add(
+            wx.StaticText(translate_panel, label=_("Qwen model (optional):")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        qwen_model_choices = [
+            str(m)
+            for m in getattr(translation_mod, "_DEFAULT_QWEN_MODEL_CANDIDATES", ())
+            if str(m or "").strip()
+        ]
+        self.translation_qwen_model_ctrl = wx.ComboBox(
+            translate_panel,
+            choices=list(dict.fromkeys(qwen_model_choices)),
+            style=wx.CB_DROPDOWN,
+        )
+        self.translation_qwen_model_ctrl.SetName("Qwen model")
+        self.translation_qwen_model_ctrl.SetValue(str(config.get("translation_qwen_model", "") or ""))
+        qwen_model_row.Add(self.translation_qwen_model_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(qwen_model_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        qwen_api_key_row = wx.BoxSizer(wx.HORIZONTAL)
+        qwen_api_key_row.Add(
+            wx.StaticText(translate_panel, label=_("Qwen API key:")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.RIGHT,
+            8,
+        )
+        self.translation_qwen_api_key_ctrl = wx.TextCtrl(
+            translate_panel,
+            value=str(config.get("translation_qwen_api_key", "") or ""),
+            style=wx.TE_PASSWORD,
+        )
+        self.translation_qwen_api_key_ctrl.SetName("Qwen API key")
+        qwen_api_key_row.Add(self.translation_qwen_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        translate_sizer.Add(qwen_api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        self._translation_layout_panel = translate_panel
+        self._translation_layout_sizer = translate_sizer
+        self._translation_provider_rows = {
+            "grok": [model_row, self.translation_grok_model_hint_lbl, api_key_row],
+            "groq": [groq_model_row, groq_api_key_row, self.translation_groq_hint_lbl],
+            "openai": [openai_model_row, openai_api_key_row],
+            "openrouter": [openrouter_model_row, openrouter_api_key_row, openrouter_tools_row],
+            "gemini": [gemini_model_row, gemini_api_key_row],
+            "qwen": [qwen_model_row, qwen_api_key_row],
+        }
+        self.translation_provider_ctrl.Bind(wx.EVT_CHOICE, self.on_translation_provider_choice)
+        self.translation_openrouter_load_models_btn.Bind(wx.EVT_BUTTON, self.on_load_openrouter_models)
+        self._openrouter_models_loading = False
+        self._update_translation_provider_controls()
+
+    def _build_advanced_page(self, panel, sizer):
+        """Built on first view; see _register_lazy_page."""
+        config = self.config
+        advanced_panel = panel
+        advanced_sizer = sizer
+
+        storage_group = wx.StaticBox(advanced_panel, label=_("Data Storage Location"))
+        storage_sizer = wx.StaticBoxSizer(storage_group, wx.VERTICAL)
+
+        storage_help = wx.StaticText(
+            advanced_panel,
+            label=_(
+                "Where BlindRSS stores config.json and rss.db.\n"
+                "User Data Folder keeps your settings and feeds across app upgrades,\n"
+                "especially on macOS where the installed app bundle is replaced."
+            ),
+        )
+        storage_sizer.Add(storage_help, 0, wx.ALL, 6)
+
+        self._storage_location_map = {
+            _("User Data Folder"): "user_data",
+            _("App Install Folder"): "app_folder",
+        }
+        storage_choices = list(self._storage_location_map.keys())
+        storage_row = wx.BoxSizer(wx.HORIZONTAL)
+        storage_row.Add(
+            wx.StaticText(advanced_panel, label=_("Storage Location:")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.ALL,
+            5,
+        )
+        self.storage_location_ctrl = wx.Choice(advanced_panel, choices=storage_choices)
+        current_storage = str(config.get("data_location", "app_folder") or "app_folder")
+        selected_label = "App Install Folder"
+        for lbl, val in self._storage_location_map.items():
+            if val == current_storage:
+                selected_label = lbl
+                break
+        self.storage_location_ctrl.SetStringSelection(selected_label)
+        storage_row.Add(self.storage_location_ctrl, 0, wx.ALL, 5)
+        storage_sizer.Add(storage_row, 0, wx.EXPAND | wx.ALL, 4)
+
+        try:
+            paths = config_mod.ConfigManager.location_paths()
+        except Exception:
+            paths = {"user_data": "", "app_folder": ""}
+        paths_lbl = wx.StaticText(
+            advanced_panel,
+            label=(
+                _("User Data Folder path:\n  {path}\n").format(path=paths.get('user_data', ''))
+                + _("App Install Folder path:\n  {path}").format(path=paths.get('app_folder', ''))
+            ),
+        )
+        storage_sizer.Add(paths_lbl, 0, wx.ALL, 6)
+
+        self._initial_storage_location = current_storage
+        advanced_sizer.Add(storage_sizer, 0, wx.EXPAND | wx.ALL, 8)
+
+        updates_group = wx.StaticBox(advanced_panel, label=_("Updates"))
+        updates_sizer = wx.StaticBoxSizer(updates_group, wx.VERTICAL)
+        self.install_updates_automatically_chk = wx.CheckBox(
+            advanced_panel,
+            label=_("Automatically install updates without confirmation"),
+        )
+        self.install_updates_automatically_chk.SetValue(
+            bool(config.get("install_updates_automatically", False))
+        )
+        updates_sizer.Add(self.install_updates_automatically_chk, 0, wx.ALL, 6)
+        advanced_sizer.Add(updates_sizer, 0, wx.EXPAND | wx.ALL, 8)
+
+        # Browser identity (core/user_agents.py). Sites behind a bot check
+        # reject a User-Agent that has aged out of the current-browser window,
+        # which is what put forum.audiogames.net permanently behind "Just a
+        # moment..." for full-text extraction.
+        ua_group = wx.StaticBox(advanced_panel, label=_("Browser Identification"))
+        ua_sizer = wx.StaticBoxSizer(ua_group, wx.VERTICAL)
+        ua_sizer.Add(
+            wx.StaticText(
+                advanced_panel,
+                label=_(
+                    "The browser BlindRSS reports itself as when fetching feeds and articles.\n"
+                    "Automatic uses a browser installed on this computer, at its real version,\n"
+                    "which is what sites with bot protection are most likely to accept."
+                ),
+            ),
+            0,
+            wx.ALL,
+            6,
+        )
+
+        self._user_agent_choices = list(user_agents.choices())
+        self._user_agent_choices.append(
+            user_agents.Identity(user_agents.CUSTOM_MODE, _("Custom (type it below)"), "", {}, "custom")
+        )
+        ua_row = wx.BoxSizer(wx.HORIZONTAL)
+        ua_row.Add(
+            wx.StaticText(advanced_panel, label=_("Identify as:")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.ALL,
+            5,
+        )
+        self.user_agent_mode_ctrl = wx.Choice(
+            advanced_panel, choices=[c.label for c in self._user_agent_choices]
+        )
+        self.user_agent_mode_ctrl.SetName("Identify as")
+        current_mode = str(config.get("user_agent_mode", user_agents.AUTO_MODE) or user_agents.AUTO_MODE)
+        selected_index = 0
+        for index, choice in enumerate(self._user_agent_choices):
+            if choice.key == current_mode:
+                selected_index = index
+                break
+        self.user_agent_mode_ctrl.SetSelection(selected_index)
+        self.user_agent_mode_ctrl.Bind(wx.EVT_CHOICE, self._on_user_agent_mode_changed)
+        ua_row.Add(self.user_agent_mode_ctrl, 1, wx.ALL, 5)
+        ua_sizer.Add(ua_row, 0, wx.EXPAND | wx.ALL, 4)
+
+        custom_row = wx.BoxSizer(wx.HORIZONTAL)
+        custom_row.Add(
+            wx.StaticText(advanced_panel, label=_("Custom User-Agent:")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.ALL,
+            5,
+        )
+        self.user_agent_custom_ctrl = wx.TextCtrl(
+            advanced_panel, value=str(config.get("user_agent_custom", "") or "")
+        )
+        self.user_agent_custom_ctrl.SetName("Custom User-Agent")
+        custom_row.Add(self.user_agent_custom_ctrl, 1, wx.ALL, 5)
+        ua_sizer.Add(custom_row, 0, wx.EXPAND | wx.ALL, 4)
+
+        # The resolved string, so the choice is verifiable without leaving the
+        # dialog — a screen reader reads it on demand rather than guessing what
+        # "Automatic" picked.
+        self.user_agent_effective_lbl = wx.StaticText(advanced_panel, label="")
+        self.user_agent_effective_lbl.SetName("Current User-Agent")
+        ua_sizer.Add(self.user_agent_effective_lbl, 0, wx.ALL, 6)
+
+        advanced_sizer.Add(ua_sizer, 0, wx.EXPAND | wx.ALL, 8)
+        self._on_user_agent_mode_changed(None)
+
+        # Video Search content controls.
+        search_group = wx.StaticBox(advanced_panel, label=_("Video Search"))
+        search_sizer = wx.StaticBoxSizer(search_group, wx.VERTICAL)
+        self.enable_adult_search_chk = wx.CheckBox(
+            advanced_panel,
+            label=_("Enable adult sites in Video Search"),
+        )
+        self.enable_adult_search_chk.SetValue(bool(config.get("enable_adult_search", False)))
+        self.enable_adult_search_chk.SetName("Enable adult sites in Video Search")
+        search_sizer.Add(self.enable_adult_search_chk, 0, wx.ALL, 6)
+        search_sizer.Add(
+            wx.StaticText(
+                advanced_panel,
+                label=_(
+                    "When off, adult sites never appear in the Video Search site list.\n"
+                    "When on, adult sites are added and must still be selected explicitly to search them."
+                ),
+            ),
+            0,
+            wx.LEFT | wx.RIGHT | wx.BOTTOM,
+            6,
+        )
+        advanced_sizer.Add(search_sizer, 0, wx.EXPAND | wx.ALL, 8)
+
     def get_data(self):
+        # Reads controls from every page, so no page may still be pending: an
+        # unbuilt page has no controls to read and would silently write its
+        # settings back as defaults (issue: lazy settings pages).
+        self._ensure_all_pages_built()
+
         # Parse speed back to float
         speed_str = self.speed_ctrl.GetValue().replace("x", "")
         try:
