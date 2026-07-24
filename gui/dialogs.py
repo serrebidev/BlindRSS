@@ -34,6 +34,7 @@ from core.discovery import (
 )
 from core.groups_io import search_groups_io_feeds
 from core import article_columns
+from core import download_formats
 from core import utils
 from core import config as config_mod
 from core import equalizer as equalizer_mod
@@ -1121,6 +1122,30 @@ class SettingsDialog(wx.Dialog):
         )
         retention_sizer.Add(self.retention_ctrl, 0, wx.ALL, 5)
         downloads_sizer.Add(retention_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
+        # Default format for yt-dlp downloads (YouTube and friends). Direct
+        # media files ignore this — they are saved byte-for-byte as published.
+        dl_format_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        dl_format_sizer.Add(
+            wx.StaticText(downloads_panel, label=_("Default video download format:")),
+            0,
+            wx.ALIGN_CENTER_VERTICAL | wx.ALL,
+            5,
+        )
+        self._download_format_ids = list(download_formats.DOWNLOAD_FORMAT_CHOICES)
+        self.download_format_ctrl = wx.ComboBox(
+            downloads_panel,
+            choices=download_formats.download_format_labels(),
+            style=wx.CB_READONLY,
+        )
+        self.download_format_ctrl.SetName(_("Default video download format"))
+        self.download_format_ctrl.SetSelection(
+            self._download_format_ids.index(
+                download_formats.normalize_download_format(config.get("download_format", ""))
+            )
+        )
+        dl_format_sizer.Add(self.download_format_ctrl, 0, wx.ALL, 5)
+        downloads_sizer.Add(dl_format_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
         art_retention_sizer = wx.BoxSizer(wx.HORIZONTAL)
         art_retention_sizer.Add(wx.StaticText(feeds_panel, label=_("Article Retention:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
@@ -2383,6 +2408,14 @@ class SettingsDialog(wx.Dialog):
         if 0 <= idx < len(ids):
             return ids[idx]
         return RETENTION_DEFAULT
+
+    def _selected_download_format_id(self):
+        """Stable identifier for the download-format combobox selection."""
+        idx = self.download_format_ctrl.GetSelection()
+        ids = self._download_format_ids
+        if 0 <= idx < len(ids):
+            return ids[idx]
+        return download_formats.DOWNLOAD_FORMAT_DEFAULT
 
     def _delete_behavior_setting(self):
         """Encode the delete-behavior choice + category into the config string."""
@@ -3763,6 +3796,7 @@ class SettingsDialog(wx.Dialog):
             "download_retention": self._selected_retention_id(
                 self.retention_ctrl, self._retention_ids_download
             ),
+            "download_format": self._selected_download_format_id(),
             "article_retention": self._selected_retention_id(
                 self.art_retention_ctrl, self._retention_ids_article
             ),

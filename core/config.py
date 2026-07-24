@@ -331,6 +331,10 @@ DEFAULT_CONFIG = {
     "download_path": _default_download_dir(),
     # Stable identifier from core.retention (issue #63) — never a UI label.
     "download_retention": "unlimited",
+    # Default yt-dlp download preset; stable identifier from core.download_formats,
+    # never a UI label. Only applies to yt-dlp items (YouTube and friends) —
+    # direct media files are always saved as published.
+    "download_format": "video_best",
     # Maps stable article/media fingerprints to locally downloaded episode files.
     # This lets playback prefer a completed download when the network is offline.
     "downloaded_media": {},

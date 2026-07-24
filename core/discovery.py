@@ -4765,6 +4765,47 @@ _DETECT_PAGE_FEED_TYPES = _ALTERNATE_FEED_TYPES | {
 }
 
 
+# Channel URL shapes YouTube still serves besides /@handle.
+_YOUTUBE_CHANNEL_PATH_PREFIXES = ("/channel/", "/c/", "/user/")
+
+
+def _native_channel_feed_for_page(page_url: str) -> dict | None:
+    """Resolve a YouTube channel/playlist page to its native videos.xml feed.
+
+    Returns a detect_page_feeds-shaped dict, or None when the URL is not a
+    YouTube channel/playlist page (or the channel id could not be resolved, in
+    which case the caller falls back to scraping the HTML).
+
+    The title is left empty on purpose: a single detection result goes straight
+    to the Add Feed dialog, which reads the real channel title from the feed.
+    """
+    try:
+        parsed = urlparse(page_url)
+    except Exception:
+        return None
+    if not _is_youtube_host(parsed.hostname or ""):
+        return None
+    if is_youtube_search_url(page_url):
+        return None
+
+    path = parsed.path or "/"
+    low_path = path.lower()
+    # A "list" parameter means a playlist page (or a video opened inside one);
+    # both have a native feed. Bare /watch?v= URLs deliberately do not.
+    is_playlist = bool(_youtube_playlist_id_from_url(page_url))
+    is_channel = path.startswith("/@") or any(
+        low_path.startswith(prefix) for prefix in _YOUTUBE_CHANNEL_PATH_PREFIXES
+    )
+    if not (is_playlist or is_channel):
+        return None
+
+    try:
+        feed_url = str(get_ytdlp_feed_url(page_url) or "").strip()
+    except Exception:
+        return None
+    return {"title": "", "url": feed_url} if feed_url else None
+
+
 def detect_page_feeds(
     url: str,
     timeout: float = 15.0,
@@ -4787,6 +4828,15 @@ def detect_page_feeds(
         raise PageFetchError("empty URL")
     if "://" not in page_url:
         page_url = "https://" + page_url
+
+    # YouTube channel/playlist pages: resolve the native videos.xml feed instead
+    # of trusting the page HTML. The RSS <link> tag is only present on some
+    # channel URL shapes and disappears entirely behind consent interstitials or
+    # when YouTube serves its lighter shell, so scraping alone made "Detect
+    # Feeds" unreliable for exactly the URL users paste (a /@handle page).
+    native = _native_channel_feed_for_page(page_url)
+    if native:
+        return [native]
 
     try:
         browser_timeout = max(15.0, min(float(browser_timeout or 90.0), 180.0))

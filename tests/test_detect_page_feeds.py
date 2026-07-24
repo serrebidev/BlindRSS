@@ -132,6 +132,77 @@ def test_cloudflare_error_uses_browser_page_and_finds_all_feeds(monkeypatch):
     assert browser_calls == [("https://forum.example", {"timeout_s": 47.0})]
 
 
+CHANNEL_FEED = "https://www.youtube.com/feeds/videos.xml?channel_id=UCbwQ-rcQimbVHnJ6EXMjUHw"
+
+
+@pytest.mark.parametrize(
+    "page_url",
+    [
+        "https://www.youtube.com/@rezanajarzadeh/featured",
+        "https://www.youtube.com/@rezanajarzadeh",
+        "https://www.youtube.com/@rezanajarzadeh/videos",
+        "https://www.youtube.com/c/SomeChannel",
+        "https://www.youtube.com/user/SomeUser",
+        "https://www.youtube.com/channel/UCbwQ-rcQimbVHnJ6EXMjUHw",
+    ],
+)
+def test_youtube_channel_pages_resolve_to_native_feed(monkeypatch, page_url):
+    """Channel URLs must not depend on YouTube serving the RSS <link> tag."""
+
+    def unexpected_get(url, **kw):
+        raise AssertionError(f"channel detection must not fetch the page: {url}")
+
+    monkeypatch.setattr(utils, "safe_requests_get", unexpected_get)
+    monkeypatch.setattr(discovery, "get_ytdlp_feed_url", lambda url: CHANNEL_FEED)
+
+    assert discovery.detect_page_feeds(page_url) == [{"title": "", "url": CHANNEL_FEED}]
+
+
+def test_youtube_playlist_page_resolves_to_native_feed(monkeypatch):
+    playlist_feed = "https://www.youtube.com/feeds/videos.xml?playlist_id=PL123"
+    monkeypatch.setattr(
+        utils, "safe_requests_get",
+        lambda url, **kw: (_ for _ in ()).throw(AssertionError("should not fetch")),
+    )
+    monkeypatch.setattr(discovery, "get_ytdlp_feed_url", lambda url: playlist_feed)
+    feeds = discovery.detect_page_feeds("https://www.youtube.com/playlist?list=PL123")
+    assert feeds == [{"title": "", "url": playlist_feed}]
+
+
+@pytest.mark.parametrize(
+    "page_url",
+    [
+        "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+        "https://www.youtube.com/results?search_query=news",
+    ],
+)
+def test_youtube_non_channel_pages_still_scrape_html(monkeypatch, page_url):
+    """A single video or a search page has no channel feed: fall through."""
+    monkeypatch.setattr(utils, "safe_requests_get", lambda url, **kw: _resp(200, PAGE))
+    monkeypatch.setattr(
+        discovery, "get_ytdlp_feed_url",
+        lambda url: (_ for _ in ()).throw(AssertionError("must not resolve a channel")),
+    )
+    feeds = discovery.detect_page_feeds(page_url)
+    assert [f["url"] for f in feeds] == [
+        "https://example.com/feeds/news.xml",
+        "https://example.com/atom.xml",
+        "https://example.com/feed.json",
+    ]
+
+
+def test_unresolvable_youtube_channel_falls_back_to_page_scan(monkeypatch):
+    """yt-dlp failing must not turn Detect Feeds into a dead end."""
+    monkeypatch.setattr(utils, "safe_requests_get", lambda url, **kw: _resp(200, PAGE))
+    monkeypatch.setattr(discovery, "get_ytdlp_feed_url", lambda url: None)
+    feeds = discovery.detect_page_feeds("https://www.youtube.com/@nobody")
+    assert [f["url"] for f in feeds] == [
+        "https://example.com/feeds/news.xml",
+        "https://example.com/atom.xml",
+        "https://example.com/feed.json",
+    ]
+
+
 def test_non_ascii_titles_survive_missing_charset_header(monkeypatch):
     page = ('<html><head><meta charset="windows-1251">'
             '<link rel="alternate" type="application/rss+xml" title="Новости" href="/rss">'

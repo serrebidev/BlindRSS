@@ -3066,6 +3066,7 @@ class MainFrame(wx.Frame):
             "article.toggle_favorite": self.on_toggle_favorite,
             "article.delete": self.on_delete_article,
             "article.download": self._cmd_download_article,
+            "article.download_as": self._cmd_download_article_as,
             "article.toggle_queue": self._cmd_toggle_queue,
             "article.view_description": self._cmd_view_description,
 
@@ -3167,6 +3168,13 @@ class MainFrame(wx.Frame):
             article = self.current_articles[idx]
             if getattr(article, "media_url", None):
                 self.on_download_article(article)
+
+    def _cmd_download_article_as(self, event=None):
+        idx = self._cmd_selected_article_index()
+        if idx is not None:
+            article = self.current_articles[idx]
+            if getattr(article, "media_url", None):
+                self.on_download_article_as(article)
 
     def _cmd_toggle_queue(self, event=None):
         idx = self._cmd_selected_article_index()
@@ -4883,6 +4891,9 @@ class MainFrame(wx.Frame):
                 download_item = menu.Append(
                     wx.ID_ANY, self._shortcut_menu_label(_("Download"), "article.download"))
                 self.Bind(wx.EVT_MENU, lambda e, a=article_for_menu: self.on_download_article(a), download_item)
+                download_as_item = menu.Append(
+                    wx.ID_ANY, self._shortcut_menu_label(_("Download As..."), "article.download_as"))
+                self.Bind(wx.EVT_MENU, lambda e, a=article_for_menu: self.on_download_article_as(a), download_as_item)
             else:
                 detect_audio_item = menu.Append(wx.ID_ANY, _("Detect Audio"))
                 self.Bind(wx.EVT_MENU, lambda e, a=article_for_menu: self.on_detect_audio(a), detect_audio_item)
@@ -12108,14 +12119,62 @@ class MainFrame(wx.Frame):
         except Exception:
             log.exception("Error syncing download path in cached views")
 
-    def on_download_article(self, article):
+    def on_download_article(self, article, download_format=None):
         if not article or not getattr(article, "media_url", None):
             wx.MessageBox(_("No downloadable media found for this item."), _("Download"), wx.ICON_INFORMATION)
             return
         if not self.config_manager.get("downloads_enabled", False):
             wx.MessageBox(_("Downloads are disabled. Enable them in Settings > Downloads."), _("Downloads disabled"), wx.ICON_INFORMATION)
             return
-        threading.Thread(target=self._download_article_thread, args=(article,), daemon=True).start()
+        threading.Thread(
+            target=self._download_article_thread,
+            args=(article, download_format),
+            daemon=True,
+        ).start()
+
+    def on_download_article_as(self, article):
+        """Download, but pick the format for this item instead of the default.
+
+        Only yt-dlp items (YouTube and friends) have formats to choose from; a
+        direct media file is downloaded byte-for-byte, so saying so beats
+        showing a picker whose choices would all be ignored.
+        """
+        if not article or not getattr(article, "media_url", None):
+            wx.MessageBox(_("No downloadable media found for this item."), _("Download"), wx.ICON_INFORMATION)
+            return
+        if not self.config_manager.get("downloads_enabled", False):
+            wx.MessageBox(_("Downloads are disabled. Enable them in Settings > Downloads."), _("Downloads disabled"), wx.ICON_INFORMATION)
+            return
+        if not self._ytdlp_download_target(article):
+            wx.MessageBox(
+                _("This item is a direct media file, so it can only be downloaded in its original format."),
+                _("Download As"),
+                wx.ICON_INFORMATION,
+            )
+            return
+
+        from core import download_formats
+
+        choices = list(download_formats.DOWNLOAD_FORMAT_CHOICES)
+        current = download_formats.normalize_download_format(
+            self.config_manager.get("download_format", download_formats.DOWNLOAD_FORMAT_DEFAULT)
+        )
+        dlg = wx.SingleChoiceDialog(
+            self,
+            _("Choose the format to download this item in:"),
+            _("Download As"),
+            download_formats.download_format_labels(),
+        )
+        try:
+            dlg.SetSelection(choices.index(current))
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            idx = dlg.GetSelection()
+        finally:
+            dlg.Destroy()
+        if not (0 <= idx < len(choices)):
+            return
+        self.on_download_article(article, download_format=choices[idx])
 
     def _ytdlp_download_target(self, article):
         """Return a yt-dlp-supported URL for this article, or None for a direct file.
@@ -12177,8 +12236,12 @@ class MainFrame(wx.Frame):
         except Exception:
             return None
 
-    def _download_article_via_ytdlp(self, article, url):
-        """Download a yt-dlp-supported item, merging audio+video into one file.
+    def _download_article_via_ytdlp(self, article, url, download_format=None):
+        """Download a yt-dlp-supported item in the requested format preset.
+
+        ``download_format`` is a core.download_formats identifier; None means
+        the configured default. Video presets ask for the H.264 + AAC ladder so
+        the result is a real MP4 rather than the MKV that AV1/Opus forces.
 
         Activity-status begin text was already posted by the caller
         (_download_article_thread, the only caller); this method pairs its own
@@ -12187,6 +12250,14 @@ class MainFrame(wx.Frame):
         """
         import subprocess
         import platform as _platform
+        from core import download_formats
+
+        fmt = download_formats.normalize_download_format(
+            download_format
+            if download_format is not None
+            else self.config_manager.get("download_format", download_formats.DOWNLOAD_FORMAT_DEFAULT)
+        )
+        audio_only = download_formats.is_audio_only(fmt)
 
         title = self._download_activity_title(article)
         cli = core.discovery._resolve_ytdlp_cli_path()
@@ -12202,11 +12273,7 @@ class MainFrame(wx.Frame):
             "--no-color",
             "--geo-bypass",
             "--extractor-args", core.discovery.youtube_player_client_arg(),
-            "-f", "bv*+ba/b",
-            # Prefer MP4, but let yt-dlp use MKV when the selected video/audio
-            # codecs cannot be safely muxed into MP4. Forcing MP4 can make
-            # ffmpeg fail on common YouTube AV1/Opus downloads.
-            "--merge-output-format", "mp4/mkv",
+            *download_formats.ytdlp_args(fmt),
             "-o", out_template,
         ]
         try:
@@ -12240,10 +12307,13 @@ class MainFrame(wx.Frame):
         last_err = "yt-dlp download failed"
         timed_out = False
         for extra in attempts:
-            merge_formats = ("mp4/mkv", "mkv")
+            # Audio presets never mux video, so the MKV rescue below does not
+            # apply to them: one attempt per cookie source is the whole loop.
+            merge_formats = ("mp4",) if audio_only else ("mp4", "mkv")
             for merge_format in merge_formats:
                 cmd = list(base_cmd)
-                cmd[cmd.index("--merge-output-format") + 1] = merge_format
+                if not audio_only:
+                    cmd[cmd.index("--merge-output-format") + 1] = merge_format
                 try:
                     res = subprocess.run(
                         cmd + extra + [url],
@@ -12287,7 +12357,7 @@ class MainFrame(wx.Frame):
                     return
 
                 last_err = (res.stderr or res.stdout or last_err).strip() or last_err
-                if merge_format == "mp4/mkv" and "conversion failed" in last_err.lower():
+                if merge_format == "mp4" and "conversion failed" in last_err.lower():
                     log.info("yt-dlp MP4-preferred merge failed; retrying download as MKV")
                     continue
                 break
@@ -12324,7 +12394,7 @@ class MainFrame(wx.Frame):
         """Human-readable title for download activity-status text."""
         return str(getattr(article, "title", "") or "").strip() or "episode"
 
-    def _download_article_thread(self, article):
+    def _download_article_thread(self, article, download_format=None):
         title = self._download_activity_title(article)
         self._post_activity_status(_("Downloading: {title}").format(title=title))
         try:
@@ -12332,7 +12402,7 @@ class MainFrame(wx.Frame):
             if ytdlp_url:
                 # _download_article_via_ytdlp pairs its own terminal outcomes
                 # (success/failure) with activity-status updates.
-                self._download_article_via_ytdlp(article, ytdlp_url)
+                self._download_article_via_ytdlp(article, ytdlp_url, download_format)
                 return
 
             url = article.media_url

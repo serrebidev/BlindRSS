@@ -61,6 +61,7 @@ COMMANDS: List[Command] = [
     Command("article.toggle_favorite", "Articles", "Add to or Remove from Favorites", "Ctrl+D"),
     Command("article.delete", "Articles", "Delete Article", ""),
     Command("article.download", "Articles", "Download", ""),
+    Command("article.download_as", "Articles", "Download As", ""),
     Command("article.toggle_queue", "Articles", "Add to or Remove from Play Queue", ""),
     Command("article.view_description", "Articles", "View Feed Description", ""),
 
@@ -164,6 +165,7 @@ _POT_ANCHORS = (
     _("Add to or Remove from Favorites"),
     _("Delete Article"),
     _("Download"),
+    _("Download As"),
     _("Add to or Remove from Play Queue"),
     _("View Feed Description"),
     _("Focus Search Field"),

@@ -622,6 +622,9 @@ class PlayerFrame(wx.Frame):
         
         self.is_playing = False
         self.duration = 0
+        # Running time reported by the metadata source (yt-dlp), when known.
+        # Trusted over libVLC's get_length(); see _set_known_duration_ms.
+        self._known_duration_ms = 0
         self.current_chapters = []
         self.chapter_marks = []
         self._chapter_pending_idx = None
@@ -3733,6 +3736,11 @@ class PlayerFrame(wx.Frame):
 
                         ytdlp_headers = info.get('http_headers', {})
                         resolved_title = info.get('title', title or 'Media Stream')
+                        # Authoritative running time straight from the extractor.
+                        # libVLC's get_length() on a remote googlevideo stream can
+                        # settle on a far shorter value, which silently capped
+                        # forward seeking at the bogus "end" of the track.
+                        self._set_known_duration_ms(info.get('duration'))
                 except Exception as e:
                     err_text = str(e or "")
                     err_lower = err_text.lower()
@@ -4034,6 +4042,10 @@ class PlayerFrame(wx.Frame):
             self._current_use_ytdlp = bool(use_ytdlp)
         except Exception:
             self._current_use_ytdlp = False
+
+        # Belongs to the outgoing item: a stale value would make us reject the
+        # next track's libVLC length (see _duration_is_plausible).
+        self._known_duration_ms = 0
 
         # State for the local-download playback fallback. When VLC cannot play the
         # streamed yt-dlp URL (e.g. googlevideo on a bundled Windows VLC), we re-run
@@ -4484,12 +4496,13 @@ class PlayerFrame(wx.Frame):
 
         try:
             length = int(self.player.get_length() or 0)
-            if length > 0 and length != int(getattr(self, 'duration', 0) or 0):
-                self.duration = int(length)
-                try:
-                    self._set_total_time_label(self._format_time(int(length)))
-                except Exception:
-                    pass
+            if length > 0 and self._duration_is_plausible(length):
+                if length != int(getattr(self, 'duration', 0) or 0):
+                    self.duration = int(length)
+                    try:
+                        self._set_total_time_label(self._format_time(int(length)))
+                    except Exception:
+                        pass
         except Exception:
             pass
 
@@ -6168,6 +6181,56 @@ class PlayerFrame(wx.Frame):
             self._seek_apply_calllater = None
 
 
+    def _set_known_duration_ms(self, seconds) -> None:
+        """Record the extractor's running time and adopt it as the duration.
+
+        yt-dlp knows how long a YouTube item actually is. libVLC does not always
+        agree: on a remote googlevideo stream get_length() can settle on a much
+        shorter value, and because that was the only source of self.duration it
+        silently capped forward seeking at a bogus "end of track".
+        """
+        try:
+            ms = int(float(seconds) * 1000)
+        except (TypeError, ValueError):
+            return
+        if ms <= 0:
+            return
+        self._known_duration_ms = ms
+        self.duration = ms
+        try:
+            self._set_total_time_label(self._format_time(ms))
+        except Exception:
+            pass
+
+    def _duration_is_plausible(self, length_ms: int) -> bool:
+        """Should libVLC's reported length be allowed to replace self.duration?
+
+        Only refuse when it contradicts a known-good extractor duration by more
+        than a rounding margin in the *shorter* direction — that is the failure
+        that breaks seeking. A longer libVLC length is accepted, since live
+        items and appended streams legitimately grow.
+        """
+        try:
+            known = int(getattr(self, "_known_duration_ms", 0) or 0)
+            candidate = int(length_ms)
+        except (TypeError, ValueError):
+            return True
+        if known <= 0:
+            return True
+        return candidate >= known - 2000
+
+    def _announce_seek_limit(self, at_end: bool) -> None:
+        """Say why a seek did nothing; a silent no-op just reads as broken."""
+        try:
+            from core import screen_reader_announce
+
+            screen_reader_announce.speak_status(
+                _("End of track") if at_end else _("Beginning of track"),
+                interrupt=True,
+            )
+        except Exception:
+            pass
+
     def seek_relative_ms(self, delta_ms: int) -> None:
         if self.is_casting:
             return
@@ -6272,6 +6335,8 @@ class PlayerFrame(wx.Frame):
                 if int(delta) > 0:
                     upper = duration_i - 1000 if duration_i > 1000 else max(0, duration_i - 1)
                     if int(base) >= int(upper):
+                        # Refusing without saying so reads as a broken key.
+                        self._announce_seek_limit(at_end=True)
                         return
                 target = max(0, min(int(target), int(upper)))
             else:
