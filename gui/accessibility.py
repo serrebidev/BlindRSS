@@ -16,9 +16,18 @@ from core import article_lang
 from core.i18n import _
 from core.categories import UNCATEGORIZED, category_display_name
 from .clipboard_utils import copy_text_to_clipboard, copy_textctrl_selection_to_clipboard
-from .reader_performance import replace_text_control_value
+from .reader_performance import replace_text_control_value, set_accessible_webview_content
 
 log = logging.getLogger(__name__)
+
+
+def _article_is_youtube_video(article) -> bool:
+    try:
+        from core import youtube_fulltext
+
+        return youtube_fulltext.is_youtube_video_url(getattr(article, "url", "") or "")
+    except Exception:
+        return False
 
 
 # A body shorter than this is probably a snippet/paywall stub, not a full article, so it's
@@ -1612,7 +1621,7 @@ class AccessibleBrowserFrame(wx.Frame):
         if rv is None:
             return
         try:
-            rv.set_content(html_body)
+            set_accessible_webview_content(rv, html_body)
         except Exception:
             log.exception("Failed to set rich reader content")
 
@@ -1777,7 +1786,8 @@ class AccessibleBrowserFrame(wx.Frame):
         if not article_id:
             return
         self._chapter_inflight.add(art_id)
-        if self._current_body_art_id == art_id:
+        is_youtube = _article_is_youtube_video(article)
+        if self._current_body_art_id == art_id and not is_youtube:
             self._set_article_content(
                 article, art_id, self._current_body_text, preserve_position=True
             )
@@ -1820,7 +1830,10 @@ class AccessibleBrowserFrame(wx.Frame):
         article = self._current_articles[idx]
         if self.mainframe._article_cache_id(article) != art_id:
             return
-        if self._current_body_art_id == art_id:
+        if (
+            self._current_body_art_id == art_id
+            and not _article_is_youtube_video(article)
+        ):
             self._set_article_content(
                 article, art_id, self._current_body_text, preserve_position=True
             )

@@ -119,7 +119,7 @@ class _ChapterHost:
         return None
 
 
-def _article(article_id="article-1", chapters=None):
+def _article(article_id="article-1", chapters=None, url="https://example.com/episode"):
     return SimpleNamespace(
         id=article_id,
         cache_id=f"feed:{article_id}",
@@ -127,7 +127,7 @@ def _article(article_id="article-1", chapters=None):
         chapters=list(chapters or []),
         media_url="https://example.com/audio.mp3",
         media_type="audio/mpeg",
-        url="https://example.com/episode",
+        url=url,
     )
 
 
@@ -149,6 +149,20 @@ def test_append_chapters_updates_indicator_and_preserves_reader_selection():
     assert host.list_ctrl.labels[(0, 0)] == "Episode, Chapters available"
     assert "Chapters (1):" in host.content_ctrl.value
     assert "1:02:03, Discussion. Link: https://example.com/chapter" in host.content_ctrl.value
+    assert host.content_ctrl.selection == (1, 4)
+
+
+def test_youtube_chapter_completion_does_not_rebuild_reader_text():
+    article = _article(url="https://www.youtube.com/watch?v=abcDEF12345")
+    host = _ChapterHost(article, _Player())
+    original = host.content_ctrl.value
+    chapters = [{"start": 60, "title": "Second section"}]
+
+    host._append_chapters(article.cache_id, chapters)
+
+    assert article.chapters == chapters
+    assert host.list_ctrl.labels[(0, 0)] == "Episode, Chapters available"
+    assert host.content_ctrl.value == original
     assert host.content_ctrl.selection == (1, 4)
 
 

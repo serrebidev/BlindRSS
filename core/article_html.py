@@ -868,15 +868,40 @@ def _feed_fallback_html(fallback_html: str, url: str) -> str:
     return paras
 
 
+_YOUTUBE_ACCESSIBLE_CHUNK_CHARS = 16_384
+
+
+def _accessible_text_chunks(text: str, limit: int = _YOUTUBE_ACCESSIBLE_CHUNK_CHARS) -> list[str]:
+    """Split a large text leaf at readable boundaries without losing bytes."""
+    remaining = str(text or "")
+    chunks = []
+    limit = max(1, int(limit))
+    while len(remaining) > limit:
+        cut = remaining.rfind("\n\n", 0, limit + 1)
+        if cut >= limit // 2:
+            cut += 2
+        else:
+            cut = remaining.rfind("\n", 0, limit + 1)
+            if cut >= limit // 2:
+                cut += 1
+            else:
+                cut = remaining.rfind(" ", 0, limit + 1)
+                cut = cut + 1 if cut >= limit // 2 else limit
+        chunks.append(remaining[:cut])
+        remaining = remaining[cut:]
+    if remaining or not chunks:
+        chunks.append(remaining)
+    return chunks
+
+
 def _structured_youtube_text_html(text: str) -> str:
     """Turn shared YouTube text into a small, complete rich-reader DOM.
 
     A paragraph/heading node per subtitle cue and comment made WebView layout
     scale with the number of blocks (hundreds of thousands on popular videos).
-    Keep the four navigable section headings, but put each complete section in
-    one pre-wrapped text node. Screen readers retain the labels, blank-line
-    grouping, reply order, and every character while the browser lays out only
-    eight nodes regardless of discussion size.
+    Keep the four navigable section headings and use moderately sized text
+    leaves.  This avoids both thousands of cue/comment nodes and a single
+    multi-megabyte accessibility object, while retaining every character.
     """
     blocks = [block.strip() for block in re.split(r"\n{2,}", str(text or "")) if block.strip()]
     heading_re = re.compile(r"^(?:Description|Chapters|Comments|Subtitles(?: \(.+\))?)$")
@@ -898,10 +923,11 @@ def _structured_youtube_text_html(text: str) -> str:
     for section_heading, section_content in sections:
         output.append(f"<h2>{_html.escape(section_heading)}</h2>")
         joined = "\n\n".join(section_content)
-        output.append(
-            '<div class="awv-youtube-section" style="white-space: pre-wrap">'
-            f"{_html.escape(joined)}</div>"
-        )
+        for chunk in _accessible_text_chunks(joined):
+            output.append(
+                '<div class="awv-youtube-section" style="white-space: pre-wrap">'
+                f"{_html.escape(chunk)}</div>"
+            )
     return "".join(output)
 
 

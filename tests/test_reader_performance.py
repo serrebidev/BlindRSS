@@ -1,4 +1,8 @@
-from gui.reader_performance import LARGE_READER_TEXT_CHARS, replace_text_control_value
+from gui.reader_performance import (
+    LARGE_READER_TEXT_CHARS,
+    replace_text_control_value,
+    set_accessible_webview_content,
+)
 
 
 class _Control:
@@ -46,3 +50,43 @@ def test_large_reader_update_never_reads_or_truncates_existing_value():
     assert control.set_calls == 0
     assert control.change_calls == 1
     assert control.freeze_calls == control.thaw_calls == 1
+
+
+def test_typical_youtube_length_uses_large_update_path():
+    complete = "subtitle line\n" * 1500
+    control = _Control("old")
+
+    replace_text_control_value(control, complete)
+
+    assert len(complete) > LARGE_READER_TEXT_CHARS
+    assert control.value == complete
+    assert control.get_calls == 0
+    assert control.change_calls == 1
+
+
+def test_large_webview_update_is_async_complete_and_atomic():
+    class _View:
+        def __init__(self):
+            self.scripts = []
+
+        def RunScriptAsync(self, script):
+            self.scripts.append(script)
+
+    class _WebView:
+        def __init__(self):
+            self.view = _View()
+            self._ready = True
+            self.sync_calls = []
+
+        def set_content(self, body):
+            self.sync_calls.append(body)
+
+    body = "<p>complete</p>" + ("x" * LARGE_READER_TEXT_CHARS) + "UNIQUE TAIL"
+    webview = _WebView()
+
+    assert set_accessible_webview_content(webview, body) is True
+    assert not webview.sync_calls
+    script = webview.view.scripts[0]
+    assert "aria-busy" in script
+    assert "replaceChildren" in script
+    assert "UNIQUE TAIL" in script

@@ -171,7 +171,7 @@ def _transcript_from_json3(payload: dict) -> list[tuple[float, str]]:
         if not isinstance(event, dict) or not event.get("segs"):
             continue
         text = "".join(str(seg.get("utf8") or "") for seg in event["segs"] if isinstance(seg, dict))
-        text = html.unescape(re.sub(r"\s+", " ", text)).strip()
+        text = _clean_subtitle_text(text)
         if not text or text == "[Music]" and entries and entries[-1][1] == text:
             continue
         start = float(event.get("tStartMs") or 0) / 1000.0
@@ -195,10 +195,22 @@ def _transcript_from_vtt(body: str) -> list[tuple[float, str]]:
         start = hours * 3600 + int(match.group(2)) * 60 + int(match.group(3)) + int(match.group(4)) / 1000
         text = " ".join(lines[cue_index + 1 :])
         text = re.sub(r"<[^>]+>", "", text)
-        text = html.unescape(re.sub(r"\s+", " ", text)).strip()
+        text = _clean_subtitle_text(text)
         if text and (not entries or entries[-1][1] != text):
             entries.append((start, text))
     return entries
+
+
+def _clean_subtitle_text(value: str) -> str:
+    """Normalize a cue and remove spoken WebVTT speaker chevrons.
+
+    YouTube captions commonly prefix speaker changes with ``>>``.  Those are
+    visual transcript markers rather than spoken content, and NVDA announces
+    each character as "greater".  Strip only leading chevrons from subtitle
+    cues; comparison operators and greater-than signs elsewhere are retained.
+    """
+    text = html.unescape(re.sub(r"\s+", " ", str(value or ""))).strip()
+    return re.sub(r"^(?:>\s*)+(?=\S)", "", text).strip()
 
 
 def transcript_from_info(info: dict, *, timeout: int = 20) -> tuple[str, list[tuple[float, str]]]:

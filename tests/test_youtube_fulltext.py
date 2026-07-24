@@ -85,6 +85,12 @@ def test_automatic_english_subtitles_beat_authored_non_english():
     assert track["url"].endswith("/en")
 
 
+def test_subtitle_speaker_chevrons_are_not_spoken_as_greater():
+    assert youtube_fulltext._clean_subtitle_text(">> Alice: Hello") == "Alice: Hello"
+    assert youtube_fulltext._clean_subtitle_text("> Bob: Hi") == "Bob: Hi"
+    assert youtube_fulltext._clean_subtitle_text("Value > 10") == "Value > 10"
+
+
 def test_hosted_youtube_article_link_is_a_chapter_media_source():
     chapter_url, media_url, media_type = utils.chapter_source_and_media({
         "alternate": [{"href": URL, "type": "text/html"}],
@@ -128,10 +134,21 @@ def test_plain_and_rich_views_share_youtube_reconstruction(monkeypatch):
         "Comments",
     ]
     sections = soup.select("div.awv-youtube-section")
-    assert len(sections) == 4
+    assert len(sections) >= 4
     assert not soup.find_all("h3")
     assert "Reply level 2 by Carol:" in sections[-1].get_text()
     assert sections[-1].get_text().index("First thread") < sections[-1].get_text().index("First reply")
+
+
+def test_rich_youtube_sections_chunk_losslessly():
+    source = "Description\n\n" + ("paragraph words\n\n" * 3000) + "TAIL"
+    rendered = article_html._structured_youtube_text_html(source)
+    soup = BeautifulSoup(rendered, "html.parser")
+    chunks = soup.select("div.awv-youtube-section")
+
+    assert len(chunks) > 1
+    assert "".join(chunk.get_text() for chunk in chunks) == source.split("\n\n", 1)[1]
+    assert max(len(chunk.get_text()) for chunk in chunks) <= article_html._YOUTUBE_ACCESSIBLE_CHUNK_CHARS
 
 
 def test_youtube_chapters_use_the_normal_chapter_cache(monkeypatch):

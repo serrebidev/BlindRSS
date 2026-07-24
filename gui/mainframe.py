@@ -62,9 +62,22 @@ import core.discovery
 from .shortcut_keys import event_to_accel
 from .menu_mnemonics import apply_menu_mnemonics, apply_menubar_mnemonics
 from .widgets import force_ltr_reading
-from .reader_performance import replace_text_control_value
+from .reader_performance import (
+    LARGE_READER_TEXT_CHARS,
+    replace_text_control_value,
+    set_accessible_webview_content,
+)
 
 log = logging.getLogger(__name__)
+
+
+def _article_is_youtube_video(article) -> bool:
+    try:
+        from core import youtube_fulltext
+
+        return youtube_fulltext.is_youtube_video_url(getattr(article, "url", "") or "")
+    except Exception:
+        return False
 
 # Recovers an http(s) URL from the plain reader text so Enter can open the link
 # under the caret. Matches to whitespace (URLs may contain parens, e.g.
@@ -634,8 +647,7 @@ class MainFrame(wx.Frame):
         # mode can swap in place without disturbing the splitter.
         self.reader_panel = wx.Panel(right_splitter)
         self._reader_sizer = wx.BoxSizer(wx.VERTICAL)
-        self.content_ctrl = wx.TextCtrl(self.reader_panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2)
-        self.content_ctrl.SetName("Article text")
+        self.content_ctrl = self._create_article_text_control()
         self._reader_sizer.Add(self.content_ctrl, 1, wx.EXPAND)
         self.reader_panel.SetSizer(self._reader_sizer)
         self._rich_view = None            # AccessibleWebView, created on demand
@@ -663,23 +675,6 @@ class MainFrame(wx.Frame):
         self.search_ctrl.Bind(wx.EVT_TEXT_ENTER, self.on_search_enter)
         self.search_ctrl.Bind(wx.EVT_SEARCHCTRL_SEARCH_BTN, self.on_search_enter)
         self.search_ctrl.Bind(wx.EVT_SEARCHCTRL_CANCEL_BTN, self.on_search_clear)
-
-        # When tabbing into the content field, load full article text.
-        self.content_ctrl.Bind(wx.EVT_SET_FOCUS, self.on_content_focus)
-        self.content_ctrl.Bind(wx.EVT_TEXT_COPY, self.on_content_copy)
-        # Replace the native (English) read-only text menu with our own so it
-        # follows the app's language (issue #73).
-        #
-        # EVT_CONTEXT_MENU alone is not enough: this is a TE_RICH2 control, and
-        # the native rich-edit shows its own menu straight from the Win32 layer
-        # without wx ever delivering the event here (verified on wxWidgets
-        # 3.2.9 -- the handler simply never runs). So bind the triggers that do
-        # reach us and swallow them, which also stops the native menu from
-        # being raised. EVT_CONTEXT_MENU stays bound for the non-rich case and
-        # for platforms that do deliver it.
-        self.content_ctrl.Bind(wx.EVT_CONTEXT_MENU, self.on_content_context_menu)
-        self.content_ctrl.Bind(wx.EVT_KEY_DOWN, self.on_content_key_down)
-        self.content_ctrl.Bind(wx.EVT_RIGHT_UP, self.on_content_right_up)
 
         # Full-text extraction cache (url -> rendered text)
         self._fulltext_cache = {}
@@ -5195,10 +5190,73 @@ class MainFrame(wx.Frame):
             return text
         return text.rstrip() + chapter_text
 
+    def _create_article_text_control(self):
+        """Create the native reader with every accessibility/key binding."""
+        ctrl = wx.TextCtrl(
+            self.reader_panel,
+            style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2,
+        )
+        ctrl.SetName("Article text")
+        ctrl.Bind(wx.EVT_SET_FOCUS, self.on_content_focus)
+        ctrl.Bind(wx.EVT_TEXT_COPY, self.on_content_copy)
+        ctrl.Bind(wx.EVT_CONTEXT_MENU, self.on_content_context_menu)
+        ctrl.Bind(wx.EVT_KEY_DOWN, self.on_content_key_down)
+        ctrl.Bind(wx.EVT_RIGHT_UP, self.on_content_right_up)
+        return ctrl
+
+    def _swap_focused_large_reader(self, displayed: str, reset_insertion: bool) -> bool:
+        """Expose a fully populated RichEdit to NVDA in one focus transition."""
+        if not sys.platform.startswith("win") or len(displayed) < LARGE_READER_TEXT_CHARS:
+            return False
+        old = self.content_ctrl
+        try:
+            if wx.Window.FindFocus() is not old or not old.IsShown():
+                return False
+            selection = old.GetSelection()
+            insertion = old.GetInsertionPoint()
+            new = self._create_article_text_control()
+            new.Hide()
+            new.ChangeValue(displayed)
+            end = len(displayed)
+            if reset_insertion:
+                new.SetInsertionPoint(0)
+            elif selection is not None:
+                new.SetSelection(min(selection[0], end), min(selection[1], end))
+            else:
+                new.SetInsertionPoint(min(insertion, end))
+            if not self._reader_sizer.Replace(old, new):
+                new.Destroy()
+                return False
+            self.content_ctrl = new
+            self._update_search_tab_order()
+            new.Show()
+            self.reader_panel.Layout()
+            new.SetFocus()
+            old.Hide()
+            wx.CallAfter(old.Destroy)
+            return True
+        except Exception:
+            log.debug("Large reader control swap failed", exc_info=True)
+            try:
+                if "new" in locals() and new is not self.content_ctrl:
+                    new.Destroy()
+            except Exception:
+                pass
+            return False
+
     def _set_article_reader_text(self, article, base_text: str, *, reset_insertion: bool = False) -> str:
         """Set the main reader from chapter-free base text and return the displayed text."""
         displayed = self._compose_article_reader_text(base_text, article=article)
         try:
+            same_tracked_text = getattr(self, "_reader_displayed_text", None) == displayed
+            if same_tracked_text and self.content_ctrl.GetLastPosition() == len(displayed):
+                if reset_insertion:
+                    self.content_ctrl.SetInsertionPoint(0)
+                return displayed
+            swapper = getattr(self, "_swap_focused_large_reader", None)
+            if callable(swapper) and swapper(displayed, reset_insertion):
+                self._reader_displayed_text = displayed
+                return displayed
             changed = replace_text_control_value(self.content_ctrl, displayed)
             if changed:
                 # An accidental right-Ctrl+Shift flips RichEdit to RTL reading
@@ -5207,6 +5265,7 @@ class MainFrame(wx.Frame):
                 force_ltr_reading(self.content_ctrl)
             if reset_insertion and changed:
                 self.content_ctrl.SetInsertionPoint(0)
+            self._reader_displayed_text = displayed
         except Exception:
             pass
         return displayed
@@ -5229,9 +5288,13 @@ class MainFrame(wx.Frame):
             return False
         try:
             from core import article_extractor as ae
+
             return bool(ae._is_forum_thread_host(url))
         except Exception:
             return False
+
+    def _is_youtube_video_article(self, article) -> bool:
+        return _article_is_youtube_video(article)
 
     def _ensure_rich_view(self):
         """Create the AccessibleWebView on first use; None if no backend exists."""
@@ -5537,7 +5600,7 @@ class MainFrame(wx.Frame):
         if rv is None:
             return
         try:
-            rv.set_content(html_body)
+            set_accessible_webview_content(rv, html_body)
         except Exception:
             log.exception("Failed to set rich reader content")
 
@@ -9566,18 +9629,20 @@ class MainFrame(wx.Frame):
         header += _("Link:") + f" {article.url}\n"
         header += "-" * 40 + "\n\n"
         
+        use_rich = self._rich_view_active()
         try:
             include_images = self._show_images_for_feed(getattr(article, "feed_id", None))
             content = self._strip_html(article.content, include_images=include_images)
             full_text = header + content
-            self._set_article_reader_text(article, full_text)
+            if not use_rich:
+                self._set_article_reader_text(article, full_text)
         except Exception:
             pass
 
         # Rich reader: show cleaned feed content instantly (no network); the full
         # web extraction is fetched when the reader gains focus, mirroring the
         # plain-text reader's "feed content on select, full text on focus" flow.
-        if self._rich_view_active():
+        if use_rich:
             try:
                 cache_key, _u, _a = self._fulltext_cache_key_for_article(article, idx)
                 cached = self._fulltext_html_cache.get(cache_key)
@@ -9612,8 +9677,12 @@ class MainFrame(wx.Frame):
         # and rich view show every post without a focus dance (issue: AppleVis
         # thread showed one comment).
         try:
-            if sys.platform == "darwin" or self._is_forum_thread_article(article):
-                if self._rich_view_active():
+            if (
+                sys.platform == "darwin"
+                or self._is_forum_thread_article(article)
+                or self._is_youtube_video_article(article)
+            ):
+                if use_rich:
                     self._schedule_rich_load_for_index(idx, force=False)
                 else:
                     self._schedule_fulltext_load_for_index(idx, force=False)
@@ -10999,6 +11068,12 @@ class MainFrame(wx.Frame):
             pass
         self._cache_article_chapters(article_cache_id, chapter_list)
         self._update_article_chapter_indicator(article_cache_id)
+
+        # Complete YouTube full text already owns its chapter section.  Keep
+        # chapter cache/player navigation, but do not rebuild the entire reader
+        # a second time when this independent chapter request completes.
+        if selected_article is not None and _article_is_youtube_video(selected_article):
+            return
 
         # Verify selection hasn't changed
         if hasattr(self, 'selected_article_id') and self.selected_article_id == article_cache_id:

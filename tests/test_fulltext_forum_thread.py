@@ -300,6 +300,7 @@ class _SelectHost:
     """Borrows the on-select branch that decides whether to eager-load full text."""
 
     _is_forum_thread_article = mainframe.MainFrame._is_forum_thread_article
+    _is_youtube_video_article = mainframe.MainFrame._is_youtube_video_article
 
     def __init__(self, rich_active=False):
         self._rich_active = rich_active
@@ -317,7 +318,11 @@ class _SelectHost:
 
     # The exact decision block from _update_content_view.
     def maybe_autoload(self, idx, article):
-        if sys.platform == "darwin" or self._is_forum_thread_article(article):
+        if (
+            sys.platform == "darwin"
+            or self._is_forum_thread_article(article)
+            or self._is_youtube_video_article(article)
+        ):
             if self._rich_view_active():
                 self._schedule_rich_load_for_index(idx, force=False)
             else:
@@ -336,6 +341,18 @@ def test_selecting_a_forum_thread_schedules_a_rich_load_when_rich_active():
     host.maybe_autoload(2, SimpleNamespace(url=FORUM_URL))
     assert host.rich_scheduled == [(2, False)]
     assert host.fulltext_scheduled == []
+
+
+def test_selecting_youtube_schedules_fulltext_before_reader_focus():
+    article = SimpleNamespace(url="https://www.youtube.com/watch?v=abcDEF12345")
+    classic = _SelectHost(rich_active=False)
+    rich = _SelectHost(rich_active=True)
+
+    classic.maybe_autoload(4, article)
+    rich.maybe_autoload(4, article)
+
+    assert classic.fulltext_scheduled == [(4, False)]
+    assert rich.rich_scheduled == [(4, False)]
 
 
 def test_selecting_an_ordinary_article_does_not_eager_load_off_mac():
