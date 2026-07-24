@@ -416,10 +416,12 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\gettext-import-time-freeze.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\gsmarena-headings-and-richedit-rtl.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\installed-app-debug-landscape.md
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\large-reader-render-and-swap.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\localization-guardrails.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\macos-parity-v1112-2.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\miniflux-refresh-streaming.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\nvda-columnsreview-focused-row-mutation.md
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\out-of-band-translation-updates.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\playback-rate-gap-and-render-lag.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\podcast-signed-url-reresolve.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\provider-flat-vs-nested.md
@@ -432,6 +434,7 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\rich-view-keyboard-bridge.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\rich2-context-menu-never-delivered.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\screen-reader-announcements.md
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\settings-dialog-lazy-pages.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\shortcut-registry-full-coverage.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\silent-noop-ui-failures.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\site-cookies-challenge-fetch.md
@@ -448,5 +451,6 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\wx-callafter-timer-starvation.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\wx-searchctrl-setmenu-ownership.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\wxlogerror-listctrl-modal.md
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\youtube-fulltext-via-ytdlp.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\youtube-live-format-selection.md
 <!-- claude-memory:end -->
