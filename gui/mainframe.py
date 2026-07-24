@@ -365,6 +365,9 @@ class MainFrame(wx.Frame):
         wx.CallLater(900, self._maybe_open_accessible_browser_for_voiceover)
         wx.CallLater(15000, self._maybe_auto_check_updates)
         wx.CallLater(4000, self._check_media_dependencies)
+        # Later than the app-update check so a slow network cannot make the two
+        # compete during the first seconds of a session.
+        wx.CallLater(25000, self._maybe_auto_update_translations)
 
     def _start_startup_background_work(self) -> None:
         """Start initial tree loading and feed refresh after the window gets an
@@ -13646,6 +13649,41 @@ class MainFrame(wx.Frame):
 
     def on_check_updates(self, event):
         self._start_update_check(manual=True)
+
+    def _maybe_auto_update_translations(self):
+        """Refresh interface translations in the background, on the user's interval.
+
+        Silent by design: the user asked for translations, not for a dialog. A
+        downloaded catalog is applied on the next launch, so there is nothing
+        actionable to report and nothing to interrupt a screen reader with.
+        """
+        try:
+            from core import translation_updates as tu
+
+            if not bool(self.config_manager.get(tu.CFG_ENABLED, tu.DEFAULT_ENABLED)):
+                return
+            frequency = str(
+                self.config_manager.get(tu.CFG_FREQUENCY, tu.DEFAULT_FREQUENCY) or ""
+            )
+            if not tu.is_due(frequency):
+                return
+        except Exception:
+            log.debug("Translation auto-update gate failed", exc_info=True)
+            return
+
+        def worker():
+            try:
+                from core import i18n, translation_updates as tu
+
+                languages = [i18n.current_language().replace("-", "_")]
+                languages.extend(tu.installed_languages())
+                result = tu.check_and_update(list(dict.fromkeys(languages)))
+                if result.updated:
+                    log.info("Updated translations: %s", ", ".join(result.updated))
+            except Exception:
+                log.debug("Translation auto-update failed", exc_info=True)
+
+        threading.Thread(target=worker, daemon=True).start()
 
     def _maybe_auto_check_updates(self):
         try:

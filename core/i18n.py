@@ -41,6 +41,35 @@ def locale_dir() -> str:
     return os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "locale")
 
 
+def override_locale_dir() -> str:
+    """Writable locale tree holding catalogs downloaded after release.
+
+    The bundled tree is inside the read-only PyInstaller payload and is rebuilt
+    on every launch, so over-the-air translations live beside config.json
+    instead (see core.translation_updates).
+    """
+    try:
+        from core.translation_updates import override_root
+
+        return override_root()
+    except Exception:
+        return ""
+
+
+def catalog_dirs() -> list:
+    """Directories to search for catalogs, most preferred first.
+
+    Downloaded catalogs win over bundled ones. They come from the same branch
+    releases are built from, so they are never older than what shipped.
+    """
+    dirs = []
+    override = override_locale_dir()
+    if override:
+        dirs.append(override)
+    dirs.append(locale_dir())
+    return dirs
+
+
 def _system_languages() -> list:
     languages = []
     for env_key in ("LANGUAGE", "LC_ALL", "LC_MESSAGES", "LANG"):
@@ -81,14 +110,27 @@ def setup(language: str = "auto") -> None:
     else:
         languages = [language]
 
-    try:
-        _translation = gettext.translation(
-            DOMAIN, localedir=locale_dir(), languages=languages, fallback=True
-        )
-    except Exception:
-        log.debug("Failed to load translations for %r", languages, exc_info=True)
-        _translation = gettext.NullTranslations()
+    _translation = _load_catalog(languages)
     _remember_active_language(languages)
+
+
+def _load_catalog(languages: list):
+    """First catalog found across catalog_dirs(), else an identity fallback."""
+    for directory in catalog_dirs():
+        if not directory:
+            continue
+        try:
+            # fallback=False so a miss here falls through to the next directory
+            # instead of stopping the search with a NullTranslations.
+            return gettext.translation(
+                DOMAIN, localedir=directory, languages=languages, fallback=False
+            )
+        except OSError:
+            continue
+        except Exception:
+            log.debug("Failed to load translations from %s", directory, exc_info=True)
+            continue
+    return gettext.NullTranslations()
 
 
 def _remember_active_language(languages: list) -> None:
@@ -135,12 +177,14 @@ def ngettext(singular: str, plural: str, n: int) -> str:
 def available_languages() -> list:
     """Language codes that have a compiled catalog on disk (for Settings)."""
     found = []
-    base = locale_dir()
-    try:
-        for entry in sorted(os.listdir(base)):
-            mo = os.path.join(base, entry, "LC_MESSAGES", DOMAIN + ".mo")
-            if os.path.isfile(mo):
-                found.append(entry)
-    except OSError:
-        pass
-    return found
+    for base in catalog_dirs():
+        if not base:
+            continue
+        try:
+            for entry in sorted(os.listdir(base)):
+                mo = os.path.join(base, entry, "LC_MESSAGES", DOMAIN + ".mo")
+                if os.path.isfile(mo) and entry not in found:
+                    found.append(entry)
+        except OSError:
+            continue
+    return sorted(found)

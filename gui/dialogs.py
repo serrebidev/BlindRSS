@@ -1418,6 +1418,12 @@ class SettingsDialog(wx.Dialog):
         language_sizer.Add(self.language_choice, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         general_sizer.Add(language_sizer, 0, wx.ALL, 0)
 
+        # Translations ship separately from the app (core/translation_updates.py):
+        # a translator fix reaches users without waiting for the next release.
+        # Grouped directly under the language picker because that is the setting
+        # it acts on.
+        self._build_translation_updates_group(general_panel, general_sizer, config)
+
         # Default expansion state of the feed category tree on launch (issue #33).
         tree_state_sizer = wx.BoxSizer(wx.HORIZONTAL)
         tree_state_sizer.Add(
@@ -2479,6 +2485,101 @@ class SettingsDialog(wx.Dialog):
         
         wx.CallAfter(self.refresh_ctrl.SetFocus)
 
+    def _build_translation_updates_group(self, panel, parent_sizer, config):
+        """Controls for over-the-air interface-translation updates."""
+        from core import translation_updates as tu
+
+        box = wx.StaticBox(panel, label=_("Translation Updates"))
+        sizer = wx.StaticBoxSizer(box, wx.VERTICAL)
+
+        self.translation_auto_update_chk = wx.CheckBox(
+            panel, label=_("Update translations automatically")
+        )
+        self.translation_auto_update_chk.SetValue(
+            bool(config.get(tu.CFG_ENABLED, tu.DEFAULT_ENABLED))
+        )
+        sizer.Add(self.translation_auto_update_chk, 0, wx.ALL, 6)
+
+        row = wx.BoxSizer(wx.HORIZONTAL)
+        row.Add(
+            wx.StaticText(panel, label=_("Check for updates:")),
+            0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5,
+        )
+        # Parallel lists: labels are translated, stored values never are.
+        self._translation_frequency_values = ["daily", "weekly", "monthly"]
+        self.translation_frequency_ctrl = wx.Choice(
+            panel, choices=[_("Daily"), _("Weekly"), _("Monthly")]
+        )
+        self.translation_frequency_ctrl.SetName(_("Check for updates:"))
+        current = str(config.get(tu.CFG_FREQUENCY, tu.DEFAULT_FREQUENCY) or "").lower()
+        try:
+            self.translation_frequency_ctrl.SetSelection(
+                self._translation_frequency_values.index(current)
+            )
+        except ValueError:
+            self.translation_frequency_ctrl.SetSelection(0)
+        row.Add(self.translation_frequency_ctrl, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
+        self.translation_check_now_btn = wx.Button(panel, label=_("Check for Updates"))
+        self.translation_check_now_btn.Bind(wx.EVT_BUTTON, self.on_check_translations_now)
+        row.Add(self.translation_check_now_btn, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+
+        sizer.Add(row, 0, wx.EXPAND)
+        parent_sizer.Add(sizer, 0, wx.EXPAND | wx.ALL, 8)
+
+    def _translation_languages_to_check(self):
+        """The selected interface language plus anything already downloaded."""
+        from core import i18n, translation_updates as tu
+
+        languages = []
+        try:
+            idx = int(self.language_choice.GetSelection())
+            code = self.language_choices[idx] if 0 <= idx < len(self.language_choices) else "auto"
+        except Exception:
+            code = "auto"
+        if code == "auto":
+            # Follow whatever the OS locale actually resolved to.
+            code = i18n.current_language().replace("-", "_")
+        if code:
+            languages.append(code)
+        languages.extend(tu.installed_languages())
+        return list(dict.fromkeys(languages))
+
+    def on_check_translations_now(self, event):
+        """Manual check. Runs off the UI thread; the dialog stays responsive."""
+        import threading
+
+        from core import translation_updates as tu
+
+        self.translation_check_now_btn.Enable(False)
+        languages = self._translation_languages_to_check()
+
+        def worker():
+            try:
+                result = tu.check_and_update(languages, force=True)
+            except Exception as exc:  # defensive: check_and_update already guards
+                result = tu.UpdateResult(error=str(exc))
+            wx.CallAfter(self._on_translations_checked, result)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _on_translations_checked(self, result):
+        # The dialog can be gone by the time the network call returns.
+        try:
+            if not self:
+                return
+            self.translation_check_now_btn.Enable(True)
+        except RuntimeError:
+            return
+
+        if not result.ok:
+            message, icon = _("Could not check for translation updates."), wx.ICON_WARNING
+        elif result.changed:
+            message, icon = _("Translations updated. Restart to apply."), wx.ICON_INFORMATION
+        else:
+            message, icon = _("Translations are up to date."), wx.ICON_INFORMATION
+        wx.MessageBox(message, _("Translation Updates"), icon)
+
     def on_provider_choice(self, event):
         self._update_provider_panels()
 
@@ -3527,6 +3628,10 @@ class SettingsDialog(wx.Dialog):
             "language": self.language_choices[max(0, self.language_choice.GetSelection())],
             "auto_check_updates": self.auto_update_chk.GetValue(),
             "install_updates_automatically": self.install_updates_automatically_chk.GetValue(),
+            "translation_auto_update": self.translation_auto_update_chk.GetValue(),
+            "translation_update_frequency": self._translation_frequency_values[
+                max(0, self.translation_frequency_ctrl.GetSelection())
+            ],
             "sounds_enabled": self.sounds_enabled_chk.GetValue(),
             "sound_refresh_complete": self.sound_complete_ctrl.GetValue(),
             "sound_refresh_error": self.sound_error_ctrl.GetValue(),

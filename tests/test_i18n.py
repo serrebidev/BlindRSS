@@ -53,6 +53,17 @@ def _write_mo(path, mapping):
 
 
 @pytest.fixture(autouse=True)
+def _no_downloaded_overrides(monkeypatch):
+    """Keep these tests about the bundled catalogs only.
+
+    available_languages()/setup() also search the downloaded-override tree
+    (core.translation_updates), which is real user state on a developer machine
+    and would otherwise leak into tests that patch only locale_dir().
+    """
+    monkeypatch.setattr(i18n, "override_locale_dir", lambda: "")
+
+
+@pytest.fixture(autouse=True)
 def _restore_default_translation():
     yield
     i18n.setup("en")
