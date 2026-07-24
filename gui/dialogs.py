@@ -922,7 +922,11 @@ class SettingsDialog(wx.Dialog):
 
         feeds_panel = wx.Panel(notebook)
         feeds_sizer = wx.BoxSizer(wx.VERTICAL)
-        downloads_panel = wx.Panel(notebook)
+        # Shown inside Media Player, which builds lazily, so this cannot be a
+        # child of that page yet. Parent it to the dialog rather than the
+        # notebook: a notebook child that is not a page shows up in the page
+        # area and in focus traversal.
+        downloads_panel = wx.Panel(self)
         downloads_sizer = wx.BoxSizer(wx.VERTICAL)
         # Startup/tray settings are a group inside General, not their own tab,
         # so this panel is a child of general_panel rather than the notebook.
@@ -1561,8 +1565,18 @@ class SettingsDialog(wx.Dialog):
         
         self.SetSizer(main_sizer)
         self.Centre()
-        
-        wx.CallAfter(self.refresh_ctrl.SetFocus)
+
+        # Open on the first tab. This used to focus self.refresh_ctrl, which is
+        # the refresh-interval choice on "Feeds && Articles": the notebook
+        # displayed General while focus - and so everything a screen reader
+        # announced - was on the second tab's contents.
+        notebook.SetSelection(0)
+        wx.CallAfter(self._focus_notebook)
+
+        # Fill in the deferred pages while the user reads the first one. Without
+        # this, OK pays to build every page the user never opened (~870ms);
+        # prebuilt, the same work at OK time is ~2ms.
+        wx.CallLater(150, self._prebuild_pending_pages)
 
     # -- Lazy notebook pages ---------------------------------------------------
     #
@@ -1605,6 +1619,36 @@ class SettingsDialog(wx.Dialog):
         """Build every page still pending. Required before reading values."""
         for panel in list(self._lazy_pages):
             self._build_page_if_needed(panel)
+
+    def _focus_notebook(self):
+        """Put focus on the tab control so the first tab is what gets announced.
+
+        Deferred to a CallAfter, so the dialog may already be gone; touching a
+        destroyed wx window raises RuntimeError out of the event handler.
+        """
+        try:
+            self.notebook.SetFocus()
+        except RuntimeError:
+            pass
+
+    def _prebuild_pending_pages(self):
+        """Build the deferred pages in the background, one per timer tick.
+
+        Deferring construction made the dialog open quickly but moved the cost
+        to OK, where get_data() had to build everything at once. Doing it a page
+        at a time while the user reads the first page keeps both ends fast and
+        never blocks the event loop for more than one page.
+        """
+        try:
+            if not self:
+                return
+        except RuntimeError:
+            return
+        for panel in list(self._lazy_pages):
+            self._build_page_if_needed(panel)
+            break
+        if self._lazy_pages:
+            wx.CallLater(30, self._prebuild_pending_pages)
 
     def _on_settings_page_changed(self, event):
         try:

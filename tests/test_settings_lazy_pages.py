@@ -151,6 +151,84 @@ def test_selecting_a_page_builds_it(parent):
         dlg.Destroy()
 
 
+def test_opens_on_the_first_tab(parent):
+    """Settings must open on General.
+
+    It used to end up announcing the second tab: the notebook displayed page 0
+    while __init__ focused self.refresh_ctrl, which lives on "Feeds &
+    Articles". The notebook shows one thing, the screen reader says another.
+    """
+    dlg = _dialog(parent)
+    try:
+        assert dlg.notebook.GetSelection() == 0
+        assert dlg.notebook.GetPageText(0) == "General"
+
+        # Selection alone was never the bug - it was already 0. Focus is what a
+        # screen reader follows, so assert where focus actually lands.
+        dlg.Show()
+        try:
+            dlg._focus_notebook()
+            for _ in range(10):
+                wx.Yield()
+            focused = wx.Window.FindFocus()
+            pages = {dlg.notebook.GetPage(i): i for i in range(dlg.notebook.GetPageCount())}
+            window, page = focused, None
+            while window is not None:
+                if window in pages:
+                    page = pages[window]
+                    break
+                window = window.GetParent()
+            assert focused is dlg.notebook or page == 0, (
+                f"focus landed on page {page} instead of General"
+            )
+        finally:
+            dlg.Hide()
+    finally:
+        dlg.Destroy()
+
+
+def test_no_notebook_child_is_missing_from_the_tabs(parent):
+    """Every child of the notebook must be a real page.
+
+    The Downloads panel is built before the page that hosts it exists; parenting
+    it to the notebook put an untabbed panel in the page area and in focus
+    traversal.
+    """
+    dlg = _dialog(parent)
+    try:
+        pages = {dlg.notebook.GetPage(i) for i in range(dlg.notebook.GetPageCount())}
+        strays = [c for c in dlg.notebook.GetChildren() if c not in pages]
+        assert strays == []
+    finally:
+        dlg.Destroy()
+
+
+def test_prebuild_drains_the_pending_pages(parent):
+    """OK must not pay to build pages the user never opened.
+
+    Deferring construction moved ~870ms from opening the dialog to pressing OK.
+    The prebuild pass fills them in beforehand; this drives it directly rather
+    than waiting on timers.
+    """
+    dlg = _dialog(parent)
+    try:
+        assert dlg._lazy_pages
+        guard = 0
+        while dlg._lazy_pages and guard < 50:
+            dlg._prebuild_pending_pages()
+            guard += 1
+        assert dlg._lazy_pages == {}
+    finally:
+        dlg.Destroy()
+
+
+def test_focus_notebook_survives_a_destroyed_dialog(parent):
+    """The deferred focus call must not raise after the dialog is gone."""
+    dlg = _dialog(parent)
+    dlg.Destroy()
+    dlg._focus_notebook()  # must not raise RuntimeError
+
+
 def test_a_failing_builder_is_retried_not_abandoned(parent):
     """A page that blew up once must not be left permanently blank."""
     dlg = _dialog(parent)
