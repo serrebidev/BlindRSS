@@ -64,7 +64,9 @@ def test_shared_document_orders_all_sections_and_nests_replies(monkeypatch):
     assert text.index("Description") < text.index("Chapters") < text.index("Subtitles (en)") < text.index("Comments")
     assert "0:00 Opening" in text
     assert "1:05 Demonstration" in text
-    assert "[0:00] First subtitle line" in text
+    assert "First subtitle line" in text
+    assert "[0:00] First subtitle line" not in text
+    assert "[0:01] Second subtitle line" not in text
     assert text.index("Comment by Alice") < text.index("Reply level 1 by Bob")
     assert text.index("Reply level 1 by Bob") < text.index("Reply level 2 by Carol")
     # Top-level threads retain YouTube's ordering; every descendant is still
@@ -116,6 +118,8 @@ def test_plain_and_rich_views_share_youtube_reconstruction(monkeypatch):
     ):
         assert expected in plain.text
         assert expected in rich_text
+    assert "[0:00] First subtitle line" not in plain.text
+    assert "[0:00] First subtitle line" not in rich_text
     soup = BeautifulSoup(rich, "html.parser")
     assert [heading.get_text(strip=True) for heading in soup.find_all("h2")] == [
         "Description",
@@ -123,7 +127,11 @@ def test_plain_and_rich_views_share_youtube_reconstruction(monkeypatch):
         "Subtitles (en)",
         "Comments",
     ]
-    assert "Reply level 2 by Carol:" in [heading.get_text(strip=True) for heading in soup.find_all("h3")]
+    sections = soup.select("div.awv-youtube-section")
+    assert len(sections) == 4
+    assert not soup.find_all("h3")
+    assert "Reply level 2 by Carol:" in sections[-1].get_text()
+    assert sections[-1].get_text().index("First thread") < sections[-1].get_text().index("First reply")
 
 
 def test_youtube_chapters_use_the_normal_chapter_cache(monkeypatch):

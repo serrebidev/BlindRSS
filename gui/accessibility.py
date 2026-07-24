@@ -16,6 +16,7 @@ from core import article_lang
 from core.i18n import _
 from core.categories import UNCATEGORIZED, category_display_name
 from .clipboard_utils import copy_text_to_clipboard, copy_textctrl_selection_to_clipboard
+from .reader_performance import replace_text_control_value
 
 log = logging.getLogger(__name__)
 
@@ -1506,7 +1507,10 @@ class AccessibleBrowserFrame(wx.Frame):
                 pass
         self._current_body_art_id = art_id
         self._current_body_text = str(body or "")
-        self.content_ctrl.SetValue(self._compose_article_content(article, art_id, body))
+        replace_text_control_value(
+            self.content_ctrl,
+            self._compose_article_content(article, art_id, body),
+        )
         if preserve_position:
             try:
                 if selection is not None:

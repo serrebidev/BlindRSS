@@ -869,18 +869,39 @@ def _feed_fallback_html(fallback_html: str, url: str) -> str:
 
 
 def _structured_youtube_text_html(text: str) -> str:
-    """Turn the shared YouTube text document into semantic rich-reader HTML."""
+    """Turn shared YouTube text into a small, complete rich-reader DOM.
+
+    A paragraph/heading node per subtitle cue and comment made WebView layout
+    scale with the number of blocks (hundreds of thousands on popular videos).
+    Keep the four navigable section headings, but put each complete section in
+    one pre-wrapped text node. Screen readers retain the labels, blank-line
+    grouping, reply order, and every character while the browser lays out only
+    eight nodes regardless of discussion size.
+    """
     blocks = [block.strip() for block in re.split(r"\n{2,}", str(text or "")) if block.strip()]
-    output = []
+    heading_re = re.compile(r"^(?:Description|Chapters|Comments|Subtitles(?: \(.+\))?)$")
+    sections = []
+    heading = ""
+    content = []
     for block in blocks:
-        if block in {"Description", "Chapters", "Subtitles", "Comments"} or re.fullmatch(
-            r"Subtitles \(.+\)", block
-        ):
-            output.append(f"<h2>{_html.escape(block)}</h2>")
-        elif re.fullmatch(r"(?:Comment|Reply level \d+) by .+:", block):
-            output.append(f"<h3>{_html.escape(block)}</h3>")
+        if heading_re.fullmatch(block):
+            if heading:
+                sections.append((heading, content))
+            heading = block
+            content = []
         else:
-            output.append(f"<p>{_html.escape(block)}</p>")
+            content.append(block)
+    if heading:
+        sections.append((heading, content))
+
+    output = []
+    for section_heading, section_content in sections:
+        output.append(f"<h2>{_html.escape(section_heading)}</h2>")
+        joined = "\n\n".join(section_content)
+        output.append(
+            '<div class="awv-youtube-section" style="white-space: pre-wrap">'
+            f"{_html.escape(joined)}</div>"
+        )
     return "".join(output)
 
 

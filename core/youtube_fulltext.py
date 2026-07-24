@@ -280,7 +280,10 @@ def article_fields_from_info(info: dict, url: str, *, timeout: int = 20) -> dict
     language, transcript = transcript_from_info(info, timeout=timeout)
     sections.append(f"Subtitles ({language})" if language else "Subtitles")
     if transcript:
-        sections.extend(f"[{_timestamp(start)}] {text}" for start, text in transcript)
+        # Subtitles are presented as continuous readable text. Timecodes add a
+        # noisy announcement before every cue in screen readers; chapter
+        # timestamps remain available separately for navigation.
+        sections.extend(text for _start, text in transcript)
     else:
         sections.append("No subtitles were available.")
 

@@ -62,6 +62,7 @@ import core.discovery
 from .shortcut_keys import event_to_accel
 from .menu_mnemonics import apply_menu_mnemonics, apply_menubar_mnemonics
 from .widgets import force_ltr_reading
+from .reader_performance import replace_text_control_value
 
 log = logging.getLogger(__name__)
 
@@ -5198,9 +5199,8 @@ class MainFrame(wx.Frame):
         """Set the main reader from chapter-free base text and return the displayed text."""
         displayed = self._compose_article_reader_text(base_text, article=article)
         try:
-            changed = self.content_ctrl.GetValue() != displayed
+            changed = replace_text_control_value(self.content_ctrl, displayed)
             if changed:
-                self.content_ctrl.SetValue(displayed)
                 # An accidental right-Ctrl+Shift flips RichEdit to RTL reading
                 # order and articles suddenly display right-to-left; re-render
                 # always resets the reader to LTR.
