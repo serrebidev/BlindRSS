@@ -41,6 +41,7 @@ from core import utils
 from core import rumble as rumble_mod
 from core import odysee as odysee_mod
 from core import npr as npr_mod
+from core import sky as sky_mod
 from core import text_encoding
 from core import browser_feed as browser_feed_mod
 from bs4 import BeautifulSoup as BS, MarkupResemblesLocatorWarning, XMLParsedAsHTMLWarning
@@ -3606,6 +3607,27 @@ class LocalProvider(RSSProvider):
                     # a currently working media URL.
                     if not media_url and npr_mod.is_npr_url(url):
                         media_url, media_type = npr_mod.extract_npr_audio(url, timeout_s=feed_timeout)
+
+                    # Sky marks podcast entries with an image enclosure and a
+                    # Podfollow link in the summary. Resolve that series feed
+                    # and attach the episode whose title exactly matches this
+                    # article; ordinary Sky news items pay no extra requests.
+                    sky_hint = "\n".join(
+                        str(value or "")
+                        for value in (entry.get("summary"), content)
+                        if value
+                    )
+                    if (
+                        not media_url
+                        and sky_mod.is_sky_news_url(url)
+                        and "podfollow.com/" in sky_hint.lower()
+                    ):
+                        media_url, media_type = sky_mod.extract_podcast_audio(
+                            url,
+                            title=title,
+                            html_hint=sky_hint,
+                            timeout=feed_timeout,
+                        )
 
                     chapter_url = None
                     inline_chapters = []

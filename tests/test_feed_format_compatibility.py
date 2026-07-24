@@ -709,6 +709,44 @@ def test_local_provider_maps_itunes_author_summary_and_enclosure(provider, monke
     assert article.media_type == "audio/mpeg"
 
 
+def test_local_provider_resolves_sky_podcast_image_enclosure(provider, monkeypatch):
+    feed_url = "https://feeds.skynews.com/feeds/rss/world.xml"
+    article_url = (
+        "https://news.sky.com/story/"
+        "is-the-no-wars-president-about-to-start-another-one-13566499"
+    )
+    mp3_url = "https://episodes.captivate.fm/episode/sky-test.mp3"
+    rss = f'''<rss version="2.0"><channel><title>Sky News</title><item>
+      <guid>sky-13566499</guid>
+      <title>Is the 'no wars' president about to start another one?</title>
+      <link>{article_url}</link>
+      <description><![CDATA[<a href="https://podfollow.com/trump100/view">Follow</a>]]></description>
+      <enclosure url="https://e3.365dm.com/thumbnail.jpg" type="image/jpeg" />
+    </item></channel></rss>'''
+    feed_id = _insert_feed(feed_url)
+    monkeypatch.setattr(
+        local_mod.utils,
+        "safe_requests_get",
+        lambda *args, **kwargs: _DummyResp(rss),
+    )
+    calls = []
+
+    def fake_extract(url, **kwargs):
+        calls.append((url, kwargs))
+        return mp3_url, "audio/mpeg"
+
+    monkeypatch.setattr(local_mod.sky_mod, "extract_podcast_audio", fake_extract)
+
+    assert provider.refresh_feed(feed_id) is True
+
+    article = provider.get_articles(feed_id=feed_id)[0]
+    assert article.media_url == mp3_url
+    assert article.media_type == "audio/mpeg"
+    assert calls[0][0] == article_url
+    assert calls[0][1]["title"] == "Is the 'no wars' president about to start another one?"
+    assert "podfollow.com/trump100/view" in calls[0][1]["html_hint"]
+
+
 def test_enclosure_only_item_gets_no_webpage_url(provider, monkeypatch):
     feed_id = _insert_feed("https://example.com/enclosure-podcast.xml")
     monkeypatch.setattr(

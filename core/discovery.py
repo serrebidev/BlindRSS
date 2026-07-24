@@ -4903,14 +4903,25 @@ def detect_media(url: str, timeout: int = 20) -> tuple[str | None, str | None]:
     if not url:
         return None, None
 
-    # 1. NPR specific
+    # 1. Publisher-specific podcast pages whose media lives outside the page.
+    try:
+        from core import sky
+
+        if sky.is_sky_news_url(url):
+            murl, mtype = sky.extract_podcast_audio(url, timeout=float(timeout))
+            if murl:
+                return murl, mtype
+    except Exception:
+        pass
+
+    # 2. NPR specific
     if "npr.org" in url:
         from core import npr
         murl, mtype = npr.extract_npr_audio(url, timeout_s=float(timeout))
         if murl:
             return murl, mtype
 
-    # 2. yt-dlp (with cookies)
+    # 3. yt-dlp (with cookies)
     try:
         from core.dependency_check import _get_startup_info
         creationflags = 0
