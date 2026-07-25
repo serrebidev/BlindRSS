@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.124.1 - 2026-07-25
+
+- Stop the Miniflux per-feed refresh storm and silent non-media playback.
+
 ## v1.124.0 - 2026-07-25
 
 - Translate every user-facing string, complete 14 locales.
