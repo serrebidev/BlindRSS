@@ -6996,13 +6996,19 @@ class YtdlpGlobalSearchDialog(wx.Dialog):
 
         site_label = str((site or {}).get("label") or (site or {}).get("id") or "site")
         if error_msg:
+            part1 = ngettext("{completed}/{total} site", "{completed}/{total} sites", self._completed_sites).format(completed=self._completed_sites, total=self._total_sites)
+            part2 = ngettext("{n} result", "{n} results", len(self._all_results)).format(n=len(self._all_results))
+            part3 = _("{label}: error").format(label=site_label)
             self.status_lbl.SetLabel(
-                f"{self._completed_sites}/{self._total_sites} sites, {len(self._all_results)} results. {site_label}: error"
+                f"{part1}, {part2}. {part3}"
             )
             return
 
+        part1 = ngettext("{completed}/{total} site", "{completed}/{total} sites", self._completed_sites).format(completed=self._completed_sites, total=self._total_sites)
+        part2 = ngettext("{n} result", "{n} results", len(self._all_results)).format(n=len(self._all_results))
+        part3 = f"{site_label} +{new_count}"
         self.status_lbl.SetLabel(
-            f"{self._completed_sites}/{self._total_sites} sites, {len(self._all_results)} results. {site_label} +{new_count}"
+            f"{part1}, {part2}. {part3}"
         )
 
     def _on_search_finished(

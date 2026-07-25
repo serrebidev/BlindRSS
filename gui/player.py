@@ -639,7 +639,7 @@ class PlayerFrame(wx.Frame):
         self.current_article_id = None
         self._load_seq = 0
         self._active_load_seq = 0
-        self.current_title = "No Track Loaded"
+        self.current_title = _("No Track Loaded")
 
         # Progress reporting to the main window (status bar) and queue
         # auto-advance. The main frame assigns these; both are optional so the
@@ -2403,7 +2403,7 @@ class PlayerFrame(wx.Frame):
             self.is_casting = False
             PlayerFrame._refresh_cast_menu_state(self)
             try:
-                self.title_lbl.SetLabel(f"{self.current_title} (Local)")
+                self.title_lbl.SetLabel(_("{title} (Local)").format(title=self.current_title))
             except Exception:
                 pass
             self._restore_local_after_cast(int(cast_pos_ms), bool(cast_was_playing))
@@ -2447,7 +2447,7 @@ class PlayerFrame(wx.Frame):
                 self._cast_recovery_inflight = False
                 self._cast_started_ts = time.monotonic()
                 PlayerFrame._refresh_cast_menu_state(self)
-                self.title_lbl.SetLabel(f"{self.current_title} (Casting to {device.name})")
+                self.title_lbl.SetLabel(_("{title} (Casting to {device})").format(title=self.current_title, device=device.name))
 
                 if local_was_playing:
                     try:
@@ -2489,7 +2489,7 @@ class PlayerFrame(wx.Frame):
                 self._cast_handoff_source_url = None
                 PlayerFrame._refresh_cast_menu_state(self)
                 try:
-                    self.title_lbl.SetLabel(f"{self.current_title} (Local)")
+                    self.title_lbl.SetLabel(_("{title} (Local)").format(title=self.current_title))
                 except Exception:
                     pass
                 if local_was_playing and local_paused_for_cast:
@@ -2614,7 +2614,7 @@ class PlayerFrame(wx.Frame):
         except Exception:
             pass
         try:
-            self.title_lbl.SetLabel(f"{self.current_title} (Local)")
+            self.title_lbl.SetLabel(_("{title} (Local)").format(title=self.current_title))
         except Exception:
             pass
 
@@ -3891,9 +3891,9 @@ class PlayerFrame(wx.Frame):
             return
 
         try:
-            self.current_title = resolved_title or "Playing Audio..."
+            self.current_title = resolved_title or _("Playing Audio...")
         except Exception:
-            self.current_title = "Playing Audio..."
+            self.current_title = _("Playing Audio...")
         try:
             self.title_lbl.SetLabel(self.current_title)
         except Exception:
@@ -4161,9 +4161,9 @@ class PlayerFrame(wx.Frame):
         self._refresh_chapter_controls_state()
 
         try:
-            self.current_title = title or "Loading media..."
+            self.current_title = title or _("Loading media...")
         except Exception:
-            self.current_title = "Loading media..."
+            self.current_title = _("Loading media...")
         try:
             self.title_lbl.SetLabel(self.current_title)
         except Exception:

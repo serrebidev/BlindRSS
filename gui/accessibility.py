@@ -1310,9 +1310,12 @@ class AccessibleBrowserFrame(wx.Frame):
             self._update_category_buttons()
             return True
         self._refresh_view_list(selected_view_id=entry["view_id"], load_view=False)
-        self.status_lbl.SetLabel(
-            f"{'Expanded' if expanded else 'Collapsed'} category: {entry['label'].replace('Category: ', '', 1)}"
-        )
+        label = entry['label'].replace(f'{_("Category:")} ', '', 1)
+        if expanded:
+            text = _("Expanded category: {label}").format(label=label)
+        else:
+            text = _("Collapsed category: {label}").format(label=label)
+        self.status_lbl.SetLabel(text)
         return True
 
     def _toggle_selected_category_expansion(self) -> bool:
