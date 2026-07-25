@@ -335,7 +335,6 @@ msgstr ""
 
 #: core/shortcuts.py:136
 #: gui/accessibility.py:507
-#: gui/mainframe.py:645
 msgid "Articles"
 msgstr ""
 
@@ -386,9 +385,9 @@ msgid "Remove Feed"
 msgstr ""
 
 #: core/shortcuts.py:149
-#: gui/accessibility.py:439
 #: gui/accessibility.py:438
 #: gui/mainframe.py:3129
+#: gui/tray.py:105
 msgid "Refresh Feeds"
 msgstr ""
 
@@ -528,7 +527,6 @@ msgid "Show or Hide Search Field"
 msgstr ""
 
 #: core/shortcuts.py:177
-#: gui/accessibility.py:464
 msgid "Rich Full-Text View"
 msgstr ""
 
@@ -1512,28 +1510,12 @@ msgstr ""
 msgid "Screen-reader announcements for key keyboard actions.\nEach event can announce via speech, Braille, both, or neither.\nBraille output is most reliable on Windows with NVDA or JAWS."
 msgstr ""
 
-#: gui/dialogs.py:108
-msgid "Article list columns"
-msgstr ""
-
 #: gui/dialogs.py:210
 msgid "https://example.com/feed or a YouTube/podcast URL"
 msgstr ""
 
 #: gui/dialogs.py:269
 msgid "Checking compatibility..."
-msgstr ""
-
-#: gui/dialogs.py:321
-msgid "https://www.youtube.com/watch?v=..."
-msgstr ""
-
-#: gui/dialogs.py:341
-msgid "Download format"
-msgstr ""
-
-#: gui/dialogs.py:470
-msgid "YouTube Takeout items to import"
 msgstr ""
 
 #: gui/dialogs.py:591
@@ -1631,10 +1613,6 @@ msgstr ""
 msgid "Category / Path"
 msgstr ""
 
-#: gui/dialogs.py:1259
-msgid "Default video download format"
-msgstr ""
-
 #: gui/dialogs.py:1315
 msgid "Use feed cache (fastest)"
 msgstr ""
@@ -1645,10 +1623,6 @@ msgstr ""
 
 #: gui/dialogs.py:1317
 msgid "Always fully refresh feeds"
-msgstr ""
-
-#: gui/dialogs.py:1324
-msgid "Local RSS automatic feed refresh workload"
 msgstr ""
 
 #: gui/dialogs.py:1422
@@ -1726,11 +1700,6 @@ msgstr ""
 msgid "Advanced"
 msgstr ""
 
-#: gui/dialogs.py:1834
-#: gui/dialogs.py:1826
-msgid "Check for updates:"
-msgstr ""
-
 #: gui/dialogs.py:1902
 #: gui/dialogs.py:1813
 msgid "Translation Updates"
@@ -1804,11 +1773,6 @@ msgstr ""
 msgid "Refresh Error Sound:"
 msgstr ""
 
-#: gui/dialogs.py:3309
-#: gui/dialogs.py:3308
-msgid "Test Announcement"
-msgstr ""
-
 #: gui/dialogs.py:3311
 msgid "Send a test announcement to your screen reader via speech and Braille."
 msgstr ""
@@ -1819,14 +1783,6 @@ msgstr ""
 
 #: gui/dialogs.py:3689
 msgid "App Install Folder"
-msgstr ""
-
-#: gui/dialogs.py:4074
-msgid "Refresh interval for this feed"
-msgstr ""
-
-#: gui/dialogs.py:4466
-msgid "Category name"
 msgstr ""
 
 #: gui/dialogs.py:4551
@@ -1936,10 +1892,6 @@ msgstr ""
 msgid "Add Search"
 msgstr ""
 
-#: gui/dialogs.py:7447
-msgid "Queued media"
-msgstr ""
-
 #: gui/dialogs.py:7575
 msgid "&Pause"
 msgstr ""
@@ -1949,16 +1901,7 @@ msgstr ""
 msgid "&Play"
 msgstr ""
 
-#: gui/dialogs.py:7680
-msgid "Captured keyboard shortcut"
-msgstr ""
-
-#: gui/dialogs.py:7757
-msgid "Keyboard shortcuts"
-msgstr ""
-
 #: gui/dialogs.py:7758
-#: gui/dialogs.py:4486
 msgid "Category"
 msgstr ""
 
@@ -1968,10 +1911,6 @@ msgstr ""
 
 #: gui/dialogs.py:7760
 msgid "Shortcut"
-msgstr ""
-
-#: gui/dialogs.py:8005
-msgid "Preset"
 msgstr ""
 
 #: gui/dialogs.py:8014
@@ -1990,10 +1929,6 @@ msgstr ""
 #: gui/dialogs.py:8210
 #: gui/dialogs.py:8196
 msgid "Save Preset"
-msgstr ""
-
-#: gui/dialogs.py:95
-msgid "Use the global column layout"
 msgstr ""
 
 #: gui/dialogs.py:117
@@ -3053,10 +2988,6 @@ msgstr ""
 msgid "Verbose range-cache proxy debug logs"
 msgstr ""
 
-#: gui/dialogs.py:3019
-msgid "Provider information"
-msgstr ""
-
 #: gui/dialogs.py:3155
 msgid "Enable Sound Notifications"
 msgstr ""
@@ -3079,6 +3010,10 @@ msgstr ""
 
 #: gui/dialogs.py:3244
 msgid "Exclude Feeds..."
+msgstr ""
+
+#: gui/dialogs.py:3308
+msgid "Test Announcement"
 msgstr ""
 
 #: gui/dialogs.py:3330
@@ -3579,6 +3514,10 @@ msgstr ""
 msgid "Startup && Tray"
 msgstr ""
 
+#: gui/dialogs.py:1826
+msgid "Check for updates:"
+msgstr ""
+
 #: gui/dialogs.py:1832
 msgid "Daily"
 msgstr ""
@@ -3934,14 +3873,6 @@ msgstr ""
 msgid "(not set)"
 msgstr ""
 
-#: gui/dialogs.py:2949
-msgid "{label} executable path override"
-msgstr ""
-
-#: gui/dialogs.py:2959
-msgid "Detected {label}"
-msgstr ""
-
 #: gui/dialogs.py:2974
 msgid "Downloads"
 msgstr ""
@@ -3956,10 +3887,6 @@ msgstr ""
 
 #: gui/dialogs.py:3071
 msgid "Redirect URI:"
-msgstr ""
-
-#: gui/dialogs.py:3168
-msgid "Browse for {name}"
 msgstr ""
 
 #: gui/dialogs.py:4741
@@ -5664,14 +5591,6 @@ msgstr ""
 
 #: gui/player.py:422
 msgid "Scanning..."
-msgstr ""
-
-#: gui/player.py:2002
-msgid "Elapsed Time: 00:00"
-msgstr ""
-
-#: gui/player.py:2019
-msgid "Playback Time"
 msgstr ""
 
 #: gui/player.py:2133

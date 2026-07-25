@@ -436,7 +436,7 @@ class AccessibleBrowserFrame(wx.Frame):
 
         toolbar = wx.BoxSizer(wx.HORIZONTAL)
         self.refresh_btn = wx.Button(panel, label=_("Refresh Feeds"))
-        self.refresh_btn.SetName(_("Refresh Feeds"))
+        self.refresh_btn.SetName("Refresh Feeds")
         toolbar.Add(self.refresh_btn, 0, wx.RIGHT, 6)
         self.load_more_btn = wx.Button(panel, label=_("Load More Articles"))
         self.load_more_btn.SetName("Load More Articles")
@@ -461,7 +461,7 @@ class AccessibleBrowserFrame(wx.Frame):
         self.download_btn.Enable(False)
         toolbar.Add(self.download_btn, 0, wx.RIGHT, 6)
         self.rich_view_chk = wx.CheckBox(panel, label=_("Rich View"))
-        self.rich_view_chk.SetName(_("Rich Full-Text View"))
+        self.rich_view_chk.SetName("Rich Full-Text View")
         self.rich_view_chk.SetValue(self._rich_view_enabled())
         toolbar.Add(self.rich_view_chk, 0, wx.ALIGN_CENTER_VERTICAL)
         root.Add(toolbar, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)

@@ -92,7 +92,7 @@ class ColumnLayoutPanel(wx.Panel):
         self.inherit_ctrl = None
         if self._allow_inherit:
             self.inherit_ctrl = wx.CheckBox(self, label=_("&Use the global column layout"))
-            self.inherit_ctrl.SetName(_("Use the global column layout"))
+            self.inherit_ctrl.SetName("Use the global column layout")
             self.inherit_ctrl.SetValue(layout is None)
             self.inherit_ctrl.Bind(wx.EVT_CHECKBOX, lambda e: self._sync_enabled())
             sizer.Add(self.inherit_ctrl, 0, wx.ALL, 5)
@@ -105,7 +105,7 @@ class ColumnLayoutPanel(wx.Panel):
             0, wx.ALL, 5,
         )
         self.list_box = CheckListCtrl(self)
-        self.list_box.SetName(_("Article list columns"))
+        self.list_box.SetName("Article list columns")
         self.list_box.on_user_check = self._on_check
         sizer.Add(self.list_box, 1, wx.EXPAND | wx.ALL, 5)
 
@@ -318,7 +318,7 @@ class OpenMediaUrlDialog(wx.Dialog):
         sizer.Add(wx.StaticText(self, label=_("Media URL:")), 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
         self.url_ctrl = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
         self.url_ctrl.SetName("Media URL")
-        self.url_ctrl.SetHint(_("https://www.youtube.com/watch?v=..."))
+        self.url_ctrl.SetHint("https://www.youtube.com/watch?v=...")
         if initial_url:
             self.url_ctrl.SetValue(str(initial_url))
             self.url_ctrl.SetInsertionPointEnd()
@@ -338,7 +338,7 @@ class OpenMediaUrlDialog(wx.Dialog):
         sizer.Add(wx.StaticText(self, label=_("Download format:")), 0, wx.LEFT | wx.RIGHT, 10)
         self._format_ids = list(download_formats.DOWNLOAD_FORMAT_CHOICES)
         self.format_ctrl = wx.Choice(self, choices=download_formats.download_format_labels())
-        self.format_ctrl.SetName(_("Download format"))
+        self.format_ctrl.SetName("Download format")
         self.format_ctrl.SetSelection(
             self._format_ids.index(download_formats.normalize_download_format(default_format))
         )
@@ -467,7 +467,7 @@ class TakeoutImportSelectionDialog(wx.Dialog):
         sizer.Add(prompt, 0, wx.ALL, 10)
 
         self.items = CheckListCtrl(self)
-        self.items.SetName(_("YouTube Takeout items to import"))
+        self.items.SetName("YouTube Takeout items to import")
         self.items.Set(labels)
         for index in range(self.items.GetCount()):
             self.items.Check(index, True)
@@ -1256,7 +1256,7 @@ class SettingsDialog(wx.Dialog):
             choices=download_formats.download_format_labels(),
             style=wx.CB_READONLY,
         )
-        self.download_format_ctrl.SetName(_("Default video download format"))
+        self.download_format_ctrl.SetName("Default video download format")
         self.download_format_ctrl.SetSelection(
             self._download_format_ids.index(
                 download_formats.normalize_download_format(config.get("download_format", ""))
@@ -1321,7 +1321,7 @@ class SettingsDialog(wx.Dialog):
             feeds_panel,
             choices=self.automatic_refresh_workload_choices,
         )
-        self.automatic_refresh_workload_ctrl.SetName(_("Local RSS automatic feed refresh workload"))
+        self.automatic_refresh_workload_ctrl.SetName("Local RSS automatic feed refresh workload")
         configured_refresh_workload = str(
             config.get("automatic_feed_refresh_workload", "") or ""
         ).strip().lower()
@@ -1831,7 +1831,7 @@ class SettingsDialog(wx.Dialog):
         self.translation_frequency_ctrl = wx.Choice(
             panel, choices=[_("Daily"), _("Weekly"), _("Monthly")]
         )
-        self.translation_frequency_ctrl.SetName(_("Check for updates:"))
+        self.translation_frequency_ctrl.SetName("Check for updates:")
         current = str(config.get(tu.CFG_FREQUENCY, tu.DEFAULT_FREQUENCY) or "").lower()
         try:
             self.translation_frequency_ctrl.SetSelection(
@@ -2946,7 +2946,7 @@ class SettingsDialog(wx.Dialog):
                 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4,
             )
             ctrl = wx.TextCtrl(media_panel, value=str(config.get(cfg_key, "") or ""))
-            ctrl.SetName(_("{label} executable path override").format(label=tool_label))
+            ctrl.SetName(f"{tool_label} executable path override")
             row.Add(ctrl, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
             browse = wx.Button(media_panel, label=_("Browse..."))
             browse.Bind(
@@ -2956,7 +2956,7 @@ class SettingsDialog(wx.Dialog):
             row.Add(browse, 0)
             tools_box.Add(row, 0, wx.EXPAND | wx.ALL, 2)
             detected = wx.StaticText(media_panel, label=_("Detected {label}: checking…").format(label=tool_label))
-            detected.SetName(_("Detected {label}").format(label=tool_label))
+            detected.SetName(f"Detected {tool_label}")
             tools_box.Add(detected, 0, wx.LEFT | wx.BOTTOM, 12)
             self._media_tool_path_ctrls[cfg_key] = ctrl
             self._media_tool_detected_lbls[tool_key] = detected
@@ -3016,7 +3016,7 @@ class SettingsDialog(wx.Dialog):
                 style=wx.TE_MULTILINE | wx.TE_READONLY,
                 size=(-1, 60),
             )
-            info.SetName(_("Provider information"))
+            info.SetName("Provider information")
             s.Add(info, 0, wx.EXPAND | wx.ALL, 5)
             pnl.SetSizer(s)
             provider_sizer.Add(pnl, 0, wx.EXPAND | wx.ALL, 5)
@@ -3165,7 +3165,7 @@ class SettingsDialog(wx.Dialog):
             ctrl.SetName(field_name)
             s.Add(ctrl, 1, wx.ALL, 5)
             browse_btn = wx.Button(sounds_panel, label=_("Browse..."))
-            browse_btn.SetName(_("Browse for {name}").format(name=field_name))
+            browse_btn.SetName(f"Browse for {field_name}")
 
             def _on_browse(evt):
                 dlg = wx.FileDialog(self, f"Choose {label}", defaultFile=ctrl.GetValue(), wildcard=f'{_("WAV files")} (*.wav)|*.wav|{_("All files")} (*.*)|*.*', style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
@@ -3290,7 +3290,7 @@ class SettingsDialog(wx.Dialog):
             label = wx.StaticText(announcements_panel, label=_(event.label))
             label.SetToolTip(_(event.help))
             choice = wx.Choice(announcements_panel, choices=mode_labels)
-            choice.SetName(_(event.label))
+            choice.SetName(event.label)
             choice.SetToolTip(_(event.help))
             try:
                 sel = mode_values.index(current_modes.get(event.id, event.default))
@@ -3306,7 +3306,7 @@ class SettingsDialog(wx.Dialog):
         # Notifications tab. Speaks and brailles regardless of the per-event
         # modes above -- see Announcer.announce_test.
         self.test_announcement_btn = wx.Button(announcements_panel, label=_("Test Announcement"))
-        self.test_announcement_btn.SetName(_("Test Announcement"))
+        self.test_announcement_btn.SetName("Test Announcement")
         self.test_announcement_btn.SetToolTip(
             _("Send a test announcement to your screen reader via speech and Braille.")
         )
@@ -4071,7 +4071,7 @@ class FeedPropertiesDialog(wx.Dialog):
             (14400, _("4 hours")),
         ]
         self.refresh_interval_ctrl = wx.Choice(general_panel, choices=[lbl for _v, lbl in self._refresh_interval_choices])
-        self.refresh_interval_ctrl.SetName(_("Refresh interval for this feed"))
+        self.refresh_interval_ctrl.SetName("Refresh interval for this feed")
         try:
             current_interval = self._feed_settings.get("refresh_interval_seconds")
         except Exception:
@@ -4463,7 +4463,7 @@ class CategoryPropertiesDialog(wx.Dialog):
 
         sizer.Add(wx.StaticText(self, label=_("Name:")), 0, wx.ALL, 5)
         self.name_ctrl = wx.TextCtrl(self, value=category_display_leaf(self.category_path))
-        self.name_ctrl.SetName(_("Category name"))
+        self.name_ctrl.SetName("Category name")
         sizer.Add(self.name_ctrl, 0, wx.EXPAND | wx.ALL, 5)
 
         self.parent_ctrl = None
@@ -4483,7 +4483,7 @@ class CategoryPropertiesDialog(wx.Dialog):
                 category_display_name(identity) for identity in self.parent_identities
             ]
             self.parent_ctrl = wx.ComboBox(self, choices=choices, style=wx.CB_READONLY)
-            self.parent_ctrl.SetName(_("Category"))
+            self.parent_ctrl.SetName("Category")
             current = str(current_parent or "")
             selection = 0
             if current and current in self.parent_identities:
@@ -7444,7 +7444,7 @@ class QueueDialog(wx.Dialog):
         outer.Add(self.info_lbl, 0, wx.ALL, 8)
 
         self.list_box = wx.ListBox(self, style=wx.LB_SINGLE)
-        self.list_box.SetName(_("Queued media"))
+        self.list_box.SetName("Queued media")
         self.list_box.Bind(wx.EVT_LISTBOX_DCLICK, self.on_play)
         self.list_box.Bind(wx.EVT_LISTBOX, lambda e: self._update_buttons())
         self.list_box.Bind(wx.EVT_KEY_DOWN, self.on_list_key)
@@ -7677,7 +7677,7 @@ class ShortcutCaptureDialog(wx.Dialog):
         outer.Add(prompt, 0, wx.ALL, 12)
 
         self.captured_lbl = wx.StaticText(self, label=_("Waiting for a key…"))
-        self.captured_lbl.SetName(_("Captured keyboard shortcut"))
+        self.captured_lbl.SetName("Captured keyboard shortcut")
         outer.Add(self.captured_lbl, 0, wx.ALL, 12)
 
         btns = self.CreateButtonSizer(wx.OK | wx.CANCEL)
@@ -7754,7 +7754,7 @@ class KeyboardShortcutsDialog(wx.Dialog):
         outer.Add(info, 0, wx.ALL, 8)
 
         self.list_ctrl = wx.ListCtrl(self, style=wx.LC_REPORT | wx.LC_SINGLE_SEL)
-        self.list_ctrl.SetName(_("Keyboard shortcuts"))
+        self.list_ctrl.SetName("Keyboard shortcuts")
         self.list_ctrl.InsertColumn(0, _("Category"), width=130)
         self.list_ctrl.InsertColumn(1, _("Command"), width=230)
         self.list_ctrl.InsertColumn(2, _("Shortcut"), width=150)
@@ -8002,7 +8002,7 @@ class EqualizerDialog(wx.Dialog):
         preset_row = wx.BoxSizer(wx.HORIZONTAL)
         preset_row.Add(wx.StaticText(self, label=_("&Preset:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
         self.preset_choice = wx.Choice(self)
-        self.preset_choice.SetName(_("Preset"))
+        self.preset_choice.SetName("Preset")
         self.preset_choice.Bind(wx.EVT_CHOICE, self.on_preset)
         preset_row.Add(self.preset_choice, 1, wx.EXPAND)
         outer.Add(preset_row, 0, wx.EXPAND | wx.ALL, 8)

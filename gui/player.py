@@ -1999,7 +1999,7 @@ class PlayerFrame(wx.Frame):
         # Time Labels
         time_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.current_time_lbl = wx.StaticText(panel, label="00:00")
-        self.current_time_lbl.SetName(_("Elapsed Time: 00:00"))
+        self.current_time_lbl.SetName("Elapsed Time: 00:00")
         self.total_time_lbl = wx.StaticText(panel, label="00:00")
         self.total_time_lbl.SetName("Total Time: 00:00")
         time_sizer.Add(self.current_time_lbl, 0, wx.LEFT, 5)
@@ -2016,7 +2016,7 @@ class PlayerFrame(wx.Frame):
             value=_("No media loaded"),
             style=wx.TE_READONLY | wx.TE_CENTER,
         )
-        self.time_info_ctrl.SetName(_("Playback Time"))
+        self.time_info_ctrl.SetName("Playback Time")
         sizer.Add(self.time_info_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
         
         # Controls

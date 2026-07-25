@@ -642,7 +642,7 @@ class MainFrame(wx.Frame):
         # No LC_SINGLE_SEL: allow multiple articles to be selected (e.g. Shift+Up/Down
         # to extend a range) so bulk actions like Delete/Copy work on the whole selection.
         self.list_ctrl = wx.ListCtrl(right_splitter, style=wx.LC_REPORT)
-        self.list_ctrl.SetName(_("Articles"))
+        self.list_ctrl.SetName("Articles")
         # Columns are built from the configured layout rather than hardcoded, so
         # they can be reordered/hidden globally or per feed (article list columns).
         self._column_keys = []
