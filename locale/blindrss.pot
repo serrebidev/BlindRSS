@@ -1496,6 +1496,14 @@ msgstr ""
 msgid "If you can read this, notifications are working."
 msgstr ""
 
+#: gui/dialogs.py:3073
+msgid "Windows toast notifications for new articles.\nDisabled by default."
+msgstr ""
+
+#: gui/dialogs.py:3152
+msgid "Screen-reader announcements for key keyboard actions.\nEach event can announce via speech, Braille, both, or neither.\nBraille output is most reliable on Windows with NVDA or JAWS."
+msgstr ""
+
 #: gui/dialogs.py:107
 msgid "Article list columns"
 msgstr ""
@@ -3527,6 +3535,10 @@ msgstr ""
 msgid "Translations are up to date."
 msgstr ""
 
+#: gui/dialogs.py:1949
+msgid "Excluded feeds: {excluded} of {total}"
+msgstr ""
+
 #: gui/dialogs.py:2143
 msgid "Inoreader Authorization"
 msgstr ""
@@ -3794,6 +3806,12 @@ msgstr ""
 msgid "Sort by:"
 msgstr ""
 
+#: gui/dialogs.py:6750
+msgid "{action} {n} site..."
+msgid_plural "{action} {n} sites..."
+msgstr[0] ""
+msgstr[1] ""
+
 #: gui/dialogs.py:7146
 msgid "Subscribe Error"
 msgstr ""
@@ -3824,6 +3842,12 @@ msgstr ""
 msgid "Cookies"
 msgstr ""
 
+#: gui/dialogs.py:1883
+msgid "Loaded {n} OpenRouter model."
+msgid_plural "Loaded {n} OpenRouter models."
+msgstr[0] ""
+msgstr[1] ""
+
 #: gui/dialogs.py:2030
 msgid "BlindRSS announcement test. If you can hear or read this, announcements are working."
 msgstr ""
@@ -3838,8 +3862,20 @@ msgid_plural "Delete {n} cached files ({size})?"
 msgstr[0] ""
 msgstr[1] ""
 
+#: gui/dialogs.py:2632
+msgid "Detected {nm}: not found"
+msgstr ""
+
 #: gui/dialogs.py:2664
 msgid "(not set)"
+msgstr ""
+
+#: gui/dialogs.py:2831
+msgid "{label} executable path override"
+msgstr ""
+
+#: gui/dialogs.py:2841
+msgid "Detected {label}"
 msgstr ""
 
 #: gui/dialogs.py:2856
@@ -3858,16 +3894,41 @@ msgstr ""
 msgid "Redirect URI:"
 msgstr ""
 
+#: gui/dialogs.py:3050
+msgid "Browse for {name}"
+msgstr ""
+
 #: gui/dialogs.py:4623
 msgid "feed"
+msgstr ""
+
+#: gui/dialogs.py:4948
+msgid "Searching {label}..."
 msgstr ""
 
 #: gui/dialogs.py:5215
 msgid "News topic feed"
 msgstr ""
 
+#: gui/dialogs.py:5602
+msgid "Found {n} result."
+msgid_plural "Found {n} results."
+msgstr[0] ""
+msgstr[1] ""
+
+#: gui/dialogs.py:6918
+msgid "Stopped. {n} result."
+msgid_plural "Stopped. {n} results."
+msgstr[0] ""
+msgstr[1] ""
+
 #: gui/dialogs.py:7120
 msgid "Playback Error"
+msgstr ""
+
+#: gui/dialogs.py:7124
+#: gui/dialogs.py:7062
+msgid "Playing: {title}"
 msgstr ""
 
 #: gui/dialogs.py:7426
@@ -3904,6 +3965,22 @@ msgstr ""
 msgid "Could not read cookies from {browser}."
 msgstr ""
 
+#: gui/dialogs.py:1846
+msgid "OpenRouter model load failed: {error}"
+msgstr ""
+
+#: gui/dialogs.py:2634
+msgid "Detected {nm}: {path} (failed version check)"
+msgstr ""
+
+#: gui/dialogs.py:2636
+msgid "Detected {nm}: {path}"
+msgstr ""
+
+#: gui/dialogs.py:2840
+msgid "Detected {label}: checking…"
+msgstr ""
+
 #: gui/dialogs.py:3599
 msgid "User Data Folder path:\n  {path}\n"
 msgstr ""
@@ -3911,6 +3988,18 @@ msgstr ""
 #: gui/dialogs.py:3600
 msgid "App Install Folder path:\n  {path}"
 msgstr ""
+
+#: gui/dialogs.py:6921
+msgid "Loaded more. {n} result."
+msgid_plural "Loaded more. {n} results."
+msgstr[0] ""
+msgstr[1] ""
+
+#: gui/dialogs.py:6923
+msgid "{n} result."
+msgid_plural "{n} results."
+msgstr[0] ""
+msgstr[1] ""
 
 #: gui/dialogs.py:7145
 msgid "Could not subscribe: {error}"
@@ -3948,10 +4037,6 @@ msgstr ""
 #: gui/player.py:6449
 #: gui/player.py:6466
 msgid "Paused"
-msgstr ""
-
-#: gui/dialogs.py:7062
-msgid "Playing: {title}"
 msgstr ""
 
 #: gui/dialogs.py:7064

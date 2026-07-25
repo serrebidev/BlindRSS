@@ -1843,7 +1843,7 @@ class SettingsDialog(wx.Dialog):
 
         if error:
             try:
-                self.translation_openrouter_models_status_lbl.SetLabel(f"OpenRouter model load failed: {error}")
+                self.translation_openrouter_models_status_lbl.SetLabel(_("OpenRouter model load failed: {error}").format(error=error))
             except Exception:
                 pass
             return
@@ -1880,7 +1880,7 @@ class SettingsDialog(wx.Dialog):
         except Exception:
             pass
         try:
-            self.translation_openrouter_models_status_lbl.SetLabel(f"Loaded {len(models)} OpenRouter models.")
+            self.translation_openrouter_models_status_lbl.SetLabel(ngettext("Loaded {n} OpenRouter model.", "Loaded {n} OpenRouter models.", len(models)).format(n=len(models)))
         except Exception:
             pass
 
@@ -1946,7 +1946,7 @@ class SettingsDialog(wx.Dialog):
         if total <= 0:
             text = "No feeds available."
         else:
-            text = f"Excluded feeds: {excluded} of {total}"
+            text = _("Excluded feeds: {excluded} of {total}").format(excluded=excluded, total=total)
         try:
             self.exclude_feeds_lbl.SetLabel(text)
         except Exception:
@@ -2629,11 +2629,11 @@ class SettingsDialog(wx.Dialog):
             path = info.get("path")
             nm = names.get(key, key)
             if not path:
-                text = f"Detected {nm}: not found"
+                text = _("Detected {nm}: not found").format(nm=nm)
             elif info.get("valid") is False:
-                text = f"Detected {nm}: {path} (failed version check)"
+                text = _("Detected {nm}: {path} (failed version check)").format(nm=nm, path=path)
             else:
-                text = f"Detected {nm}: {path}"
+                text = _("Detected {nm}: {path}").format(nm=nm, path=path)
             try:
                 lbl.SetLabel(text)
             except Exception:
@@ -2828,7 +2828,7 @@ class SettingsDialog(wx.Dialog):
                 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 4,
             )
             ctrl = wx.TextCtrl(media_panel, value=str(config.get(cfg_key, "") or ""))
-            ctrl.SetName(f"{tool_label} executable path override")
+            ctrl.SetName(_("{label} executable path override").format(label=tool_label))
             row.Add(ctrl, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 5)
             browse = wx.Button(media_panel, label=_("Browse..."))
             browse.Bind(
@@ -2837,8 +2837,8 @@ class SettingsDialog(wx.Dialog):
             )
             row.Add(browse, 0)
             tools_box.Add(row, 0, wx.EXPAND | wx.ALL, 2)
-            detected = wx.StaticText(media_panel, label=f"Detected {tool_label}: checking…")
-            detected.SetName(f"Detected {tool_label}")
+            detected = wx.StaticText(media_panel, label=_("Detected {label}: checking…").format(label=tool_label))
+            detected.SetName(_("Detected {label}").format(label=tool_label))
             tools_box.Add(detected, 0, wx.LEFT | wx.BOTTOM, 12)
             self._media_tool_path_ctrls[cfg_key] = ctrl
             self._media_tool_detected_lbls[tool_key] = detected
@@ -3047,7 +3047,7 @@ class SettingsDialog(wx.Dialog):
             ctrl.SetName(field_name)
             s.Add(ctrl, 1, wx.ALL, 5)
             browse_btn = wx.Button(sounds_panel, label=_("Browse..."))
-            browse_btn.SetName(f"Browse for {field_name}")
+            browse_btn.SetName(_("Browse for {name}").format(name=field_name))
 
             def _on_browse(evt):
                 dlg = wx.FileDialog(self, f"Choose {label}", defaultFile=ctrl.GetValue(), wildcard=f'{_("WAV files")} (*.wav)|*.wav|{_("All files")} (*.*)|*.*', style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST)
@@ -3070,7 +3070,7 @@ class SettingsDialog(wx.Dialog):
         notifications_panel = panel
         notifications_sizer = sizer
 
-        notice_txt = (
+        notice_txt = _(
             "Windows toast notifications for new articles.\n"
             "Disabled by default."
         )
@@ -3149,7 +3149,7 @@ class SettingsDialog(wx.Dialog):
         announcements_sizer = sizer
         announcements_panel.SetScrollRate(0, 12)
 
-        announce_note = (
+        announce_note = _(
             "Screen-reader announcements for key keyboard actions.\n"
             "Each event can announce via speech, Braille, both, or neither.\n"
             "Braille output is most reliable on Windows with NVDA or JAWS."
@@ -4945,7 +4945,7 @@ class FeedSearchDialog(wx.Dialog):
         if source_key == self._SOURCE_ALL:
             self.status_lbl.SetLabel(_("Searching all sources..."))
         else:
-            self.status_lbl.SetLabel(f"Searching {source_label}...")
+            self.status_lbl.SetLabel(_("Searching {label}...").format(label=source_label))
 
         # Start unified search thread
         threading.Thread(target=self._unified_search_manager, args=(term, source_key), daemon=True).start()
@@ -5599,7 +5599,7 @@ class FeedSearchDialog(wx.Dialog):
             self.search_btn.Enable()
             if getattr(self, "source_combo", None):
                 self.source_combo.Enable()
-            self.status_lbl.SetLabel(f"Found {len(results)} results.")
+            self.status_lbl.SetLabel(ngettext("Found {n} result.", "Found {n} results.", len(results)).format(nn=len(results)))
             self.search_ctrl.SetFocus()
         except Exception:
             # wx raises when the underlying C++ widgets were already destroyed.
@@ -6747,7 +6747,7 @@ class YtdlpGlobalSearchDialog(wx.Dialog):
         self.load_more_btn.Disable()
         self.scope_choice.Disable()
         action = "Searching" if reset else "Loading more"
-        self.status_lbl.SetLabel(f"{action} {self._total_sites} sites...")
+        self.status_lbl.SetLabel(ngettext("{action} {n} site...", "{action} {n} sites...", self._total_sites).format(action=action, n=self._total_sites))
 
         self._search_thread = threading.Thread(
             target=self._search_manager,
@@ -6915,12 +6915,12 @@ class YtdlpGlobalSearchDialog(wx.Dialog):
             pass
 
         if cancelled:
-            self.status_lbl.SetLabel(f"Stopped. {len(self._all_results)} results.")
+            self.status_lbl.SetLabel(ngettext("Stopped. {n} result.", "Stopped. {n} results.", len(self._all_results)).format(n=len(self._all_results)))
         else:
             if append_mode:
-                self.status_lbl.SetLabel(f"Loaded more. {len(self._all_results)} results.")
+                self.status_lbl.SetLabel(ngettext("Loaded more. {n} result.", "Loaded more. {n} results.", len(self._all_results)).format(n=len(self._all_results)))
             else:
-                self.status_lbl.SetLabel(f"{len(self._all_results)} results.")
+                self.status_lbl.SetLabel(ngettext("{n} result.", "{n} results.", len(self._all_results)).format(n=len(self._all_results)))
         self._schedule_results_refresh(immediate=True)
 
     def _get_selected_result(self):
@@ -7121,7 +7121,7 @@ class YtdlpGlobalSearchDialog(wx.Dialog):
                     wx.ICON_ERROR,
                 )
                 return
-            self.status_lbl.SetLabel(f"Playing: {title}")
+            self.status_lbl.SetLabel(_("Playing: {title}").format(title=title))
             self._register_player_status_callback(parent, title)
         else:
             webbrowser.open(url)
