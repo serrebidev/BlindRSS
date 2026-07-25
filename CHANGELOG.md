@@ -4,6 +4,15 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.124.0 - 2026-07-25
+
+- Translate every user-facing string, complete 14 locales.
+- Fix Russian translation.
+- Merge PR #94 (tseykovets) plus full i18n coverage and 14 completed locales.
+- Update Russian translation.
+- Add gettext support to new strings.
+- Remove unnecessary gettext function calls on strings that don't need to be translated.
+
 ## v1.123.0 - 2026-07-25
 
 - Open any media URL from the File menu, and fix the YouTube seek ceiling.
