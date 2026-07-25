@@ -35,6 +35,7 @@ from core.discovery import (
 from core.groups_io import search_groups_io_feeds
 from core import article_columns
 from core import download_formats
+from core import media_url
 from core import utils
 from core import config as config_mod
 from core import equalizer as equalizer_mod
@@ -280,6 +281,123 @@ class AddFeedDialog(wx.Dialog):
             self.cat_ctrl.GetValue(), self.category_identities
         )
         return utils.normalize_user_submitted_url(self.url_ctrl.GetValue()), category
+
+
+class OpenMediaUrlDialog(wx.Dialog):
+    """Take any playable/downloadable URL and either stream it or save it.
+
+    The article list only reaches what a feed still lists, so this is the way
+    to a video that has scrolled out of a YouTube feed (or any other yt-dlp
+    site, or a direct media file). Streaming never writes to disk; downloading
+    reuses the same format presets as Download As.
+
+    The format control stays visible but disabled while Streaming is selected,
+    rather than disappearing: a control that vanishes moves everything after it
+    under the reader's cursor, and a disabled control still announces why it
+    cannot be used (see the "silent no-op" rule).
+    """
+
+    ACTION_STREAM = "stream"
+    ACTION_DOWNLOAD = "download"
+
+    def __init__(self, parent, initial_url: str = "", default_format: str = "",
+                 downloads_enabled: bool = True):
+        super().__init__(parent, title=_("Open Media URL"), size=(560, 360))
+
+        self._downloads_enabled = bool(downloads_enabled)
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(
+            wx.StaticText(self, label=_(
+                "Paste a link to a video, podcast episode, or other media file.\n"
+                "YouTube and other yt-dlp sites are supported, as are direct media links."
+            )),
+            0, wx.ALL, 10,
+        )
+
+        sizer.Add(wx.StaticText(self, label=_("Media URL:")), 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
+        self.url_ctrl = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
+        self.url_ctrl.SetName("Media URL")
+        self.url_ctrl.SetHint(_("https://www.youtube.com/watch?v=..."))
+        if initial_url:
+            self.url_ctrl.SetValue(str(initial_url))
+            self.url_ctrl.SetInsertionPointEnd()
+        sizer.Add(self.url_ctrl, 0, wx.EXPAND | wx.ALL, 10)
+
+        self.action_ctrl = wx.RadioBox(
+            self,
+            label=_("Action"),
+            choices=[_("Stream it now (nothing is saved)"), _("Download it")],
+            majorDimension=1,
+            style=wx.RA_SPECIFY_COLS,
+        )
+        self.action_ctrl.SetName("Action")
+        self.action_ctrl.SetSelection(0)
+        sizer.Add(self.action_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        sizer.Add(wx.StaticText(self, label=_("Download format:")), 0, wx.LEFT | wx.RIGHT, 10)
+        self._format_ids = list(download_formats.DOWNLOAD_FORMAT_CHOICES)
+        self.format_ctrl = wx.Choice(self, choices=download_formats.download_format_labels())
+        self.format_ctrl.SetName(_("Download format"))
+        self.format_ctrl.SetSelection(
+            self._format_ids.index(download_formats.normalize_download_format(default_format))
+        )
+        sizer.Add(self.format_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        self.note_lbl = wx.StaticText(self, label="")
+        sizer.Add(self.note_lbl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
+        if btn_sizer:
+            sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 10)
+
+        self.SetSizer(sizer)
+        self.Centre()
+
+        self.action_ctrl.Bind(wx.EVT_RADIOBOX, self._on_action_changed)
+        self.url_ctrl.Bind(wx.EVT_TEXT_ENTER, lambda e: self.EndModal(wx.ID_OK))
+        self._sync_enabled()
+        wx.CallAfter(self.url_ctrl.SetFocus)
+
+    def _on_action_changed(self, event):
+        self._sync_enabled()
+        if event:
+            event.Skip()
+
+    def _sync_enabled(self):
+        downloading = self.get_action() == self.ACTION_DOWNLOAD
+        self.format_ctrl.Enable(downloading and self._downloads_enabled)
+        if downloading and not self._downloads_enabled:
+            # Same wording (and so the same translations) as every other place
+            # the app refuses a download.
+            self.note_lbl.SetLabel(
+                _("Downloads are disabled. Enable them in Settings > Downloads.")
+            )
+        elif downloading:
+            self.note_lbl.SetLabel(
+                _("Direct media links are always saved in their original format.")
+            )
+        else:
+            self.note_lbl.SetLabel(_("Streaming plays in the BlindRSS player without saving."))
+
+    def get_action(self) -> str:
+        return self.ACTION_DOWNLOAD if self.action_ctrl.GetSelection() == 1 else self.ACTION_STREAM
+
+    def get_url(self) -> str:
+        return media_url.normalize_media_url(self.url_ctrl.GetValue())
+
+    def get_format(self) -> str:
+        idx = self.format_ctrl.GetSelection()
+        if 0 <= idx < len(self._format_ids):
+            return self._format_ids[idx]
+        return download_formats.DOWNLOAD_FORMAT_DEFAULT
+
+    def get_data(self) -> dict:
+        return {
+            "url": self.get_url(),
+            "action": self.get_action(),
+            "download_format": self.get_format(),
+        }
 
 
 class AddShortcutsDialog(wx.Dialog):

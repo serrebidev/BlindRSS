@@ -53,6 +53,8 @@ COMMANDS: List[Command] = [
     Command("feeds.find_podcast", "Feeds", "Find a Podcast or RSS Feed", "Ctrl+Shift+F"),
     Command("feeds.video_search", "Feeds", "Video Search", ""),
 
+    Command("media.open_url", "Media", "Open Media URL", ""),
+
     Command("article.open_browser", "Articles", "Open in Browser", ""),
     Command("article.copy_link", "Articles", "Copy Link", ""),
     Command("article.copy_media_link", "Articles", "Copy Media Link", ""),
@@ -132,6 +134,7 @@ _POT_ANCHORS = (
     # Categories
     _("Feeds"),
     _("Articles"),
+    _("Media"),
     _("View"),
     _("Article Filter"),
     _("Sorting"),
@@ -157,6 +160,7 @@ _POT_ANCHORS = (
     _("Export OPML"),
     _("Find a Podcast or RSS Feed"),
     _("Video Search"),
+    _("Open Media URL"),
     _("Open in Browser"),
     _("Copy Link"),
     _("Copy Media Link"),

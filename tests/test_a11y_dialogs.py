@@ -80,6 +80,52 @@ def test_feed_properties_dialog_fields_named(parent):
         dlg.Destroy()
 
 
+def test_open_media_url_dialog_controls_named(parent):
+    dlg = dialogs.OpenMediaUrlDialog(
+        parent,
+        initial_url="https://www.youtube.com/watch?v=abc",
+        default_format="audio_mp3_192",
+        downloads_enabled=True,
+    )
+    try:
+        assert dlg.url_ctrl.GetName() == "Media URL"
+        assert dlg.action_ctrl.GetName() == "Action"
+        assert dlg.format_ctrl.GetName() == "Download format"
+        # Streaming is the default, and the format picker is disabled (but still
+        # present) until Download is chosen.
+        assert dlg.get_action() == dialogs.OpenMediaUrlDialog.ACTION_STREAM
+        assert not dlg.format_ctrl.IsEnabled()
+        assert dlg.get_url() == "https://www.youtube.com/watch?v=abc"
+
+        dlg.action_ctrl.SetSelection(1)
+        dlg._sync_enabled()
+        assert dlg.get_action() == dialogs.OpenMediaUrlDialog.ACTION_DOWNLOAD
+        assert dlg.format_ctrl.IsEnabled()
+        assert dlg.get_format() == "audio_mp3_192"
+    finally:
+        dlg.Destroy()
+
+
+def test_open_media_url_dialog_explains_disabled_downloads(parent):
+    dlg = dialogs.OpenMediaUrlDialog(parent, downloads_enabled=False)
+    try:
+        dlg.action_ctrl.SetSelection(1)
+        dlg._sync_enabled()
+        # The refusal is visible before the user commits to it.
+        assert not dlg.format_ctrl.IsEnabled()
+        assert "disabled" in dlg.note_lbl.GetLabel().lower()
+    finally:
+        dlg.Destroy()
+
+
+def test_open_media_url_dialog_rejects_a_non_url(parent):
+    dlg = dialogs.OpenMediaUrlDialog(parent, initial_url="how to bake bread")
+    try:
+        assert dlg.get_url() == ""
+    finally:
+        dlg.Destroy()
+
+
 def test_exclude_notification_feeds_list_named(parent):
     dlg = dialogs.ExcludeNotificationFeedsDialog(
         parent,

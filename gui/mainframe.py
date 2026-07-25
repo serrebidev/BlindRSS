@@ -43,6 +43,7 @@ from core.models import Article
 from core import utils
 from core import article_columns
 from core import article_extractor
+from core import media_url as media_url_mod
 from core import article_lang
 from core import article_html
 from core import smart_folders as smart_folders_mod
@@ -2152,6 +2153,9 @@ class MainFrame(wx.Frame):
         file_menu = wx.Menu()
         add_feed_item = self._append_shortcut_menu_item(
             file_menu, "feeds.add", _("&Add Feed"), _("Add a new RSS feed"))
+        open_media_url_item = self._append_shortcut_menu_item(
+            file_menu, "media.open_url", _("Open Media &URL..."),
+            _("Stream or download media from any supported link"))
         detect_feeds_item = self._append_shortcut_menu_item(
             file_menu, "feeds.detect_page", _("Detect Feeds on &Page..."),
             _("Scan a webpage for RSS, Atom, or JSON feed links"))
@@ -2420,6 +2424,7 @@ class MainFrame(wx.Frame):
         apply_menubar_mnemonics(menubar)
         
         self.Bind(wx.EVT_MENU, self.on_add_feed, add_feed_item)
+        self.Bind(wx.EVT_MENU, self.on_open_media_url, open_media_url_item)
         self.Bind(wx.EVT_MENU, self.on_detect_page_feeds, detect_feeds_item)
         self.Bind(wx.EVT_MENU, self.on_remove_feed, remove_feed_item)
         self.Bind(wx.EVT_MENU, self.on_refresh_feeds, refresh_item)
@@ -3057,6 +3062,8 @@ class MainFrame(wx.Frame):
             "feeds.export_opml": self.on_export_opml,
             "feeds.find_podcast": self.on_find_feed,
             "feeds.video_search": self.on_ytdlp_global_search,
+
+            "media.open_url": self.on_open_media_url,
 
             "article.open_browser": self._cmd_open_in_browser,
             "article.copy_link": self._cmd_copy_link,
@@ -12201,6 +12208,14 @@ class MainFrame(wx.Frame):
         download_root = self.config_manager.get("download_path", _default_download_dir())
         if not download_root:
             download_root = _default_download_dir()
+        # Items that came from a pasted link (File > Open Media URL) belong to no
+        # feed, so they name their own subfolder instead of landing in "Feed".
+        folder_override = str(getattr(article, "download_folder", "") or "").strip()
+        if folder_override:
+            target_dir = os.path.join(download_root, self._safe_name(folder_override))
+            if create:
+                os.makedirs(target_dir, exist_ok=True)
+            return target_dir
         feed_title = None
         if allow_provider_lookup:
             feed_title = self._get_feed_title(article.feed_id)
@@ -12410,14 +12425,9 @@ class MainFrame(wx.Frame):
             resp.raise_for_status()
 
             ext = self._guess_extension(url, resp.headers.get("Content-Type"))
-            download_root = self.config_manager.get("download_path", _default_download_dir())
-            if not download_root:
-                download_root = _default_download_dir()
-
-            feed_title = self._get_feed_title(article.feed_id) or "Feed"
-            feed_folder = self._safe_name(feed_title)
-            target_dir = os.path.join(download_root, feed_folder)
-            os.makedirs(target_dir, exist_ok=True)
+            # Same "<download path>/<feed>" layout as before, but via the shared
+            # helper so a pasted link's own subfolder is honoured too.
+            target_dir = self._download_dir_for_article(article)
 
             base_name = self._safe_name(article.title) or "episode"
             target_path = self._unique_path(os.path.join(target_dir, base_name + ext))
@@ -13941,6 +13951,167 @@ class MainFrame(wx.Frame):
             self.toggle_player_visibility(force_show=True)
         else:
             self.toggle_player_visibility(force_show=False)
+
+    # --- Open Media URL (File menu) ------------------------------------
+    # Any yt-dlp page or direct media link, streamed or downloaded, without it
+    # having to be an article in a feed: feeds drop older items, so a video that
+    # has scrolled out of a subscription is otherwise unreachable from the app.
+
+    #: Subfolder (under the download path) for items downloaded from a pasted link.
+    MEDIA_URL_DOWNLOAD_FOLDER = "Media Links"
+
+    def _clipboard_media_url(self) -> str:
+        """The clipboard's contents if they are a usable media URL, else ""."""
+        text = ""
+        try:
+            clipboard = wx.TheClipboard
+            if clipboard.Open():
+                try:
+                    data = wx.TextDataObject()
+                    if clipboard.GetData(data):
+                        text = data.GetText()
+                finally:
+                    clipboard.Close()
+        except Exception:
+            log.debug("Could not read the clipboard for Open Media URL", exc_info=True)
+        return media_url_mod.normalize_media_url(text)
+
+    def on_open_media_url(self, event=None):
+        """File > Open Media URL: stream or download any supported link."""
+        from gui.dialogs import OpenMediaUrlDialog
+        from core import download_formats
+
+        dlg = OpenMediaUrlDialog(
+            self,
+            initial_url=self._clipboard_media_url(),
+            default_format=self.config_manager.get(
+                "download_format", download_formats.DOWNLOAD_FORMAT_DEFAULT
+            ),
+            downloads_enabled=bool(self.config_manager.get("downloads_enabled", False)),
+        )
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            data = dlg.get_data()
+            typed = dlg.url_ctrl.GetValue()
+            download_action = data["action"] == OpenMediaUrlDialog.ACTION_DOWNLOAD
+        finally:
+            dlg.Destroy()
+
+        url = data["url"]
+        if not url:
+            # Never fail silently: an empty or malformed box must say why.
+            wx.MessageBox(
+                _("That does not look like a media link. Enter a full web address, "
+                  "for example https://www.youtube.com/watch?v=...")
+                if str(typed or "").strip()
+                else _("Enter the address of the media you want to open."),
+                _("Open Media URL"),
+                wx.ICON_INFORMATION,
+            )
+            return
+
+        if download_action:
+            self.download_media_url(url, data["download_format"])
+        else:
+            self.stream_media_url(url)
+
+    def stream_media_url(self, url: str, title: str | None = None) -> None:
+        """Play a pasted link in the BlindRSS player without saving anything."""
+        url = media_url_mod.normalize_media_url(url)
+        if not url:
+            return
+        try:
+            use_ytdlp = bool(core.discovery.is_ytdlp_supported(url))
+        except Exception:
+            use_ytdlp = False
+
+        pw = self._ensure_player_window()
+        if not pw:
+            wx.MessageBox(
+                _("The media player could not be opened, so this link cannot be streamed."),
+                _("Open Media URL"),
+                wx.ICON_ERROR,
+            )
+            return
+
+        # yt-dlp pages resolve their own real title during extraction; a direct
+        # file has no metadata step, so name it from the URL rather than leaving
+        # the player announcing "Loading media...".
+        if not title and not use_ytdlp:
+            title = media_url_mod.title_from_url(url)
+        self._post_activity_status(_("Opening: {title}").format(title=title or url))
+        pw.load_media(url, use_ytdlp=use_ytdlp, chapters=None, title=title, article_id=None)
+
+        if bool(self.config_manager.get("show_player_on_play", True)):
+            self.toggle_player_visibility(force_show=True)
+        else:
+            self.toggle_player_visibility(force_show=False)
+
+    def download_media_url(self, url: str, download_format=None) -> None:
+        """Save a pasted link to the downloads folder in the chosen format."""
+        url = media_url_mod.normalize_media_url(url)
+        if not url:
+            return
+        if not self.config_manager.get("downloads_enabled", False):
+            wx.MessageBox(
+                _("Downloads are disabled. Enable them in Settings > Downloads."),
+                _("Downloads disabled"),
+                wx.ICON_INFORMATION,
+            )
+            return
+        threading.Thread(
+            target=self._download_media_url_thread,
+            args=(url, download_format),
+            daemon=True,
+        ).start()
+
+    def _media_url_article(self, url: str, title: str = ""):
+        """An article-shaped stand-in so a pasted link reuses the download path.
+
+        It carries no id and no feed_id, which is what keeps it harmless: the
+        download index then keys the saved file by media URL only, so if the
+        same video later arrives in a feed the app still finds the local copy.
+        `download_folder` sends it to its own subfolder instead of "Feed".
+        """
+        return SimpleNamespace(
+            id="",
+            feed_id="",
+            title=str(title or media_url_mod.title_from_url(url)),
+            url=url,
+            media_url=url,
+            local_media_path=None,
+            download_folder=self.MEDIA_URL_DOWNLOAD_FOLDER,
+        )
+
+    def _download_media_url_thread(self, url: str, download_format=None) -> None:
+        ytdlp_url = None
+        try:
+            ytdlp_url = url if core.discovery.is_ytdlp_supported(url) else None
+        except Exception:
+            ytdlp_url = None
+
+        # Name the file from the site's own metadata when we can reach it; the
+        # URL-derived fallback keeps a failed lookup from writing "watch.mp4".
+        title = ""
+        if ytdlp_url:
+            self._post_activity_status(_("Opening: {title}").format(title=url))
+            try:
+                title = core.discovery.resolve_ytdlp_url_title(url, timeout=20) or ""
+            except Exception:
+                log.debug("Could not resolve a title for %s", url, exc_info=True)
+        article = self._media_url_article(url, title)
+
+        if ytdlp_url:
+            self._post_activity_status(
+                _("Downloading: {title}").format(title=article.title)
+            )
+            self._download_article_via_ytdlp(article, ytdlp_url, download_format)
+            return
+
+        # Not a yt-dlp page: save the bytes as they are. Format presets cannot
+        # apply here, which the dialog says up front.
+        self._download_article_thread(article, download_format)
 
     def on_find_feed(self, event):
         from gui.dialogs import FeedSearchDialog

@@ -3242,19 +3242,28 @@ class PlayerFrame(wx.Frame):
                 host_name = ""
             if host_name in ("127.0.0.1", "localhost"):
                 return url
-            # YouTube direct media URLs (googlevideo CDN) can be sensitive to
-            # proxying in packaged builds; prefer direct VLC playback.
-            if _is_googlevideo_url(url):
-                return url
+            # YouTube media (googlevideo CDN) must go through this proxy, not
+            # straight to VLC. Served direct, libVLC settles on its own — often
+            # far too short — idea of the track length and then silently clamps
+            # every seek to it: the "Ctrl+Right will not move past ~3:00 of a
+            # 5:00 video" bug. v1.122.0 fixed the app-side cap (self.duration now
+            # comes from yt-dlp) but libVLC is what actually performs the seek,
+            # so the ceiling stayed. The range-cache proxy reports a truthful
+            # Content-Length, answers real 206 range requests, and re-resolves an
+            # expiring signed URL mid-playback (the same rescue podcasts get) —
+            # which also removes the periodic re-buffering on throttled links.
             # HLS playlists often contain relative segment URLs; proxying them through
             # the range cache breaks resolution and also isn't helpful for caching.
+            # That still holds for YouTube live HLS, so this check comes first.
             if ".m3u8" in low:
                 return url
-            force_proxy = False
-            try:
-                force_proxy = bool(self.config_manager.get("skip_silence", False))
-            except Exception:
-                force_proxy = False
+            force_youtube_proxy = _is_googlevideo_url(url)
+            force_proxy = force_youtube_proxy
+            if not force_proxy:
+                try:
+                    force_proxy = bool(self.config_manager.get("skip_silence", False))
+                except Exception:
+                    force_proxy = False
             if not force_proxy:
                 if not bool(self.config_manager.get('range_cache_enabled', True)):
                     return url
@@ -5699,6 +5708,9 @@ class PlayerFrame(wx.Frame):
         self._seek_guard_target_ms = int(t)
         self._seek_guard_attempts_left = 10
         self._seek_guard_reapply_left = 3
+        # One "could not seek" announcement per seek at most; the guard gives up
+        # from two different places and must not say it twice.
+        self._seek_guard_announced = False
         now = time.monotonic()
         self._seek_guard_last_cur_ms = None
         self._seek_guard_last_delta_ms = None
@@ -5760,6 +5772,7 @@ class PlayerFrame(wx.Frame):
             # to avoid the 'repeating' audio loop caused by constant re-seeks.
             if is_remote and left < 7:
                 self._seek_guard_attempts_left = 0
+                self._announce_seek_not_reached(target_i, cur)
                 return
 
             now = time.monotonic()
@@ -5835,6 +5848,10 @@ class PlayerFrame(wx.Frame):
                     self._seek_guard_calllater = wx.CallLater(500, self._seek_guard_tick)
                 except Exception:
                     self._seek_guard_calllater = None
+            else:
+                # Budget exhausted and still not there: the position is about to
+                # snap back to where playback actually is, so say so.
+                self._announce_seek_not_reached(target_i, cur)
         except Exception:
             pass
 
@@ -6226,6 +6243,37 @@ class PlayerFrame(wx.Frame):
 
             screen_reader_announce.speak_status(
                 _("End of track") if at_end else _("Beginning of track"),
+                interrupt=True,
+            )
+        except Exception:
+            pass
+
+    def _announce_seek_not_reached(self, target_ms: int, cur_ms: int) -> None:
+        """Say when a seek did not land where it was asked to.
+
+        The seek guard gives up quietly on remote streams, and ~4s later
+        _update_position drops the optimistic target and the position visibly
+        snaps back. Without this the user just hears the same spot again and
+        again with no explanation — indistinguishable from a broken key.
+        Announced at most once per seek, and only when the gap is big enough to
+        be real rather than stream jitter.
+        """
+        if getattr(self, "_seek_guard_announced", False):
+            return
+        try:
+            gap = abs(int(target_ms) - int(cur_ms))
+        except (TypeError, ValueError):
+            return
+        if int(cur_ms) < 0 or gap < 8000:
+            return
+        self._seek_guard_announced = True
+        try:
+            from core import screen_reader_announce
+
+            screen_reader_announce.speak_status(
+                _("Could not seek there. Position {position}").format(
+                    position=self._format_time(int(cur_ms))
+                ),
                 interrupt=True,
             )
         except Exception:

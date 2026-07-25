@@ -80,8 +80,16 @@ def test_maybe_range_cache_url_nonblocking():
     print(f"PASS: _maybe_range_cache_url() completed quickly ({elapsed:.3f}s)")
 
 
-def test_maybe_range_cache_url_bypasses_googlevideo():
-    """YouTube direct media URLs should bypass the local range proxy."""
+def test_maybe_range_cache_url_proxies_googlevideo():
+    """YouTube media must go through the range proxy, not straight to VLC.
+
+    Handed the googlevideo URL directly, libVLC adopts its own (often far too
+    short) idea of the length and then clamps every seek to it — the "cannot
+    seek past ~3:00 of a 5:00 video" bug. The proxy serves a truthful
+    Content-Length with real 206 range support, and re-resolves the signed URL
+    when it expires. Routing here is unconditional: it must not depend on
+    `range_cache_enabled`, which a user may well have turned off.
+    """
     import wx
 
     app = wx.App(False)
@@ -90,6 +98,7 @@ def test_maybe_range_cache_url_bypasses_googlevideo():
     from core.config import ConfigManager
 
     config = ConfigManager()
+    config.set("range_cache_enabled", False)
     frame = PlayerFrame(None, config)
     frame.Hide()
 
@@ -103,8 +112,34 @@ def test_maybe_range_cache_url_bypasses_googlevideo():
             headers={"User-Agent": "Mozilla/5.0"},
             url_is_resolved=True,
         )
+        assert result_url != test_url
+        assert "127.0.0.1" in result_url
+        assert bool(getattr(frame, "_last_used_range_proxy", False)) is True
+    finally:
+        frame.Destroy()
+
+
+def test_maybe_range_cache_url_still_bypasses_youtube_live_hls():
+    """Live HLS playlists keep going direct: proxying breaks relative segments."""
+    import wx
+
+    app = wx.App(False)
+
+    from gui.player import PlayerFrame
+    from core.config import ConfigManager
+
+    config = ConfigManager()
+    frame = PlayerFrame(None, config)
+    frame.Hide()
+
+    try:
+        test_url = "https://rr1---sn-uxa0n-t8ge7.googlevideo.com/videoplayback/index.m3u8?id=abc"
+        result_url = frame._maybe_range_cache_url(
+            test_url,
+            headers={"User-Agent": "Mozilla/5.0"},
+            url_is_resolved=True,
+        )
         assert result_url == test_url
-        assert bool(getattr(frame, "_last_used_range_proxy", False)) is False
     finally:
         frame.Destroy()
 
