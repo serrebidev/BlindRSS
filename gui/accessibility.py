@@ -51,7 +51,7 @@ def normalize_accessible_chapters(chapters):
             start = 0.0
         if not math.isfinite(start) or start < 0:
             start = 0.0
-        title = str(chapter.get("title", "") or "").strip() or "Untitled chapter"
+        title = str(chapter.get("title", "") or "").strip() or _("Untitled chapter")
         href = str(
             chapter.get("href", "")
             or chapter.get("url", "")
@@ -436,32 +436,32 @@ class AccessibleBrowserFrame(wx.Frame):
 
         toolbar = wx.BoxSizer(wx.HORIZONTAL)
         self.refresh_btn = wx.Button(panel, label=_("Refresh Feeds"))
-        self.refresh_btn.SetName("Refresh Feeds")
+        self.refresh_btn.SetName(_("Refresh Feeds"))
         toolbar.Add(self.refresh_btn, 0, wx.RIGHT, 6)
         self.load_more_btn = wx.Button(panel, label=_("Load More Articles"))
-        self.load_more_btn.SetName("Load More Articles")
+        self.load_more_btn.SetName(_("Load More Articles"))
         toolbar.Add(self.load_more_btn, 0, wx.RIGHT, 6)
         self.expand_btn = wx.Button(panel, label=_("Expand Category"))
-        self.expand_btn.SetName("Expand Category")
+        self.expand_btn.SetName(_("Expand Category"))
         toolbar.Add(self.expand_btn, 0, wx.RIGHT, 6)
         self.collapse_btn = wx.Button(panel, label=_("Collapse Category"))
-        self.collapse_btn.SetName("Collapse Category")
+        self.collapse_btn.SetName(_("Collapse Category"))
         toolbar.Add(self.collapse_btn, 0, wx.RIGHT, 6)
         self.open_btn = wx.Button(panel, label=_("Open or Play Article"))
-        self.open_btn.SetName("Open or Play Article")
+        self.open_btn.SetName(_("Open or Play Article"))
         toolbar.Add(self.open_btn, 0, wx.RIGHT, 6)
         self.mark_read_btn = wx.Button(panel, label=_("Mark Read"))
-        self.mark_read_btn.SetName("Mark Read")
+        self.mark_read_btn.SetName(_("Mark Read"))
         toolbar.Add(self.mark_read_btn, 0, wx.RIGHT, 6)
         self.mark_unread_btn = wx.Button(panel, label=_("Mark Unread"))
-        self.mark_unread_btn.SetName("Mark Unread")
+        self.mark_unread_btn.SetName(_("Mark Unread"))
         toolbar.Add(self.mark_unread_btn, 0, wx.RIGHT, 6)
         self.download_btn = wx.Button(panel, label=_("Download"))
-        self.download_btn.SetName("Download Article")
+        self.download_btn.SetName(_("Download Article"))
         self.download_btn.Enable(False)
         toolbar.Add(self.download_btn, 0, wx.RIGHT, 6)
         self.rich_view_chk = wx.CheckBox(panel, label=_("Rich View"))
-        self.rich_view_chk.SetName("Rich Full-Text View")
+        self.rich_view_chk.SetName(_("Rich Full-Text View"))
         self.rich_view_chk.SetValue(self._rich_view_enabled())
         toolbar.Add(self.rich_view_chk, 0, wx.ALIGN_CENTER_VERTICAL)
         root.Add(toolbar, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
@@ -470,7 +470,7 @@ class AccessibleBrowserFrame(wx.Frame):
         search_lbl = wx.StaticText(panel, label=_("Filter Articles:"))
         search_row.Add(search_lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
         self.search_ctrl = wx.TextCtrl(panel)
-        self.search_ctrl.SetName("Accessible Article Filter")
+        self.search_ctrl.SetName(_("Accessible Article Filter"))
         try:
             search_lbl.SetLabelFor(self.search_ctrl)
         except Exception:
@@ -484,7 +484,7 @@ class AccessibleBrowserFrame(wx.Frame):
         views_lbl = wx.StaticText(panel, label=_("Views"))
         left.Add(views_lbl, 0, wx.BOTTOM, 4)
         self.view_list = wx.ListBox(panel)
-        self.view_list.SetName("Accessible Views")
+        self.view_list.SetName(_("Accessible Views"))
         # Cap the list width so long feed labels don't starve the reader pane (which
         # otherwise gets squeezed to one word per line). Long labels truncate/scroll.
         self.view_list.SetMinSize((240, 240))
@@ -507,7 +507,7 @@ class AccessibleBrowserFrame(wx.Frame):
         articles_lbl = wx.StaticText(panel, label=_("Articles"))
         middle.Add(articles_lbl, 0, wx.BOTTOM, 4)
         self.article_list = wx.ListBox(panel)
-        self.article_list.SetName("Accessible Articles")
+        self.article_list.SetName(_("Accessible Articles"))
         self.article_list.SetMinSize((260, 240))
         try:
             articles_lbl.SetLabelFor(self.article_list)
@@ -524,7 +524,7 @@ class AccessibleBrowserFrame(wx.Frame):
         self.content_ctrl = wx.TextCtrl(
             panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_BESTWRAP
         )
-        self.content_ctrl.SetName("Accessible Article Content")
+        self.content_ctrl.SetName(_("Accessible Article Content"))
         # Give the reader a generous minimum width so article text wraps as full lines,
         # not one word per line.
         self.content_ctrl.SetMinSize((620, 240))
@@ -1354,7 +1354,7 @@ class AccessibleBrowserFrame(wx.Frame):
         # Drop any read-ahead prefetch queued for the previous view.
         with self._prefetch_lock:
             self._prefetch_queue.clear()
-        self.article_list.Set(["Loading articles..."])
+        self.article_list.Set([_("Loading articles...")])
         self.content_ctrl.SetValue("")
         self.status_lbl.SetLabel(_("Loading articles..."))
         threading.Thread(target=self._load_articles_page_thread, args=(self.current_view_id, 0), daemon=True).start()
@@ -1502,7 +1502,7 @@ class AccessibleBrowserFrame(wx.Frame):
         if art_id in chapter_cache:
             return format_accessible_chapters(chapter_cache[art_id])
         if art_id in getattr(self, "_chapter_inflight", set()):
-            return "Chapter availability: Loading."
+            return _("Chapter availability: Loading.")
         return ""
 
     def _compose_article_content(self, article, art_id, body) -> str:

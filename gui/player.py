@@ -849,9 +849,11 @@ class PlayerFrame(wx.Frame):
             self._vlc_init_failed = True
             wx.CallAfter(
                 wx.MessageBox,
-                f"VLC could not be initialized: {e}\n\n"
-                "Please ensure VLC media player is installed (64-bit version recommended).",
-                "VLC Error",
+                _(
+                    "VLC could not be initialized: {error}\n\n"
+                    "Please ensure VLC media player is installed (64-bit version recommended)."
+                ).format(error=e),
+                _("VLC Error"),
                 wx.OK | wx.ICON_ERROR,
             )
             return False
@@ -1982,12 +1984,12 @@ class PlayerFrame(wx.Frame):
 
         # Status (helps screen readers during connect/buffer)
         self.status_lbl = wx.StaticText(panel, label="")
-        self.status_lbl.SetName("Playback Status")
+        self.status_lbl.SetName(_("Playback Status"))
         sizer.Add(self.status_lbl, 0, wx.ALL | wx.CENTER, 2)
         
         # Slider
         self.slider = wx.Slider(panel, value=0, minValue=0, maxValue=1000)
-        self.slider.SetName("Playback Position")
+        self.slider.SetName(_("Playback Position"))
         # FIX: Separate tracking (dragging) from release (seeking)
         self.slider.Bind(wx.EVT_SCROLL_THUMBTRACK, self.on_slider_track)
         self.slider.Bind(wx.EVT_SCROLL_THUMBRELEASE, self.on_slider_release)
@@ -1999,9 +2001,9 @@ class PlayerFrame(wx.Frame):
         # Time Labels
         time_sizer = wx.BoxSizer(wx.HORIZONTAL)
         self.current_time_lbl = wx.StaticText(panel, label="00:00")
-        self.current_time_lbl.SetName("Elapsed Time: 00:00")
+        self.current_time_lbl.SetName(_("Elapsed Time: 00:00"))
         self.total_time_lbl = wx.StaticText(panel, label="00:00")
-        self.total_time_lbl.SetName("Total Time: 00:00")
+        self.total_time_lbl.SetName(_("Total Time: 00:00"))
         time_sizer.Add(self.current_time_lbl, 0, wx.LEFT, 5)
         time_sizer.AddStretchSpacer()
         time_sizer.Add(self.total_time_lbl, 0, wx.RIGHT, 5)
@@ -2016,7 +2018,7 @@ class PlayerFrame(wx.Frame):
             value=_("No media loaded"),
             style=wx.TE_READONLY | wx.TE_CENTER,
         )
-        self.time_info_ctrl.SetName("Playback Time")
+        self.time_info_ctrl.SetName(_("Playback Time"))
         sizer.Add(self.time_info_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
         
         # Controls
@@ -2024,7 +2026,7 @@ class PlayerFrame(wx.Frame):
         
         # Rewind 10s
         rewind_btn = wx.Button(panel, label=_("-10s"))
-        rewind_btn.SetName("Rewind 10 seconds")
+        rewind_btn.SetName(_("Rewind 10 seconds"))
         rewind_btn.Bind(wx.EVT_BUTTON, self.on_rewind)
         btn_sizer.Add(rewind_btn, 0, wx.ALL, 5)
         
@@ -2040,14 +2042,14 @@ class PlayerFrame(wx.Frame):
         
         # Forward 10s
         forward_btn = wx.Button(panel, label=_("+10s"))
-        forward_btn.SetName("Fast Forward 10 seconds")
+        forward_btn.SetName(_("Fast Forward 10 seconds"))
         forward_btn.Bind(wx.EVT_BUTTON, self.on_forward)
         btn_sizer.Add(forward_btn, 0, wx.ALL, 5)
         
         # Speed
         speeds = utils.build_playback_speeds()
         self.speed_combo = wx.ComboBox(panel, choices=[f"{s}x" for s in speeds], style=wx.CB_READONLY)
-        self.speed_combo.SetName("Playback Speed")
+        self.speed_combo.SetName(_("Playback Speed"))
         self.speed_combo.Bind(wx.EVT_COMBOBOX, self.on_speed_select)
         btn_sizer.Add(self.speed_combo, 0, wx.ALL, 5)
         
@@ -2058,7 +2060,7 @@ class PlayerFrame(wx.Frame):
 
         # Chapters menu
         self.chapters_btn = wx.Button(panel, label=_("Chapters"))
-        self.chapters_btn.SetName("Chapters Menu")
+        self.chapters_btn.SetName(_("Chapters Menu"))
         self.chapters_btn.Bind(wx.EVT_BUTTON, self.on_show_chapters_menu)
         btn_sizer.Add(self.chapters_btn, 0, wx.ALL, 5)
         
@@ -2069,18 +2071,20 @@ class PlayerFrame(wx.Frame):
         volume_lbl = wx.StaticText(panel, label=_("Volume"))
         volume_sizer.Add(volume_lbl, 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
         self.volume_slider = wx.Slider(panel, value=int(getattr(self, "volume", 100)), minValue=0, maxValue=100, style=wx.SL_HORIZONTAL)
-        self.volume_slider.SetName("Volume")
+        self.volume_slider.SetName(_("Volume"))
         self.volume_slider.Bind(wx.EVT_SCROLL_THUMBTRACK, self.on_volume_slider)
         self.volume_slider.Bind(wx.EVT_SCROLL_CHANGED, self.on_volume_slider)
         volume_sizer.Add(self.volume_slider, 1, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
         self.volume_value_lbl = wx.StaticText(panel, label=f"{int(getattr(self, 'volume', 100))}%")
-        self.volume_value_lbl.SetName(f"Volume Level: {int(getattr(self, 'volume', 100))}%")
+        self.volume_value_lbl.SetName(
+            _("Volume Level: {percent}%").format(percent=int(getattr(self, "volume", 100)))
+        )
         volume_sizer.Add(self.volume_value_lbl, 0, wx.ALIGN_CENTER_VERTICAL)
         sizer.Add(volume_sizer, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 6)
         
         # Chapters
         self.chapter_choice = wx.ComboBox(panel, style=wx.CB_READONLY)
-        self.chapter_choice.SetName("Chapters")
+        self.chapter_choice.SetName(_("Chapters"))
         self.chapter_choice.Bind(wx.EVT_COMBOBOX, self.on_chapter_select)
         if hasattr(wx, "EVT_COMBOBOX_CLOSEUP"):
             try:
@@ -2178,7 +2182,9 @@ class PlayerFrame(wx.Frame):
 
     def _format_chapter_menu_label(self, chapter: dict) -> str:
         timestamp = _format_chapter_timestamp(chapter.get("start", 0))
-        title = str(chapter.get("title", "") or "").strip() or f"Chapter at {timestamp}"
+        title = str(chapter.get("title", "") or "").strip() or _("Chapter at {timestamp}").format(
+            timestamp=timestamp
+        )
         return f"{timestamp}  {title}"
 
     def _chapter_link_action_index(self) -> int:
@@ -2224,17 +2230,21 @@ class PlayerFrame(wx.Frame):
         try:
             chapters = list(getattr(self, "current_chapters", []) or [])
             if not chapters:
-                self.chapter_choice.SetName("Chapters, none available")
+                self.chapter_choice.SetName(_("Chapters, none available"))
                 return
             if active_idx is None:
                 active_idx = self._active_chapter_index()
             if 0 <= int(active_idx) < len(chapters):
                 current = self._format_chapter_menu_label(chapters[int(active_idx)])
                 self.chapter_choice.SetName(
-                    f"Chapters, {len(chapters)} available, current chapter {current}"
+                    _("Chapters, {count} available, current chapter {current}").format(
+                        count=len(chapters), current=current
+                    )
                 )
             else:
-                self.chapter_choice.SetName(f"Chapters, {len(chapters)} available")
+                self.chapter_choice.SetName(
+                    _("Chapters, {count} available").format(count=len(chapters))
+                )
         except Exception:
             pass
 
@@ -2272,7 +2282,7 @@ class PlayerFrame(wx.Frame):
             else:
                 active_idx = self._active_chapter_index()
                 link_idx = self._chapter_link_action_index()
-                link_label = "Open Link for Selected Chapter"
+                link_label = _("Open Link for Selected Chapter")
                 if 0 <= link_idx < len(chapters):
                     link_label = _("Open Link for {chapter}").format(
                         chapter=self._format_chapter_menu_label(chapters[link_idx])
@@ -3379,7 +3389,7 @@ class PlayerFrame(wx.Frame):
     ) -> None:
         final_url = url
         ytdlp_headers = {}
-        resolved_title = title or "Playing Audio..."
+        resolved_title = title or _("Playing Audio...")
         should_resolve = True
 
         if use_ytdlp:
@@ -3391,7 +3401,7 @@ class PlayerFrame(wx.Frame):
                     resolved = rumble_mod.resolve_rumble_media(url)
                     final_url = resolved.media_url
                     ytdlp_headers = resolved.headers or {}
-                    resolved_title = resolved.title or title or "Media Stream"
+                    resolved_title = resolved.title or title or _("Media Stream")
                     rumble_handled = True
             except Exception as e:
                 try:
@@ -3695,7 +3705,7 @@ class PlayerFrame(wx.Frame):
                                     info = {
                                         "url": rk_media_url,
                                         "http_headers": dict(rokfin_probe.get("http_headers") or {}),
-                                        "title": str(rokfin_probe.get("title") or title or "Media Stream"),
+                                        "title": str(rokfin_probe.get("title") or title or _("Media Stream")),
                                     }
                                     try:
                                         _log("Rokfin playback resolved via public API fallback")
@@ -3731,7 +3741,7 @@ class PlayerFrame(wx.Frame):
                             _log("yt-dlp extraction failed; trying VLC direct as a last resort")
                         final_url = url
                         ytdlp_headers = {}
-                        resolved_title = title or "Media Stream"
+                        resolved_title = title or _("Media Stream")
                     else:
                         # Handle playlists/multi-video pages
                         if 'entries' in info:
@@ -3744,7 +3754,7 @@ class PlayerFrame(wx.Frame):
                             raise RuntimeError("No media URL found in yt-dlp info")
 
                         ytdlp_headers = info.get('http_headers', {})
-                        resolved_title = info.get('title', title or 'Media Stream')
+                        resolved_title = info.get("title", title or _("Media Stream"))
                         # Authoritative running time straight from the extractor.
                         # libVLC's get_length() on a remote googlevideo stream can
                         # settle on a far shorter value, which silently capped
@@ -3759,19 +3769,19 @@ class PlayerFrame(wx.Frame):
                         log.warning("yt-dlp resolve failed (browser cookies/DPAPI): %s", err_text)
                     else:
                         log.exception("yt-dlp resolve failed")
-                    ui_msg = f"yt-dlp resolve failed: {e}"
+                    ui_msg = _("yt-dlp resolve failed: {error}").format(error=e)
                     if "rokfin playback is broken on the source site" in err_lower:
-                        ui_msg = (
+                        ui_msg = _(
                             "Rokfin post is listed but not streamable right now: Rokfin returned an invalid "
                             "playback ID for this post."
                         )
                     elif "rokfin playback requires a rokfin login/cookies" in err_lower:
-                        ui_msg = (
+                        ui_msg = _(
                             "Rokfin post is not anonymously streamable right now. Rokfin requires a login/cookies "
                             "to play this post."
                         )
                     elif "browser cookies unavailable on this windows session" in err_lower:
-                        ui_msg = (
+                        ui_msg = _(
                             "yt-dlp resolve failed: this media may require a login, but browser cookies could not be "
                             "loaded on this Windows session (DPAPI). Try running BlindRSS as your normal Windows user "
                             "and restart the app."
@@ -3783,7 +3793,7 @@ class PlayerFrame(wx.Frame):
                     wx.CallAfter(self._handle_media_load_error, int(load_seq), url, ui_msg, True)
                     return
         else:
-            resolved_title = title or "Playing Audio..."
+            resolved_title = title or _("Playing Audio...")
             try:
                 maxr = int(self.config_manager.get('http_max_redirects', 30))
             except Exception:
@@ -4293,7 +4303,7 @@ class PlayerFrame(wx.Frame):
                 startupinfo = None
 
         produced = None
-        last_err = "download failed"
+        last_err = _("download failed")
         wider = False
         for extra in attempts:
             try:
@@ -4337,7 +4347,9 @@ class PlayerFrame(wx.Frame):
                 self._handle_media_load_error,
                 int(load_seq),
                 page_url,
-                f"Could not play this YouTube item. yt-dlp could not fetch it: {last_err}",
+                _("Could not play this YouTube item. yt-dlp could not fetch it: {error}").format(
+                    error=last_err
+                ),
                 True,
             )
             return
@@ -5349,13 +5361,13 @@ class PlayerFrame(wx.Frame):
     def _set_named_value_label(self, control, name: str, value: str) -> None:
         text = str(value)
         control.SetLabel(text)
-        control.SetName(f"{name}: {text}")
+        control.SetName(_("{name}: {value}").format(name=name, value=text))
 
     def _set_elapsed_time_label(self, value: str) -> None:
         self._set_named_value_label(self.current_time_lbl, _("Elapsed Time"), value)
 
     def _set_total_time_label(self, value: str) -> None:
-        self._set_named_value_label(self.total_time_lbl, "Total Time", value)
+        self._set_named_value_label(self.total_time_lbl, _("Total Time"), value)
 
     def _remaining_ms(self, position_ms: int) -> int | None:
         try:
@@ -5488,9 +5500,9 @@ class PlayerFrame(wx.Frame):
                     self.volume_slider.SetValue(int(percent))
             if getattr(self, "volume_value_lbl", None):
                 value = f"{int(percent)}%"
-                self._set_named_value_label(self.volume_value_lbl, "Volume Level", value)
+                self._set_named_value_label(self.volume_value_lbl, _("Volume Level"), value)
             if getattr(self, "volume_slider", None):
-                self.volume_slider.SetName(f"Volume: {int(percent)}%")
+                self.volume_slider.SetName(_("Volume: {percent}%").format(percent=int(percent)))
         except Exception:
             pass
         finally:

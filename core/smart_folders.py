@@ -31,6 +31,7 @@ Unknown/empty leaves are skipped in BOTH paths so the two never diverge. An empt
 """
 from __future__ import annotations
 
+from core.i18n import _
 BOOL_FIELDS = ("read", "favorite", "opened", "updated")
 # "tag" matches the newline-separated site tags/categories stored in
 # articles.tags (see providers.local tag extraction). In the Python evaluator the
@@ -287,35 +288,35 @@ def _describe_leaf(cond) -> str:
     if field in BOOL_FIELDS:
         want = _as_bool(value)
         labels = {
-            ("read", True): "is read",
-            ("read", False): "is unread",
-            ("favorite", True): "is a favorite",
-            ("favorite", False): "is not a favorite",
-            ("opened", True): "has been opened",
-            ("opened", False): "has not been opened",
-            ("updated", True): "was updated",
-            ("updated", False): "was not updated",
+            ("read", True): _("is read"),
+            ("read", False): _("is unread"),
+            ("favorite", True): _("is a favorite"),
+            ("favorite", False): _("is not a favorite"),
+            ("opened", True): _("has been opened"),
+            ("opened", False): _("has not been opened"),
+            ("updated", True): _("was updated"),
+            ("updated", False): _("was not updated"),
         }
         return labels.get((field, want), field)
     if field in TEXT_FIELDS:
         verb = {
-            "contains": "contains",
-            "not_contains": "does not contain",
-            "equals": "equals",
-            "starts_with": "starts with",
-        }.get(op, "contains")
-        return f'{field} {verb} "{value}"'
+            "contains": _("contains"),
+            "not_contains": _("does not contain"),
+            "equals": _("equals"),
+            "starts_with": _("starts with"),
+        }.get(op, _("contains"))
+        return _('{field} {verb} "{value}"').format(field=field, verb=verb, value=value)
     return ""
 
 
 def describe_rule(rule) -> str:
     """A short, screen-reader-friendly summary of a rule."""
     if not isinstance(rule, dict):
-        return "all articles"
+        return _("all articles")
 
     def _describe_group(group):
         match = str(group.get("match") or "all").lower()
-        joiner = " OR " if match == "any" else " AND "
+        joiner = _(" OR ") if match == "any" else _(" AND ")
         parts = []
         for cond in group.get("conditions") or []:
             if _is_group(cond):
@@ -329,4 +330,4 @@ def describe_rule(rule) -> str:
         return joiner.join(parts)
 
     text = _describe_group(rule)
-    return text or "all articles"
+    return text or _("all articles")
