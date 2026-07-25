@@ -1147,139 +1147,34 @@ class _Entry:
         self._bg_thread = threading.Thread(target=run, name="RangeCacheProxyBG", daemon=True)
         self._bg_thread.start()
 
-    def stop(self) -> None:
-        with self._lock:
-            if self._server is None:
-                return
-            try:
-                self._server.shutdown()
-            except Exception:
-                pass
-            try:
-                self._server.server_close()
-            except Exception:
-                pass
-            self._server = None
-            self._thread = None
-            self._port = None
-            self._ready.clear()
+    def stop_background(self) -> None:
+        """Stop this entry's background downloader and wait briefly for it to exit.
 
-    def _wait_ready(self, timeout: float = 2.0) -> bool:
-        import http.client
-        deadline = time.time() + max(0.1, float(timeout))
-        while time.time() < deadline:
-            with self._lock:
-                if self._port is None:
-                    time.sleep(0.05)
-                    continue
-                port = self._port
-            try:
-                conn = http.client.HTTPConnection(self._host, port, timeout=0.5)
-                conn.request("GET", "/health")
-                resp = conn.getresponse()
-                try:
-                    _ = resp.read()
-                except Exception:
-                    pass
-                ok = (resp.status == 200)
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-                if ok:
-                    self._ready.set()
-                    return True
-            except Exception:
-                try:
-                    conn.close()
-                except Exception:
-                    pass
-            time.sleep(0.05)
-        return False
-
-    def is_ready(self) -> bool:
-        # Active health check (the server may have died while the event is still set).
-        # Do not clear the readiness event on a single failure; transient hiccups
-        # should not trigger restarts that break in-flight VLC connections.
+        RangeCacheProxy.prune() has always called this; it went missing when a
+        copy of the proxy's own methods was pasted over it, and because the call
+        site swallows exceptions the failure was silent -- pruned entries kept
+        downloading into the cache.
+        """
         try:
-            return bool(self._wait_ready(timeout=0.25))
+            self._bg_stop.set()
         except Exception:
-            return False
-
-    @property
-    def base_url(self) -> str:
-        self.start()
+            return
+        thread = getattr(self, "_bg_thread", None)
+        if thread is None:
+            return
         try:
-            self._ready.wait(timeout=2.0)
+            if thread.is_alive() and thread is not threading.current_thread():
+                thread.join(timeout=1.0)
         except Exception:
             pass
-        with self._lock:
-            if self._port is None:
-                raise RuntimeError("RangeCacheProxy not started")
-            return f"http://{self._host}:{self._port}"
+        self._bg_thread = None
 
-    def proxify(self, url: str, headers: Optional[Dict[str, str]] = None, skip_redirect_resolve: bool = False) -> str:
-        """
-        Register a URL and return a local proxy URL.
-
-        The id is a short stable hash of (url + headers subset). Using a stable id
-        allows VLC retries without re-registering, while keeping cache per URL.
-        """
-        if not url:
-            return url
-        self.start()
-
-        # Include headers in id because some hosts require specific Referer/User-Agent
-        # to permit range access.
-        h = headers or {}
-        id_src = url + "\n" + "\n".join(f"{k.lower()}:{v}" for k, v in sorted(h.items(), key=lambda kv: kv[0].lower()))
-        sid = _sha256_hex(id_src)[:24]
-
-        # Persist the mapping so /media can still resolve even if the in-memory entry is missing.
-        self._save_mapping(sid, url, headers)
-
-        ent = self._get_or_create_entry(sid, url, headers)
-        
-        # If the caller says redirects are already resolved, set real_url to skip that step in probe()
-        if skip_redirect_resolve:
-            ent.real_url = url
-        
-        # Launch probe in a background thread so proxify() returns immediately.
-        # The HTTP handler will wait for the probe if needed when VLC requests bytes.
-        def _bg_probe():
-            try:
-                # Never hold ent.lock (segment/cache lock) while probing the origin.
-                # A slow probe would otherwise block /media reads and delay playback.
-                ent.probe()
-            except Exception:
-                pass
-        try:
-            threading.Thread(target=_bg_probe, daemon=True).start()
-        except Exception:
-            pass
-
-        return f"{self.base_url}/media?id={sid}"
-
-    def prune(self, max_entries: int = 20, max_idle_seconds: int = 1800) -> None:
-        # Optional: drop very old entries from memory.
-        now = time.time()
-        with self._lock:
-            items = list(self._entries.items())
-            items.sort(key=lambda kv: kv[1].last_access)
-            # Remove idle
-            for sid, ent in items:
-                if len(self._entries) <= max_entries:
-                    break
-                if now - ent.last_access < max_idle_seconds:
-                    continue
-                try:
-                    ent.stop_background()
-                except Exception:
-                    pass
-                self._entries.pop(sid, None)
 
 
 class RangeCacheProxy:
+    #: How long a successful /health probe is trusted before we re-verify.
+    _READY_RECHECK_SECONDS = 5.0
+
     def __init__(
         self,
         cache_dir: Optional[str] = None,
@@ -1314,6 +1209,8 @@ class RangeCacheProxy:
         self._entries: Dict[str, _Entry] = {}
         self._lock = threading.RLock()
 
+        # Monotonic timestamp of the last successful /health round trip.
+        self._last_ready_check = 0.0
         self._server: Optional[_ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
         self._host = "127.0.0.1"
@@ -1418,8 +1315,16 @@ class RangeCacheProxy:
                 pass
 
         if self._server is not None and self._thread is not None and self._thread.is_alive():
+            # Re-probing a live server on every call is what made proxify() cost
+            # ~1s. The thread being alive plus a recent successful probe is enough;
+            # re-verify only after _READY_RECHECK_SECONDS so a server that died
+            # without taking its thread down is still noticed.
+            now = time.monotonic()
+            if self._ready.is_set() and (now - self._last_ready_check) < self._READY_RECHECK_SECONDS:
+                return
             try:
-                self._wait_ready(timeout=1.0)
+                if self._wait_ready(timeout=1.0):
+                    self._last_ready_check = now
             except Exception:
                 pass
             return
@@ -1459,15 +1364,27 @@ class RangeCacheProxy:
                         raise
 
                 def _send_health(self) -> None:
+                    # Send headers and body in a SINGLE flush. A separate
+                    # wfile.write() after end_headers() never reaches the client
+                    # here: the caller then blocked for its whole socket timeout
+                    # on resp.read() and only "passed" because the status line had
+                    # already parsed, which cost ~0.5s on every readiness check
+                    # (three per playback start).
                     body = b"ok"
                     self.send_response(200)
                     self.send_header("Content-Type", "text/plain; charset=utf-8")
                     self.send_header("Content-Length", str(len(body)))
-                    self.end_headers()
                     try:
-                        self.wfile.write(body)
+                        self._headers_buffer.append(b"\r\n" + body)
+                        self.flush_headers()
                     except Exception:
-                        pass
+                        # Fall back to the two-step form rather than answer nothing.
+                        try:
+                            self.end_headers()
+                            self.wfile.write(body)
+                            self.wfile.flush()
+                        except Exception:
+                            pass
 
                 def do_HEAD(self) -> None:
                     parsed = urlparse(self.path)
@@ -1810,11 +1727,16 @@ class RangeCacheProxy:
                 conn = http.client.HTTPConnection(self._host, port, timeout=0.5)
                 conn.request("GET", "/health")
                 resp = conn.getresponse()
+                # Read the body and require it: a half-delivered response means
+                # the server is not actually answering, and treating that as
+                # "ready" is what masked the stalled /health handler.
+                body = b""
+                read_ok = True
                 try:
-                    _ = resp.read()
+                    body = resp.read()
                 except Exception:
-                    pass
-                ok = (resp.status == 200)
+                    read_ok = False
+                ok = (resp.status == 200) and read_ok and body == b"ok"
                 try:
                     conn.close()
                 except Exception:
@@ -1831,16 +1753,35 @@ class RangeCacheProxy:
         return False
 
     def is_ready(self) -> bool:
-        # Active health check (the server may have died while the event is still set).
-        # Do not clear the readiness event on a single failure; transient hiccups
-        # should not trigger restarts that break in-flight VLC connections.
+        """Best-effort readiness, cheap by design.
+
+        Callers treat this as advisory (gui/player.py logs it and proceeds either
+        way), so it must not block: a recent successful probe answers immediately
+        and only a stale one pays for a fresh round trip. Never clear the readiness
+        event on a single failure -- a transient hiccup must not trigger a restart
+        that breaks in-flight VLC connections.
+        """
         try:
-            return bool(self._wait_ready(timeout=0.25))
+            if self._ready.is_set() and (
+                time.monotonic() - self._last_ready_check
+            ) < self._READY_RECHECK_SECONDS:
+                return True
+            ok = bool(self._wait_ready(timeout=0.25))
+            if ok:
+                self._last_ready_check = time.monotonic()
+            return ok
         except Exception:
             return False
 
     @property
     def base_url(self) -> str:
+        # Fast path: the port is bound before the serving thread starts, so once
+        # we have one there is nothing to wait for. Only a genuinely unstarted
+        # proxy pays for start() and the readiness wait.
+        with self._lock:
+            port = self._port
+        if port is not None:
+            return f"http://{self._host}:{port}"
         self.start()
         try:
             self._ready.wait(timeout=2.0)

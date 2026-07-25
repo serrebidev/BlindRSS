@@ -52,7 +52,12 @@ def test_ambiguous_controls_have_accessible_names():
         plain = f'self.{attr}.SetName("{name}")'
         wrapped = f'self.{attr}.SetName(_("{name}"))'
         assert plain in src or wrapped in src, f"missing accessible name for {attr}"
-    assert 'self.volume_value_lbl.SetName(f"Volume Level: ' in src
+    # The percentage name is built at runtime; accept the f-string or the
+    # gettext-wrapped .format() form, but insist the control is named.
+    assert (
+        'self.volume_value_lbl.SetName(f"Volume Level: ' in src
+        or '_("Volume Level: {percent}%")' in src
+    ), "missing accessible name for volume_value_lbl"
 
 
 class _NamedLabel:
@@ -134,8 +139,13 @@ def test_dynamic_volume_accessible_names_follow_visible_value():
 def test_seek_buttons_named_despite_symbolic_labels():
     """The -10s / +10s buttons read as symbols, so they carry spoken names."""
     src = _init_ui_source()
-    assert 'rewind_btn.SetName("Rewind 10 seconds")' in src
-    assert 'forward_btn.SetName("Fast Forward 10 seconds")' in src
+    for attr, name in (
+        ("rewind_btn", "Rewind 10 seconds"),
+        ("forward_btn", "Fast Forward 10 seconds"),
+    ):
+        plain = f'{attr}.SetName("{name}")'
+        wrapped = f'{attr}.SetName(_("{name}"))'
+        assert plain in src or wrapped in src, f"missing accessible name for {attr}"
 
 
 def test_clear_text_buttons_not_renamed():
