@@ -36,6 +36,7 @@ from __future__ import annotations
 
 from core import smart_folders as _sf
 
+from core.i18n import _
 # Boolean action keys OR-combined across matching rules.
 BOOL_ACTIONS = ("mark_read", "mark_favorite", "delete", "skip_notification")
 
@@ -260,15 +261,15 @@ def describe_actions(actions) -> str:
     a = normalize_actions(actions)
     parts = []
     if a["move"]:
-        parts.append(f'move to "{a["move"]}"')
+        parts.append(_('move to "{category}"').format(category=a["move"]))
     if a["label"]:
-        parts.append(f'label "{a["label"]}"')
+        parts.append(_('label "{label}"').format(label=a["label"]))
     if a["mark_read"]:
-        parts.append("mark as read")
+        parts.append(_("mark as read"))
     if a["mark_favorite"]:
-        parts.append("mark as favorite")
+        parts.append(_("mark as favorite"))
     if a["delete"]:
-        parts.append("delete")
+        parts.append(_("delete"))
     if a["skip_notification"]:
-        parts.append("skip notification")
-    return ", ".join(parts) if parts else "do nothing"
+        parts.append(_("skip notification"))
+    return ", ".join(parts) if parts else _("do nothing")

@@ -128,6 +128,33 @@ ARTICLE_MEDIA_YES = "Contains audio"
 ARTICLE_MEDIA_NO = "No audio"
 
 
+# Translation anchors -- SmartFolderDialog._FIELDS / ._OPS labels are translated
+# at display time, which the AST-based POT extractor cannot follow. Keep in sync
+# with those tables.
+_RULE_LABEL_POT_ANCHORS = (
+    _("(no condition)"),
+    _("Title"),
+    _("Content"),
+    _("Description"),
+    _("Author"),
+    _("Feed / Publication"),
+    _("Link (URL)"),
+    _("Tag / Site category"),
+    _("Is unread"),
+    _("Is read"),
+    _("Is favorite"),
+    _("Is not favorite"),
+    _("Has been opened"),
+    _("Has not been opened"),
+    _("Was updated since first fetch"),
+    _("Was not updated"),
+    _("contains"),
+    _("does not contain"),
+    _("equals"),
+    _("starts with"),
+)
+
+
 def should_show_add_shortcuts(platform=None):
     """Whether to offer the "Add Shortcuts..." File-menu item.
 
@@ -234,8 +261,8 @@ class MainFrame(wx.Frame):
         # Article paging
         self.article_page_size = 400
         self._load_more_inflight = False
-        self._load_more_label = "Load more items (Enter)"
-        self._loading_label = "Loading more..."
+        self._load_more_label = _("Load more items (Enter)")
+        self._loading_label = _("Loading more...")
         # Chunked article-list rendering keeps the UI thread (and NVDA) responsive
         # on large feeds. The first chunk renders synchronously for immediate
         # content; the rest is appended in bounded wx.CallAfter batches. Bumping
@@ -487,7 +514,7 @@ class MainFrame(wx.Frame):
                     )
 
                     if wx.MessageBox(msg, _("Install Dependencies"), wx.YES_NO | wx.ICON_QUESTION) == wx.YES:
-                        self.SetStatusText("Installing dependencies...")
+                        self.SetStatusText(_("Installing dependencies..."))
                         # Run in thread to avoid freezing
                         threading.Thread(
                             target=self._install_dependencies_thread,
@@ -501,7 +528,7 @@ class MainFrame(wx.Frame):
                     )
 
                     if wx.MessageBox(msg, _("Install Dependencies"), wx.YES_NO | wx.ICON_QUESTION) == wx.YES:
-                        self.SetStatusText("Installing dependencies...")
+                        self.SetStatusText(_("Installing dependencies..."))
                         threading.Thread(
                             target=self._install_dependencies_thread,
                             args=(missing_vlc, missing_ffmpeg, missing_ytdlp),
@@ -584,15 +611,19 @@ class MainFrame(wx.Frame):
             return
 
         lines = []
-        for key, label in (("desktop", "Desktop"), ("start_menu", "Start Menu"), ("taskbar", "Taskbar")):
+        for key, label in (
+            ("desktop", _("Desktop")),
+            ("start_menu", _("Start Menu")),
+            ("taskbar", _("Taskbar")),
+        ):
             if key not in results:
                 continue
-            ok, message = results.get(key, (False, "Unknown error"))
-            prefix = "OK" if ok else "Failed"
+            ok, message = results.get(key, (False, _("Unknown error")))
+            prefix = _("OK") if ok else _("Failed")
             detail = f": {message}" if message else ""
             lines.append(f"{label}: {prefix}{detail}")
         if not lines:
-            lines.append("No shortcut actions were performed.")
+            lines.append(_("No shortcut actions were performed."))
 
         failed = any(not bool(results.get(k, (True, ""))[0]) for k in results.keys())
         wx.MessageBox("\n".join(lines), _("Shortcuts"), wx.ICON_WARNING if failed else wx.ICON_INFORMATION)
@@ -613,18 +644,18 @@ class MainFrame(wx.Frame):
         
         # Left: Tree (Feeds)
         self.tree = wx.TreeCtrl(splitter, style=wx.TR_DEFAULT_STYLE | wx.TR_HIDE_ROOT | wx.TR_HAS_BUTTONS)
-        self.tree.SetName("Feeds and folders")
+        self.tree.SetName(_("Feeds and folders"))
         self.root = self.tree.AddRoot("Root")
-        self.all_feeds_node = self.tree.AppendItem(self.root, "All Feeds")
+        self.all_feeds_node = self.tree.AppendItem(self.root, _("All Feeds"))
         
         # Right: Search + Splitter (List + Content)
         right_panel = wx.Panel(splitter)
         right_sizer = wx.BoxSizer(wx.VERTICAL)
 
         self.search_ctrl = wx.SearchCtrl(right_panel, style=wx.TE_PROCESS_ENTER)
-        self.search_ctrl.SetName("Search articles")
+        self.search_ctrl.SetName(_("Search articles"))
         try:
-            self.search_ctrl.SetDescriptiveText("Filter current view (Enter)")
+            self.search_ctrl.SetDescriptiveText(_("Filter current view (Enter)"))
         except Exception:
             try:
                 self.search_ctrl.SetHint(_("Filter current view (Enter)"))
@@ -1569,7 +1600,7 @@ class MainFrame(wx.Frame):
             display_articles = self._filter_articles(base_articles, self._search_query)
         self.current_articles = self._sort_articles_for_display(display_articles)
         self._remove_loading_more_placeholder()
-        empty_label = "No matches." if (self._is_search_active() and base_articles) else _("No articles found.")
+        empty_label = _("No matches.") if (self._is_search_active() and base_articles) else _("No articles found.")
         self._render_articles_list(self.current_articles, empty_label=empty_label)
 
         show_more = self._should_show_load_more_placeholder(len(base_articles))
@@ -1613,7 +1644,7 @@ class MainFrame(wx.Frame):
         self.current_articles = self._sort_articles_for_display(filtered)
 
         self._remove_loading_more_placeholder()
-        empty_label = "No matches." if base_articles else _("No articles found.")
+        empty_label = _("No matches.") if base_articles else _("No articles found.")
         self._render_articles_list(self.current_articles, empty_label=empty_label)
 
         show_more = self._should_show_load_more_placeholder(len(base_articles))
@@ -1974,7 +2005,7 @@ class MainFrame(wx.Frame):
 
             self.current_articles = self._sort_articles_for_display(display_articles)
             self._remove_loading_more_placeholder()
-            empty_label = "No matches." if (self._is_search_active() and base_articles) else _("No articles found.")
+            empty_label = _("No matches.") if (self._is_search_active() and base_articles) else _("No articles found.")
             self._render_articles_list(self.current_articles, empty_label=empty_label)
             if self._is_search_active():
                 try:
@@ -3483,7 +3514,7 @@ class MainFrame(wx.Frame):
 
     def _format_player_chapter_menu_label(self, chapter: dict) -> str:
         timestamp = self._format_chapter_timestamp(chapter.get("start", 0))
-        title = str(chapter.get("title", "") or "").strip() or "Untitled chapter"
+        title = str(chapter.get("title", "") or "").strip() or _("Untitled chapter")
         return f"{timestamp}, {title}"
 
     def _clear_menu_items(self, menu: wx.Menu) -> None:
@@ -3898,7 +3929,7 @@ class MainFrame(wx.Frame):
         if not (article_url or media_url):
             return None
 
-        title = str(payload.get("title") or "New article").strip() or "New article"
+        title = str(payload.get("title") or _("New article")).strip() or _("New article")
         feed_id = str(payload.get("feed_id") or "").strip()
         return Article(
             title=title,
@@ -4010,7 +4041,7 @@ class MainFrame(wx.Frame):
             return None
         return {
             "article_id": article_id,
-            "title": str(item.get("title") or "New article").strip() or "New article",
+            "title": str(item.get("title") or _("New article")).strip() or _("New article"),
             "url": url,
             "feed_id": str(feed_id or item.get("feed_id") or "").strip(),
             "media_url": media_url,
@@ -4044,7 +4075,7 @@ class MainFrame(wx.Frame):
             if article_id and (article_id in notified_ids or article_id in seen):
                 continue
             seen.add(article_id)
-            title = str(getattr(article, "title", "") or "").strip() or "New article"
+            title = str(getattr(article, "title", "") or "").strip() or _("New article")
             preview = self._notification_preview_text(getattr(article, "content", "") or "")
             article_url = str(getattr(article, "url", "") or "").strip()
             media_url = str(getattr(article, "media_url", "") or "").strip()
@@ -4119,7 +4150,7 @@ class MainFrame(wx.Frame):
                     if article_id in notified_ids:
                         continue
                     notified_ids.add(article_id)
-                title = str(item.get("title") or "New article").strip() or "New article"
+                title = str(item.get("title") or _("New article")).strip() or _("New article")
                 preview = self._notification_preview_text(item.get("preview") or "")
                 body = self._build_notification_body(preview, feed_title, include_feed)
                 activation_payload = self._build_notification_activation_payload(item, feed_id=feed_id)
@@ -4129,8 +4160,8 @@ class MainFrame(wx.Frame):
                     remaining = max(0, remaining - 1)
 
             for _ in range(max(0, generic_count - sent)):
-                body = feed_title if (include_feed and feed_title) else "New article available."
-                wx.CallAfter(self._show_windows_notification, "New article", body)
+                body = feed_title if (include_feed and feed_title) else _("New article available.")
+                wx.CallAfter(self._show_windows_notification, _("New article"), body)
                 if not unlimited:
                     remaining = max(0, remaining - 1)
             if not unlimited:
@@ -4148,7 +4179,7 @@ class MainFrame(wx.Frame):
                 if article_id in notified_ids:
                     continue
                 notified_ids.add(article_id)
-            article_title = str(item.get("title") or "New article").strip() or "New article"
+            article_title = str(item.get("title") or _("New article")).strip() or _("New article")
             preview = self._notification_preview_text(
                 item.get("preview") or item.get("content") or item.get("summary") or ""
             )
@@ -4387,7 +4418,11 @@ class MainFrame(wx.Frame):
                 wx.CallAfter(
                     self._show_windows_notification,
                     "BlindRSS",
-                    f"{hidden} new article notification(s) were suppressed by your cap.",
+                    ngettext(
+                        "{count} new article notification was suppressed by your cap.",
+                        "{count} new article notifications were suppressed by your cap.",
+                        hidden,
+                    ).format(count=hidden),
                 )
             if new_items_total > 0:
                 self._play_sound("sound_refresh_complete")
@@ -4761,7 +4796,7 @@ class MainFrame(wx.Frame):
             folder = get_smart_folder(smart_id)
         except Exception:
             folder = None
-        name = (folder or {}).get("name") or "this Smart Folder"
+        name = (folder or {}).get("name") or _("this Smart Folder")
         if wx.MessageBox(
             _('Delete Smart Folder "{name}"? Your articles are not affected.').format(name=name),
             _("Delete Smart Folder"),
@@ -5173,7 +5208,7 @@ class MainFrame(wx.Frame):
 
         try:
             sizer = wx.BoxSizer(wx.VERTICAL)
-            title = str(getattr(article, "title", "") or "Feed description")
+            title = str(getattr(article, "title", "") or _("Feed description"))
             title_lbl = wx.StaticText(dlg, label=title)
             sizer.Add(title_lbl, 0, wx.ALL | wx.EXPAND, 8)
 
@@ -5182,7 +5217,7 @@ class MainFrame(wx.Frame):
                 value=description,
                 style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2,
             )
-            desc_ctrl.SetName("Feed description")
+            desc_ctrl.SetName(_("Feed description"))
             sizer.Add(desc_ctrl, 1, wx.LEFT | wx.RIGHT | wx.BOTTOM | wx.EXPAND, 8)
 
             btns = wx.BoxSizer(wx.HORIZONTAL)
@@ -5225,7 +5260,7 @@ class MainFrame(wx.Frame):
             self.reader_panel,
             style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2,
         )
-        ctrl.SetName("Article text")
+        ctrl.SetName(_("Article text"))
         ctrl.Bind(wx.EVT_SET_FOCUS, self.on_content_focus)
         ctrl.Bind(wx.EVT_TEXT_COPY, self.on_content_copy)
         ctrl.Bind(wx.EVT_CONTEXT_MENU, self.on_content_context_menu)
@@ -6010,7 +6045,12 @@ class MainFrame(wx.Frame):
 
                         # Refresh UI for this item
                         wx.CallAfter(self._refresh_article_in_list, self._article_cache_id(article))
-                        wx.CallAfter(wx.MessageBox, "Audio detected and added!", "Success", wx.ICON_INFORMATION)
+                        wx.CallAfter(
+                            wx.MessageBox,
+                            _("Audio detected and added!"),
+                            _("Success"),
+                            wx.ICON_INFORMATION,
+                        )
                     else:
                          wx.CallAfter(wx.MessageBox, _("Provider does not support updating media."), _("Error"), wx.ICON_ERROR)
                 else:
@@ -6233,17 +6273,17 @@ class MainFrame(wx.Frame):
 
         row = wx.BoxSizer(wx.HORIZONTAL)
         listbox = wx.ListBox(dlg, style=wx.LB_SINGLE)
-        listbox.SetName("Versions")
+        listbox.SetName(_("Versions"))
         for i, v in enumerate(versions):
             num = total - i  # highest number is the current version
             ts = v.get("captured_at") or 0
-            when = time.strftime("%Y-%m-%d %H:%M", time.localtime(float(ts))) if ts else "unknown time"
-            suffix = " (current)" if i == 0 else (" (original)" if num == 1 else "")
+            when = time.strftime("%Y-%m-%d %H:%M", time.localtime(float(ts))) if ts else _("unknown time")
+            suffix = _(" (current)") if i == 0 else (_(" (original)") if num == 1 else "")
             listbox.Append(_("Version {num} - {when}{suffix}").format(num=num, when=when, suffix=suffix))
         row.Add(listbox, 1, wx.EXPAND | wx.ALL, 8)
 
         text = wx.TextCtrl(dlg, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2)
-        text.SetName("Version content")
+        text.SetName(_("Version content"))
         row.Add(text, 2, wx.EXPAND | wx.ALL, 8)
         sizer.Add(row, 1, wx.EXPAND)
 
@@ -6927,7 +6967,7 @@ class MainFrame(wx.Frame):
             try:
                 ok = bool(self.provider.purge_deleted_article(article_id, feed_id))
             except Exception as e:
-                err = str(e) or "Unknown error"
+                err = str(e) or _("Unknown error")
             results.append((article_id, article_cache_id, cache_key, ok, err))
         wx.CallAfter(self._post_delete_articles, results, anchor_idx)
 
@@ -6943,7 +6983,7 @@ class MainFrame(wx.Frame):
             try:
                 ok = bool(self.provider.delete_article(article_id))
             except Exception as e:
-                err = str(e) or "Unknown error"
+                err = str(e) or _("Unknown error")
             results.append((article_id, article_cache_id, cache_key, ok, err))
         wx.CallAfter(self._post_delete_articles, results, anchor_idx)
 
@@ -7073,7 +7113,7 @@ class MainFrame(wx.Frame):
         try:
             self._remove_loading_more_placeholder()
             self.list_ctrl.DeleteAllItems()
-            label = "No matches." if (self._is_search_active() and getattr(self, "_base_articles", None)) else _("No articles found.")
+            label = _("No matches.") if (self._is_search_active() and getattr(self, "_base_articles", None)) else _("No articles found.")
             self.list_ctrl.InsertItem(0, label)
             self.content_ctrl.Clear()
             self._invalidate_reader_text_tracking()
@@ -7257,7 +7297,7 @@ class MainFrame(wx.Frame):
 
         sizer.Add(wx.StaticText(dlg, label=_("Category name:")), 0, wx.ALL, 5)
         name_ctrl = wx.TextCtrl(dlg)
-        name_ctrl.SetName("Category name")
+        name_ctrl.SetName(_("Category name"))
         sizer.Add(name_ctrl, 0, wx.EXPAND | wx.ALL, 5)
 
         parent_ctrl = None
@@ -7630,7 +7670,7 @@ class MainFrame(wx.Frame):
 
     def _set_tray_activity_label(self, text: str | None, *, update: bool = True) -> None:
         activity = " ".join(str(text or "").split())
-        if activity == "Refresh complete":
+        if activity == _("Refresh complete"):
             activity = ""
         self._tray_activity_label = activity
         if update:
@@ -8443,7 +8483,9 @@ class MainFrame(wx.Frame):
                     self.tree.SetItemData(self.smart_root_node, {"type": "smart_root"})
                     for folder in (self.provider.get_smart_folders() or []):
                         sid = folder.get("id")
-                        node = self.tree.AppendItem(self.smart_root_node, folder.get("name") or "Smart Folder")
+                        node = self.tree.AppendItem(
+                            self.smart_root_node, folder.get("name") or _("Smart Folder")
+                        )
                         self.tree.SetItemData(node, {"type": "smart", "id": f"smart:{sid}", "smart_id": sid})
                         self.smart_folder_nodes[sid] = node
                     if self.smart_folder_nodes:
@@ -8816,7 +8858,7 @@ class MainFrame(wx.Frame):
             self._set_base_articles([], feed_id)
             self._remove_loading_more_placeholder()
             self.list_ctrl.DeleteAllItems()
-            self.list_ctrl.InsertItem(0, "Loading...")
+            self.list_ctrl.InsertItem(0, _("Loading..."))
             self.content_ctrl.Clear()
             self._invalidate_reader_text_tracking()
 
@@ -8982,11 +9024,15 @@ class MainFrame(wx.Frame):
 
         self.current_articles = self._sort_articles_for_display(display_articles)
         self.list_ctrl.DeleteAllItems()
-        empty_label = "No matches." if (self._is_search_active() and base_articles) else _("No articles found.")
+        empty_label = _("No matches.") if (self._is_search_active() and base_articles) else _("No articles found.")
         self._render_articles_list(self.current_articles, empty_label=empty_label)
         if self._is_search_active():
             try:
-                self.SetStatusText(f"Filter: {len(self.current_articles)} of {len(base_articles)}")
+                self.SetStatusText(
+                    _("Filter: {shown} of {total}").format(
+                        shown=len(self.current_articles), total=len(base_articles)
+                    )
+                )
             except Exception:
                 pass
 
@@ -9107,11 +9153,15 @@ class MainFrame(wx.Frame):
             display_articles = self._filter_articles(combined, self._search_query)
         self.current_articles = self._sort_articles_for_display(display_articles)
 
-        empty_label = "No matches." if (self._is_search_active() and combined) else _("No articles found.")
+        empty_label = _("No matches.") if (self._is_search_active() and combined) else _("No articles found.")
         self._render_articles_list(self.current_articles, empty_label=empty_label)
         if self._is_search_active():
             try:
-                self.SetStatusText(f"Filter: {len(self.current_articles)} of {len(combined)}")
+                self.SetStatusText(
+                    _("Filter: {shown} of {total}").format(
+                        shown=len(self.current_articles), total=len(combined)
+                    )
+                )
             except Exception:
                 pass
 
@@ -9597,11 +9647,15 @@ class MainFrame(wx.Frame):
                 # render is still in flight — rebuild the whole list.
                 self._remove_loading_more_placeholder()
 
-                empty_label = "No matches." if (self._is_search_active() and combined) else _("No articles found.")
+                empty_label = _("No matches.") if (self._is_search_active() and combined) else _("No articles found.")
                 self._render_articles_list(self.current_articles, empty_label=empty_label)
                 if self._is_search_active():
                     try:
-                        self.SetStatusText(f"Filter: {len(self.current_articles)} of {len(combined)}")
+                        self.SetStatusText(
+                    _("Filter: {shown} of {total}").format(
+                        shown=len(self.current_articles), total=len(combined)
+                    )
+                )
                     except Exception:
                         pass
 
@@ -9677,7 +9731,7 @@ class MainFrame(wx.Frame):
             self._fulltext_token += 1
             
             # Immediate feedback (fast)
-            self.content_ctrl.SetValue("Loading...")
+            self.content_ctrl.SetValue(_("Loading..."))
             self._invalidate_reader_text_tracking()
 
             # Debounce heavy operations (HTML parsing, marking read, etc.)
@@ -9892,11 +9946,15 @@ class MainFrame(wx.Frame):
         # Announce, don't interrupt: a modal dialog forces the screen-reader user
         # to dismiss an OK button just to keep reading. A live announcement is
         # spoken by NVDA/JAWS and leaves keyboard focus in the article text.
-        self._announce(f'"{term}" was not found.')
+        self._announce(_('"{term}" was not found.').format(term=term))
 
     def _content_find_no_more(self, term, forward: bool):
-        where = "No more occurrences" if forward else "No previous occurrences"
-        self._announce(f'{where} of "{term}".')
+        template = (
+            _('No more occurrences of "{term}".')
+            if forward
+            else _('No previous occurrences of "{term}".')
+        )
+        self._announce(template.format(term=term))
 
     def _announce_event(self, event_id: str, message: str) -> None:
         """Announce a key-event message (issue #67) via the configured mode.
@@ -10356,7 +10414,7 @@ class MainFrame(wx.Frame):
                 if msg:
                     if len(msg) > 180:
                         msg = msg[:177].rstrip() + "..."
-                    self.SetStatusText(f"Translation failed: {msg}")
+                    self.SetStatusText(_("Translation failed: {error}").format(error=msg))
             except Exception:
                 pass
             return text
@@ -10426,9 +10484,16 @@ class MainFrame(wx.Frame):
         if not text:
             return False
         low = text.lower()
-        if "full-text extraction failed. showing feed content." in low:
-            return True
-        if "no webpage url for this item. showing feed content." in low:
+        # Compare against the translated notes as well: the notes below are
+        # emitted through gettext, so an English-only check silently fails
+        # for every non-English UI.
+        notes = (
+            "full-text extraction failed. showing feed content.",
+            "no webpage url for this item. showing feed content.",
+            _("Full-text extraction failed. Showing feed content.").lower(),
+            _("No webpage URL for this item. Showing feed content.").lower(),
+        )
+        if any(note in low for note in notes):
             return True
         return False
 
@@ -10862,7 +10927,7 @@ class MainFrame(wx.Frame):
                 try:
                     provider_html = self._provider_fetch_full_content(req.get("article_id"), url)
                 except Exception as e:
-                    if not err: err = str(e) or "Unknown error"
+                    if not err: err = str(e) or _("Unknown error")
                 if provider_html:
                     _metadata_sink(provider_html, url)
                     try:
@@ -10875,7 +10940,7 @@ class MainFrame(wx.Frame):
                         )
                         render_source = "provider"
                     except Exception as e:
-                        if not err: err = str(e) or "Unknown error"
+                        if not err: err = str(e) or _("Unknown error")
                         rendered = None
             else:
                 if is_web_eligible:
@@ -10907,7 +10972,7 @@ class MainFrame(wx.Frame):
                         )
                         render_source = "feed_preferred" if prefer_feed_first else "web"
                     except Exception as e:
-                        err = str(e) or "Unknown error"
+                        err = str(e) or _("Unknown error")
                         rendered = None
 
                 # If web extraction failed, try provider-side fetch.
@@ -10916,7 +10981,7 @@ class MainFrame(wx.Frame):
                     try:
                         provider_html = self._provider_fetch_full_content(req.get("article_id"), url)
                     except Exception as e:
-                        if not err: err = str(e) or "Unknown error"
+                        if not err: err = str(e) or _("Unknown error")
                     if provider_html:
                         _metadata_sink(provider_html, url)
                         try:
@@ -10929,7 +10994,7 @@ class MainFrame(wx.Frame):
                             )
                             render_source = "provider"
                         except Exception as e:
-                            if not err: err = str(e) or "Unknown error"
+                            if not err: err = str(e) or _("Unknown error")
                             rendered = None
 
             if not rendered:
@@ -10965,7 +11030,7 @@ class MainFrame(wx.Frame):
                         stripped_fallback = (self._strip_html(fallback_html) or "").strip()
                     except Exception:
                         stripped_fallback = ""
-                    final_text += stripped_fallback or "No text available.\n"
+                    final_text += stripped_fallback or _("No text available.\n")
                 rendered = final_text
                 render_source = "fallback"
 
@@ -11102,11 +11167,11 @@ class MainFrame(wx.Frame):
         lines = [_("Chapters ({count}):").format(count=len(chapter_list))]
         for chapter in chapter_list:
             timestamp = self._format_chapter_timestamp(chapter.get("start", 0))
-            title = str(chapter.get("title", "") or "").strip() or "Untitled chapter"
+            title = str(chapter.get("title", "") or "").strip() or _("Untitled chapter")
             line = f"{timestamp}, {title}"
             href = str(chapter.get("href", "") or "").strip()
             if href:
-                line += f". Link: {href}"
+                line += _(". Link: {url}").format(url=href)
             lines.append(line)
         return "\n\n" + "\n".join(lines) + "\n"
 
@@ -11436,7 +11501,7 @@ class MainFrame(wx.Frame):
                 else:
                     ok = bool(self.provider.mark_read_batch(unread_ids))
         except Exception as e:
-            err = str(e) or "Unknown error"
+            err = str(e) or _("Unknown error")
         wx.CallAfter(self._post_mark_all_read, feed_id, ok, unread_ids, err, used_direct)
 
     def _is_global_mark_all_view(self, feed_id: str) -> bool:
@@ -11555,7 +11620,7 @@ class MainFrame(wx.Frame):
 
     def _post_mark_all_read(self, feed_id: str, ok: bool, unread_ids: list[str], err: str = "", used_direct: bool = False):
         if not ok:
-            msg = "Failed to mark all items as read."
+            msg = _("Failed to mark all items as read.")
             if err:
                 msg += f"\n\n{err}"
             wx.MessageBox(msg, _("Error"), wx.ICON_ERROR)
@@ -12319,7 +12384,7 @@ class MainFrame(wx.Frame):
             except Exception:
                 startupinfo = None
 
-        last_err = "yt-dlp download failed"
+        last_err = _("yt-dlp download failed")
         timed_out = False
         for extra in attempts:
             # Audio presets never mux video, so the MKV rescue below does not
@@ -12349,7 +12414,7 @@ class MainFrame(wx.Frame):
                     self._post_activity_status(_("Download failed: {title}").format(title=title))
                     return
                 except subprocess.TimeoutExpired:
-                    last_err = "yt-dlp download timed out"
+                    last_err = _("yt-dlp download timed out")
                     timed_out = True
                     break
                 except Exception as e:
@@ -12450,7 +12515,7 @@ class MainFrame(wx.Frame):
             error_message = str(e) or type(e).__name__
             wx.CallAfter(
                 lambda message=error_message: wx.MessageBox(
-                    f"Download failed: {message}",
+                    _("Download failed: {error}").format(error=message),
                     _("Download error"),
                     wx.ICON_ERROR,
                 )
@@ -12549,7 +12614,7 @@ class MainFrame(wx.Frame):
         if dlg.ShowModal() == wx.ID_OK:
             url, cat = dlg.get_data()
             if url:
-                self.SetTitle(f"BlindRSS - Adding feed {url}...")
+                self.SetTitle(_("BlindRSS - Adding feed {url}...").format(url=url))
                 threading.Thread(target=self._add_feed_thread, args=(url, cat), daemon=True).start()
         dlg.Destroy()
 
@@ -12793,9 +12858,9 @@ class MainFrame(wx.Frame):
 
     def _begin_feed_removal(self, feed_id: str, feed_title: str | None) -> None:
         if feed_title:
-            self.SetTitle(f"BlindRSS - Removing feed {feed_title}...")
+            self.SetTitle(_("BlindRSS - Removing feed {title}...").format(title=feed_title))
         else:
-            self.SetTitle("BlindRSS - Removing feed...")
+            self.SetTitle(_("BlindRSS - Removing feed..."))
         self._start_critical_worker(
             self._remove_feed_thread,
             args=(feed_id, feed_title),
@@ -12832,18 +12897,18 @@ class MainFrame(wx.Frame):
             self._selection_hint = None
             parts = []
             if feed_title:
-                parts.append(f"Could not remove feed '{feed_title}'.")
+                parts.append(_("Could not remove feed '{title}'.").format(title=feed_title))
             else:
-                parts.append("Could not remove feed.")
+                parts.append(_("Could not remove feed."))
 
             if error_message:
                 low = str(error_message).lower()
                 if "locked" in low or "busy" in low:
-                    parts.append("It may be busy due to another operation.")
+                    parts.append(_("It may be busy due to another operation."))
                 else:
-                    parts.append(f"Error: {error_message}")
+                    parts.append(_("Error: {error}").format(error=error_message))
 
-            parts.append("Please try again.")
+            parts.append(_("Please try again."))
             wx.MessageBox("\n\n".join(parts), _("Error"), wx.ICON_ERROR)
             return
 
@@ -12971,7 +13036,7 @@ class MainFrame(wx.Frame):
         if ok:
             self.refresh_feeds()
             return
-        msg = "Could not update feed."
+        msg = _("Could not update feed.")
         if err:
             msg = f"{msg}\n\n{err}"
         wx.MessageBox(msg, _("Error"), wx.ICON_ERROR)
@@ -13022,7 +13087,7 @@ class MainFrame(wx.Frame):
         if ok:
             self.refresh_feeds()
             return
-        msg = "Could not reset feed title."
+        msg = _("Could not reset feed title.")
         if err:
             msg = f"{msg}\n\n{err}"
         wx.MessageBox(msg, _("Error"), wx.ICON_ERROR)
@@ -13031,7 +13096,7 @@ class MainFrame(wx.Frame):
         dlg = wx.FileDialog(self, _("Import OPML"), wildcard=f'{_("OPML files")} (*.opml)|*.opml', style=wx.FD_OPEN)
         if dlg.ShowModal() == wx.ID_OK:
             path = dlg.GetPath()
-            self.SetTitle("BlindRSS - Importing OPML...")
+            self.SetTitle(_("BlindRSS - Importing OPML..."))
             threading.Thread(target=self._import_opml_thread, args=(path, target_category), daemon=True).start()
         dlg.Destroy()
 
@@ -13422,11 +13487,11 @@ class MainFrame(wx.Frame):
         target_cat = self._normalize_category_title_for_export(category_title)
         feeds = self._collect_category_feeds_for_export(target_cat)
         if not feeds:
-            return False, f'No feeds found in category "{target_cat}".'
+            return False, _('No feeds found in category "{category}".').format(category=target_cat)
         ok = bool(utils.write_opml(feeds, path))
         if ok:
             return True, None
-        return False, f'Export failed for category "{target_cat}".'
+        return False, _('Export failed for category "{category}".').format(category=target_cat)
 
     def on_export_category_opml(self, event, category_title=None):
         target_cat = self._normalize_category_title_for_export(category_title)
@@ -13434,7 +13499,7 @@ class MainFrame(wx.Frame):
         default_name = f"{safe_cat}.opml"
         dlg = wx.FileDialog(
             self,
-            f'Export "{target_cat}" Category OPML',
+            _('Export "{category}" Category OPML').format(category=target_cat),
             wildcard=f'{_("OPML files")} (*.opml)|*.opml',
             style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
             defaultFile=default_name,
@@ -13593,7 +13658,11 @@ class MainFrame(wx.Frame):
                         self.config_manager.set("start_on_windows_login", old_start_on_login)
                     except Exception:
                         pass
-                    wx.MessageBox(msg or "Could not update startup registration.", _("Settings"), wx.ICON_WARNING)
+                    wx.MessageBox(
+                        msg or _("Could not update startup registration."),
+                        _("Settings"),
+                        wx.ICON_WARNING,
+                    )
 
             if sys.platform.startswith("win"):
                 try:
@@ -13787,7 +13856,9 @@ class MainFrame(wx.Frame):
         try:
             result = updater.check_for_updates()
         except Exception as e:
-            result = updater.UpdateCheckResult("error", f"Update check failed: {e}")
+            result = updater.UpdateCheckResult(
+                "error", _("Update check failed: {error}").format(error=e)
+            )
         wx.CallAfter(self._handle_update_check_result, result, manual)
 
     def _handle_update_check_result(self, result: updater.UpdateCheckResult, manual: bool):
@@ -13921,13 +13992,13 @@ class MainFrame(wx.Frame):
         cats = self.provider.get_categories()
         if not cats:
             cats = [UNCATEGORIZED]
-        cat_dlg = wx.SingleChoiceDialog(self, "Choose category:", "Add Feed", cats)
+        cat_dlg = wx.SingleChoiceDialog(self, _("Choose category:"), _("Add Feed"), cats)
         cat = UNCATEGORIZED
         if cat_dlg.ShowModal() == wx.ID_OK:
             cat = cat_dlg.GetStringSelection()
         cat_dlg.Destroy()
 
-        self.SetTitle(f"BlindRSS - Adding feed {url}...")
+        self.SetTitle(_("BlindRSS - Adding feed {url}...").format(url=url))
         threading.Thread(target=self._add_feed_thread, args=(url, cat), daemon=True).start()
 
     def play_ytdlp_search_result(self, url: str, title: str | None = None) -> None:
@@ -14189,13 +14260,13 @@ class SmartFolderDialog(wx.Dialog):
         name_row.Add(wx.StaticText(self, label=_("Folder &name:")), 0,
                      wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
         self.name_ctrl = wx.TextCtrl(self, value=name or "")
-        self.name_ctrl.SetName("Folder name")
+        self.name_ctrl.SetName(_("Folder name"))
         name_row.Add(self.name_ctrl, 1)
         outer.Add(name_row, 0, wx.EXPAND | wx.ALL, 8)
 
         self.match_box = wx.RadioBox(
             self, label=_("Show articles that match"),
-            choices=["All conditions (AND)", "Any condition (OR)"],
+            choices=[_("All conditions (AND)"), _("Any condition (OR)")],
             majorDimension=1, style=wx.RA_SPECIFY_ROWS,
         )
         outer.Add(self.match_box, 0, wx.EXPAND | wx.ALL, 8)
@@ -14206,17 +14277,17 @@ class SmartFolderDialog(wx.Dialog):
         grid.Add(wx.StaticText(self, label=_("Field")), 0)
         grid.Add(wx.StaticText(self, label=_("Condition")), 0)
         grid.Add(wx.StaticText(self, label=_("Value")), 0, wx.EXPAND)
-        field_labels = [lbl for _k, lbl in self._FIELDS]
-        op_labels = [lbl for _k, lbl in self._OPS]
+        field_labels = [_(lbl) for _k, lbl in self._FIELDS]
+        op_labels = [_(lbl) for _k, lbl in self._OPS]
         for i in range(self.MAX_ROWS):
             field_ctrl = wx.Choice(self, choices=field_labels)
-            field_ctrl.SetName(f"Condition {i + 1} field")
+            field_ctrl.SetName(_("Condition {n} field").format(n=i + 1))
             field_ctrl.SetSelection(0)
             op_ctrl = wx.Choice(self, choices=op_labels)
-            op_ctrl.SetName(f"Condition {i + 1} operator")
+            op_ctrl.SetName(_("Condition {n} operator").format(n=i + 1))
             op_ctrl.SetSelection(0)
             val_ctrl = wx.TextCtrl(self)
-            val_ctrl.SetName(f"Condition {i + 1} value")
+            val_ctrl.SetName(_("Condition {n} value").format(n=i + 1))
             grid.Add(field_ctrl, 0)
             grid.Add(op_ctrl, 0)
             grid.Add(val_ctrl, 0, wx.EXPAND)
@@ -14272,7 +14343,7 @@ class SmartFolderDialog(wx.Dialog):
                         break
 
     def get_result(self):
-        name = self.name_ctrl.GetValue().strip() or "Smart Folder"
+        name = self.name_ctrl.GetValue().strip() or _("Smart Folder")
         match = "any" if self.match_box.GetSelection() == 1 else "all"
         conditions = []
         for row in self.rows:
@@ -14320,13 +14391,13 @@ class FilterRuleEditorDialog(wx.Dialog):
         name_row.Add(wx.StaticText(self, label=_("Rule &name:")), 0,
                      wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
         self.name_ctrl = wx.TextCtrl(self, value=name or "")
-        self.name_ctrl.SetName("Rule name")
+        self.name_ctrl.SetName(_("Rule name"))
         name_row.Add(self.name_ctrl, 1)
         outer.Add(name_row, 0, wx.EXPAND | wx.ALL, 8)
 
         self.match_box = wx.RadioBox(
             self, label=_("Apply this rule to articles that match"),
-            choices=["All conditions (AND)", "Any condition (OR)"],
+            choices=[_("All conditions (AND)"), _("Any condition (OR)")],
             majorDimension=1, style=wx.RA_SPECIFY_ROWS,
         )
         outer.Add(self.match_box, 0, wx.EXPAND | wx.ALL, 8)
@@ -14338,17 +14409,17 @@ class FilterRuleEditorDialog(wx.Dialog):
         grid.Add(wx.StaticText(self, label=_("Field")), 0)
         grid.Add(wx.StaticText(self, label=_("Condition")), 0)
         grid.Add(wx.StaticText(self, label=_("Value")), 0, wx.EXPAND)
-        field_labels = [lbl for _k, lbl in self._FIELDS]
-        op_labels = [lbl for _k, lbl in self._OPS]
+        field_labels = [_(lbl) for _k, lbl in self._FIELDS]
+        op_labels = [_(lbl) for _k, lbl in self._OPS]
         for i in range(self.MAX_ROWS):
             field_ctrl = wx.Choice(self, choices=field_labels)
-            field_ctrl.SetName(f"Condition {i + 1} field")
+            field_ctrl.SetName(_("Condition {n} field").format(n=i + 1))
             field_ctrl.SetSelection(0)
             op_ctrl = wx.Choice(self, choices=op_labels)
-            op_ctrl.SetName(f"Condition {i + 1} operator")
+            op_ctrl.SetName(_("Condition {n} operator").format(n=i + 1))
             op_ctrl.SetSelection(0)
             val_ctrl = wx.TextCtrl(self)
-            val_ctrl.SetName(f"Condition {i + 1} value")
+            val_ctrl.SetName(_("Condition {n} value").format(n=i + 1))
             grid.Add(field_ctrl, 0)
             grid.Add(op_ctrl, 0)
             grid.Add(val_ctrl, 0, wx.EXPAND)
@@ -14359,7 +14430,7 @@ class FilterRuleEditorDialog(wx.Dialog):
         outer.Add(cond_box, 1, wx.EXPAND | wx.ALL, 8)
 
         # Actions the rule performs on each matching article.
-        act_box = wx.StaticBoxSizer(wx.VERTICAL, self, "Then do this")
+        act_box = wx.StaticBoxSizer(wx.VERTICAL, self, _("Then do this"))
         move_row = wx.BoxSizer(wx.HORIZONTAL)
         move_row.Add(wx.StaticText(self, label=_("&Move to category:")), 0,
                      wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 6)
@@ -14367,7 +14438,7 @@ class FilterRuleEditorDialog(wx.Dialog):
             self,
             value=category_display_name(move_category) if move_category else "",
         )
-        self.move_ctrl.SetName("Move to category (full path, blank for none)")
+        self.move_ctrl.SetName(_("Move to category (full path, blank for none)"))
         move_row.Add(self.move_ctrl, 1)
         act_box.Add(move_row, 0, wx.EXPAND | wx.ALL, 4)
 
@@ -14378,7 +14449,7 @@ class FilterRuleEditorDialog(wx.Dialog):
             self,
             value=category_display_name(label_category) if label_category else "",
         )
-        self.label_ctrl.SetName("Also show under category (label, blank for none)")
+        self.label_ctrl.SetName(_("Also show under category (label, blank for none)"))
         label_row.Add(self.label_ctrl, 1)
         act_box.Add(label_row, 0, wx.EXPAND | wx.ALL, 4)
 
@@ -14492,7 +14563,7 @@ class FilterRulesDialog(wx.Dialog):
 
         body = wx.BoxSizer(wx.HORIZONTAL)
         self.list_ctrl = wx.ListBox(self, style=wx.LB_SINGLE)
-        self.list_ctrl.SetName("Filter rules")
+        self.list_ctrl.SetName(_("Filter rules"))
         self.list_ctrl.Bind(wx.EVT_LISTBOX_DCLICK, lambda e: self._on_edit())
         body.Add(self.list_ctrl, 1, wx.EXPAND | wx.ALL, 8)
 
@@ -14546,9 +14617,11 @@ class FilterRulesDialog(wx.Dialog):
         name = rule.get("name") or "Filter"
         cond = smart_folders_mod.describe_rule(rule.get("rule"))
         acts = filters_mod.describe_actions(rule.get("actions"))
-        label = f"{name}: if {cond} then {acts}"
+        label = _("{name}: if {condition} then {actions}").format(
+            name=name, condition=cond, actions=acts
+        )
         if rule.get("stop"):
-            label += " [stop]"
+            label += _(" [stop]")
         if not rule.get("enabled", True):
             label += " (disabled)"
         return label
@@ -14606,7 +14679,7 @@ class FilterRulesDialog(wx.Dialog):
         if idx is None:
             return
         rule = self._rules[idx]
-        name = rule.get("name") or "this rule"
+        name = rule.get("name") or _("this rule")
         if wx.MessageBox(
             _('Delete filter rule "{name}"? Articles it already filed are not changed.').format(name=name),
             _("Delete Rule"), wx.YES_NO | wx.ICON_QUESTION, self,
@@ -14678,7 +14751,9 @@ class FilterRulesDialog(wx.Dialog):
                 )
                 return
             wx.MessageBox(
-                f"Scanned {result.get('scanned', 0)} articles; {result.get('changed', 0)} matched a rule.",
+                _("Scanned {scanned} articles; {changed} matched a rule.").format(
+                    scanned=result.get("scanned", 0), changed=result.get("changed", 0)
+                ),
                 _("Filter Rules Applied"), wx.ICON_INFORMATION, self,
             )
             self._reload(select_index=self._selected_index())
