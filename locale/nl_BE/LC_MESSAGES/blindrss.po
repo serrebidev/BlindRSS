@@ -1445,6 +1445,24 @@ msgstr "BlindRSS-meldingstest"
 msgid "If you can read this, notifications are working."
 msgstr "Als u dit kunt lezen, werken de meldingen."
 
+#: gui/dialogs.py:3073
+msgid ""
+"Windows toast notifications for new articles.\n"
+"Disabled by default."
+msgstr ""
+"Windows-meldingen voor nieuwe artikelen.\n"
+"Standaard uitgeschakeld."
+
+#: gui/dialogs.py:3152
+msgid ""
+"Screen-reader announcements for key keyboard actions.\n"
+"Each event can announce via speech, Braille, both, or neither.\n"
+"Braille output is most reliable on Windows with NVDA or JAWS."
+msgstr ""
+"Schermlezermeldingen voor belangrijke toetsenbordacties.\n"
+"Elke gebeurtenis kan worden aangekondigd via spraak, braille, beide of geen van beide.\n"
+"Braille-uitvoer werkt het betrouwbaarst op Windows met NVDA of JAWS."
+
 #: gui/dialogs.py:107
 msgid "Article list columns"
 msgstr "Kolommen van de artikellijst"
@@ -1634,6 +1652,10 @@ msgstr "Controleren op updates:"
 msgid "Translation Updates"
 msgstr "Vertaalupdates"
 
+#: gui/dialogs.py:1947 gui/dialogs.py:446
+msgid "No feeds available."
+msgstr "Geen feeds beschikbaar."
+
 #: gui/dialogs.py:2044
 msgid ""
 "The announcement could not be delivered.\n"
@@ -1797,7 +1819,15 @@ msgstr "Soort"
 msgid "Close"
 msgstr "Sluiten"
 
-#: gui/dialogs.py:6960 gui/player.py:2032 gui/player.py:5463
+#: gui/dialogs.py:6749
+msgid "Searching"
+msgstr "Doorzoeken van"
+
+#: gui/dialogs.py:6749
+msgid "Loading more"
+msgstr "Meer laden van"
+
+#: gui/dialogs.py:6960 gui/player.py:2032 gui/player.py:5467
 msgid "Play"
 msgstr "Afspelen"
 
@@ -1924,10 +1954,6 @@ msgstr "Alles aanvinken"
 #: gui/dialogs.py:427
 msgid "Uncheck All"
 msgstr "Alles uitvinken"
-
-#: gui/dialogs.py:446
-msgid "No feeds available."
-msgstr "Geen feeds beschikbaar."
 
 #: gui/dialogs.py:467
 msgid "No feed selected."
@@ -3530,6 +3556,10 @@ msgstr "Vertalingen bijgewerkt. Herstart om toe te passen."
 msgid "Translations are up to date."
 msgstr "De vertalingen zijn up-to-date."
 
+#: gui/dialogs.py:1949
+msgid "Excluded feeds: {excluded} of {total}"
+msgstr "Uitgesloten feeds: {excluded} van {total}"
+
 #: gui/dialogs.py:2143
 msgid "Inoreader Authorization"
 msgstr "Inoreader-autorisatie"
@@ -3843,6 +3873,12 @@ msgstr "Resultaten filteren:"
 msgid "Sort by:"
 msgstr "Sorteren op:"
 
+#: gui/dialogs.py:6750
+msgid "{action} {n} site..."
+msgid_plural "{action} {n} sites..."
+msgstr[0] "{action} {n} site..."
+msgstr[1] "{action} {n} sites..."
+
 #: gui/dialogs.py:7146
 msgid "Subscribe Error"
 msgstr "Abonneerfout"
@@ -3871,6 +3907,12 @@ msgstr "&Voorinstelling:"
 msgid "Cookies"
 msgstr "Cookies"
 
+#: gui/dialogs.py:1883
+msgid "Loaded {n} OpenRouter model."
+msgid_plural "Loaded {n} OpenRouter models."
+msgstr[0] "{n} OpenRouter-model geladen."
+msgstr[1] "{n} OpenRouter-modellen geladen."
+
 #: gui/dialogs.py:2030
 msgid ""
 "BlindRSS announcement test. If you can hear or read this, announcements are "
@@ -3889,9 +3931,21 @@ msgid_plural "Delete {n} cached files ({size})?"
 msgstr[0] "{n} bestand in cache verwijderen ({size})?"
 msgstr[1] "{n} bestanden in cache verwijderen ({size})?"
 
+#: gui/dialogs.py:2632
+msgid "Detected {nm}: not found"
+msgstr "{nm} gedetecteerd: niet gevonden"
+
 #: gui/dialogs.py:2664
 msgid "(not set)"
 msgstr "(niet ingesteld)"
+
+#: gui/dialogs.py:2831
+msgid "{label} executable path override"
+msgstr "Aangepast pad naar het uitvoerbare bestand van {label}"
+
+#: gui/dialogs.py:2841
+msgid "Detected {label}"
+msgstr "{label} gedetecteerd"
 
 #: gui/dialogs.py:2856
 msgid "Downloads"
@@ -3909,17 +3963,41 @@ msgstr "Inoreader-appsleutel:"
 msgid "Redirect URI:"
 msgstr "Omleidings-URI:"
 
+#: gui/dialogs.py:3050
+msgid "Browse for {name}"
+msgstr "Bladeren voor {name}"
+
 #: gui/dialogs.py:4623
 msgid "feed"
 msgstr "feed"
+
+#: gui/dialogs.py:4948
+msgid "Searching {label}..."
+msgstr "{label} doorzoeken..."
 
 #: gui/dialogs.py:5215
 msgid "News topic feed"
 msgstr "Nieuwsonderwerpfeed"
 
+#: gui/dialogs.py:5602
+msgid "Found {n} result."
+msgid_plural "Found {n} results."
+msgstr[0] "{n} resultaat gevonden."
+msgstr[1] "{n} resultaten gevonden."
+
+#: gui/dialogs.py:6918
+msgid "Stopped. {n} result."
+msgid_plural "Stopped. {n} results."
+msgstr[0] "Gestopt. {n} resultaat."
+msgstr[1] "Gestopt. {n} resultaten."
+
 #: gui/dialogs.py:7120
 msgid "Playback Error"
 msgstr "Afspeelfout"
+
+#: gui/dialogs.py:7124 gui/dialogs.py:7062
+msgid "Playing: {title}"
+msgstr "Speelt af: {title}"
 
 #: gui/dialogs.py:7426
 msgid "{index}. {title}, from {source}"
@@ -3959,6 +4037,22 @@ msgstr "Voorinstelling \"{name}\" verwijderen?"
 msgid "Could not read cookies from {browser}."
 msgstr "Kan cookies niet lezen uit {browser}."
 
+#: gui/dialogs.py:1846
+msgid "OpenRouter model load failed: {error}"
+msgstr "Laden van OpenRouter-modellen mislukt: {error}"
+
+#: gui/dialogs.py:2634
+msgid "Detected {nm}: {path} (failed version check)"
+msgstr "{nm} gedetecteerd: {path} (versiecontrole mislukt)"
+
+#: gui/dialogs.py:2636
+msgid "Detected {nm}: {path}"
+msgstr "{nm} gedetecteerd: {path}"
+
+#: gui/dialogs.py:2840
+msgid "Detected {label}: checking…"
+msgstr "{label} gedetecteerd: controleren…"
+
 #: gui/dialogs.py:3599
 msgid ""
 "User Data Folder path:\n"
@@ -3974,6 +4068,18 @@ msgid ""
 msgstr ""
 "Pad van de app-installatiemap:\n"
 "  {path}"
+
+#: gui/dialogs.py:6921
+msgid "Loaded more. {n} result."
+msgid_plural "Loaded more. {n} results."
+msgstr[0] "Meer geladen. {n} resultaat."
+msgstr[1] "Meer geladen. {n} resultaten."
+
+#: gui/dialogs.py:6923
+msgid "{n} result."
+msgid_plural "{n} results."
+msgstr[0] "{n} resultaat."
+msgstr[1] "{n} resultaten."
 
 #: gui/dialogs.py:7145
 msgid "Could not subscribe: {error}"
@@ -3992,7 +4098,7 @@ msgid "WAV files"
 msgstr "WAV-bestanden"
 
 #: gui/dialogs.py:7062 gui/mainframe.py:1771 gui/player.py:3961
-#: gui/player.py:6389
+#: gui/player.py:6393
 msgid "Playing"
 msgstr "Bezig met afspelen"
 
@@ -4008,24 +4114,20 @@ msgstr ""
 "{accel} is al toegewezen aan “{other}”.\n"
 "Opnieuw toewijzen aan “{this}”?"
 
-#: gui/dialogs.py:7064 gui/mainframe.py:1771 gui/player.py:6445
-#: gui/player.py:6462
+#: gui/dialogs.py:7064 gui/mainframe.py:1771 gui/player.py:6449
+#: gui/player.py:6466
 msgid "Paused"
 msgstr "Gepauzeerd"
-
-#: gui/dialogs.py:7062
-msgid "Playing: {title}"
-msgstr "Speelt af: {title}"
 
 #: gui/dialogs.py:7064
 msgid "Paused: {title}"
 msgstr "Gepauzeerd: {title}"
 
-#: gui/dialogs.py:7068 gui/player.py:4022 gui/player.py:4428
+#: gui/dialogs.py:7068 gui/player.py:4022 gui/player.py:4432
 msgid "Buffering..."
 msgstr "Bufferen..."
 
-#: gui/dialogs.py:7070 gui/player.py:4159
+#: gui/dialogs.py:7070 gui/player.py:4163
 msgid "Connecting..."
 msgstr "Verbinden..."
 
@@ -5693,11 +5795,11 @@ msgstr "Cast &verbreken"
 msgid "&Cast to Device..."
 msgstr "&Casten naar apparaat..."
 
-#: gui/player.py:5342
+#: gui/player.py:5346
 msgid "Elapsed Time"
 msgstr "Verstreken tijd"
 
-#: gui/player.py:6501 gui/player.py:6613 gui/player.py:4434
+#: gui/player.py:6505 gui/player.py:6617 gui/player.py:4438
 msgid "Stopped"
 msgstr "Gestopt"
 
@@ -5777,11 +5879,11 @@ msgstr "Media konden niet worden geladen"
 msgid "VLC is not initialized. Playback is unavailable."
 msgstr "VLC is niet geïnitialiseerd. Afspelen is niet beschikbaar."
 
-#: gui/player.py:4219
+#: gui/player.py:4223
 msgid "Downloading for playback..."
 msgstr "Downloaden voor afspelen..."
 
-#: gui/player.py:5368
+#: gui/player.py:5372
 msgid "Elapsed {elapsed}, Remaining {remaining}, Total {total}"
 msgstr "Verstreken {elapsed}, Resterend {remaining}, Totaal {total}"
 
@@ -5805,23 +5907,23 @@ msgstr "Hoofdstuklink niet beschikbaar"
 msgid "Could not open chapter link"
 msgstr "Kon hoofdstuklink niet openen"
 
-#: gui/player.py:4138
+#: gui/player.py:4142
 msgid "Loading media..."
 msgstr "Media laden..."
 
-#: gui/player.py:5366
+#: gui/player.py:5370
 msgid "Elapsed {elapsed}"
 msgstr "Verstreken {elapsed}"
 
-#: gui/player.py:6224
+#: gui/player.py:6228
 msgid "End of track"
 msgstr "Einde van het nummer"
 
-#: gui/player.py:6224
+#: gui/player.py:6228
 msgid "Beginning of track"
 msgstr "Begin van het nummer"
 
-#: gui/player.py:5463
+#: gui/player.py:5467
 msgid "Pause"
 msgstr "Pauzeren"
 

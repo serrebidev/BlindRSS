@@ -1448,6 +1448,24 @@ msgstr "Test powiadomień BlindRSS"
 msgid "If you can read this, notifications are working."
 msgstr "Jeśli widzisz tę wiadomość, powiadomienia działają poprawnie."
 
+#: gui/dialogs.py:3073
+msgid ""
+"Windows toast notifications for new articles.\n"
+"Disabled by default."
+msgstr ""
+"Powiadomienia Windows o nowych artykułach.\n"
+"Domyślnie wyłączone."
+
+#: gui/dialogs.py:3152
+msgid ""
+"Screen-reader announcements for key keyboard actions.\n"
+"Each event can announce via speech, Braille, both, or neither.\n"
+"Braille output is most reliable on Windows with NVDA or JAWS."
+msgstr ""
+"Komunikaty czytnika ekranu dla najważniejszych akcji klawiaturowych.\n"
+"Każde zdarzenie może być ogłaszane mową, brajlem, obydwoma lub wcale.\n"
+"Wyjście brajlowskie działa najpewniej w systemie Windows z NVDA lub JAWS."
+
 #: gui/dialogs.py:107
 msgid "Article list columns"
 msgstr "Kolumny listy artykułów"
@@ -1637,6 +1655,10 @@ msgstr "Sprawdzaj aktualizacje:"
 msgid "Translation Updates"
 msgstr "Aktualizacje tłumaczeń"
 
+#: gui/dialogs.py:1947 gui/dialogs.py:446
+msgid "No feeds available."
+msgstr "Brak dostępnych kanałów."
+
 #: gui/dialogs.py:2044
 msgid ""
 "The announcement could not be delivered.\n"
@@ -1800,7 +1822,15 @@ msgstr "Rodzaj"
 msgid "Close"
 msgstr "Zamknij"
 
-#: gui/dialogs.py:6960 gui/player.py:2032 gui/player.py:5463
+#: gui/dialogs.py:6749
+msgid "Searching"
+msgstr "Przeszukiwanie"
+
+#: gui/dialogs.py:6749
+msgid "Loading more"
+msgstr "Wczytywanie kolejnych z"
+
+#: gui/dialogs.py:6960 gui/player.py:2032 gui/player.py:5467
 msgid "Play"
 msgstr "Odtwórz"
 
@@ -1927,10 +1957,6 @@ msgstr "Zaznacz wszystko"
 #: gui/dialogs.py:427
 msgid "Uncheck All"
 msgstr "Odznacz wszystko"
-
-#: gui/dialogs.py:446
-msgid "No feeds available."
-msgstr "Brak dostępnych kanałów."
 
 #: gui/dialogs.py:467
 msgid "No feed selected."
@@ -3540,6 +3566,10 @@ msgstr "Tłumaczenia zaktualizowane. Uruchom ponownie, aby zastosować."
 msgid "Translations are up to date."
 msgstr "Tłumaczenia są aktualne."
 
+#: gui/dialogs.py:1949
+msgid "Excluded feeds: {excluded} of {total}"
+msgstr "Wykluczone kanały: {excluded} z {total}"
+
 #: gui/dialogs.py:2143
 msgid "Inoreader Authorization"
 msgstr "Autoryzacja Inoreader"
@@ -3853,6 +3883,13 @@ msgstr "Filtruj wyniki:"
 msgid "Sort by:"
 msgstr "Sortuj według:"
 
+#: gui/dialogs.py:6750
+msgid "{action} {n} site..."
+msgid_plural "{action} {n} sites..."
+msgstr[0] "{action} {n} witryny..."
+msgstr[1] "{action} {n} witryn..."
+msgstr[2] "{action} {n} witryn..."
+
 #: gui/dialogs.py:7146
 msgid "Subscribe Error"
 msgstr "Błąd subskrypcji"
@@ -3881,6 +3918,13 @@ msgstr "&Ustawienie wstępne:"
 msgid "Cookies"
 msgstr "Pliki cookie"
 
+#: gui/dialogs.py:1883
+msgid "Loaded {n} OpenRouter model."
+msgid_plural "Loaded {n} OpenRouter models."
+msgstr[0] "Wczytano {n} model OpenRouter."
+msgstr[1] "Wczytano {n} modele OpenRouter."
+msgstr[2] "Wczytano {n} modeli OpenRouter."
+
 #: gui/dialogs.py:2030
 msgid ""
 "BlindRSS announcement test. If you can hear or read this, announcements are "
@@ -3900,9 +3944,21 @@ msgstr[0] "Usunąć {n} plik z pamięci podręcznej ({size})?"
 msgstr[1] "Usunąć {n} pliki z pamięci podręcznej ({size})?"
 msgstr[2] "Usunąć {n} plików z pamięci podręcznej ({size})?"
 
+#: gui/dialogs.py:2632
+msgid "Detected {nm}: not found"
+msgstr "Wykryto {nm}: nie znaleziono"
+
 #: gui/dialogs.py:2664
 msgid "(not set)"
 msgstr "(nie ustawiono)"
+
+#: gui/dialogs.py:2831
+msgid "{label} executable path override"
+msgstr "Własna ścieżka pliku wykonywalnego {label}"
+
+#: gui/dialogs.py:2841
+msgid "Detected {label}"
+msgstr "Wykryto {label}"
 
 #: gui/dialogs.py:2856
 msgid "Downloads"
@@ -3920,17 +3976,43 @@ msgstr "Klucz aplikacji Inoreader:"
 msgid "Redirect URI:"
 msgstr "Identyfikator URI przekierowania:"
 
+#: gui/dialogs.py:3050
+msgid "Browse for {name}"
+msgstr "Przeglądaj w poszukiwaniu {name}"
+
 #: gui/dialogs.py:4623
 msgid "feed"
 msgstr "kanał"
+
+#: gui/dialogs.py:4948
+msgid "Searching {label}..."
+msgstr "Przeszukiwanie {label}..."
 
 #: gui/dialogs.py:5215
 msgid "News topic feed"
 msgstr "Kanał tematyczny wiadomości"
 
+#: gui/dialogs.py:5602
+msgid "Found {n} result."
+msgid_plural "Found {n} results."
+msgstr[0] "Znaleziono {n} wynik."
+msgstr[1] "Znaleziono {n} wyniki."
+msgstr[2] "Znaleziono {n} wyników."
+
+#: gui/dialogs.py:6918
+msgid "Stopped. {n} result."
+msgid_plural "Stopped. {n} results."
+msgstr[0] "Zatrzymano. {n} wynik."
+msgstr[1] "Zatrzymano. {n} wyniki."
+msgstr[2] "Zatrzymano. {n} wyników."
+
 #: gui/dialogs.py:7120
 msgid "Playback Error"
 msgstr "Błąd odtwarzania"
+
+#: gui/dialogs.py:7124 gui/dialogs.py:7062
+msgid "Playing: {title}"
+msgstr "Odtwarzanie: {title}"
 
 #: gui/dialogs.py:7426
 msgid "{index}. {title}, from {source}"
@@ -3971,6 +4053,22 @@ msgstr "Usunąć ustawienie wstępne \"{name}\"?"
 msgid "Could not read cookies from {browser}."
 msgstr "Nie można odczytać plików cookie z {browser}."
 
+#: gui/dialogs.py:1846
+msgid "OpenRouter model load failed: {error}"
+msgstr "Nie udało się wczytać modeli OpenRouter: {error}"
+
+#: gui/dialogs.py:2634
+msgid "Detected {nm}: {path} (failed version check)"
+msgstr "Wykryto {nm}: {path} (niepowodzenie sprawdzania wersji)"
+
+#: gui/dialogs.py:2636
+msgid "Detected {nm}: {path}"
+msgstr "Wykryto {nm}: {path}"
+
+#: gui/dialogs.py:2840
+msgid "Detected {label}: checking…"
+msgstr "Wykryto {label}: sprawdzanie…"
+
 #: gui/dialogs.py:3599
 msgid ""
 "User Data Folder path:\n"
@@ -3986,6 +4084,20 @@ msgid ""
 msgstr ""
 "Ścieżka folderu instalacyjnego aplikacji:\n"
 "  {path}"
+
+#: gui/dialogs.py:6921
+msgid "Loaded more. {n} result."
+msgid_plural "Loaded more. {n} results."
+msgstr[0] "Wczytano więcej. {n} wynik."
+msgstr[1] "Wczytano więcej. {n} wyniki."
+msgstr[2] "Wczytano więcej. {n} wyników."
+
+#: gui/dialogs.py:6923
+msgid "{n} result."
+msgid_plural "{n} results."
+msgstr[0] "{n} wynik."
+msgstr[1] "{n} wyniki."
+msgstr[2] "{n} wyników."
 
 #: gui/dialogs.py:7145
 msgid "Could not subscribe: {error}"
@@ -4004,7 +4116,7 @@ msgid "WAV files"
 msgstr "Pliki WAV"
 
 #: gui/dialogs.py:7062 gui/mainframe.py:1771 gui/player.py:3961
-#: gui/player.py:6389
+#: gui/player.py:6393
 msgid "Playing"
 msgstr "Odtwarzanie"
 
@@ -4020,24 +4132,20 @@ msgstr ""
 "{accel} jest już przypisany do „{other}”.\n"
 "Przypisać go do „{this}”?"
 
-#: gui/dialogs.py:7064 gui/mainframe.py:1771 gui/player.py:6445
-#: gui/player.py:6462
+#: gui/dialogs.py:7064 gui/mainframe.py:1771 gui/player.py:6449
+#: gui/player.py:6466
 msgid "Paused"
 msgstr "Wstrzymane"
-
-#: gui/dialogs.py:7062
-msgid "Playing: {title}"
-msgstr "Odtwarzanie: {title}"
 
 #: gui/dialogs.py:7064
 msgid "Paused: {title}"
 msgstr "Wstrzymano: {title}"
 
-#: gui/dialogs.py:7068 gui/player.py:4022 gui/player.py:4428
+#: gui/dialogs.py:7068 gui/player.py:4022 gui/player.py:4432
 msgid "Buffering..."
 msgstr "Buforowanie..."
 
-#: gui/dialogs.py:7070 gui/player.py:4159
+#: gui/dialogs.py:7070 gui/player.py:4163
 msgid "Connecting..."
 msgstr "Łączenie..."
 
@@ -5711,11 +5819,11 @@ msgstr "&Rozłącz przesyłanie"
 msgid "&Cast to Device..."
 msgstr "&Rzutuj na urządzenie..."
 
-#: gui/player.py:5342
+#: gui/player.py:5346
 msgid "Elapsed Time"
 msgstr "Czas, który upłynął"
 
-#: gui/player.py:6501 gui/player.py:6613 gui/player.py:4434
+#: gui/player.py:6505 gui/player.py:6617 gui/player.py:4438
 msgid "Stopped"
 msgstr "Zatrzymano"
 
@@ -5796,11 +5904,11 @@ msgstr "Nie udało się wczytać multimediów"
 msgid "VLC is not initialized. Playback is unavailable."
 msgstr "VLC nie zostało zainicjowane. Odtwarzanie jest niedostępne."
 
-#: gui/player.py:4219
+#: gui/player.py:4223
 msgid "Downloading for playback..."
 msgstr "Pobieranie do odtwarzania..."
 
-#: gui/player.py:5368
+#: gui/player.py:5372
 msgid "Elapsed {elapsed}, Remaining {remaining}, Total {total}"
 msgstr "Upłynęło {elapsed}, Pozostało {remaining}, Łącznie {total}"
 
@@ -5824,23 +5932,23 @@ msgstr "Link do rozdziału niedostępny"
 msgid "Could not open chapter link"
 msgstr "Nie udało się otworzyć linku do rozdziału"
 
-#: gui/player.py:4138
+#: gui/player.py:4142
 msgid "Loading media..."
 msgstr "Ładowanie multimediów..."
 
-#: gui/player.py:5366
+#: gui/player.py:5370
 msgid "Elapsed {elapsed}"
 msgstr "Upłynęło {elapsed}"
 
-#: gui/player.py:6224
+#: gui/player.py:6228
 msgid "End of track"
 msgstr "Koniec ścieżki"
 
-#: gui/player.py:6224
+#: gui/player.py:6228
 msgid "Beginning of track"
 msgstr "Początek ścieżki"
 
-#: gui/player.py:5463
+#: gui/player.py:5467
 msgid "Pause"
 msgstr "Pauza"
 

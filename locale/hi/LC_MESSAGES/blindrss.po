@@ -1431,6 +1431,24 @@ msgstr "BlindRSS सूचना परीक्षण"
 msgid "If you can read this, notifications are working."
 msgstr "यदि आप इसे पढ़ सकते हैं, तो सूचनाएं काम कर रही हैं।"
 
+#: gui/dialogs.py:3073
+msgid ""
+"Windows toast notifications for new articles.\n"
+"Disabled by default."
+msgstr ""
+"नए लेखों के लिए विंडोज़ टोस्ट सूचनाएँ।\n"
+"डिफ़ॉल्ट रूप से अक्षम।"
+
+#: gui/dialogs.py:3152
+msgid ""
+"Screen-reader announcements for key keyboard actions.\n"
+"Each event can announce via speech, Braille, both, or neither.\n"
+"Braille output is most reliable on Windows with NVDA or JAWS."
+msgstr ""
+"मुख्य कीबोर्ड क्रियाओं के लिए स्क्रीन रीडर घोषणाएँ।\n"
+"प्रत्येक घटना को वाक्, ब्रेल, दोनों या किसी से भी घोषित किया जा सकता है।\n"
+"ब्रेल आउटपुट विंडोज़ पर NVDA या JAWS के साथ सबसे विश्वसनीय है।"
+
 #: gui/dialogs.py:107
 msgid "Article list columns"
 msgstr "लेख सूची स्तंभ"
@@ -1620,6 +1638,10 @@ msgstr "अपडेट जाँचें:"
 msgid "Translation Updates"
 msgstr "अनुवाद अपडेट"
 
+#: gui/dialogs.py:1947 gui/dialogs.py:446
+msgid "No feeds available."
+msgstr "कोई फ़ीड उपलब्ध नहीं है।"
+
 #: gui/dialogs.py:2044
 msgid ""
 "The announcement could not be delivered.\n"
@@ -1785,7 +1807,15 @@ msgstr "प्रकार"
 msgid "Close"
 msgstr "बंद करें"
 
-#: gui/dialogs.py:6960 gui/player.py:2032 gui/player.py:5463
+#: gui/dialogs.py:6749
+msgid "Searching"
+msgstr "खोजा जा रहा है"
+
+#: gui/dialogs.py:6749
+msgid "Loading more"
+msgstr "और लोड किया जा रहा है"
+
+#: gui/dialogs.py:6960 gui/player.py:2032 gui/player.py:5467
 msgid "Play"
 msgstr "चलाएं"
 
@@ -1912,10 +1942,6 @@ msgstr "सभी चुनें"
 #: gui/dialogs.py:427
 msgid "Uncheck All"
 msgstr "सभी अचयनित करें"
-
-#: gui/dialogs.py:446
-msgid "No feeds available."
-msgstr "कोई फ़ीड उपलब्ध नहीं है।"
 
 #: gui/dialogs.py:467
 msgid "No feed selected."
@@ -3514,6 +3540,10 @@ msgstr "अनुवाद अपडेट हुए। लागू करन�
 msgid "Translations are up to date."
 msgstr "अनुवाद अद्यतित हैं।"
 
+#: gui/dialogs.py:1949
+msgid "Excluded feeds: {excluded} of {total}"
+msgstr "बहिष्कृत फ़ीड: {total} में से {excluded}"
+
 #: gui/dialogs.py:2143
 msgid "Inoreader Authorization"
 msgstr "Inoreader प्राधिकरण"
@@ -3822,6 +3852,12 @@ msgstr "परिणाम फ़िल्टर करें:"
 msgid "Sort by:"
 msgstr "इसके अनुसार क्रमबद्ध करें:"
 
+#: gui/dialogs.py:6750
+msgid "{action} {n} site..."
+msgid_plural "{action} {n} sites..."
+msgstr[0] "{n} साइट में {action}..."
+msgstr[1] "{n} साइटों में {action}..."
+
 #: gui/dialogs.py:7146
 msgid "Subscribe Error"
 msgstr "सदस्यता त्रुटि"
@@ -3850,6 +3886,12 @@ msgstr "प्रीसेट(&P):"
 msgid "Cookies"
 msgstr "कुकीज़"
 
+#: gui/dialogs.py:1883
+msgid "Loaded {n} OpenRouter model."
+msgid_plural "Loaded {n} OpenRouter models."
+msgstr[0] "{n} OpenRouter मॉडल लोड हुआ।"
+msgstr[1] "{n} OpenRouter मॉडल लोड हुए।"
+
 #: gui/dialogs.py:2030
 msgid ""
 "BlindRSS announcement test. If you can hear or read this, announcements are "
@@ -3868,9 +3910,21 @@ msgid_plural "Delete {n} cached files ({size})?"
 msgstr[0] "{n} कैश की गई फ़ाइल हटाएं ({size})?"
 msgstr[1] "{n} कैश की गई फ़ाइलें हटाएं ({size})?"
 
+#: gui/dialogs.py:2632
+msgid "Detected {nm}: not found"
+msgstr "{nm} का पता चला: नहीं मिला"
+
 #: gui/dialogs.py:2664
 msgid "(not set)"
 msgstr "(सेट नहीं)"
+
+#: gui/dialogs.py:2831
+msgid "{label} executable path override"
+msgstr "{label} निष्पादन योग्य फ़ाइल का पथ अधिभावी"
+
+#: gui/dialogs.py:2841
+msgid "Detected {label}"
+msgstr "{label} का पता चला"
 
 #: gui/dialogs.py:2856
 msgid "Downloads"
@@ -3888,17 +3942,41 @@ msgstr "Inoreader ऐप कुंजी:"
 msgid "Redirect URI:"
 msgstr "रीडायरेक्ट URI:"
 
+#: gui/dialogs.py:3050
+msgid "Browse for {name}"
+msgstr "{name} के लिए ब्राउज़ करें"
+
 #: gui/dialogs.py:4623
 msgid "feed"
 msgstr "फ़ीड"
+
+#: gui/dialogs.py:4948
+msgid "Searching {label}..."
+msgstr "{label} में खोजा जा रहा है..."
 
 #: gui/dialogs.py:5215
 msgid "News topic feed"
 msgstr "समाचार विषय फ़ीड"
 
+#: gui/dialogs.py:5602
+msgid "Found {n} result."
+msgid_plural "Found {n} results."
+msgstr[0] "{n} परिणाम मिला।"
+msgstr[1] "{n} परिणाम मिले।"
+
+#: gui/dialogs.py:6918
+msgid "Stopped. {n} result."
+msgid_plural "Stopped. {n} results."
+msgstr[0] "रोका गया। {n} परिणाम।"
+msgstr[1] "रोका गया। {n} परिणाम।"
+
 #: gui/dialogs.py:7120
 msgid "Playback Error"
 msgstr "प्लेबैक त्रुटि"
+
+#: gui/dialogs.py:7124 gui/dialogs.py:7062
+msgid "Playing: {title}"
+msgstr "चल रहा है: {title}"
 
 #: gui/dialogs.py:7426
 msgid "{index}. {title}, from {source}"
@@ -3938,6 +4016,22 @@ msgstr "प्रीसेट \"{name}\" हटाएँ?"
 msgid "Could not read cookies from {browser}."
 msgstr "{browser} से कुकीज़ नहीं पढ़ी जा सकीं।"
 
+#: gui/dialogs.py:1846
+msgid "OpenRouter model load failed: {error}"
+msgstr "OpenRouter मॉडल लोड करने में विफल: {error}"
+
+#: gui/dialogs.py:2634
+msgid "Detected {nm}: {path} (failed version check)"
+msgstr "{nm} का पता चला: {path} (संस्करण जाँच विफल)"
+
+#: gui/dialogs.py:2636
+msgid "Detected {nm}: {path}"
+msgstr "{nm} का पता चला: {path}"
+
+#: gui/dialogs.py:2840
+msgid "Detected {label}: checking…"
+msgstr "{label} का पता चला: जाँच हो रही है…"
+
 #: gui/dialogs.py:3599
 msgid ""
 "User Data Folder path:\n"
@@ -3953,6 +4047,18 @@ msgid ""
 msgstr ""
 "ऐप इंस्टॉलेशन फ़ोल्डर का पथ:\n"
 "  {path}"
+
+#: gui/dialogs.py:6921
+msgid "Loaded more. {n} result."
+msgid_plural "Loaded more. {n} results."
+msgstr[0] "और लोड किया गया। {n} परिणाम।"
+msgstr[1] "और लोड किया गया। {n} परिणाम।"
+
+#: gui/dialogs.py:6923
+msgid "{n} result."
+msgid_plural "{n} results."
+msgstr[0] "{n} परिणाम।"
+msgstr[1] "{n} परिणाम।"
 
 #: gui/dialogs.py:7145
 msgid "Could not subscribe: {error}"
@@ -3971,7 +4077,7 @@ msgid "WAV files"
 msgstr "WAV फ़ाइलें"
 
 #: gui/dialogs.py:7062 gui/mainframe.py:1771 gui/player.py:3961
-#: gui/player.py:6389
+#: gui/player.py:6393
 msgid "Playing"
 msgstr "चल रहा है"
 
@@ -3987,24 +4093,20 @@ msgstr ""
 "{accel} पहले से “{other}” को असाइन है।\n"
 "इसे “{this}” को पुनः असाइन करें?"
 
-#: gui/dialogs.py:7064 gui/mainframe.py:1771 gui/player.py:6445
-#: gui/player.py:6462
+#: gui/dialogs.py:7064 gui/mainframe.py:1771 gui/player.py:6449
+#: gui/player.py:6466
 msgid "Paused"
 msgstr "रुका हुआ"
-
-#: gui/dialogs.py:7062
-msgid "Playing: {title}"
-msgstr "चल रहा है: {title}"
 
 #: gui/dialogs.py:7064
 msgid "Paused: {title}"
 msgstr "रोका गया: {title}"
 
-#: gui/dialogs.py:7068 gui/player.py:4022 gui/player.py:4428
+#: gui/dialogs.py:7068 gui/player.py:4022 gui/player.py:4432
 msgid "Buffering..."
 msgstr "बफ़रिंग हो रही है..."
 
-#: gui/dialogs.py:7070 gui/player.py:4159
+#: gui/dialogs.py:7070 gui/player.py:4163
 msgid "Connecting..."
 msgstr "कनेक्ट हो रहा है..."
 
@@ -5659,11 +5761,11 @@ msgstr "कास्ट डिस्कनेक्ट करें(&D)"
 msgid "&Cast to Device..."
 msgstr "डिवाइस पर कास्ट करें(&C)..."
 
-#: gui/player.py:5342
+#: gui/player.py:5346
 msgid "Elapsed Time"
 msgstr "बीता हुआ समय"
 
-#: gui/player.py:6501 gui/player.py:6613 gui/player.py:4434
+#: gui/player.py:6505 gui/player.py:6617 gui/player.py:4438
 msgid "Stopped"
 msgstr "रुका हुआ"
 
@@ -5743,11 +5845,11 @@ msgstr "मीडिया लोड करने में विफल"
 msgid "VLC is not initialized. Playback is unavailable."
 msgstr "VLC प्रारंभ नहीं हुआ है। प्लेबैक उपलब्ध नहीं है।"
 
-#: gui/player.py:4219
+#: gui/player.py:4223
 msgid "Downloading for playback..."
 msgstr "प्लेबैक के लिए डाउनलोड हो रहा है..."
 
-#: gui/player.py:5368
+#: gui/player.py:5372
 msgid "Elapsed {elapsed}, Remaining {remaining}, Total {total}"
 msgstr "बीता {elapsed}, शेष {remaining}, कुल {total}"
 
@@ -5771,23 +5873,23 @@ msgstr "अध्याय लिंक अनुपलब्ध"
 msgid "Could not open chapter link"
 msgstr "अध्याय लिंक नहीं खोला जा सका"
 
-#: gui/player.py:4138
+#: gui/player.py:4142
 msgid "Loading media..."
 msgstr "मीडिया लोड हो रहा है..."
 
-#: gui/player.py:5366
+#: gui/player.py:5370
 msgid "Elapsed {elapsed}"
 msgstr "बीता {elapsed}"
 
-#: gui/player.py:6224
+#: gui/player.py:6228
 msgid "End of track"
 msgstr "ट्रैक का अंत"
 
-#: gui/player.py:6224
+#: gui/player.py:6228
 msgid "Beginning of track"
 msgstr "ट्रैक का आरंभ"
 
-#: gui/player.py:5463
+#: gui/player.py:5467
 msgid "Pause"
 msgstr "रोकें"
 

@@ -1407,6 +1407,24 @@ msgstr "BlindRSS 通知テスト"
 msgid "If you can read this, notifications are working."
 msgstr "これが読めれば、通知は正常に機能しています。"
 
+#: gui/dialogs.py:3073
+msgid ""
+"Windows toast notifications for new articles.\n"
+"Disabled by default."
+msgstr ""
+"新着記事の Windows トースト通知。\n"
+"既定では無効です。"
+
+#: gui/dialogs.py:3152
+msgid ""
+"Screen-reader announcements for key keyboard actions.\n"
+"Each event can announce via speech, Braille, both, or neither.\n"
+"Braille output is most reliable on Windows with NVDA or JAWS."
+msgstr ""
+"主要なキーボード操作のスクリーンリーダー通知。\n"
+"各イベントは音声、点字、両方、またはなしで通知できます。\n"
+"点字出力は Windows の NVDA または JAWS で最も確実に動作します。"
+
 #: gui/dialogs.py:107
 msgid "Article list columns"
 msgstr "記事リストの列"
@@ -1596,6 +1614,10 @@ msgstr "更新の確認:"
 msgid "Translation Updates"
 msgstr "翻訳の更新"
 
+#: gui/dialogs.py:1947 gui/dialogs.py:446
+msgid "No feeds available."
+msgstr "利用可能なフィードがありません。"
+
 #: gui/dialogs.py:2044
 msgid ""
 "The announcement could not be delivered.\n"
@@ -1757,7 +1779,15 @@ msgstr "種類"
 msgid "Close"
 msgstr "閉じる"
 
-#: gui/dialogs.py:6960 gui/player.py:2032 gui/player.py:5463
+#: gui/dialogs.py:6749
+msgid "Searching"
+msgstr "検索しています"
+
+#: gui/dialogs.py:6749
+msgid "Loading more"
+msgstr "追加で読み込んでいます"
+
+#: gui/dialogs.py:6960 gui/player.py:2032 gui/player.py:5467
 msgid "Play"
 msgstr "再生"
 
@@ -1883,10 +1913,6 @@ msgstr "すべて選択"
 #: gui/dialogs.py:427
 msgid "Uncheck All"
 msgstr "すべて解除"
-
-#: gui/dialogs.py:446
-msgid "No feeds available."
-msgstr "利用可能なフィードがありません。"
 
 #: gui/dialogs.py:467
 msgid "No feed selected."
@@ -3465,6 +3491,10 @@ msgstr "翻訳を更新しました。適用するには再起動してくださ
 msgid "Translations are up to date."
 msgstr "翻訳は最新です。"
 
+#: gui/dialogs.py:1949
+msgid "Excluded feeds: {excluded} of {total}"
+msgstr "除外されたフィード: {total} 件中 {excluded} 件"
+
 #: gui/dialogs.py:2143
 msgid "Inoreader Authorization"
 msgstr "Inoreader の承認"
@@ -3767,6 +3797,11 @@ msgstr "結果を絞り込む:"
 msgid "Sort by:"
 msgstr "並べ替え:"
 
+#: gui/dialogs.py:6750
+msgid "{action} {n} site..."
+msgid_plural "{action} {n} sites..."
+msgstr[0] "{n} 件のサイトを{action}..."
+
 #: gui/dialogs.py:7146
 msgid "Subscribe Error"
 msgstr "登録エラー"
@@ -3795,6 +3830,11 @@ msgstr "プリセット(&P):"
 msgid "Cookies"
 msgstr "Cookie"
 
+#: gui/dialogs.py:1883
+msgid "Loaded {n} OpenRouter model."
+msgid_plural "Loaded {n} OpenRouter models."
+msgstr[0] "{n} 件の OpenRouter モデルを読み込みました。"
+
 #: gui/dialogs.py:2030
 msgid ""
 "BlindRSS announcement test. If you can hear or read this, announcements are "
@@ -3810,9 +3850,21 @@ msgid "Delete {n} cached file ({size})?"
 msgid_plural "Delete {n} cached files ({size})?"
 msgstr[0] "{n} 個のキャッシュファイルを削除しますか({size})?"
 
+#: gui/dialogs.py:2632
+msgid "Detected {nm}: not found"
+msgstr "検出された {nm}: 見つかりません"
+
 #: gui/dialogs.py:2664
 msgid "(not set)"
 msgstr "(未設定)"
+
+#: gui/dialogs.py:2831
+msgid "{label} executable path override"
+msgstr "{label} の実行ファイルのパスの上書き"
+
+#: gui/dialogs.py:2841
+msgid "Detected {label}"
+msgstr "検出された {label}"
 
 #: gui/dialogs.py:2856
 msgid "Downloads"
@@ -3830,17 +3882,39 @@ msgstr "Inoreader アプリキー:"
 msgid "Redirect URI:"
 msgstr "リダイレクト URI:"
 
+#: gui/dialogs.py:3050
+msgid "Browse for {name}"
+msgstr "{name} を参照"
+
 #: gui/dialogs.py:4623
 msgid "feed"
 msgstr "フィード"
+
+#: gui/dialogs.py:4948
+msgid "Searching {label}..."
+msgstr "{label} を検索しています..."
 
 #: gui/dialogs.py:5215
 msgid "News topic feed"
 msgstr "ニューストピックフィード"
 
+#: gui/dialogs.py:5602
+msgid "Found {n} result."
+msgid_plural "Found {n} results."
+msgstr[0] "{n} 件の結果が見つかりました。"
+
+#: gui/dialogs.py:6918
+msgid "Stopped. {n} result."
+msgid_plural "Stopped. {n} results."
+msgstr[0] "停止しました。{n} 件の結果。"
+
 #: gui/dialogs.py:7120
 msgid "Playback Error"
 msgstr "再生エラー"
+
+#: gui/dialogs.py:7124 gui/dialogs.py:7062
+msgid "Playing: {title}"
+msgstr "再生中: {title}"
 
 #: gui/dialogs.py:7426
 msgid "{index}. {title}, from {source}"
@@ -3879,6 +3953,22 @@ msgstr "プリセット「{name}」を削除しますか?"
 msgid "Could not read cookies from {browser}."
 msgstr "{browser} から Cookie を読み取れませんでした。"
 
+#: gui/dialogs.py:1846
+msgid "OpenRouter model load failed: {error}"
+msgstr "OpenRouter モデルの読み込みに失敗しました: {error}"
+
+#: gui/dialogs.py:2634
+msgid "Detected {nm}: {path} (failed version check)"
+msgstr "検出された {nm}: {path} (バージョン確認に失敗)"
+
+#: gui/dialogs.py:2636
+msgid "Detected {nm}: {path}"
+msgstr "検出された {nm}: {path}"
+
+#: gui/dialogs.py:2840
+msgid "Detected {label}: checking…"
+msgstr "検出された {label}: 確認中…"
+
 #: gui/dialogs.py:3599
 msgid ""
 "User Data Folder path:\n"
@@ -3894,6 +3984,16 @@ msgid ""
 msgstr ""
 "アプリのインストールフォルダーのパス:\n"
 "  {path}"
+
+#: gui/dialogs.py:6921
+msgid "Loaded more. {n} result."
+msgid_plural "Loaded more. {n} results."
+msgstr[0] "追加で読み込みました。{n} 件の結果。"
+
+#: gui/dialogs.py:6923
+msgid "{n} result."
+msgid_plural "{n} results."
+msgstr[0] "{n} 件の結果。"
 
 #: gui/dialogs.py:7145
 msgid "Could not subscribe: {error}"
@@ -3912,7 +4012,7 @@ msgid "WAV files"
 msgstr "WAV ファイル"
 
 #: gui/dialogs.py:7062 gui/mainframe.py:1771 gui/player.py:3961
-#: gui/player.py:6389
+#: gui/player.py:6393
 msgid "Playing"
 msgstr "再生中"
 
@@ -3928,24 +4028,20 @@ msgstr ""
 "{accel} は既に「{other}」に割り当てられています。\n"
 "「{this}」に割り当て直しますか?"
 
-#: gui/dialogs.py:7064 gui/mainframe.py:1771 gui/player.py:6445
-#: gui/player.py:6462
+#: gui/dialogs.py:7064 gui/mainframe.py:1771 gui/player.py:6449
+#: gui/player.py:6466
 msgid "Paused"
 msgstr "一時停止中"
-
-#: gui/dialogs.py:7062
-msgid "Playing: {title}"
-msgstr "再生中: {title}"
 
 #: gui/dialogs.py:7064
 msgid "Paused: {title}"
 msgstr "一時停止中: {title}"
 
-#: gui/dialogs.py:7068 gui/player.py:4022 gui/player.py:4428
+#: gui/dialogs.py:7068 gui/player.py:4022 gui/player.py:4432
 msgid "Buffering..."
 msgstr "バッファリング中..."
 
-#: gui/dialogs.py:7070 gui/player.py:4159
+#: gui/dialogs.py:7070 gui/player.py:4163
 msgid "Connecting..."
 msgstr "接続中..."
 
@@ -5571,11 +5667,11 @@ msgstr "キャストを切断(&D)"
 msgid "&Cast to Device..."
 msgstr "デバイスにキャスト(&C)..."
 
-#: gui/player.py:5342
+#: gui/player.py:5346
 msgid "Elapsed Time"
 msgstr "経過時間"
 
-#: gui/player.py:6501 gui/player.py:6613 gui/player.py:4434
+#: gui/player.py:6505 gui/player.py:6617 gui/player.py:4438
 msgid "Stopped"
 msgstr "停止しました"
 
@@ -5655,11 +5751,11 @@ msgstr "メディアを読み込めませんでした"
 msgid "VLC is not initialized. Playback is unavailable."
 msgstr "VLC が初期化されていません。再生できません。"
 
-#: gui/player.py:4219
+#: gui/player.py:4223
 msgid "Downloading for playback..."
 msgstr "再生のためにダウンロード中..."
 
-#: gui/player.py:5368
+#: gui/player.py:5372
 msgid "Elapsed {elapsed}, Remaining {remaining}, Total {total}"
 msgstr "経過 {elapsed}、残り {remaining}、合計 {total}"
 
@@ -5683,23 +5779,23 @@ msgstr "チャプターリンクは利用できません"
 msgid "Could not open chapter link"
 msgstr "チャプターリンクを開けませんでした"
 
-#: gui/player.py:4138
+#: gui/player.py:4142
 msgid "Loading media..."
 msgstr "メディアを読み込んでいます..."
 
-#: gui/player.py:5366
+#: gui/player.py:5370
 msgid "Elapsed {elapsed}"
 msgstr "経過 {elapsed}"
 
-#: gui/player.py:6224
+#: gui/player.py:6228
 msgid "End of track"
 msgstr "トラックの終わり"
 
-#: gui/player.py:6224
+#: gui/player.py:6228
 msgid "Beginning of track"
 msgstr "トラックの先頭"
 
-#: gui/player.py:5463
+#: gui/player.py:5467
 msgid "Pause"
 msgstr "一時停止"
 

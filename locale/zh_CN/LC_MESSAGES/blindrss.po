@@ -1399,6 +1399,24 @@ msgstr "BlindRSS 通知测试"
 msgid "If you can read this, notifications are working."
 msgstr "如果您能看到这条消息,说明通知功能正常。"
 
+#: gui/dialogs.py:3073
+msgid ""
+"Windows toast notifications for new articles.\n"
+"Disabled by default."
+msgstr ""
+"新文章的 Windows 通知。\n"
+"默认禁用。"
+
+#: gui/dialogs.py:3152
+msgid ""
+"Screen-reader announcements for key keyboard actions.\n"
+"Each event can announce via speech, Braille, both, or neither.\n"
+"Braille output is most reliable on Windows with NVDA or JAWS."
+msgstr ""
+"针对主要键盘操作的屏幕阅读器播报。\n"
+"每个事件均可通过语音、盲文、两者或都不播报。\n"
+"在 Windows 上使用 NVDA 或 JAWS 时，盲文输出最为可靠。"
+
 #: gui/dialogs.py:107
 msgid "Article list columns"
 msgstr "文章列表列"
@@ -1588,6 +1606,10 @@ msgstr "检查更新:"
 msgid "Translation Updates"
 msgstr "翻译更新"
 
+#: gui/dialogs.py:1947 gui/dialogs.py:446
+msgid "No feeds available."
+msgstr "没有可用的订阅源。"
+
 #: gui/dialogs.py:2044
 msgid ""
 "The announcement could not be delivered.\n"
@@ -1749,7 +1771,15 @@ msgstr "类型"
 msgid "Close"
 msgstr "关闭"
 
-#: gui/dialogs.py:6960 gui/player.py:2032 gui/player.py:5463
+#: gui/dialogs.py:6749
+msgid "Searching"
+msgstr "正在搜索"
+
+#: gui/dialogs.py:6749
+msgid "Loading more"
+msgstr "正在加载更多"
+
+#: gui/dialogs.py:6960 gui/player.py:2032 gui/player.py:5467
 msgid "Play"
 msgstr "播放"
 
@@ -1874,10 +1904,6 @@ msgstr "全选"
 #: gui/dialogs.py:427
 msgid "Uncheck All"
 msgstr "全部取消选择"
-
-#: gui/dialogs.py:446
-msgid "No feeds available."
-msgstr "没有可用的订阅源。"
 
 #: gui/dialogs.py:467
 msgid "No feed selected."
@@ -3452,6 +3478,10 @@ msgstr "翻译已更新。重启后生效。"
 msgid "Translations are up to date."
 msgstr "翻译已是最新。"
 
+#: gui/dialogs.py:1949
+msgid "Excluded feeds: {excluded} of {total}"
+msgstr "已排除的订阅源：{total} 个中的 {excluded} 个"
+
 #: gui/dialogs.py:2143
 msgid "Inoreader Authorization"
 msgstr "Inoreader 授权"
@@ -3750,6 +3780,11 @@ msgstr "筛选结果:"
 msgid "Sort by:"
 msgstr "排序方式:"
 
+#: gui/dialogs.py:6750
+msgid "{action} {n} site..."
+msgid_plural "{action} {n} sites..."
+msgstr[0] "{action} {n} 个网站..."
+
 #: gui/dialogs.py:7146
 msgid "Subscribe Error"
 msgstr "订阅错误"
@@ -3778,6 +3813,11 @@ msgstr "预设(&P):"
 msgid "Cookies"
 msgstr "Cookie"
 
+#: gui/dialogs.py:1883
+msgid "Loaded {n} OpenRouter model."
+msgid_plural "Loaded {n} OpenRouter models."
+msgstr[0] "已加载 {n} 个 OpenRouter 模型。"
+
 #: gui/dialogs.py:2030
 msgid ""
 "BlindRSS announcement test. If you can hear or read this, announcements are "
@@ -3793,9 +3833,21 @@ msgid "Delete {n} cached file ({size})?"
 msgid_plural "Delete {n} cached files ({size})?"
 msgstr[0] "删除 {n} 个缓存文件({size})?"
 
+#: gui/dialogs.py:2632
+msgid "Detected {nm}: not found"
+msgstr "检测到的 {nm}：未找到"
+
 #: gui/dialogs.py:2664
 msgid "(not set)"
 msgstr "（未设置）"
+
+#: gui/dialogs.py:2831
+msgid "{label} executable path override"
+msgstr "{label} 可执行文件路径覆盖"
+
+#: gui/dialogs.py:2841
+msgid "Detected {label}"
+msgstr "检测到的 {label}"
 
 #: gui/dialogs.py:2856
 msgid "Downloads"
@@ -3813,17 +3865,39 @@ msgstr "Inoreader 应用密钥:"
 msgid "Redirect URI:"
 msgstr "重定向 URI:"
 
+#: gui/dialogs.py:3050
+msgid "Browse for {name}"
+msgstr "浏览 {name}"
+
 #: gui/dialogs.py:4623
 msgid "feed"
 msgstr "订阅源"
+
+#: gui/dialogs.py:4948
+msgid "Searching {label}..."
+msgstr "正在搜索 {label}..."
 
 #: gui/dialogs.py:5215
 msgid "News topic feed"
 msgstr "新闻主题源"
 
+#: gui/dialogs.py:5602
+msgid "Found {n} result."
+msgid_plural "Found {n} results."
+msgstr[0] "找到 {n} 个结果。"
+
+#: gui/dialogs.py:6918
+msgid "Stopped. {n} result."
+msgid_plural "Stopped. {n} results."
+msgstr[0] "已停止。{n} 个结果。"
+
 #: gui/dialogs.py:7120
 msgid "Playback Error"
 msgstr "播放错误"
+
+#: gui/dialogs.py:7124 gui/dialogs.py:7062
+msgid "Playing: {title}"
+msgstr "正在播放：{title}"
 
 #: gui/dialogs.py:7426
 msgid "{index}. {title}, from {source}"
@@ -3862,6 +3936,22 @@ msgstr "要删除预设“{name}”吗?"
 msgid "Could not read cookies from {browser}."
 msgstr "无法从 {browser} 读取 Cookie。"
 
+#: gui/dialogs.py:1846
+msgid "OpenRouter model load failed: {error}"
+msgstr "OpenRouter 模型加载失败：{error}"
+
+#: gui/dialogs.py:2634
+msgid "Detected {nm}: {path} (failed version check)"
+msgstr "检测到的 {nm}：{path}（版本检查失败）"
+
+#: gui/dialogs.py:2636
+msgid "Detected {nm}: {path}"
+msgstr "检测到的 {nm}：{path}"
+
+#: gui/dialogs.py:2840
+msgid "Detected {label}: checking…"
+msgstr "检测到的 {label}：正在检查…"
+
 #: gui/dialogs.py:3599
 msgid ""
 "User Data Folder path:\n"
@@ -3877,6 +3967,16 @@ msgid ""
 msgstr ""
 "应用安装文件夹路径：\n"
 "  {path}"
+
+#: gui/dialogs.py:6921
+msgid "Loaded more. {n} result."
+msgid_plural "Loaded more. {n} results."
+msgstr[0] "已加载更多。{n} 个结果。"
+
+#: gui/dialogs.py:6923
+msgid "{n} result."
+msgid_plural "{n} results."
+msgstr[0] "{n} 个结果。"
 
 #: gui/dialogs.py:7145
 msgid "Could not subscribe: {error}"
@@ -3895,7 +3995,7 @@ msgid "WAV files"
 msgstr "WAV 文件"
 
 #: gui/dialogs.py:7062 gui/mainframe.py:1771 gui/player.py:3961
-#: gui/player.py:6389
+#: gui/player.py:6393
 msgid "Playing"
 msgstr "正在播放"
 
@@ -3911,24 +4011,20 @@ msgstr ""
 "{accel} 已分配给“{other}”。\n"
 "要将其重新分配给“{this}”吗?"
 
-#: gui/dialogs.py:7064 gui/mainframe.py:1771 gui/player.py:6445
-#: gui/player.py:6462
+#: gui/dialogs.py:7064 gui/mainframe.py:1771 gui/player.py:6449
+#: gui/player.py:6466
 msgid "Paused"
 msgstr "已暂停"
-
-#: gui/dialogs.py:7062
-msgid "Playing: {title}"
-msgstr "正在播放：{title}"
 
 #: gui/dialogs.py:7064
 msgid "Paused: {title}"
 msgstr "已暂停：{title}"
 
-#: gui/dialogs.py:7068 gui/player.py:4022 gui/player.py:4428
+#: gui/dialogs.py:7068 gui/player.py:4022 gui/player.py:4432
 msgid "Buffering..."
 msgstr "正在缓冲..."
 
-#: gui/dialogs.py:7070 gui/player.py:4159
+#: gui/dialogs.py:7070 gui/player.py:4163
 msgid "Connecting..."
 msgstr "正在连接..."
 
@@ -5554,11 +5650,11 @@ msgstr "断开投放(&D)"
 msgid "&Cast to Device..."
 msgstr "投放到设备(&C)..."
 
-#: gui/player.py:5342
+#: gui/player.py:5346
 msgid "Elapsed Time"
 msgstr "已用时间"
 
-#: gui/player.py:6501 gui/player.py:6613 gui/player.py:4434
+#: gui/player.py:6505 gui/player.py:6617 gui/player.py:4438
 msgid "Stopped"
 msgstr "已停止"
 
@@ -5638,11 +5734,11 @@ msgstr "媒体加载失败"
 msgid "VLC is not initialized. Playback is unavailable."
 msgstr "VLC 尚未初始化。播放不可用。"
 
-#: gui/player.py:4219
+#: gui/player.py:4223
 msgid "Downloading for playback..."
 msgstr "正在下载以供播放..."
 
-#: gui/player.py:5368
+#: gui/player.py:5372
 msgid "Elapsed {elapsed}, Remaining {remaining}, Total {total}"
 msgstr "已用 {elapsed},剩余 {remaining},总计 {total}"
 
@@ -5666,23 +5762,23 @@ msgstr "章节链接不可用"
 msgid "Could not open chapter link"
 msgstr "无法打开章节链接"
 
-#: gui/player.py:4138
+#: gui/player.py:4142
 msgid "Loading media..."
 msgstr "正在加载媒体..."
 
-#: gui/player.py:5366
+#: gui/player.py:5370
 msgid "Elapsed {elapsed}"
 msgstr "已用 {elapsed}"
 
-#: gui/player.py:6224
+#: gui/player.py:6228
 msgid "End of track"
 msgstr "音轨结尾"
 
-#: gui/player.py:6224
+#: gui/player.py:6228
 msgid "Beginning of track"
 msgstr "音轨开头"
 
-#: gui/player.py:5463
+#: gui/player.py:5467
 msgid "Pause"
 msgstr "暂停"
 

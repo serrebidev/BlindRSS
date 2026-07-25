@@ -1944,7 +1944,7 @@ class SettingsDialog(wx.Dialog):
         total = len(self._sorted_notification_feed_entries())
         excluded = len(getattr(self, "_notification_excluded_feed_ids", set()) or set())
         if total <= 0:
-            text = "No feeds available."
+            text = _("No feeds available.")
         else:
             text = _("Excluded feeds: {excluded} of {total}").format(excluded=excluded, total=total)
         try:
@@ -5599,7 +5599,7 @@ class FeedSearchDialog(wx.Dialog):
             self.search_btn.Enable()
             if getattr(self, "source_combo", None):
                 self.source_combo.Enable()
-            self.status_lbl.SetLabel(ngettext("Found {n} result.", "Found {n} results.", len(results)).format(nn=len(results)))
+            self.status_lbl.SetLabel(ngettext("Found {n} result.", "Found {n} results.", len(results)).format(n=len(results)))
             self.search_ctrl.SetFocus()
         except Exception:
             # wx raises when the underlying C++ widgets were already destroyed.
@@ -6746,7 +6746,7 @@ class YtdlpGlobalSearchDialog(wx.Dialog):
         self.search_btn.Disable()
         self.load_more_btn.Disable()
         self.scope_choice.Disable()
-        action = "Searching" if reset else "Loading more"
+        action = _("Searching") if reset else _("Loading more")
         self.status_lbl.SetLabel(ngettext("{action} {n} site...", "{action} {n} sites...", self._total_sites).format(action=action, n=self._total_sites))
 
         self._search_thread = threading.Thread(
