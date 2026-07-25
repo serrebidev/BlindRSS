@@ -4,6 +4,14 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.122.1 - 2026-07-25
+
+- Repair PR #93 format bug and complete all 15 locales.
+- Fix Russian translation.
+- Merge pull request #93 from tseykovets/ru.
+- Update Russian translation.
+- Add gettext support to new strings.
+
 ## v1.122.0 - 2026-07-24
 
 - Choose YouTube download formats, detect channel feeds, fix seek cap.
