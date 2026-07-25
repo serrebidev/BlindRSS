@@ -148,7 +148,9 @@ def _fetch_latest_release() -> Tuple[Optional[dict], Optional[str]]:
     url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
     headers = {"Accept": "application/vnd.github+json"}
     try:
-        resp = safe_requests_get(url, headers=headers, timeout=15)
+        # No imported browser cookies: this is our own release API call, and the
+        # user's github.com session has no business travelling with it.
+        resp = safe_requests_get(url, headers=headers, timeout=15, site_cookies=False)
     except Exception as e:
         return None, _("Network error while checking GitHub: {error}").format(error=e)
 
@@ -178,7 +180,7 @@ def _find_release_asset(release: dict, name: str) -> Optional[dict]:
 
 def _download_json(url: str, timeout: int = 20) -> Tuple[Optional[dict], Optional[str]]:
     try:
-        resp = safe_requests_get(url, timeout=timeout)
+        resp = safe_requests_get(url, timeout=timeout, site_cookies=False)
         resp.raise_for_status()
         return resp.json(), None
     except Exception as e:
@@ -737,7 +739,9 @@ def download_and_apply_update(info: UpdateInfo, debug_mode: bool = False, progre
 
     # --- Download (common to all platforms) -----------------------------------
     try:
-        resp = safe_requests_get(info.download_url, stream=True, timeout=30)
+        resp = safe_requests_get(
+            info.download_url, stream=True, timeout=30, site_cookies=False
+        )
         resp.raise_for_status()
         try:
             total = int(resp.headers.get("Content-Length") or 0)

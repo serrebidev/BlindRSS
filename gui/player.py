@@ -731,6 +731,9 @@ class PlayerFrame(wx.Frame):
         self._last_range_proxy_initial_inline_kb = None
         self._range_proxy_retry_count = 0
         self._range_proxy_last_stall_recover_ts = 0.0
+        # Set by the seek probe when a URL turns out to be a web page (see
+        # _note_seek_probe_content); cleared at the start of every load.
+        self._non_media_probe = None
         self._last_used_stream_proxy = False
         self._stream_proxy_retry_count = 0
         self._stream_proxy_last_stall_recover_ts = 0.0
@@ -1733,6 +1736,19 @@ class PlayerFrame(wx.Frame):
             if (now_mono - last_recover) < 6.0:
                 return
             self._range_proxy_last_stall_recover_ts = now_mono
+            # No amount of retrying turns a web page into audio. Say so and stop.
+            non_media = self._pending_non_media_reason()
+            if non_media:
+                log.warning(
+                    "Abandoning playback after %.1fs: the URL resolved to a web page, not media.",
+                    max(0.0, now_mono - load_started),
+                )
+                self._handle_media_load_error(
+                    int(getattr(self, "_active_load_seq", 0) or 0),
+                    str(getattr(self, "_last_orig_url", "") or ""),
+                    non_media,
+                )
+                return
             log.warning(
                 "Detected stalled proxied playback after %.1fs (state=%s, pos=%sms); attempting recovery",
                 max(0.0, now_mono - load_started),
@@ -1811,6 +1827,19 @@ class PlayerFrame(wx.Frame):
                 return
 
             orig_url = str(getattr(self, "_last_orig_url", "") or "").strip()
+
+            # A web page will not start playing on the second attempt either.
+            non_media = self._pending_non_media_reason()
+            if non_media:
+                self._stream_proxy_last_stall_recover_ts = now_mono
+                log.warning(
+                    "Abandoning playback after %.1fs: the URL resolved to a web page, not media.",
+                    max(0.0, now_mono - load_started),
+                )
+                self._handle_media_load_error(
+                    int(getattr(self, "_active_load_seq", 0) or 0), orig_url, non_media
+                )
+                return
 
             # First pass: direct googlevideo stalled -> retry via local stream proxy.
             if (
@@ -3013,6 +3042,64 @@ class PlayerFrame(wx.Frame):
             is_remote,
         )
 
+    #: Content types that are a web page, not media. A URL that resolves to one of
+    #: these will never play: VLC sits in Opening until the stall watchdog fires,
+    #: retries, stalls again, and the user is told nothing. The seek probe already
+    #: knows the answer seconds earlier, so record it and fail with a real reason.
+    _NON_MEDIA_CONTENT_TYPES = (
+        "text/html",
+        "application/xhtml+xml",
+        "application/xml+html",
+    )
+
+    def _note_seek_probe_content(
+        self, url: str, content_type: str, content_length: str, is_hls: bool
+    ) -> None:
+        """Record whether the probed URL is a web page rather than playable media."""
+        try:
+            if is_hls:
+                return
+            base_type = str(content_type or "").split(";")[0].strip().lower()
+            if not base_type or base_type not in self._NON_MEDIA_CONTENT_TYPES:
+                return
+            if str(url or "").strip() != str(getattr(self, "_last_orig_url", "") or "").strip():
+                # A newer load already replaced this one; its own probe will speak.
+                if str(url or "").strip() != str(getattr(self, "current_url", "") or "").strip():
+                    return
+            self._non_media_probe = {
+                "url": str(url or ""),
+                "content_type": base_type,
+                "content_length": str(content_length or ""),
+                "load_seq": int(getattr(self, "_active_load_seq", 0) or 0),
+            }
+            log.warning(
+                "Seek probe resolved %s to %s (%s bytes), which is a web page, not media.",
+                url,
+                base_type,
+                content_length or "?",
+            )
+        except Exception:
+            log.debug("Could not record seek probe content type", exc_info=True)
+
+    def _pending_non_media_reason(self) -> str:
+        """A user-facing reason if the current media URL resolved to a web page."""
+        try:
+            probe = dict(getattr(self, "_non_media_probe", None) or {})
+        except Exception:
+            return ""
+        if not probe:
+            return ""
+        try:
+            if int(probe.get("load_seq", -1)) != int(getattr(self, "_active_load_seq", 0) or 0):
+                return ""
+        except Exception:
+            return ""
+        return _(
+            "This link opens a web page, not audio or video. The server returned "
+            "{content_type} instead of a media file, which often means the item needs "
+            "you to sign in, or the feed has no downloadable enclosure."
+        ).format(content_type=probe.get("content_type") or "text/html")
+
     def _start_http_seek_diagnostics(self, url: str, headers: dict | None = None) -> None:
         if not url:
             return
@@ -3046,6 +3133,7 @@ class PlayerFrame(wx.Frame):
                 final_url = str(getattr(resp, "url", "") or "")
                 low = (final_url or url).lower()
                 is_hls = ".m3u8" in low or "mpegurl" in content_type.lower()
+                self._note_seek_probe_content(url, content_type, content_len, is_hls)
                 log.info(
                     "HTTP seek probe: url=%s final=%s status=%s accept_ranges=%s content_range=%s content_type=%s content_length=%s hls=%s",
                     url,
@@ -3374,6 +3462,20 @@ class PlayerFrame(wx.Frame):
                 webbrowser.open(url)
             except Exception:
                 pass
+        # The player window is about to close, which takes the status label with
+        # it before a screen reader ever reaches it. A failure the user asked for
+        # has to be said out loud, not just logged (v1.114.0 lesson), so show the
+        # specific reason modally first when we have one.
+        try:
+            if error_msg:
+                wx.MessageBox(
+                    str(error_msg),
+                    _("Cannot play this item"),
+                    wx.OK | wx.ICON_ERROR,
+                    self.GetParent() or None,
+                )
+        except Exception:
+            log.debug("Could not show media load failure message", exc_info=True)
         try:
             self.Close()
         except Exception:
@@ -4123,6 +4225,7 @@ class PlayerFrame(wx.Frame):
         try:
             self._load_seq += 1
             self._active_load_seq = self._load_seq
+            self._non_media_probe = None
         except Exception:
             pass
         self._cancel_silence_scan()

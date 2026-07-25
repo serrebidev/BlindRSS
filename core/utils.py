@@ -1047,7 +1047,14 @@ def _site_cookie_impersonation(url: str) -> str:
         return ""
 
 
-def safe_requests_get(url, *, impersonate: bool = False, impersonate_target: str | None = None, **kwargs):
+def safe_requests_get(
+    url,
+    *,
+    impersonate: bool = False,
+    impersonate_target: str | None = None,
+    site_cookies: bool = True,
+    **kwargs,
+):
     """Wrapper for requests.get with default browser headers.
 
     When ``impersonate`` is True and curl_cffi is installed, the request is sent
@@ -1062,20 +1069,24 @@ def safe_requests_get(url, *, impersonate: bool = False, impersonate_target: str
     """
     url = encode_non_ascii_url(url)
     headers = kwargs.pop("headers", {})
-    if not impersonate:
+    # Imported browser cookies exist to get past interactive bot checks on content
+    # sites. An API we call with our own credentials (or none) must not receive the
+    # user's browser session for that domain just because they happen to have one.
+    _cookies = _apply_site_cookies if site_cookies else (lambda _url, hdrs: hdrs)
+    if not impersonate and site_cookies:
         session_target = _site_cookie_impersonation(url)
         if session_target:
             impersonate = True
             impersonate_target = impersonate_target or session_target
     if impersonate and CURL_CFFI_AVAILABLE:
         target = impersonate_target or IMPERSONATE_TARGET
-        final_headers = _apply_site_cookies(url, _request_safe_headers(_impersonated_headers(headers)))
+        final_headers = _cookies(url, _request_safe_headers(_impersonated_headers(headers)))
         _log_http_request("GET", url, final_headers, f"curl_cffi:{target}")
         return _get_curl_session().get(url, headers=final_headers, impersonate=target, **kwargs)
     # Merge with defaults, preserving caller's headers if they exist
     final_headers = HEADERS.copy()
     final_headers.update(headers)
-    final_headers = _apply_site_cookies(url, _request_safe_headers(final_headers))
+    final_headers = _cookies(url, _request_safe_headers(final_headers))
     _log_http_request("GET", url, final_headers, "requests")
     return _get_plain_session().get(url, headers=final_headers, **kwargs)
 

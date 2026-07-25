@@ -66,14 +66,12 @@ class MinifluxProvider(RSSProvider):
         self._session.mount("https://", adapter)
         self._session.mount("http://", adapter)
         self._cached_get_responses: dict[str, Any] = {}
-        self._last_request_info = {
-            "ok": False,
-            "used_cache": False,
-            "status_code": None,
-            "endpoint": "",
-            "method": "",
-            "error_body": None,
-        }
+        # Per-thread: the feed-tree load and a refresh run issue overlapping GETs
+        # (both fetch /v1/feeds within milliseconds at startup), and a single shared
+        # slot means whichever finishes last describes *both*. The refresh decides
+        # whether to fire targeted per-feed refreshes from this, so a cross-thread
+        # read is a real wrong-decision bug, not just a confusing log line.
+        self._request_info_local = threading.local()
         self._last_add_feed_result = {
             "ok": False,
             "duplicate": False,
@@ -90,6 +88,39 @@ class MinifluxProvider(RSSProvider):
         self._targeted_refresh_backoff_until: dict[str, float] = {}
         self._targeted_refresh_fail_counts: dict[str, int] = {}
         self._targeted_refresh_backoff_lock = threading.Lock()
+        # Server-wide circuit breaker for the targeted per-feed refresh route.
+        # The per-feed backoff above only helps the *next* cycle: when the server
+        # rejects the route outright it answers 5xx for every feed, so a whole
+        # batch fires and fails before any backoff applies. This stops the batch
+        # mid-flight and parks the route for a cooldown.
+        self._targeted_refresh_route_cooldown_until = 0.0
+
+    @staticmethod
+    def _blank_request_info() -> dict[str, Any]:
+        return {
+            "ok": False,
+            "used_cache": False,
+            "status_code": None,
+            "endpoint": "",
+            "method": "",
+            "error_body": None,
+        }
+
+    @property
+    def _last_request_info(self) -> dict[str, Any]:
+        """Outcome of the most recent request *made on this thread*."""
+        info = getattr(self._request_info_local, "info", None)
+        if info is None:
+            info = self._blank_request_info()
+            self._request_info_local.info = info
+        return info
+
+    @_last_request_info.setter
+    def _last_request_info(self, value) -> None:
+        try:
+            self._request_info_local.info = dict(value or {})
+        except Exception:
+            self._request_info_local.info = self._blank_request_info()
 
     def _browser_feed_fallback_request(self, action: str, payload: dict, *, wait: bool = False):
         """Call the optional direct-browser Miniflux companion endpoint.
@@ -300,9 +331,48 @@ class MinifluxProvider(RSSProvider):
             n = 1
         return min(1800.0, 60.0 * (2 ** (n - 1)))  # 60s, 120s, 240s... cap 30m
 
+    def _targeted_refresh_route_batch_5xx_limit(self) -> int:
+        """Consecutive 5xx from the per-feed refresh route before the whole batch is
+        abandoned. 0 disables the breaker. Default 3: one or two failures are a bad
+        feed, but three in a row means the route itself is refusing work."""
+        try:
+            val = int(self.config.get("miniflux_targeted_refresh_5xx_limit", 3))
+        except Exception:
+            val = 3
+        return max(0, val)
+
+    def _targeted_refresh_route_cooldown_seconds(self) -> float:
+        try:
+            val = float(self.config.get("miniflux_targeted_refresh_cooldown_s", 300) or 0)
+        except Exception:
+            val = 300.0
+        return max(0.0, val)
+
+    def _targeted_refresh_route_in_cooldown(self) -> bool:
+        try:
+            return float(self._targeted_refresh_route_cooldown_until or 0.0) > time.monotonic()
+        except Exception:
+            return False
+
+    def _trip_targeted_refresh_route_breaker(self, failures: int) -> None:
+        cooldown = self._targeted_refresh_route_cooldown_seconds()
+        if cooldown <= 0:
+            return
+        already = self._targeted_refresh_route_in_cooldown()
+        self._targeted_refresh_route_cooldown_until = time.monotonic() + cooldown
+        if not already:
+            log.warning(
+                "Miniflux per-feed refresh route returned %s consecutive 5xx; "
+                "skipping targeted refreshes for %.0fs and letting the server poller work.",
+                failures,
+                cooldown,
+            )
+
     def _should_attempt_targeted_refresh(self, feed_id: str, *, force: bool = False) -> bool:
         fid = str(feed_id or "").strip()
         if not fid:
+            return False
+        if self._targeted_refresh_route_in_cooldown():
             return False
         now_mono = time.monotonic()
         try:
@@ -780,6 +850,12 @@ class MinifluxProvider(RSSProvider):
         if self._refresh_cancelled(cancel_event):
             info["cancelled"] = True
             return info
+        # The batch breaker may have tripped after this worker was queued but
+        # before it started; skipping here is what keeps the remaining requests
+        # of a doomed batch off the wire.
+        if self._targeted_refresh_route_in_cooldown():
+            info["skipped"] = True
+            return info
 
         url = f"{self.base_url}{endpoint}"
         timeout_s = self._request_timeout_seconds(endpoint)
@@ -913,12 +989,36 @@ class MinifluxProvider(RSSProvider):
 
         results: dict[str, dict[str, Any]] = {}
         worker_count = self._targeted_refresh_worker_count(len(ordered_ids))
+        batch_5xx_limit = self._targeted_refresh_route_batch_5xx_limit()
+        batch_state = {"consecutive_5xx": 0}
+        batch_lock = threading.Lock()
+
+        def _note_route_health(info: dict[str, Any]) -> None:
+            """Trip the route breaker once the server 5xxes the whole batch."""
+            if batch_5xx_limit <= 0:
+                return
+            try:
+                status = int(info.get("status_code") or 0)
+            except Exception:
+                status = 0
+            with batch_lock:
+                if status >= 500:
+                    batch_state["consecutive_5xx"] += 1
+                    tripped = batch_state["consecutive_5xx"] >= batch_5xx_limit
+                    count = batch_state["consecutive_5xx"]
+                else:
+                    # Any non-5xx answer proves the route still works.
+                    batch_state["consecutive_5xx"] = 0
+                    tripped, count = False, 0
+            if tripped:
+                self._trip_targeted_refresh_route_breaker(count)
 
         def _store_result(fid: str, info: dict[str, Any]) -> None:
             info = info or {}
             results[fid] = info
-            if info.get("cancelled"):
+            if info.get("cancelled") or info.get("skipped"):
                 return
+            _note_route_health(info)
             self._record_targeted_refresh_attempt_result(
                 fid,
                 bool(info.get("ok", False)),
@@ -1462,9 +1562,28 @@ class MinifluxProvider(RSSProvider):
                 elif status in ("error", "stale"):
                     per_feed_retry_ids.append(feed_id)
 
+            # Retrying stale/errored feeds individually stays the designed behavior;
+            # what the field log exposed is that nothing stopped a batch once the
+            # server started answering 5xx for every one of them. That is the route
+            # breaker's job (see _trip_targeted_refresh_route_breaker), so here we
+            # only add its cooldown to the existing preconditions.
+            route_parked = self._targeted_refresh_route_in_cooldown()
             allow_targeted_refresh = bool(
-                global_refresh_ok and (not feeds_from_cache) and not scheduled
+                global_refresh_ok
+                and (not feeds_from_cache)
+                and not scheduled
+                and not route_parked
             )
+            if scheduled:
+                targeted_skip_reason = "server poller owns scheduled refreshes"
+            elif route_parked:
+                targeted_skip_reason = "per-feed refresh route is in cooldown"
+            elif feeds_from_cache:
+                targeted_skip_reason = "feed list came from cache"
+            elif not global_refresh_ok:
+                targeted_skip_reason = "global refresh was rejected"
+            else:
+                targeted_skip_reason = ""
             log.info(
                 "Miniflux refresh feed metadata force=%s feeds=%s feeds_from_cache=%s targeted_candidates=%s chronic_skipped=%s retry_budget=%s allow_targeted=%s",
                 force,
@@ -1476,9 +1595,10 @@ class MinifluxProvider(RSSProvider):
                 allow_targeted_refresh,
             )
             if not allow_targeted_refresh and per_feed_retry_ids:
-                log.warning(
-                    "Skipping Miniflux per-feed refresh retries due to upstream instability "
-                    "(global refresh failed or feed list came from cache)."
+                log.info(
+                    "Skipping %s Miniflux per-feed refresh retries: %s.",
+                    len(per_feed_retry_ids),
+                    targeted_skip_reason or "not applicable this cycle",
                 )
 
             if retry_budget > 0 and allow_targeted_refresh:

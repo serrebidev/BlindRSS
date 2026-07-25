@@ -445,7 +445,7 @@ msgstr "Проигрыватель"
 msgid "Play Queue"
 msgstr "Очередь воспроизведения"
 
-#: core/shortcuts.py:143 gui/player.py:2052
+#: core/shortcuts.py:143 gui/player.py:2081
 msgid "Playback Speed"
 msgstr "Скорость воспроизведения"
 
@@ -646,7 +646,7 @@ msgstr "Переключить сортировку по возрастанию"
 msgid "Play/Pause"
 msgstr "Воспроизведение/пауза"
 
-#: core/shortcuts.py:193 gui/mainframe.py:2343 gui/player.py:2039
+#: core/shortcuts.py:193 gui/mainframe.py:2343 gui/player.py:2068
 #: gui/tray.py:110
 msgid "Stop"
 msgstr "Стоп"
@@ -784,197 +784,197 @@ msgstr ""
 msgid "starts with"
 msgstr ""
 
-#: core/updater.py:297
+#: core/updater.py:299
 msgid "Update available."
 msgstr "Доступно обновление."
 
-#: core/updater.py:500
+#: core/updater.py:502
 msgid "Authenticode verification failed: PowerShell was not found."
 msgstr ""
 "Не удалось выполнить проверку аутентификационного кода: PowerShell не был "
 "найден."
 
-#: core/updater.py:760
+#: core/updater.py:764
 msgid "Verifying download…"
 msgstr "Проверка загрузки…"
 
-#: core/updater.py:775
+#: core/updater.py:779
 msgid "Extracting update…"
 msgstr "Извлечение обновления…"
 
-#: core/updater.py:801 core/updater.py:855 core/updater.py:933
+#: core/updater.py:805 core/updater.py:859 core/updater.py:937
 msgid "Verifying signature…"
 msgstr "Проверка подписи…"
 
-#: core/updater.py:806 core/updater.py:860 core/updater.py:938
-#: core/updater.py:958
+#: core/updater.py:810 core/updater.py:864 core/updater.py:942
+#: core/updater.py:962
 msgid "Preparing restart…"
 msgstr "Подготовка к перезапуску…"
 
-#: core/updater.py:197
+#: core/updater.py:199
 msgid "No release data from GitHub."
 msgstr "На GitHub нет данных о релизе."
 
-#: core/updater.py:222
+#: core/updater.py:224
 msgid "Update manifest is empty."
 msgstr "Манифест обновления пуст."
 
-#: core/updater.py:226
+#: core/updater.py:228
 msgid "Update manifest has invalid version."
 msgstr "В манифесте обновления указана недопустимая версия."
 
-#: core/updater.py:228
+#: core/updater.py:230
 msgid "Update manifest version does not match the latest release."
 msgstr "Версия манифеста обновления не соответствует последнему релизу."
 
-#: core/updater.py:232
+#: core/updater.py:234
 msgid "Update manifest is missing asset name."
 msgstr "В манифесте обновления отсутствует название ресурса."
 
-#: core/updater.py:242
+#: core/updater.py:244
 msgid "Update manifest is missing a download URL."
 msgstr "В манифесте обновления отсутствует URL-адрес для загрузки."
 
-#: core/updater.py:246
+#: core/updater.py:248
 msgid "Update manifest has an invalid SHA-256 hash."
 msgstr "Манифест обновления имеет недопустимый хэш SHA-256."
 
-#: core/updater.py:717
+#: core/updater.py:719
 msgid "Auto-update is not available for this build."
 msgstr "Автоматическое обновление для этой сборки недоступно."
 
-#: core/updater.py:763
+#: core/updater.py:767
 msgid "Downloaded update failed SHA-256 verification."
 msgstr "Загруженное обновление не прошло проверку соответствия SHA-256."
 
-#: core/updater.py:853
+#: core/updater.py:857
 msgid "Downloaded Windows installer is missing."
 msgstr "Загруженный Windows-установщик отсутствует."
 
-#: core/updater.py:921
+#: core/updater.py:925
 msgid "Could not locate the running .app bundle to update."
 msgstr ""
 "Не удалось установить местоположение запущенного приложения .app для "
 "обновления."
 
-#: core/updater.py:929
+#: core/updater.py:933
 msgid "Update package does not contain a BlindRSS.app bundle."
 msgstr "Пакет обновления не содержит приложения BlindRSS.app."
 
-#: core/updater.py:931
+#: core/updater.py:935
 msgid "Update package .app is missing its executable."
 msgstr "В пакете обновления .app отсутствует исполняемый файл."
 
-#: core/updater.py:956
+#: core/updater.py:960
 msgid "Update package is missing the BlindRSS executable."
 msgstr "В пакете обновления отсутствует исполняемый файл BlindRSS."
 
-#: core/updater.py:747 core/updater.py:755
+#: core/updater.py:751 core/updater.py:759
 msgid "Downloading update…"
 msgstr "Загрузка обновления…"
 
-#: core/updater.py:788 core/updater.py:209
+#: core/updater.py:792 core/updater.py:211
 msgid "Auto-update is not supported on this platform ({platform})."
 msgstr ""
 "Автоматическое обновление на этой платформе не поддерживается ({platform})."
 
-#: core/updater.py:915
+#: core/updater.py:919
 msgid "Update signature verification failed: {error}"
 msgstr "Ошибка проверки подписи обновления: {error}"
 
-#: core/updater.py:159
+#: core/updater.py:161
 msgid "{msg} Reset time (epoch): {reset}"
 msgstr "{msg} Время сброса (Unix epoch): {reset}"
 
-#: core/updater.py:163
+#: core/updater.py:165
 msgid "GitHub API error: HTTP {status}"
 msgstr "Ошибка API GitHub: HTTP {status}"
 
-#: core/updater.py:191
+#: core/updater.py:193
 msgid "Invalid current version: {version}"
 msgstr "Недопустимая текущая версия: {version}"
 
-#: core/updater.py:202
+#: core/updater.py:204
 msgid "Latest release tag is not semver: {tag}"
 msgstr "Тег последнего релиза не соответствует правилам semver: {tag}"
 
-#: core/updater.py:205
+#: core/updater.py:207
 msgid "BlindRSS is up to date ({version})."
 msgstr "Установлена последняя версия BlindRSS ({version})."
 
-#: core/updater.py:216
+#: core/updater.py:218
 msgid "Update manifest '{manifest}' not found in release assets."
 msgstr "Манифест обновления '{manifest}' не найден в ресурсах релиза."
 
-#: core/updater.py:234
+#: core/updater.py:236
 msgid "Update asset must be a {extension} file."
 msgstr "Ресурс обновления должен быть файлом {extension}."
 
-#: core/updater.py:238
+#: core/updater.py:240
 msgid "Update asset '{name}' not found in release assets."
 msgstr "Ресурс обновления '{name}' не найден в ресурсах релиза."
 
-#: core/updater.py:264
+#: core/updater.py:266
 msgid "Windows installer asset must be an .exe file."
 msgstr "Ресурс программы установки для Windows должен быть файлом .exe."
 
-#: core/updater.py:273
+#: core/updater.py:275
 msgid "Update installer has an invalid SHA-256 hash."
 msgstr "Программа установки обновления имеет недопустимый хэш SHA-256."
 
-#: core/updater.py:280
+#: core/updater.py:282
 msgid "Update installer is missing a download URL."
 msgstr "В программе установки обновления отсутствует URL-адрес для загрузки."
 
-#: core/updater.py:499
+#: core/updater.py:501
 msgid "Authenticode verification failed: {error}"
 msgstr "Не удалось выполнить проверку аутентификационного кода: {error}"
 
-#: core/updater.py:794 core/updater.py:851 core/updater.py:952
+#: core/updater.py:798 core/updater.py:855 core/updater.py:956
 msgid "{name} is missing from the install directory."
 msgstr "{name} отсутствует в директории установки."
 
-#: core/updater.py:799
+#: core/updater.py:803
 msgid "Update package is missing {name}."
 msgstr "Отсутствует пакет обновления {name}."
 
-#: core/updater.py:925
+#: core/updater.py:929
 msgid "{name} is missing from the app bundle."
 msgstr "{name} отсутствует в пакете приложения."
 
-#: core/updater.py:153
+#: core/updater.py:155
 msgid "Network error while checking GitHub: {error}"
 msgstr "Сетевая ошибка при проверке GitHub: {error}"
 
-#: core/updater.py:168
+#: core/updater.py:170
 msgid "Invalid GitHub response: {error}"
 msgstr "Неверный ответ GitHub: {error}"
 
-#: core/updater.py:185
+#: core/updater.py:187
 msgid "Failed to download update metadata: {error}"
 msgstr "Не удалось загрузить метаданные обновления: {error}"
 
-#: core/updater.py:408
+#: core/updater.py:410
 msgid "Unsupported update archive type: {type}"
 msgstr "Неподдерживаемый тип архива обновления: {type}"
 
-#: core/updater.py:590 core/updater.py:1016
+#: core/updater.py:592 core/updater.py:1020
 msgid "Failed to start update helper: {error}"
 msgstr "Не удалось запустить помощника по обновлению: {error}"
 
-#: core/updater.py:758
+#: core/updater.py:762
 msgid "Failed to download update: {error}"
 msgstr "Не удалось загрузить обновление: {error}"
 
-#: core/updater.py:779
+#: core/updater.py:783
 msgid "Failed to extract update: {error}"
 msgstr "Не удалось извлечь обновление: {error}"
 
-#: core/updater.py:269
+#: core/updater.py:271
 msgid "Update installer '{name}' not found in release assets."
 msgstr "Программа установки обновления '{name}' не найдена в ресурсах релиза."
 
-#: core/updater.py:487
+#: core/updater.py:489
 msgid "Update is signed but not by a trusted certificate{suffix}"
 msgstr "Обновление подписано, но не доверенным сертификатом{suffix}"
 
@@ -990,18 +990,18 @@ msgstr "Автоматически ({label})"
 msgid "{label} {major} (installed)"
 msgstr "{label} {major} (установлен)"
 
-#: core/utils.py:1376
+#: core/utils.py:1387
 msgid "Just now"
 msgstr "Только что"
 
-#: core/utils.py:1381
+#: core/utils.py:1392
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] "{n} час назад"
 msgstr[1] "{n} часа назад"
 msgstr[2] "{n} часов назад"
 
-#: core/utils.py:1379
+#: core/utils.py:1390
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] "{n} минуту назад"
@@ -2353,7 +2353,7 @@ msgstr "Поиск"
 msgid "Loading more"
 msgstr "Загрузка ещё"
 
-#: gui/dialogs.py:7133 gui/player.py:2034 gui/player.py:5488
+#: gui/dialogs.py:7133 gui/player.py:2063 gui/player.py:5591
 msgid "Play"
 msgstr "Воспроизведение"
 
@@ -4981,8 +4981,8 @@ msgstr "WAV файлы"
 msgid "Google News: {topic} headlines"
 msgstr ""
 
-#: gui/dialogs.py:7235 gui/mainframe.py:1803 gui/player.py:3980
-#: gui/player.py:6453
+#: gui/dialogs.py:7235 gui/mainframe.py:1803 gui/player.py:4082
+#: gui/player.py:6556
 msgid "Playing"
 msgstr "Воспроизводимое"
 
@@ -5002,8 +5002,8 @@ msgstr ""
 msgid "Bing News: {term}"
 msgstr ""
 
-#: gui/dialogs.py:7237 gui/mainframe.py:1803 gui/player.py:6509
-#: gui/player.py:6526
+#: gui/dialogs.py:7237 gui/mainframe.py:1803 gui/player.py:6612
+#: gui/player.py:6629
 msgid "Paused"
 msgstr "Приостановлено"
 
@@ -5011,11 +5011,11 @@ msgstr "Приостановлено"
 msgid "Paused: {title}"
 msgstr "Приостановлен: {title}"
 
-#: gui/dialogs.py:7241 gui/player.py:4041 gui/player.py:4453
+#: gui/dialogs.py:7241 gui/player.py:4143 gui/player.py:4556
 msgid "Buffering..."
 msgstr "Буферизация..."
 
-#: gui/dialogs.py:7243 gui/player.py:4182
+#: gui/dialogs.py:7243 gui/player.py:4285
 msgid "Connecting..."
 msgstr "Подключение..."
 
@@ -5414,7 +5414,7 @@ msgstr "У&меньшить громкость (Ctrl+Вниз)"
 msgid "Decrease volume"
 msgstr "Уменьшить громкость"
 
-#: gui/mainframe.py:2400 gui/player.py:2087 gui/player.py:2062
+#: gui/mainframe.py:2400 gui/player.py:2116 gui/player.py:2091
 msgid "Chapters"
 msgstr "&Тайм-коды"
 
@@ -6206,7 +6206,7 @@ msgstr "Конец очереди воспроизведения."
 msgid "Start of play queue."
 msgstr "Начало очереди воспроизведения."
 
-#: gui/mainframe.py:3550 gui/player.py:2280
+#: gui/mainframe.py:3550 gui/player.py:2309
 msgid "No chapters available"
 msgstr "Нет доступных тайм-кодов"
 
@@ -7049,11 +7049,11 @@ msgstr ""
 "\n"
 "Совет: вы можете отключить этот запрос в \"Настройки\" > \"YouTube\"."
 
-#: gui/player.py:642 gui/player.py:1982
+#: gui/player.py:642 gui/player.py:2011
 msgid "No Track Loaded"
 msgstr "Трек не загружен"
 
-#: gui/player.py:4306
+#: gui/player.py:4409
 #, fuzzy
 msgid "download failed"
 msgstr "Загрузка отключена"
@@ -7062,77 +7062,77 @@ msgstr "Загрузка отключена"
 msgid "Scanning..."
 msgstr "Сканирование..."
 
-#: gui/player.py:1987
+#: gui/player.py:2016
 #, fuzzy
 msgid "Playback Status"
 msgstr "Скорость воспроизведения"
 
-#: gui/player.py:1992
+#: gui/player.py:2021
 #, fuzzy
 msgid "Playback Position"
 msgstr "Время воспроизведения"
 
-#: gui/player.py:2004
+#: gui/player.py:2033
 msgid "Elapsed Time: 00:00"
 msgstr "Прошло времени: 00:00"
 
-#: gui/player.py:2006
+#: gui/player.py:2035
 #, fuzzy
 msgid "Total Time: 00:00"
 msgstr "Прошло времени: 00:00"
 
-#: gui/player.py:2021
+#: gui/player.py:2050
 msgid "Playback Time"
 msgstr "Время воспроизведения"
 
-#: gui/player.py:2029
+#: gui/player.py:2058
 #, fuzzy
 msgid "Rewind 10 seconds"
 msgstr "30 секунд"
 
-#: gui/player.py:2045
+#: gui/player.py:2074
 #, fuzzy
 msgid "Fast Forward 10 seconds"
 msgstr "Перемотать вперёд"
 
-#: gui/player.py:2063
+#: gui/player.py:2092
 #, fuzzy
 msgid "Chapters Menu"
 msgstr "&Тайм-коды"
 
-#: gui/player.py:2074 gui/player.py:2071 gui/tray.py:122
+#: gui/player.py:2103 gui/player.py:2100 gui/tray.py:122
 msgid "Volume"
 msgstr "Громкость"
 
-#: gui/player.py:2137
+#: gui/player.py:2166
 msgid "Disconnect"
 msgstr "Отключить"
 
-#: gui/player.py:2137 gui/player.py:2057
+#: gui/player.py:2166 gui/player.py:2086
 msgid "Cast"
 msgstr "Транслировать"
 
-#: gui/player.py:2138
+#: gui/player.py:2167
 msgid "&Disconnect Cast"
 msgstr "&Отключить трансляцию"
 
-#: gui/player.py:2138 gui/player.py:2107
+#: gui/player.py:2167 gui/player.py:2136
 msgid "&Cast to Device..."
 msgstr "&Трансляция на устройство..."
 
-#: gui/player.py:3392 gui/player.py:3796 gui/player.py:3904 gui/player.py:3906
+#: gui/player.py:3494 gui/player.py:3898 gui/player.py:4006 gui/player.py:4008
 msgid "Playing Audio..."
 msgstr "Воспроизведение аудио..."
 
-#: gui/player.py:5367
+#: gui/player.py:5470
 msgid "Elapsed Time"
 msgstr "Прошло времени"
 
-#: gui/player.py:5370
+#: gui/player.py:5473
 msgid "Total Time"
 msgstr ""
 
-#: gui/player.py:6565 gui/player.py:6677 gui/player.py:4459
+#: gui/player.py:6668 gui/player.py:6780 gui/player.py:4562
 msgid "Stopped"
 msgstr "Остановлено"
 
@@ -7156,69 +7156,76 @@ msgstr "Устройств не найдено"
 msgid "Audio Player"
 msgstr "Аудиоплеер"
 
-#: gui/player.py:2018
+#: gui/player.py:2047
 msgid "No media loaded"
 msgstr "Мультимедиа не загружено"
 
-#: gui/player.py:2028
+#: gui/player.py:2057
 msgid "-10s"
 msgstr "-10 сек."
 
-#: gui/player.py:2044
+#: gui/player.py:2073
 msgid "+10s"
 msgstr "+10 сек."
 
-#: gui/player.py:2111
+#: gui/player.py:2140
 msgid "Show &Chapters\tCtrl+M"
 msgstr "Показать &тайм-коды\tCtrl+M"
 
-#: gui/player.py:2114
+#: gui/player.py:2143
 msgid "Open Chapter &Link\tCtrl+Shift+L"
 msgstr "Открыть ссы&лку на тайм-код\tCtrl+Shift+L"
 
-#: gui/player.py:2117
+#: gui/player.py:2146
 msgid "&Previous Chapter\tCtrl+Shift+Left"
 msgstr "&Предыдущий тайм-код\tCtrl+Shift+Влево"
 
-#: gui/player.py:2118
+#: gui/player.py:2147
 msgid "&Next Chapter\tCtrl+Shift+Right"
 msgstr "&Следующий тайм-код\tCtrl+Shift+Вправо"
 
-#: gui/player.py:2120
+#: gui/player.py:2149
 msgid "&Playback"
 msgstr "&Воспроизведение"
 
-#: gui/player.py:2121
+#: gui/player.py:2150
 msgid "&Chapters"
 msgstr "&Тайм-коды"
 
-#: gui/player.py:2285
+#: gui/player.py:2314
 #, fuzzy
 msgid "Open Link for Selected Chapter"
 msgstr "Открыть ссылку на {chapter}"
 
-#: gui/player.py:2623
+#: gui/player.py:2652
 msgid "Cast device disconnected; resuming local playback"
 msgstr ""
 "Устройство для трансляции отключено; возобновление локального воспроизведения"
 
-#: gui/player.py:3369 gui/player.py:3895
+#: gui/player.py:3097
+msgid ""
+"This link opens a web page, not audio or video. The server returned "
+"{content_type} instead of a media file, which often means the item needs you "
+"to sign in, or the feed has no downloadable enclosure."
+msgstr ""
+
+#: gui/player.py:3457 gui/player.py:3997
 msgid "Failed to load media"
 msgstr "Не удалось загрузить мультимедиа"
 
-#: gui/player.py:3897
+#: gui/player.py:3999
 msgid "VLC is not initialized. Playback is unavailable."
 msgstr "VLC не инициализирован. Воспроизведение недоступно."
 
-#: gui/player.py:4174 gui/player.py:4176 gui/player.py:4161
+#: gui/player.py:4277 gui/player.py:4279 gui/player.py:4264
 msgid "Loading media..."
 msgstr "Загрузка мультимедиа..."
 
-#: gui/player.py:4242
+#: gui/player.py:4345
 msgid "Downloading for playback..."
 msgstr "Загрузка для воспроизведения..."
 
-#: gui/player.py:5393
+#: gui/player.py:5496
 msgid "Elapsed {elapsed}, Remaining {remaining}, Total {total}"
 msgstr "Прошло {elapsed}, Осталось {remaining}, Всего {total}"
 
@@ -7234,71 +7241,75 @@ msgstr "Сопряжение с AirPlay"
 msgid "Connection failed: {error}"
 msgstr "Не удалось установить соединение: {error}"
 
-#: gui/player.py:856
+#: gui/player.py:859
 #, fuzzy
 msgid "VLC Error"
 msgstr "Ошибка"
 
-#: gui/player.py:2080
+#: gui/player.py:2109
 msgid "Volume Level: {percent}%"
 msgstr ""
 
-#: gui/player.py:2185
+#: gui/player.py:2214
 #, fuzzy
 msgid "Chapter at {timestamp}"
 msgstr "Тайм-код {index}: {timestamp}, {title}."
 
-#: gui/player.py:2212
+#: gui/player.py:2241
 msgid "Chapter link unavailable"
 msgstr "Ссылка на тайм-коды недоступна"
 
-#: gui/player.py:2223
+#: gui/player.py:2252
 msgid "Could not open chapter link"
 msgstr "Не удалось открыть ссылку на тайм-коды"
 
-#: gui/player.py:2233
+#: gui/player.py:2262
 #, fuzzy
 msgid "Chapters, none available"
 msgstr "Доступны тайм-коды"
 
-#: gui/player.py:5364
+#: gui/player.py:3473
+msgid "Cannot play this item"
+msgstr ""
+
+#: gui/player.py:5467
 msgid "{name}: {value}"
 msgstr ""
 
-#: gui/player.py:5391
+#: gui/player.py:5494
 msgid "Elapsed {elapsed}"
 msgstr "Прошло {elapsed}"
 
-#: gui/player.py:5503
+#: gui/player.py:5606
 #, fuzzy
 msgid "Volume Level"
 msgstr "Увеличить громкость"
 
-#: gui/player.py:6257
+#: gui/player.py:6360
 msgid "End of track"
 msgstr "Конец дорожки"
 
-#: gui/player.py:6257
+#: gui/player.py:6360
 msgid "Beginning of track"
 msgstr "Начало дорожки"
 
-#: gui/player.py:2627 gui/player.py:2416 gui/player.py:2502
+#: gui/player.py:2656 gui/player.py:2445 gui/player.py:2531
 msgid "{title} (Local)"
 msgstr "{title} (локально)"
 
-#: gui/player.py:3404 gui/player.py:3744 gui/player.py:3757 gui/player.py:3708
+#: gui/player.py:3506 gui/player.py:3846 gui/player.py:3859 gui/player.py:3810
 msgid "Media Stream"
 msgstr ""
 
-#: gui/player.py:4350
+#: gui/player.py:4453
 msgid "Could not play this YouTube item. yt-dlp could not fetch it: {error}"
 msgstr ""
 
-#: gui/player.py:5488
+#: gui/player.py:5591
 msgid "Pause"
 msgstr "Пауза"
 
-#: gui/player.py:6286
+#: gui/player.py:6389
 msgid "Could not seek there. Position {position}"
 msgstr "Не удалось перейти. Позиция {position}"
 
@@ -7310,61 +7321,61 @@ msgstr "Не удалось запустить сопряжение: {error}"
 msgid "Pairing failed: {error}"
 msgstr "Ошибка сопряжения: {error}"
 
-#: gui/player.py:852
+#: gui/player.py:855
 msgid ""
 "VLC could not be initialized: {error}\n"
 "\n"
 "Please ensure VLC media player is installed (64-bit version recommended)."
 msgstr ""
 
-#: gui/player.py:2240
+#: gui/player.py:2269
 #, fuzzy
 msgid "Chapters, {count} available, current chapter {current}"
 msgstr "Доступно тайм-кодов: {count}."
 
-#: gui/player.py:2246
+#: gui/player.py:2275
 #, fuzzy
 msgid "Chapters, {count} available"
 msgstr "Доступны тайм-коды"
 
-#: gui/player.py:2287
+#: gui/player.py:2316
 msgid "Open Link for {chapter}"
 msgstr "Открыть ссылку на {chapter}"
 
-#: gui/player.py:2460
+#: gui/player.py:2489
 msgid "{title} (Casting to {device})"
 msgstr "{title} (трансляция на {device})"
 
-#: gui/player.py:3774
+#: gui/player.py:3876
 msgid ""
 "Rokfin post is listed but not streamable right now: Rokfin returned an "
 "invalid playback ID for this post."
 msgstr ""
 
-#: gui/player.py:5505
+#: gui/player.py:5608
 msgid "Volume: {percent}%"
 msgstr ""
 
-#: gui/player.py:2301
+#: gui/player.py:2330
 msgid "[Current]"
 msgstr "[Текущий]"
 
-#: gui/player.py:2511
+#: gui/player.py:2540
 msgid "Casting failed: {error}"
 msgstr "Не удалось выполнить трансляцию: {error}"
 
-#: gui/player.py:3772
+#: gui/player.py:3874
 #, fuzzy
 msgid "yt-dlp resolve failed: {error}"
 msgstr "Не удалось выполнить экспорт: {error}"
 
-#: gui/player.py:3779
+#: gui/player.py:3881
 msgid ""
 "Rokfin post is not anonymously streamable right now. Rokfin requires a login/"
 "cookies to play this post."
 msgstr ""
 
-#: gui/player.py:3784
+#: gui/player.py:3886
 msgid ""
 "yt-dlp resolve failed: this media may require a login, but browser cookies "
 "could not be loaded on this Windows session (DPAPI). Try running BlindRSS as "

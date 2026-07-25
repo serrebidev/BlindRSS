@@ -435,7 +435,7 @@ msgstr "Speler"
 msgid "Play Queue"
 msgstr "Afspeelwachtrij"
 
-#: core/shortcuts.py:143 gui/player.py:2052
+#: core/shortcuts.py:143 gui/player.py:2081
 msgid "Playback Speed"
 msgstr "Afspeelsnelheid"
 
@@ -636,7 +636,7 @@ msgstr "Oplopende sortering wisselen"
 msgid "Play/Pause"
 msgstr "Afspelen/Pauzeren"
 
-#: core/shortcuts.py:193 gui/mainframe.py:2343 gui/player.py:2039
+#: core/shortcuts.py:193 gui/mainframe.py:2343 gui/player.py:2068
 #: gui/tray.py:110
 msgid "Stop"
 msgstr "Stoppen"
@@ -766,195 +766,195 @@ msgstr "is gelijk aan"
 msgid "starts with"
 msgstr "begint met"
 
-#: core/updater.py:297
+#: core/updater.py:299
 msgid "Update available."
 msgstr "Update beschikbaar."
 
-#: core/updater.py:500
+#: core/updater.py:502
 msgid "Authenticode verification failed: PowerShell was not found."
 msgstr "Authenticode-verificatie mislukt: PowerShell is niet gevonden."
 
-#: core/updater.py:760
+#: core/updater.py:764
 msgid "Verifying download…"
 msgstr "Download controleren…"
 
-#: core/updater.py:775
+#: core/updater.py:779
 msgid "Extracting update…"
 msgstr "Update uitpakken…"
 
-#: core/updater.py:801 core/updater.py:855 core/updater.py:933
+#: core/updater.py:805 core/updater.py:859 core/updater.py:937
 msgid "Verifying signature…"
 msgstr "Handtekening controleren…"
 
-#: core/updater.py:806 core/updater.py:860 core/updater.py:938
-#: core/updater.py:958
+#: core/updater.py:810 core/updater.py:864 core/updater.py:942
+#: core/updater.py:962
 msgid "Preparing restart…"
 msgstr "Herstart voorbereiden…"
 
-#: core/updater.py:197
+#: core/updater.py:199
 msgid "No release data from GitHub."
 msgstr "Geen releasegegevens ontvangen van GitHub."
 
-#: core/updater.py:222
+#: core/updater.py:224
 msgid "Update manifest is empty."
 msgstr "Het updatemanifest is leeg."
 
-#: core/updater.py:226
+#: core/updater.py:228
 msgid "Update manifest has invalid version."
 msgstr "Het updatemanifest heeft een ongeldige versie."
 
-#: core/updater.py:228
+#: core/updater.py:230
 msgid "Update manifest version does not match the latest release."
 msgstr ""
 "De versie van het updatemanifest komt niet overeen met de nieuwste release."
 
-#: core/updater.py:232
+#: core/updater.py:234
 msgid "Update manifest is missing asset name."
 msgstr "In het updatemanifest ontbreekt de naam van het item."
 
-#: core/updater.py:242
+#: core/updater.py:244
 msgid "Update manifest is missing a download URL."
 msgstr "In het updatemanifest ontbreekt een download-URL."
 
-#: core/updater.py:246
+#: core/updater.py:248
 msgid "Update manifest has an invalid SHA-256 hash."
 msgstr "Het updatemanifest heeft een ongeldige SHA-256-hash."
 
-#: core/updater.py:717
+#: core/updater.py:719
 msgid "Auto-update is not available for this build."
 msgstr "Automatisch bijwerken is niet beschikbaar voor deze build."
 
-#: core/updater.py:763
+#: core/updater.py:767
 msgid "Downloaded update failed SHA-256 verification."
 msgstr "De gedownloade update is niet door de SHA-256-verificatie gekomen."
 
-#: core/updater.py:853
+#: core/updater.py:857
 msgid "Downloaded Windows installer is missing."
 msgstr "Het gedownloade Windows-installatieprogramma ontbreekt."
 
-#: core/updater.py:921
+#: core/updater.py:925
 msgid "Could not locate the running .app bundle to update."
 msgstr "Kon de actieve .app-bundel voor de update niet vinden."
 
-#: core/updater.py:929
+#: core/updater.py:933
 msgid "Update package does not contain a BlindRSS.app bundle."
 msgstr "Het updatepakket bevat geen BlindRSS.app-bundel."
 
-#: core/updater.py:931
+#: core/updater.py:935
 msgid "Update package .app is missing its executable."
 msgstr "In de .app van het updatepakket ontbreekt het uitvoerbare bestand."
 
-#: core/updater.py:956
+#: core/updater.py:960
 msgid "Update package is missing the BlindRSS executable."
 msgstr "In het updatepakket ontbreekt het uitvoerbare BlindRSS-bestand."
 
-#: core/updater.py:747 core/updater.py:755
+#: core/updater.py:751 core/updater.py:759
 msgid "Downloading update…"
 msgstr "Update downloaden…"
 
-#: core/updater.py:788 core/updater.py:209
+#: core/updater.py:792 core/updater.py:211
 msgid "Auto-update is not supported on this platform ({platform})."
 msgstr ""
 "Automatisch bijwerken wordt niet ondersteund op dit platform ({platform})."
 
-#: core/updater.py:915
+#: core/updater.py:919
 msgid "Update signature verification failed: {error}"
 msgstr "Verificatie van update-handtekening mislukt: {error}"
 
-#: core/updater.py:159
+#: core/updater.py:161
 msgid "{msg} Reset time (epoch): {reset}"
 msgstr "{msg} Reset-tijd (epoch): {reset}"
 
-#: core/updater.py:163
+#: core/updater.py:165
 msgid "GitHub API error: HTTP {status}"
 msgstr "GitHub API-fout: HTTP {status}"
 
-#: core/updater.py:191
+#: core/updater.py:193
 msgid "Invalid current version: {version}"
 msgstr "Ongeldige huidige versie: {version}"
 
-#: core/updater.py:202
+#: core/updater.py:204
 msgid "Latest release tag is not semver: {tag}"
 msgstr "De tag van de nieuwste release is geen geldige semver: {tag}"
 
-#: core/updater.py:205
+#: core/updater.py:207
 msgid "BlindRSS is up to date ({version})."
 msgstr "BlindRSS is up-to-date ({version})."
 
-#: core/updater.py:216
+#: core/updater.py:218
 msgid "Update manifest '{manifest}' not found in release assets."
 msgstr "Updatemanifest '{manifest}' niet gevonden in de release-items."
 
-#: core/updater.py:234
+#: core/updater.py:236
 msgid "Update asset must be a {extension} file."
 msgstr "Het update-item moet een {extension}-bestand zijn."
 
-#: core/updater.py:238
+#: core/updater.py:240
 msgid "Update asset '{name}' not found in release assets."
 msgstr "Update-item '{name}' niet gevonden in de release-items."
 
-#: core/updater.py:264
+#: core/updater.py:266
 msgid "Windows installer asset must be an .exe file."
 msgstr "Het Windows-installatie-item moet een .exe-bestand zijn."
 
-#: core/updater.py:273
+#: core/updater.py:275
 msgid "Update installer has an invalid SHA-256 hash."
 msgstr "Het update-installatieprogramma heeft een ongeldige SHA-256-hash."
 
-#: core/updater.py:280
+#: core/updater.py:282
 msgid "Update installer is missing a download URL."
 msgstr "In het update-installatieprogramma ontbreekt een download-URL."
 
-#: core/updater.py:499
+#: core/updater.py:501
 msgid "Authenticode verification failed: {error}"
 msgstr "Authenticode-verificatie mislukt: {error}"
 
-#: core/updater.py:794 core/updater.py:851 core/updater.py:952
+#: core/updater.py:798 core/updater.py:855 core/updater.py:956
 msgid "{name} is missing from the install directory."
 msgstr "{name} ontbreekt in de installatiemap."
 
-#: core/updater.py:799
+#: core/updater.py:803
 msgid "Update package is missing {name}."
 msgstr "In het updatepakket ontbreekt {name}."
 
-#: core/updater.py:925
+#: core/updater.py:929
 msgid "{name} is missing from the app bundle."
 msgstr "{name} ontbreekt in de app-bundel."
 
-#: core/updater.py:153
+#: core/updater.py:155
 msgid "Network error while checking GitHub: {error}"
 msgstr "Netwerkfout bij het controleren van GitHub: {error}"
 
-#: core/updater.py:168
+#: core/updater.py:170
 msgid "Invalid GitHub response: {error}"
 msgstr "Ongeldig GitHub-antwoord: {error}"
 
-#: core/updater.py:185
+#: core/updater.py:187
 msgid "Failed to download update metadata: {error}"
 msgstr "Kan update-metagegevens niet downloaden: {error}"
 
-#: core/updater.py:408
+#: core/updater.py:410
 msgid "Unsupported update archive type: {type}"
 msgstr "Niet-ondersteund update-archieftype: {type}"
 
-#: core/updater.py:590 core/updater.py:1016
+#: core/updater.py:592 core/updater.py:1020
 msgid "Failed to start update helper: {error}"
 msgstr "Kan update-helper niet starten: {error}"
 
-#: core/updater.py:758
+#: core/updater.py:762
 msgid "Failed to download update: {error}"
 msgstr "Kan update niet downloaden: {error}"
 
-#: core/updater.py:779
+#: core/updater.py:783
 msgid "Failed to extract update: {error}"
 msgstr "Kan update niet uitpakken: {error}"
 
-#: core/updater.py:269
+#: core/updater.py:271
 msgid "Update installer '{name}' not found in release assets."
 msgstr ""
 "Update-installatieprogramma '{name}' niet gevonden in de release-items."
 
-#: core/updater.py:487
+#: core/updater.py:489
 msgid "Update is signed but not by a trusted certificate{suffix}"
 msgstr ""
 "De update is ondertekend, maar niet met een vertrouwd certificaat{suffix}"
@@ -971,17 +971,17 @@ msgstr "Automatisch ({label})"
 msgid "{label} {major} (installed)"
 msgstr "{label} {major} (geïnstalleerd)"
 
-#: core/utils.py:1376
+#: core/utils.py:1387
 msgid "Just now"
 msgstr "Zojuist"
 
-#: core/utils.py:1381
+#: core/utils.py:1392
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] "{n} uur geleden"
 msgstr[1] "{n} uur geleden"
 
-#: core/utils.py:1379
+#: core/utils.py:1390
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] "{n} minuut geleden"
@@ -2254,7 +2254,7 @@ msgstr "Doorzoeken van"
 msgid "Loading more"
 msgstr "Meer laden van"
 
-#: gui/dialogs.py:7133 gui/player.py:2034 gui/player.py:5488
+#: gui/dialogs.py:7133 gui/player.py:2063 gui/player.py:5591
 msgid "Play"
 msgstr "Afspelen"
 
@@ -4846,8 +4846,8 @@ msgstr "WAV-bestanden"
 msgid "Google News: {topic} headlines"
 msgstr "Google News: koppen over {topic}"
 
-#: gui/dialogs.py:7235 gui/mainframe.py:1803 gui/player.py:3980
-#: gui/player.py:6453
+#: gui/dialogs.py:7235 gui/mainframe.py:1803 gui/player.py:4082
+#: gui/player.py:6556
 msgid "Playing"
 msgstr "Bezig met afspelen"
 
@@ -4867,8 +4867,8 @@ msgstr ""
 msgid "Bing News: {term}"
 msgstr "Bing News: {term}"
 
-#: gui/dialogs.py:7237 gui/mainframe.py:1803 gui/player.py:6509
-#: gui/player.py:6526
+#: gui/dialogs.py:7237 gui/mainframe.py:1803 gui/player.py:6612
+#: gui/player.py:6629
 msgid "Paused"
 msgstr "Gepauzeerd"
 
@@ -4876,11 +4876,11 @@ msgstr "Gepauzeerd"
 msgid "Paused: {title}"
 msgstr "Gepauzeerd: {title}"
 
-#: gui/dialogs.py:7241 gui/player.py:4041 gui/player.py:4453
+#: gui/dialogs.py:7241 gui/player.py:4143 gui/player.py:4556
 msgid "Buffering..."
 msgstr "Bufferen..."
 
-#: gui/dialogs.py:7243 gui/player.py:4182
+#: gui/dialogs.py:7243 gui/player.py:4285
 msgid "Connecting..."
 msgstr "Verbinden..."
 
@@ -5264,7 +5264,7 @@ msgstr "Volume omlaag (Ctrl+Omlaag)"
 msgid "Decrease volume"
 msgstr "Volume verlagen"
 
-#: gui/mainframe.py:2400 gui/player.py:2087 gui/player.py:2062
+#: gui/mainframe.py:2400 gui/player.py:2116 gui/player.py:2091
 msgid "Chapters"
 msgstr "Hoofdstukken"
 
@@ -6039,7 +6039,7 @@ msgstr "Einde van de afspeelwachtrij."
 msgid "Start of play queue."
 msgstr "Begin van de afspeelwachtrij."
 
-#: gui/mainframe.py:3550 gui/player.py:2280
+#: gui/mainframe.py:3550 gui/player.py:2309
 msgid "No chapters available"
 msgstr "Geen hoofdstukken beschikbaar"
 
@@ -6847,11 +6847,11 @@ msgstr ""
 "\n"
 "Tip: u kunt deze vraag uitschakelen in Instellingen > YouTube."
 
-#: gui/player.py:642 gui/player.py:1982
+#: gui/player.py:642 gui/player.py:2011
 msgid "No Track Loaded"
 msgstr "Geen track geladen"
 
-#: gui/player.py:4306
+#: gui/player.py:4409
 msgid "download failed"
 msgstr "download mislukt"
 
@@ -6859,71 +6859,71 @@ msgstr "download mislukt"
 msgid "Scanning..."
 msgstr "Scannen..."
 
-#: gui/player.py:1987
+#: gui/player.py:2016
 msgid "Playback Status"
 msgstr "Afspeelstatus"
 
-#: gui/player.py:1992
+#: gui/player.py:2021
 msgid "Playback Position"
 msgstr "Afspeelpositie"
 
-#: gui/player.py:2004
+#: gui/player.py:2033
 msgid "Elapsed Time: 00:00"
 msgstr "Verstreken tijd: 00:00"
 
-#: gui/player.py:2006
+#: gui/player.py:2035
 msgid "Total Time: 00:00"
 msgstr "Totale tijd: 00:00"
 
-#: gui/player.py:2021
+#: gui/player.py:2050
 msgid "Playback Time"
 msgstr "Afspeeltijd"
 
-#: gui/player.py:2029
+#: gui/player.py:2058
 msgid "Rewind 10 seconds"
 msgstr "10 seconden terug"
 
-#: gui/player.py:2045
+#: gui/player.py:2074
 msgid "Fast Forward 10 seconds"
 msgstr "10 seconden vooruit"
 
-#: gui/player.py:2063
+#: gui/player.py:2092
 msgid "Chapters Menu"
 msgstr "Hoofdstukkenmenu"
 
-#: gui/player.py:2074 gui/player.py:2071 gui/tray.py:122
+#: gui/player.py:2103 gui/player.py:2100 gui/tray.py:122
 msgid "Volume"
 msgstr "Volume"
 
-#: gui/player.py:2137
+#: gui/player.py:2166
 msgid "Disconnect"
 msgstr "Verbinding verbreken"
 
-#: gui/player.py:2137 gui/player.py:2057
+#: gui/player.py:2166 gui/player.py:2086
 msgid "Cast"
 msgstr "Casten"
 
-#: gui/player.py:2138
+#: gui/player.py:2167
 msgid "&Disconnect Cast"
 msgstr "Cast &verbreken"
 
-#: gui/player.py:2138 gui/player.py:2107
+#: gui/player.py:2167 gui/player.py:2136
 msgid "&Cast to Device..."
 msgstr "&Casten naar apparaat..."
 
-#: gui/player.py:3392 gui/player.py:3796 gui/player.py:3904 gui/player.py:3906
+#: gui/player.py:3494 gui/player.py:3898 gui/player.py:4006 gui/player.py:4008
 msgid "Playing Audio..."
 msgstr "Audio wordt afgespeeld..."
 
-#: gui/player.py:5367
+#: gui/player.py:5470
 msgid "Elapsed Time"
 msgstr "Verstreken tijd"
 
-#: gui/player.py:5370
+#: gui/player.py:5473
 msgid "Total Time"
 msgstr "Totale tijd"
 
-#: gui/player.py:6565 gui/player.py:6677 gui/player.py:4459
+#: gui/player.py:6668 gui/player.py:6780 gui/player.py:4562
 msgid "Stopped"
 msgstr "Gestopt"
 
@@ -6947,67 +6947,78 @@ msgstr "Geen apparaten gevonden"
 msgid "Audio Player"
 msgstr "Audiospeler"
 
-#: gui/player.py:2018
+#: gui/player.py:2047
 msgid "No media loaded"
 msgstr "Geen media geladen"
 
-#: gui/player.py:2028
+#: gui/player.py:2057
 msgid "-10s"
 msgstr "-10 s"
 
-#: gui/player.py:2044
+#: gui/player.py:2073
 msgid "+10s"
 msgstr "+10 s"
 
-#: gui/player.py:2111
+#: gui/player.py:2140
 msgid "Show &Chapters\tCtrl+M"
 msgstr "Hoofdstukken tonen (&C)\tCtrl+M"
 
-#: gui/player.py:2114
+#: gui/player.py:2143
 msgid "Open Chapter &Link\tCtrl+Shift+L"
 msgstr "Hoofdstuk&link openen\tCtrl+Shift+L"
 
-#: gui/player.py:2117
+#: gui/player.py:2146
 msgid "&Previous Chapter\tCtrl+Shift+Left"
 msgstr "Vorig hoofdstuk (&P)\tCtrl+Shift+Links"
 
-#: gui/player.py:2118
+#: gui/player.py:2147
 msgid "&Next Chapter\tCtrl+Shift+Right"
 msgstr "Volge&nd hoofdstuk\tCtrl+Shift+Rechts"
 
-#: gui/player.py:2120
+#: gui/player.py:2149
 msgid "&Playback"
 msgstr "Af&spelen"
 
-#: gui/player.py:2121
+#: gui/player.py:2150
 msgid "&Chapters"
 msgstr "&Hoofdstukken"
 
-#: gui/player.py:2285
+#: gui/player.py:2314
 msgid "Open Link for Selected Chapter"
 msgstr "Link van geselecteerd hoofdstuk openen"
 
-#: gui/player.py:2623
+#: gui/player.py:2652
 msgid "Cast device disconnected; resuming local playback"
 msgstr "Cast-apparaat losgekoppeld; lokale weergave wordt hervat"
 
-#: gui/player.py:3369 gui/player.py:3895
+#: gui/player.py:3097
+msgid ""
+"This link opens a web page, not audio or video. The server returned "
+"{content_type} instead of a media file, which often means the item needs you"
+" to sign in, or the feed has no downloadable enclosure."
+msgstr ""
+"Deze link opent een webpagina, geen audio of video. De server gaf "
+"{content_type} terug in plaats van een mediabestand, wat vaak betekent dat u"
+" zich voor dit item moet aanmelden of dat de feed geen downloadbaar bestand "
+"bevat."
+
+#: gui/player.py:3457 gui/player.py:3997
 msgid "Failed to load media"
 msgstr "Media konden niet worden geladen"
 
-#: gui/player.py:3897
+#: gui/player.py:3999
 msgid "VLC is not initialized. Playback is unavailable."
 msgstr "VLC is niet geïnitialiseerd. Afspelen is niet beschikbaar."
 
-#: gui/player.py:4174 gui/player.py:4176 gui/player.py:4161
+#: gui/player.py:4277 gui/player.py:4279 gui/player.py:4264
 msgid "Loading media..."
 msgstr "Media laden..."
 
-#: gui/player.py:4242
+#: gui/player.py:4345
 msgid "Downloading for playback..."
 msgstr "Downloaden voor afspelen..."
 
-#: gui/player.py:5393
+#: gui/player.py:5496
 msgid "Elapsed {elapsed}, Remaining {remaining}, Total {total}"
 msgstr "Verstreken {elapsed}, Resterend {remaining}, Totaal {total}"
 
@@ -7023,68 +7034,72 @@ msgstr "AirPlay-koppeling"
 msgid "Connection failed: {error}"
 msgstr "Verbinding mislukt: {error}"
 
-#: gui/player.py:856
+#: gui/player.py:859
 msgid "VLC Error"
 msgstr "VLC-fout"
 
-#: gui/player.py:2080
+#: gui/player.py:2109
 msgid "Volume Level: {percent}%"
 msgstr "Volumeniveau: {percent}%"
 
-#: gui/player.py:2185
+#: gui/player.py:2214
 msgid "Chapter at {timestamp}"
 msgstr "Hoofdstuk op {timestamp}"
 
-#: gui/player.py:2212
+#: gui/player.py:2241
 msgid "Chapter link unavailable"
 msgstr "Hoofdstuklink niet beschikbaar"
 
-#: gui/player.py:2223
+#: gui/player.py:2252
 msgid "Could not open chapter link"
 msgstr "Kon hoofdstuklink niet openen"
 
-#: gui/player.py:2233
+#: gui/player.py:2262
 msgid "Chapters, none available"
 msgstr "Hoofdstukken, geen beschikbaar"
 
-#: gui/player.py:5364
+#: gui/player.py:3473
+msgid "Cannot play this item"
+msgstr "Kan dit item niet afspelen"
+
+#: gui/player.py:5467
 msgid "{name}: {value}"
 msgstr "{name}: {value}"
 
-#: gui/player.py:5391
+#: gui/player.py:5494
 msgid "Elapsed {elapsed}"
 msgstr "Verstreken {elapsed}"
 
-#: gui/player.py:5503
+#: gui/player.py:5606
 msgid "Volume Level"
 msgstr "Volumeniveau"
 
-#: gui/player.py:6257
+#: gui/player.py:6360
 msgid "End of track"
 msgstr "Einde van het nummer"
 
-#: gui/player.py:6257
+#: gui/player.py:6360
 msgid "Beginning of track"
 msgstr "Begin van het nummer"
 
-#: gui/player.py:2627 gui/player.py:2416 gui/player.py:2502
+#: gui/player.py:2656 gui/player.py:2445 gui/player.py:2531
 msgid "{title} (Local)"
 msgstr "{title} (lokaal)"
 
-#: gui/player.py:3404 gui/player.py:3744 gui/player.py:3757 gui/player.py:3708
+#: gui/player.py:3506 gui/player.py:3846 gui/player.py:3859 gui/player.py:3810
 msgid "Media Stream"
 msgstr "Mediastream"
 
-#: gui/player.py:4350
+#: gui/player.py:4453
 msgid "Could not play this YouTube item. yt-dlp could not fetch it: {error}"
 msgstr ""
 "Kon dit YouTube-item niet afspelen. yt-dlp kon het niet ophalen: {error}"
 
-#: gui/player.py:5488
+#: gui/player.py:5591
 msgid "Pause"
 msgstr "Pauzeren"
 
-#: gui/player.py:6286
+#: gui/player.py:6389
 msgid "Could not seek there. Position {position}"
 msgstr "Kan daar niet naartoe. Positie {position}"
 
@@ -7096,7 +7111,7 @@ msgstr "Kon koppelen niet starten: {error}"
 msgid "Pairing failed: {error}"
 msgstr "Koppelen mislukt: {error}"
 
-#: gui/player.py:852
+#: gui/player.py:855
 msgid ""
 "VLC could not be initialized: {error}\n"
 "\n"
@@ -7106,23 +7121,23 @@ msgstr ""
 "\n"
 "Zorg ervoor dat VLC media player is geïnstalleerd (64-bitsversie aanbevolen)."
 
-#: gui/player.py:2240
+#: gui/player.py:2269
 msgid "Chapters, {count} available, current chapter {current}"
 msgstr "Hoofdstukken, {count} beschikbaar, huidig hoofdstuk {current}"
 
-#: gui/player.py:2246
+#: gui/player.py:2275
 msgid "Chapters, {count} available"
 msgstr "Hoofdstukken, {count} beschikbaar"
 
-#: gui/player.py:2287
+#: gui/player.py:2316
 msgid "Open Link for {chapter}"
 msgstr "Link openen voor {chapter}"
 
-#: gui/player.py:2460
+#: gui/player.py:2489
 msgid "{title} (Casting to {device})"
 msgstr "{title} (streamen naar {device})"
 
-#: gui/player.py:3774
+#: gui/player.py:3876
 msgid ""
 "Rokfin post is listed but not streamable right now: Rokfin returned an "
 "invalid playback ID for this post."
@@ -7130,23 +7145,23 @@ msgstr ""
 "De Rokfin-post staat vermeld maar is nu niet afspeelbaar: Rokfin gaf een "
 "ongeldig afspeel-ID terug voor deze post."
 
-#: gui/player.py:5505
+#: gui/player.py:5608
 msgid "Volume: {percent}%"
 msgstr "Volume: {percent}%"
 
-#: gui/player.py:2301
+#: gui/player.py:2330
 msgid "[Current]"
 msgstr "[Huidig]"
 
-#: gui/player.py:2511
+#: gui/player.py:2540
 msgid "Casting failed: {error}"
 msgstr "Casten mislukt: {error}"
 
-#: gui/player.py:3772
+#: gui/player.py:3874
 msgid "yt-dlp resolve failed: {error}"
 msgstr "yt-dlp-resolutie mislukt: {error}"
 
-#: gui/player.py:3779
+#: gui/player.py:3881
 msgid ""
 "Rokfin post is not anonymously streamable right now. Rokfin requires a "
 "login/cookies to play this post."
@@ -7154,7 +7169,7 @@ msgstr ""
 "De Rokfin-post is nu niet anoniem afspeelbaar. Rokfin vereist een login of "
 "cookies om deze post af te spelen."
 
-#: gui/player.py:3784
+#: gui/player.py:3886
 msgid ""
 "yt-dlp resolve failed: this media may require a login, but browser cookies "
 "could not be loaded on this Windows session (DPAPI). Try running BlindRSS as"

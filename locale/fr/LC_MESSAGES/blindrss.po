@@ -435,7 +435,7 @@ msgstr "Lecteur"
 msgid "Play Queue"
 msgstr "File d'attente de lecture"
 
-#: core/shortcuts.py:143 gui/player.py:2052
+#: core/shortcuts.py:143 gui/player.py:2081
 msgid "Playback Speed"
 msgstr "Vitesse de lecture"
 
@@ -636,7 +636,7 @@ msgstr "Basculer le tri croissant"
 msgid "Play/Pause"
 msgstr "Lecture/Pause"
 
-#: core/shortcuts.py:193 gui/mainframe.py:2343 gui/player.py:2039
+#: core/shortcuts.py:193 gui/mainframe.py:2343 gui/player.py:2068
 #: gui/tray.py:110
 msgid "Stop"
 msgstr "Arrêter"
@@ -766,206 +766,206 @@ msgstr "est égal à"
 msgid "starts with"
 msgstr "commence par"
 
-#: core/updater.py:297
+#: core/updater.py:299
 msgid "Update available."
 msgstr "Mise à jour disponible."
 
-#: core/updater.py:500
+#: core/updater.py:502
 msgid "Authenticode verification failed: PowerShell was not found."
 msgstr "Échec de la vérification Authenticode : PowerShell est introuvable."
 
-#: core/updater.py:760
+#: core/updater.py:764
 msgid "Verifying download…"
 msgstr "Vérification du téléchargement…"
 
-#: core/updater.py:775
+#: core/updater.py:779
 msgid "Extracting update…"
 msgstr "Extraction de la mise à jour…"
 
-#: core/updater.py:801 core/updater.py:855 core/updater.py:933
+#: core/updater.py:805 core/updater.py:859 core/updater.py:937
 msgid "Verifying signature…"
 msgstr "Vérification de la signature…"
 
-#: core/updater.py:806 core/updater.py:860 core/updater.py:938
-#: core/updater.py:958
+#: core/updater.py:810 core/updater.py:864 core/updater.py:942
+#: core/updater.py:962
 msgid "Preparing restart…"
 msgstr "Préparation du redémarrage…"
 
-#: core/updater.py:197
+#: core/updater.py:199
 msgid "No release data from GitHub."
 msgstr "Aucune donnée de version reçue depuis GitHub."
 
-#: core/updater.py:222
+#: core/updater.py:224
 msgid "Update manifest is empty."
 msgstr "Le manifeste de mise à jour est vide."
 
-#: core/updater.py:226
+#: core/updater.py:228
 msgid "Update manifest has invalid version."
 msgstr "Le manifeste de mise à jour a une version non valide."
 
-#: core/updater.py:228
+#: core/updater.py:230
 msgid "Update manifest version does not match the latest release."
 msgstr ""
 "La version du manifeste de mise à jour ne correspond pas à la dernière "
 "version."
 
-#: core/updater.py:232
+#: core/updater.py:234
 msgid "Update manifest is missing asset name."
 msgstr "Le nom de la ressource est manquant dans le manifeste de mise à jour."
 
-#: core/updater.py:242
+#: core/updater.py:244
 msgid "Update manifest is missing a download URL."
 msgstr ""
 "Une URL de téléchargement est manquante dans le manifeste de mise à jour."
 
-#: core/updater.py:246
+#: core/updater.py:248
 msgid "Update manifest has an invalid SHA-256 hash."
 msgstr "Le manifeste de mise à jour a un hachage SHA-256 non valide."
 
-#: core/updater.py:717
+#: core/updater.py:719
 msgid "Auto-update is not available for this build."
 msgstr ""
 "Les mises à jour automatiques ne sont pas disponibles pour cette version."
 
-#: core/updater.py:763
+#: core/updater.py:767
 msgid "Downloaded update failed SHA-256 verification."
 msgstr "La mise à jour téléchargée a échoué à la vérification SHA-256."
 
-#: core/updater.py:853
+#: core/updater.py:857
 msgid "Downloaded Windows installer is missing."
 msgstr "Le programme d'installation Windows téléchargé est introuvable."
 
-#: core/updater.py:921
+#: core/updater.py:925
 msgid "Could not locate the running .app bundle to update."
 msgstr ""
 "Impossible de localiser le bundle .app en cours d'exécution à mettre à jour."
 
-#: core/updater.py:929
+#: core/updater.py:933
 msgid "Update package does not contain a BlindRSS.app bundle."
 msgstr "Le paquet de mise à jour ne contient pas de bundle BlindRSS.app."
 
-#: core/updater.py:931
+#: core/updater.py:935
 msgid "Update package .app is missing its executable."
 msgstr "Le bundle .app du paquet de mise à jour n'a pas d'exécutable."
 
-#: core/updater.py:956
+#: core/updater.py:960
 msgid "Update package is missing the BlindRSS executable."
 msgstr "Le paquet de mise à jour ne contient pas l'exécutable BlindRSS."
 
-#: core/updater.py:747 core/updater.py:755
+#: core/updater.py:751 core/updater.py:759
 msgid "Downloading update…"
 msgstr "Téléchargement de la mise à jour…"
 
-#: core/updater.py:788 core/updater.py:209
+#: core/updater.py:792 core/updater.py:211
 msgid "Auto-update is not supported on this platform ({platform})."
 msgstr ""
 "Les mises à jour automatiques ne sont pas prises en charge sur cette "
 "plateforme ({platform})."
 
-#: core/updater.py:915
+#: core/updater.py:919
 msgid "Update signature verification failed: {error}"
 msgstr "Échec de la vérification de la signature de la mise à jour : {error}"
 
-#: core/updater.py:159
+#: core/updater.py:161
 msgid "{msg} Reset time (epoch): {reset}"
 msgstr "{msg} Heure de réinitialisation (epoch) : {reset}"
 
-#: core/updater.py:163
+#: core/updater.py:165
 msgid "GitHub API error: HTTP {status}"
 msgstr "Erreur de l'API GitHub : HTTP {status}"
 
-#: core/updater.py:191
+#: core/updater.py:193
 msgid "Invalid current version: {version}"
 msgstr "Version actuelle non valide : {version}"
 
-#: core/updater.py:202
+#: core/updater.py:204
 msgid "Latest release tag is not semver: {tag}"
 msgstr "Le tag de la dernière version n'est pas au format semver : {tag}"
 
-#: core/updater.py:205
+#: core/updater.py:207
 msgid "BlindRSS is up to date ({version})."
 msgstr "BlindRSS est à jour ({version})."
 
-#: core/updater.py:216
+#: core/updater.py:218
 msgid "Update manifest '{manifest}' not found in release assets."
 msgstr ""
 "Le manifeste de mise à jour « {manifest} » est introuvable dans les "
 "ressources de la version."
 
-#: core/updater.py:234
+#: core/updater.py:236
 msgid "Update asset must be a {extension} file."
 msgstr "La ressource de mise à jour doit être un fichier {extension}."
 
-#: core/updater.py:238
+#: core/updater.py:240
 msgid "Update asset '{name}' not found in release assets."
 msgstr ""
 "La ressource de mise à jour « {name} » est introuvable dans les ressources "
 "de la version."
 
-#: core/updater.py:264
+#: core/updater.py:266
 msgid "Windows installer asset must be an .exe file."
 msgstr "La ressource de l'installateur Windows doit être un fichier .exe."
 
-#: core/updater.py:273
+#: core/updater.py:275
 msgid "Update installer has an invalid SHA-256 hash."
 msgstr "L'installateur de mise à jour a un hachage SHA-256 non valide."
 
-#: core/updater.py:280
+#: core/updater.py:282
 msgid "Update installer is missing a download URL."
 msgstr ""
 "Une URL de téléchargement est manquante dans l'installateur de mise à jour."
 
-#: core/updater.py:499
+#: core/updater.py:501
 msgid "Authenticode verification failed: {error}"
 msgstr "Échec de la vérification Authenticode : {error}"
 
-#: core/updater.py:794 core/updater.py:851 core/updater.py:952
+#: core/updater.py:798 core/updater.py:855 core/updater.py:956
 msgid "{name} is missing from the install directory."
 msgstr "{name} est introuvable dans le répertoire d'installation."
 
-#: core/updater.py:799
+#: core/updater.py:803
 msgid "Update package is missing {name}."
 msgstr "Le paquet de mise à jour ne contient pas {name}."
 
-#: core/updater.py:925
+#: core/updater.py:929
 msgid "{name} is missing from the app bundle."
 msgstr "{name} est introuvable dans le bundle de l'application."
 
-#: core/updater.py:153
+#: core/updater.py:155
 msgid "Network error while checking GitHub: {error}"
 msgstr "Erreur réseau lors de la vérification de GitHub : {error}"
 
-#: core/updater.py:168
+#: core/updater.py:170
 msgid "Invalid GitHub response: {error}"
 msgstr "Réponse GitHub non valide : {error}"
 
-#: core/updater.py:185
+#: core/updater.py:187
 msgid "Failed to download update metadata: {error}"
 msgstr "Échec du téléchargement des métadonnées de la mise à jour : {error}"
 
-#: core/updater.py:408
+#: core/updater.py:410
 msgid "Unsupported update archive type: {type}"
 msgstr "Type d'archive de mise à jour non pris en charge : {type}"
 
-#: core/updater.py:590 core/updater.py:1016
+#: core/updater.py:592 core/updater.py:1020
 msgid "Failed to start update helper: {error}"
 msgstr "Impossible de démarrer l'assistant de mise à jour : {error}"
 
-#: core/updater.py:758
+#: core/updater.py:762
 msgid "Failed to download update: {error}"
 msgstr "Échec du téléchargement de la mise à jour : {error}"
 
-#: core/updater.py:779
+#: core/updater.py:783
 msgid "Failed to extract update: {error}"
 msgstr "Échec de l'extraction de la mise à jour : {error}"
 
-#: core/updater.py:269
+#: core/updater.py:271
 msgid "Update installer '{name}' not found in release assets."
 msgstr ""
 "L'installateur de mise à jour « {name} » est introuvable dans les ressources"
 " de la version."
 
-#: core/updater.py:487
+#: core/updater.py:489
 msgid "Update is signed but not by a trusted certificate{suffix}"
 msgstr ""
 "La mise à jour est signée, mais pas par un certificat de confiance{suffix}"
@@ -982,17 +982,17 @@ msgstr "Automatique ({label})"
 msgid "{label} {major} (installed)"
 msgstr "{label} {major} (installé)"
 
-#: core/utils.py:1376
+#: core/utils.py:1387
 msgid "Just now"
 msgstr "À l'instant"
 
-#: core/utils.py:1381
+#: core/utils.py:1392
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] "Il y a {n} heure"
 msgstr[1] "Il y a {n} heures"
 
-#: core/utils.py:1379
+#: core/utils.py:1390
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] "Il y a {n} minute"
@@ -2268,7 +2268,7 @@ msgstr "Recherche dans"
 msgid "Loading more"
 msgstr "Chargement supplémentaire dans"
 
-#: gui/dialogs.py:7133 gui/player.py:2034 gui/player.py:5488
+#: gui/dialogs.py:7133 gui/player.py:2063 gui/player.py:5591
 msgid "Play"
 msgstr "Lire"
 
@@ -4886,8 +4886,8 @@ msgstr "Fichiers WAV"
 msgid "Google News: {topic} headlines"
 msgstr "Google News : titres sur {topic}"
 
-#: gui/dialogs.py:7235 gui/mainframe.py:1803 gui/player.py:3980
-#: gui/player.py:6453
+#: gui/dialogs.py:7235 gui/mainframe.py:1803 gui/player.py:4082
+#: gui/player.py:6556
 msgid "Playing"
 msgstr "Lecture en cours"
 
@@ -4907,8 +4907,8 @@ msgstr ""
 msgid "Bing News: {term}"
 msgstr "Bing News : {term}"
 
-#: gui/dialogs.py:7237 gui/mainframe.py:1803 gui/player.py:6509
-#: gui/player.py:6526
+#: gui/dialogs.py:7237 gui/mainframe.py:1803 gui/player.py:6612
+#: gui/player.py:6629
 msgid "Paused"
 msgstr "En pause"
 
@@ -4916,11 +4916,11 @@ msgstr "En pause"
 msgid "Paused: {title}"
 msgstr "En pause : {title}"
 
-#: gui/dialogs.py:7241 gui/player.py:4041 gui/player.py:4453
+#: gui/dialogs.py:7241 gui/player.py:4143 gui/player.py:4556
 msgid "Buffering..."
 msgstr "Mise en mémoire tampon..."
 
-#: gui/dialogs.py:7243 gui/player.py:4182
+#: gui/dialogs.py:7243 gui/player.py:4285
 msgid "Connecting..."
 msgstr "Connexion..."
 
@@ -5305,7 +5305,7 @@ msgstr "Diminuer le volume (Ctrl+Bas)"
 msgid "Decrease volume"
 msgstr "Diminuer le volume"
 
-#: gui/mainframe.py:2400 gui/player.py:2087 gui/player.py:2062
+#: gui/mainframe.py:2400 gui/player.py:2116 gui/player.py:2091
 msgid "Chapters"
 msgstr "Chapitres"
 
@@ -6082,7 +6082,7 @@ msgstr "Fin de la file d'attente de lecture."
 msgid "Start of play queue."
 msgstr "Début de la file d'attente de lecture."
 
-#: gui/mainframe.py:3550 gui/player.py:2280
+#: gui/mainframe.py:3550 gui/player.py:2309
 msgid "No chapters available"
 msgstr "Aucun chapitre disponible"
 
@@ -6901,11 +6901,11 @@ msgstr ""
 "\n"
 "Astuce : vous pouvez désactiver cette invite dans Paramètres > YouTube."
 
-#: gui/player.py:642 gui/player.py:1982
+#: gui/player.py:642 gui/player.py:2011
 msgid "No Track Loaded"
 msgstr "Aucune piste chargée"
 
-#: gui/player.py:4306
+#: gui/player.py:4409
 msgid "download failed"
 msgstr "échec du téléchargement"
 
@@ -6913,71 +6913,71 @@ msgstr "échec du téléchargement"
 msgid "Scanning..."
 msgstr "Analyse en cours..."
 
-#: gui/player.py:1987
+#: gui/player.py:2016
 msgid "Playback Status"
 msgstr "État de lecture"
 
-#: gui/player.py:1992
+#: gui/player.py:2021
 msgid "Playback Position"
 msgstr "Position de lecture"
 
-#: gui/player.py:2004
+#: gui/player.py:2033
 msgid "Elapsed Time: 00:00"
 msgstr "Temps écoulé : 00:00"
 
-#: gui/player.py:2006
+#: gui/player.py:2035
 msgid "Total Time: 00:00"
 msgstr "Durée totale : 00:00"
 
-#: gui/player.py:2021
+#: gui/player.py:2050
 msgid "Playback Time"
 msgstr "Temps de lecture"
 
-#: gui/player.py:2029
+#: gui/player.py:2058
 msgid "Rewind 10 seconds"
 msgstr "Reculer de 10 secondes"
 
-#: gui/player.py:2045
+#: gui/player.py:2074
 msgid "Fast Forward 10 seconds"
 msgstr "Avancer de 10 secondes"
 
-#: gui/player.py:2063
+#: gui/player.py:2092
 msgid "Chapters Menu"
 msgstr "Menu des chapitres"
 
-#: gui/player.py:2074 gui/player.py:2071 gui/tray.py:122
+#: gui/player.py:2103 gui/player.py:2100 gui/tray.py:122
 msgid "Volume"
 msgstr "Volume"
 
-#: gui/player.py:2137
+#: gui/player.py:2166
 msgid "Disconnect"
 msgstr "Déconnecter"
 
-#: gui/player.py:2137 gui/player.py:2057
+#: gui/player.py:2166 gui/player.py:2086
 msgid "Cast"
 msgstr "Caster"
 
-#: gui/player.py:2138
+#: gui/player.py:2167
 msgid "&Disconnect Cast"
 msgstr "&Déconnecter la diffusion"
 
-#: gui/player.py:2138 gui/player.py:2107
+#: gui/player.py:2167 gui/player.py:2136
 msgid "&Cast to Device..."
 msgstr "&Caster vers un appareil..."
 
-#: gui/player.py:3392 gui/player.py:3796 gui/player.py:3904 gui/player.py:3906
+#: gui/player.py:3494 gui/player.py:3898 gui/player.py:4006 gui/player.py:4008
 msgid "Playing Audio..."
 msgstr "Lecture audio en cours..."
 
-#: gui/player.py:5367
+#: gui/player.py:5470
 msgid "Elapsed Time"
 msgstr "Temps écoulé"
 
-#: gui/player.py:5370
+#: gui/player.py:5473
 msgid "Total Time"
 msgstr "Durée totale"
 
-#: gui/player.py:6565 gui/player.py:6677 gui/player.py:4459
+#: gui/player.py:6668 gui/player.py:6780 gui/player.py:4562
 msgid "Stopped"
 msgstr "Arrêté"
 
@@ -7001,67 +7001,78 @@ msgstr "Aucun appareil trouvé"
 msgid "Audio Player"
 msgstr "Lecteur audio"
 
-#: gui/player.py:2018
+#: gui/player.py:2047
 msgid "No media loaded"
 msgstr "Aucun média chargé"
 
-#: gui/player.py:2028
+#: gui/player.py:2057
 msgid "-10s"
 msgstr "-10 s"
 
-#: gui/player.py:2044
+#: gui/player.py:2073
 msgid "+10s"
 msgstr "+10 s"
 
-#: gui/player.py:2111
+#: gui/player.py:2140
 msgid "Show &Chapters\tCtrl+M"
 msgstr "Afficher les &chapitres\tCtrl+M"
 
-#: gui/player.py:2114
+#: gui/player.py:2143
 msgid "Open Chapter &Link\tCtrl+Shift+L"
 msgstr "Ouvrir le &lien du chapitre\tCtrl+Maj+L"
 
-#: gui/player.py:2117
+#: gui/player.py:2146
 msgid "&Previous Chapter\tCtrl+Shift+Left"
 msgstr "Chapitre &précédent\tCtrl+Maj+Gauche"
 
-#: gui/player.py:2118
+#: gui/player.py:2147
 msgid "&Next Chapter\tCtrl+Shift+Right"
 msgstr "Chapitre suiva&nt\tCtrl+Maj+Droite"
 
-#: gui/player.py:2120
+#: gui/player.py:2149
 msgid "&Playback"
 msgstr "&Lecture"
 
-#: gui/player.py:2121
+#: gui/player.py:2150
 msgid "&Chapters"
 msgstr "&Chapitres"
 
-#: gui/player.py:2285
+#: gui/player.py:2314
 msgid "Open Link for Selected Chapter"
 msgstr "Ouvrir le lien du chapitre sélectionné"
 
-#: gui/player.py:2623
+#: gui/player.py:2652
 msgid "Cast device disconnected; resuming local playback"
 msgstr "Appareil de diffusion déconnecté ; reprise de la lecture locale"
 
-#: gui/player.py:3369 gui/player.py:3895
+#: gui/player.py:3097
+msgid ""
+"This link opens a web page, not audio or video. The server returned "
+"{content_type} instead of a media file, which often means the item needs you"
+" to sign in, or the feed has no downloadable enclosure."
+msgstr ""
+"Ce lien ouvre une page web, pas un fichier audio ou vidéo. Le serveur a "
+"renvoyé {content_type} au lieu d'un fichier multimédia, ce qui signifie "
+"souvent que l'élément nécessite une connexion ou que le flux ne contient "
+"aucun fichier téléchargeable."
+
+#: gui/player.py:3457 gui/player.py:3997
 msgid "Failed to load media"
 msgstr "Échec du chargement du média"
 
-#: gui/player.py:3897
+#: gui/player.py:3999
 msgid "VLC is not initialized. Playback is unavailable."
 msgstr "VLC n'est pas initialisé. La lecture n'est pas disponible."
 
-#: gui/player.py:4174 gui/player.py:4176 gui/player.py:4161
+#: gui/player.py:4277 gui/player.py:4279 gui/player.py:4264
 msgid "Loading media..."
 msgstr "Chargement du média..."
 
-#: gui/player.py:4242
+#: gui/player.py:4345
 msgid "Downloading for playback..."
 msgstr "Téléchargement pour la lecture..."
 
-#: gui/player.py:5393
+#: gui/player.py:5496
 msgid "Elapsed {elapsed}, Remaining {remaining}, Total {total}"
 msgstr "Écoulé {elapsed}, Restant {remaining}, Total {total}"
 
@@ -7077,69 +7088,73 @@ msgstr "Appairage AirPlay"
 msgid "Connection failed: {error}"
 msgstr "Échec de la connexion : {error}"
 
-#: gui/player.py:856
+#: gui/player.py:859
 msgid "VLC Error"
 msgstr "Erreur VLC"
 
-#: gui/player.py:2080
+#: gui/player.py:2109
 msgid "Volume Level: {percent}%"
 msgstr "Niveau du volume : {percent} %"
 
-#: gui/player.py:2185
+#: gui/player.py:2214
 msgid "Chapter at {timestamp}"
 msgstr "Chapitre à {timestamp}"
 
-#: gui/player.py:2212
+#: gui/player.py:2241
 msgid "Chapter link unavailable"
 msgstr "Lien du chapitre indisponible"
 
-#: gui/player.py:2223
+#: gui/player.py:2252
 msgid "Could not open chapter link"
 msgstr "Impossible d'ouvrir le lien du chapitre"
 
-#: gui/player.py:2233
+#: gui/player.py:2262
 msgid "Chapters, none available"
 msgstr "Chapitres, aucun disponible"
 
-#: gui/player.py:5364
+#: gui/player.py:3473
+msgid "Cannot play this item"
+msgstr "Impossible de lire cet élément"
+
+#: gui/player.py:5467
 msgid "{name}: {value}"
 msgstr "{name} : {value}"
 
-#: gui/player.py:5391
+#: gui/player.py:5494
 msgid "Elapsed {elapsed}"
 msgstr "Écoulé {elapsed}"
 
-#: gui/player.py:5503
+#: gui/player.py:5606
 msgid "Volume Level"
 msgstr "Niveau du volume"
 
-#: gui/player.py:6257
+#: gui/player.py:6360
 msgid "End of track"
 msgstr "Fin de la piste"
 
-#: gui/player.py:6257
+#: gui/player.py:6360
 msgid "Beginning of track"
 msgstr "Début de la piste"
 
-#: gui/player.py:2627 gui/player.py:2416 gui/player.py:2502
+#: gui/player.py:2656 gui/player.py:2445 gui/player.py:2531
 msgid "{title} (Local)"
 msgstr "{title} (local)"
 
-#: gui/player.py:3404 gui/player.py:3744 gui/player.py:3757 gui/player.py:3708
+#: gui/player.py:3506 gui/player.py:3846 gui/player.py:3859 gui/player.py:3810
 msgid "Media Stream"
 msgstr "Flux multimédia"
 
-#: gui/player.py:4350
+#: gui/player.py:4453
 msgid "Could not play this YouTube item. yt-dlp could not fetch it: {error}"
 msgstr ""
 "Impossible de lire cet élément YouTube. yt-dlp n'a pas pu le récupérer : "
 "{error}"
 
-#: gui/player.py:5488
+#: gui/player.py:5591
 msgid "Pause"
 msgstr "Pause"
 
-#: gui/player.py:6286
+#: gui/player.py:6389
 msgid "Could not seek there. Position {position}"
 msgstr "Impossible d'aller à cette position. Position {position}"
 
@@ -7151,7 +7166,7 @@ msgstr "Impossible de démarrer l'appairage : {error}"
 msgid "Pairing failed: {error}"
 msgstr "Échec de l'appairage : {error}"
 
-#: gui/player.py:852
+#: gui/player.py:855
 msgid ""
 "VLC could not be initialized: {error}\n"
 "\n"
@@ -7161,23 +7176,23 @@ msgstr ""
 "\n"
 "Assurez-vous que VLC media player est installé (version 64 bits recommandée)."
 
-#: gui/player.py:2240
+#: gui/player.py:2269
 msgid "Chapters, {count} available, current chapter {current}"
 msgstr "Chapitres, {count} disponibles, chapitre actuel {current}"
 
-#: gui/player.py:2246
+#: gui/player.py:2275
 msgid "Chapters, {count} available"
 msgstr "Chapitres, {count} disponibles"
 
-#: gui/player.py:2287
+#: gui/player.py:2316
 msgid "Open Link for {chapter}"
 msgstr "Ouvrir le lien pour {chapter}"
 
-#: gui/player.py:2460
+#: gui/player.py:2489
 msgid "{title} (Casting to {device})"
 msgstr "{title} (diffusion vers {device})"
 
-#: gui/player.py:3774
+#: gui/player.py:3876
 msgid ""
 "Rokfin post is listed but not streamable right now: Rokfin returned an "
 "invalid playback ID for this post."
@@ -7186,23 +7201,23 @@ msgstr ""
 "moment : Rokfin a renvoyé un identifiant de lecture non valide pour cette "
 "publication."
 
-#: gui/player.py:5505
+#: gui/player.py:5608
 msgid "Volume: {percent}%"
 msgstr "Volume : {percent} %"
 
-#: gui/player.py:2301
+#: gui/player.py:2330
 msgid "[Current]"
 msgstr "[Actuel]"
 
-#: gui/player.py:2511
+#: gui/player.py:2540
 msgid "Casting failed: {error}"
 msgstr "Échec de la diffusion : {error}"
 
-#: gui/player.py:3772
+#: gui/player.py:3874
 msgid "yt-dlp resolve failed: {error}"
 msgstr "Échec de la résolution yt-dlp : {error}"
 
-#: gui/player.py:3779
+#: gui/player.py:3881
 msgid ""
 "Rokfin post is not anonymously streamable right now. Rokfin requires a "
 "login/cookies to play this post."
@@ -7210,7 +7225,7 @@ msgstr ""
 "La publication Rokfin n'est pas diffusable de façon anonyme pour le moment. "
 "Rokfin exige une connexion ou des cookies pour la lire."
 
-#: gui/player.py:3784
+#: gui/player.py:3886
 msgid ""
 "yt-dlp resolve failed: this media may require a login, but browser cookies "
 "could not be loaded on this Windows session (DPAPI). Try running BlindRSS as"
