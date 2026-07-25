@@ -208,6 +208,12 @@ _LINK_LIST_MAX_BODY_LEN = 1500
 _LINK_LIST_MIN_LINES = 4
 _LINK_LIST_MAX_LINE_LEN = 90
 _LINK_LIST_MIN_FRACTION = 0.6
+# Counting lines alone rejects real articles built from many short segment titles with a few
+# real paragraphs between them — e.g. NPR program pages ("Wait Wait...Don't Tell Me!"), whose
+# rundown is a stack of bold segment names interleaved with prose blurbs. Those pages are 70%+
+# link-like *by line*, but only ~35% by character mass, while a true navigation stack is ~90%
+# by both. Requiring both fractions keeps the junk out without discarding short real articles.
+_LINK_LIST_MIN_CHAR_FRACTION = 0.6
 _LINK_LIST_SENTENCE_END_RE = re.compile(r"[.!?…](\s|$)")
 # The "#3 Reply by alice — 2026-07-19 13:54:46" line _extract_forum_thread_text
 # writes before each post. Short and punctuation-free by design, so it must not
@@ -255,12 +261,21 @@ def _looks_like_link_list(text: str) -> bool:
     ]
     if len(lines) < _LINK_LIST_MIN_LINES:
         return False
-    linky = sum(
-        1
+    linky_lines = [
+        line
         for line in lines
         if len(line) <= _LINK_LIST_MAX_LINE_LEN and not _LINK_LIST_SENTENCE_END_RE.search(line)
-    )
-    return linky / len(lines) >= _LINK_LIST_MIN_FRACTION
+    ]
+    if len(linky_lines) / len(lines) < _LINK_LIST_MIN_FRACTION:
+        return False
+    # Weigh the same test by text mass: a navigation stack is nearly all link captions, whereas
+    # a real article's prose paragraphs carry most of its characters even when they are
+    # outnumbered by short lines.
+    total_chars = sum(len(line) for line in lines)
+    if not total_chars:
+        return False
+    linky_chars = sum(len(line) for line in linky_lines)
+    return linky_chars / total_chars >= _LINK_LIST_MIN_CHAR_FRACTION
 
 
 # A hard paywall (e.g. The Information) server-renders only the headline, byline, and a

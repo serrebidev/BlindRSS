@@ -40,6 +40,43 @@ REAL_SHORT_ARTICLE = "\n".join(
     ]
 )
 
+# Real extraction output for an NPR "Wait Wait...Don't Tell Me!" episode page
+# (feeds.npr.org/35/rss.xml). The episode rundown is a stack of short bold segment
+# names interleaved with prose blurbs, so it is 72% link-like by line but only 36%
+# by character mass. The line test alone rejected it and the reader showed the
+# "video-only page" fallback instead of the whole rundown.
+NPR_WAIT_WAIT_EPISODE = "\n".join(
+    [
+        "'Wait Wait' for July 25, 2026: With Not My Job guest Tyler James Williams",
+        "This week's show was recorded in Chicago with host Peter Sagal, judge and "
+        "scorekeeper Alzo Slade, Not My Job guest Tyler James Williams and panelists "
+        "Josh Gondelman, Hari Kondabolu, and Faith Salie. Click the audio link above "
+        "to hear the whole show.",
+        "Who's Alzo This Time",
+        "What A Long Strange Trip; It's Time For Lyme; A Summer Fashion Tip/Warning",
+        "Panel Questions",
+        "We All Scream for This Easy Recipe",
+        "Bluff The Listener",
+        "Our panelists tell three stories about books in the news, only one of which is true",
+        "Not My Job: Abbott Elementary's Tyler James Williams on growing up on TV and "
+        "being too handsome to play Chris Rock",
+        "Peter talks to Tyler James Williams, one of the stars of the Abbott Elementary "
+        'and Everyone Hates Chris. Tyler plays our game called, "Everyone Loves These '
+        'Chrises" Three questions about the Hollywood A-list Chrises: Pratt, Evans and '
+        "Hemsworth.",
+        "Panel Questions",
+        "The Big Day Parlay; Rest Easy But Not Cheaply; A Candid And Stinky Camera",
+        "Limericks",
+        "Alzo Slade reads three news-related limericks: Fruity Air Conditioners; A "
+        "Hi-Tech Solution for Mosquitoes; Ruining Dessert on Purpose",
+        "Lightning Fill In The Blank",
+        "All the news we couldn't fit anywhere else",
+        "Predictions",
+        "Our panelists predict, after the success of The Odyssey, what will be the next "
+        "classic piece of literature made into a movie?",
+    ]
+)
+
 
 def _resp(status_code, text):
     return types.SimpleNamespace(status_code=status_code, text=text, encoding="utf-8")
@@ -47,6 +84,42 @@ def _resp(status_code, text):
 
 def test_detects_video_page_headline_stack():
     assert article_extractor._looks_like_link_list(WDBJ7_VIDEO_PAGE_JUNK) is True
+
+
+def test_npr_episode_rundown_is_not_flagged():
+    # The segment-title stack outnumbers the prose lines, but the prose carries most of
+    # the characters, so the page is a real article and must be shown.
+    assert article_extractor._looks_like_link_list(NPR_WAIT_WAIT_EPISODE) is False
+
+
+def test_npr_episode_rundown_is_mostly_linky_by_line():
+    # Guards the premise of the fix: if this stopped tripping the line test, the
+    # character-mass test would no longer be what saves the page.
+    lines = [line for line in NPR_WAIT_WAIT_EPISODE.splitlines() if line.strip()]
+    linky = [
+        line
+        for line in lines
+        if len(line) <= article_extractor._LINK_LIST_MAX_LINE_LEN
+        and not article_extractor._LINK_LIST_SENTENCE_END_RE.search(line)
+    ]
+    assert len(linky) / len(lines) >= article_extractor._LINK_LIST_MIN_FRACTION
+    linky_chars = sum(len(line) for line in linky)
+    total_chars = sum(len(line) for line in lines)
+    assert linky_chars / total_chars < article_extractor._LINK_LIST_MIN_CHAR_FRACTION
+
+
+def test_video_page_junk_is_linky_by_both_measures():
+    # The junk page stays caught because it is a link stack by character mass too.
+    lines = [line for line in WDBJ7_VIDEO_PAGE_JUNK.splitlines() if line.strip()]
+    linky = [
+        line
+        for line in lines
+        if len(line) <= article_extractor._LINK_LIST_MAX_LINE_LEN
+        and not article_extractor._LINK_LIST_SENTENCE_END_RE.search(line)
+    ]
+    linky_chars = sum(len(line) for line in linky)
+    total_chars = sum(len(line) for line in lines)
+    assert linky_chars / total_chars >= article_extractor._LINK_LIST_MIN_CHAR_FRACTION
 
 
 def test_real_sentences_are_not_flagged():
