@@ -288,36 +288,31 @@ msgstr "Только аудио - наилучшее качество, без п
 
 #: core/filters.py:275
 msgid "do nothing"
-msgstr ""
+msgstr "ничего не делать"
 
 #: core/filters.py:268
-#, fuzzy
 msgid "mark as read"
-msgstr "Отметить как &прочитанное"
+msgstr "отметить как прочитанное"
 
 #: core/filters.py:270
-#, fuzzy
 msgid "mark as favorite"
-msgstr "Отметить как &избранное"
+msgstr "отметить как избранное"
 
 #: core/filters.py:272
-#, fuzzy
 msgid "delete"
-msgstr "&Удалить"
+msgstr "удалить"
 
 #: core/filters.py:274
-#, fuzzy
 msgid "skip notification"
-msgstr "Пропустить &уведомление"
+msgstr "пропустить уведомление"
 
 #: core/filters.py:264
-#, fuzzy
 msgid "move to \"{category}\""
-msgstr "&Переместить в категорию:"
+msgstr "переместить в \"{category}\""
 
 #: core/filters.py:266
 msgid "label \"{label}\""
-msgstr ""
+msgstr "метка \"{label}\""
 
 #: core/forum_sources.py:165
 msgid ""
@@ -713,76 +708,68 @@ msgid "Check for Updates"
 msgstr "Проверить наличие обновлений"
 
 #: core/smart_folders.py:315 core/smart_folders.py:333
-#, fuzzy
 msgid "all articles"
-msgstr "Все статьи"
+msgstr "все статьи"
 
 #: core/smart_folders.py:291
-#, fuzzy
 msgid "is read"
-msgstr "Непрочитано"
+msgstr "прочитано"
 
 #: core/smart_folders.py:292
-#, fuzzy
 msgid "is unread"
-msgstr "Непрочитано"
+msgstr "непрочитано"
 
 #: core/smart_folders.py:293
-#, fuzzy
 msgid "is a favorite"
-msgstr "Отметить как &избранное"
+msgstr "является избранным"
 
 #: core/smart_folders.py:294
-#, fuzzy
 msgid "is not a favorite"
-msgstr "Отметить как &избранное"
+msgstr "не является избранным"
 
 #: core/smart_folders.py:295
 msgid "has been opened"
-msgstr ""
+msgstr "было открыто"
 
 #: core/smart_folders.py:296
 msgid "has not been opened"
-msgstr ""
+msgstr "не было открыто"
 
 #: core/smart_folders.py:297
-#, fuzzy
 msgid "was updated"
-msgstr "Запуск обновления"
+msgstr "был обновлён"
 
 #: core/smart_folders.py:298
-#, fuzzy
 msgid "was not updated"
-msgstr "Запуск обновления"
+msgstr "не был обновлён"
 
 #: core/smart_folders.py:307 core/smart_folders.py:303 gui/mainframe.py:151
-#, fuzzy
 msgid "contains"
-msgstr "Содержит аудио"
+msgstr "содержит"
 
 #: core/smart_folders.py:319
 msgid " OR "
-msgstr ""
+msgstr " ИЛИ "
 
 #: core/smart_folders.py:319
 msgid " AND "
-msgstr ""
+msgstr " И "
 
 #: core/smart_folders.py:308
 msgid "{field} {verb} \"{value}\""
-msgstr ""
+msgstr "{field} {verb} \"{value}\""
 
 #: core/smart_folders.py:304 gui/mainframe.py:152
 msgid "does not contain"
-msgstr ""
+msgstr "не содержит"
 
 #: core/smart_folders.py:305 gui/mainframe.py:153
 msgid "equals"
-msgstr ""
+msgstr "равняется"
 
 #: core/smart_folders.py:306 gui/mainframe.py:154
 msgid "starts with"
-msgstr ""
+msgstr "начинается с"
 
 #: core/updater.py:299
 msgid "Update available."
@@ -1045,9 +1032,8 @@ msgid "collapsed"
 msgstr "свёрнуто"
 
 #: gui/accessibility.py:54 gui/mainframe.py:3517 gui/mainframe.py:11170
-#, fuzzy
 msgid "Untitled chapter"
-msgstr "Канал без названия"
+msgstr "Тайм-код без названия"
 
 #: gui/accessibility.py:248
 msgid "Unread Articles"
@@ -1082,29 +1068,24 @@ msgid "Mark Unread"
 msgstr "Отметить непрочитанным"
 
 #: gui/accessibility.py:460
-#, fuzzy
 msgid "Download Article"
-msgstr "Загрузить как"
+msgstr "Загрузить статью"
 
 #: gui/accessibility.py:473
-#, fuzzy
 msgid "Accessible Article Filter"
-msgstr "Фильтр статей"
+msgstr "Доступный фильтр статей"
 
 #: gui/accessibility.py:487
-#, fuzzy
 msgid "Accessible Views"
-msgstr "Открыть доступный браузер"
+msgstr "Досттупные представления"
 
 #: gui/accessibility.py:510
-#, fuzzy
 msgid "Accessible Articles"
-msgstr "Все статьи"
+msgstr "Доступные статьи"
 
 #: gui/accessibility.py:527
-#, fuzzy
 msgid "Accessible Article Content"
-msgstr "Содержимое статьи"
+msgstr "Доступное содержимое статьи"
 
 #: gui/accessibility.py:605
 msgid "&Add Feed...\tCtrl+N"
@@ -1331,9 +1312,8 @@ msgid "Loading articles..."
 msgstr "Загрузка статей..."
 
 #: gui/accessibility.py:1505
-#, fuzzy
 msgid "Chapter availability: Loading."
-msgstr "Доступно тайм-кодов: {count}."
+msgstr "Доступен тайм-код: Загрузка."
 
 #: gui/accessibility.py:2000 gui/mainframe.py:5862
 msgid "Full text loaded."
@@ -1592,29 +1572,28 @@ msgid "Deleted Articles"
 msgstr "Удалённые статьи"
 
 #: gui/dialogs.py:71
-#, fuzzy
 msgid "All sources"
-msgstr "Все статьи"
+msgstr "Все источники"
 
 #: gui/dialogs.py:72
 msgid "All podcast sources"
-msgstr ""
+msgstr "Все источники подкастов"
 
 #: gui/dialogs.py:73
 msgid "All RSS feed sources"
-msgstr ""
+msgstr "Все источники RSS-каналов"
 
 #: gui/dialogs.py:74
 msgid "Fediverse (all)"
-msgstr ""
+msgstr "Fediverse (все)"
 
 #: gui/dialogs.py:75
 msgid "Feedsearch (URL or site name)"
-msgstr ""
+msgstr "Feedsearch (URL-адрес или название сайта)"
 
 #: gui/dialogs.py:76
 msgid "Website scan (URL or site name)"
-msgstr ""
+msgstr "Сканирование веб-сайта (URL-адрес или название сайта)"
 
 #: gui/dialogs.py:421
 msgid ""
@@ -1662,6 +1641,8 @@ msgid ""
 "Configure automatic article translation.\n"
 "Your API key is stored locally in config.json."
 msgstr ""
+"Настройка автоматического перевода статей.\n"
+"Ваш API-ключ хранится локально в config.json."
 
 #: gui/dialogs.py:3729 gui/dialogs.py:3717
 msgid "App Install Folder"
@@ -1672,9 +1653,8 @@ msgid "Article list columns"
 msgstr "Столбцы списка статей"
 
 #: gui/dialogs.py:221
-#, fuzzy
 msgid "Feed or Media URL"
-msgstr "URL-адрес канала или мультимедиа:"
+msgstr "Канал или URL-адрес мультимедиа"
 
 #: gui/dialogs.py:222
 msgid "https://example.com/feed or a YouTube/podcast URL"
@@ -1690,9 +1670,8 @@ msgid "Checking compatibility..."
 msgstr "Проверка совместимости..."
 
 #: gui/dialogs.py:332
-#, fuzzy
 msgid "Media URL"
-msgstr "URL-адрес мультимедиа:"
+msgstr "URL-адрес мультимедиа"
 
 #: gui/dialogs.py:346 gui/dialogs.py:341
 msgid "Action"
@@ -1707,11 +1686,8 @@ msgid "YouTube Takeout items to import"
 msgstr "Элементы архива YouTube для импорта"
 
 #: gui/dialogs.py:538
-#, fuzzy
 msgid "Feeds (checked feeds send notifications)"
-msgstr ""
-"Каналы по умолчанию отмечены.\n"
-"Снимите флажки с каналов, которые не должны отправлять уведомления."
+msgstr "Каналы (отмеченные каналы отправляют уведомления)"
 
 #: gui/dialogs.py:603
 msgid "checked"
@@ -1722,21 +1698,16 @@ msgid "unchecked"
 msgstr "не отмечено"
 
 #: gui/dialogs.py:694
-#, fuzzy
 msgid "Get cookies.txt LOCALLY extension link"
-msgstr ""
-"Получить расширение \"Get cookies.txt LOCALLY\" для браузеров на основе "
-"Chrome"
+msgstr "Ссылка на расширение Get cookies.txt LOCALLY"
 
 #: gui/dialogs.py:703
-#, fuzzy
 msgid "Cookies file path"
-msgstr "Cookie-файл:"
+msgstr "Путь к cookie-файлу"
 
 #: gui/dialogs.py:716
-#, fuzzy
 msgid "Browser User-Agent"
-msgstr "User-Agent браузера (рекомендуется):"
+msgstr "User-Agent браузера"
 
 #: gui/dialogs.py:749
 msgid "Choose the exported cookies.txt"
@@ -1803,27 +1774,24 @@ msgid "Titles and article text"
 msgstr "Заголовки и текст статей"
 
 #: gui/dialogs.py:1200
-#, fuzzy
 msgid "Delete behavior"
-msgstr "Удалить правило"
+msgstr "Поведение при удалении"
 
 #: gui/dialogs.py:1203 gui/dialogs.py:4236
 msgid "Delete target category (full path)"
-msgstr ""
+msgstr "Удалить целевую категорию (полный путь)"
 
 #: gui/dialogs.py:1204 gui/dialogs.py:4237
 msgid "Category / Path"
 msgstr "Категория / Путь"
 
 #: gui/dialogs.py:1223
-#, fuzzy
 msgid "Download path"
-msgstr "Путь к загрузкам:"
+msgstr "Путь загрузки"
 
 #: gui/dialogs.py:1226
-#, fuzzy
 msgid "Browse for download folder"
-msgstr "Укажите путь к {name}"
+msgstr "Укажите папку загрузки"
 
 #: gui/dialogs.py:1272
 msgid "Default video download format"
@@ -1846,41 +1814,36 @@ msgid "Local RSS automatic feed refresh workload"
 msgstr "Нагрузка по автоматическому обновлению локального RSS-канала"
 
 #: gui/dialogs.py:1434
-#, fuzzy
 msgid "yt-dlp cookies file path"
-msgstr "Выберите cookies.txt для yt-dlp"
+msgstr "Путь к cookie-файлу yt-dlp"
 
 #: gui/dialogs.py:1435
 msgid "Path to a cookies.txt file"
 msgstr "Путь к файлу cookies.txt"
 
 #: gui/dialogs.py:1438
-#, fuzzy
 msgid "Browse for cookies file"
-msgstr "Путь к файлу cookies.txt"
+msgstr "Укажите cookie-файл"
 
 #: gui/dialogs.py:1469
-#, fuzzy
 msgid "YouTube playback cache folder"
-msgstr "Кэш воспроизведения очищен"
+msgstr "Папка кэша воспроизведения YouTube"
 
 #: gui/dialogs.py:1470
 msgid "Leave blank for the default location"
 msgstr "Оставьте поле пустым для местоположения по умолчанию"
 
 #: gui/dialogs.py:1473
-#, fuzzy
 msgid "Browse for playback cache folder"
-msgstr "Очистить кэш воспроизведения"
+msgstr "Укажите папку кэша воспроизведения"
 
 #: gui/dialogs.py:1539
 msgid "Automatic (system language)"
 msgstr "Автоматически (язык системы)"
 
 #: gui/dialogs.py:1576
-#, fuzzy
 msgid "Interface language"
-msgstr "Интерлингве"
+msgstr "Язык интерфейса"
 
 #: gui/dialogs.py:1603 gui/dialogs.py:1611
 msgid "All items expanded"
@@ -1891,9 +1854,8 @@ msgid "All items collapsed"
 msgstr "Все элементы свёрнуты"
 
 #: gui/dialogs.py:1608
-#, fuzzy
 msgid "Feed category tree default state on startup"
-msgstr "Дерево категорий каналов при запуске:"
+msgstr "Состояние дерева категорий по умолчанию при запуске"
 
 #: gui/dialogs.py:1623 gui/dialogs.py:1631
 msgid "Default browser"
@@ -1904,18 +1866,16 @@ msgid "Custom command"
 msgstr "Пользовательская команда"
 
 #: gui/dialogs.py:1628
-#, fuzzy
 msgid "Article opening method"
-msgstr "Способ открытия статей:"
+msgstr "Способ открытия статей"
 
 #: gui/dialogs.py:1644
-#, fuzzy
 msgid "Custom article open command"
-msgstr "Пользовательская команда"
+msgstr "Пользовательская команда открытия статьи"
 
 #: gui/dialogs.py:1647
 msgid "Test custom article open command"
-msgstr ""
+msgstr "Проверить пользовательскую команду открытия статьи"
 
 #: gui/dialogs.py:1678 gui/dialogs.py:4257
 msgid "General"
@@ -1985,32 +1945,28 @@ msgid "Announcements"
 msgstr "Объявления"
 
 #: gui/dialogs.py:2267
-#, fuzzy
 msgid "Waiting for authorization..."
-msgstr "Очистить авторизацию"
+msgstr "Ожидание авторизации..."
 
 #: gui/dialogs.py:2410
-#, fuzzy
 msgid "Authorization failed"
-msgstr "Очистить авторизацию"
+msgstr "Не удалось выполнить авторизацию"
 
 #: gui/dialogs.py:2429 gui/dialogs.py:3144
-#, fuzzy
 msgid "Not authorized"
-msgstr "Не поддерживается"
+msgstr "Неавторизован"
 
 #: gui/dialogs.py:2572
 msgid "Choose download directory"
-msgstr ""
+msgstr "Выбрать директорию загрузки"
 
 #: gui/dialogs.py:2580
 msgid "Choose yt-dlp cookies.txt"
 msgstr "Выберите cookies.txt для yt-dlp"
 
 #: gui/dialogs.py:2598
-#, fuzzy
 msgid "Choose YouTube playback cache folder"
-msgstr "Очистить кэш воспроизведения"
+msgstr "Выберите папку кэша воспроизведения YouTube"
 
 #: gui/dialogs.py:2621
 msgid "Clear playback cache"
@@ -2021,9 +1977,8 @@ msgid "Playback cache cleared"
 msgstr "Кэш воспроизведения очищен"
 
 #: gui/dialogs.py:2658
-#, fuzzy
 msgid "Import cookies from browser"
-msgstr "Импортирован {count} cookie из {browser}."
+msgstr "Импорт cookie-файлов из браузера"
 
 #: gui/dialogs.py:2661
 msgid "Find my export"
@@ -2042,9 +1997,8 @@ msgid "Cookies imported"
 msgstr "Cookie-файлы импортированы"
 
 #: gui/dialogs.py:2880
-#, fuzzy
 msgid "Groups.io API key"
-msgstr "Вставьте свой API-ключ Groups.io"
+msgstr "API-ключ Groups.io"
 
 #: gui/dialogs.py:2881
 msgid "Paste your Groups.io API key"
@@ -2085,148 +2039,122 @@ msgstr ""
 "речь и брайль."
 
 #: gui/dialogs.py:3410
-#, fuzzy
 msgid "Target language"
-msgstr "Целевой язык:"
+msgstr "Целевой язык"
 
 #: gui/dialogs.py:3445
-#, fuzzy
 msgid "Grok (xAI) model"
-msgstr "Модель Grok (xAI) (необязательно):"
+msgstr "Модель Grok (xAI)"
 
 #: gui/dialogs.py:3467
-#, fuzzy
 msgid "Grok (xAI) API key"
-msgstr "API-ключ Grok (xAI) (начинается с xai-):"
+msgstr "API-ключ Grok (xAI)"
 
 #: gui/dialogs.py:3488
 msgid "Groq model"
-msgstr ""
+msgstr "Модель Groq"
 
 #: gui/dialogs.py:3505
-#, fuzzy
 msgid "Groq API key"
-msgstr "API-ключ Gemini:"
+msgstr "API-ключ Groq"
 
 #: gui/dialogs.py:3536
-#, fuzzy
 msgid "OpenAI model"
-msgstr "Модель OpenAI (необязательно):"
+msgstr "Модель OpenAI"
 
 #: gui/dialogs.py:3553
-#, fuzzy
 msgid "OpenAI API key"
-msgstr "API-ключ OpenAI:"
+msgstr "API-ключ OpenAI"
 
 #: gui/dialogs.py:3574
-#, fuzzy
 msgid "OpenRouter model"
-msgstr "Загрузить модели OpenRouter"
+msgstr "Модель OpenRouter"
 
 #: gui/dialogs.py:3591
-#, fuzzy
 msgid "OpenRouter API key"
-msgstr "API-ключ OpenRouter:"
+msgstr "API-ключ OpenRouter"
 
 #: gui/dialogs.py:3622
-#, fuzzy
 msgid "Gemini model"
-msgstr "Модель Gemini (необязательно):"
+msgstr "Модель Gemini"
 
 #: gui/dialogs.py:3639
-#, fuzzy
 msgid "Gemini API key"
-msgstr "API-ключ Gemini:"
+msgstr "API-ключ Gemini"
 
 #: gui/dialogs.py:3660
-#, fuzzy
 msgid "Qwen model"
-msgstr "Модель Qwen (необязательно):"
+msgstr "Модель Qwen"
 
 #: gui/dialogs.py:3677
-#, fuzzy
 msgid "Qwen API key"
-msgstr "API-ключ Qwen:"
+msgstr "API-ключ Qwen"
 
 #: gui/dialogs.py:3716
 msgid "User Data Folder"
 msgstr "Папка пользовательских данных"
 
 #: gui/dialogs.py:3800
-#, fuzzy
 msgid "Identify as"
-msgstr "Идентифицировать себя как:"
+msgstr "Идентифицировать себя как"
 
 #: gui/dialogs.py:3822
-#, fuzzy
 msgid "Custom User-Agent"
-msgstr "Пользовательский User-Agent:"
+msgstr "Пользовательский User-Agent"
 
 #: gui/dialogs.py:3830
-#, fuzzy
 msgid "Current User-Agent"
-msgstr "Текущий User-Agent: {ua}"
+msgstr "Текущий User-Agent"
 
 #: gui/dialogs.py:3844 gui/dialogs.py:3841
 msgid "Enable adult sites in Video Search"
 msgstr "Включить сайты для взрослых в поиск видео"
 
 #: gui/dialogs.py:4059
-#, fuzzy
 msgid "Feed title"
-msgstr "Проверен: {title}"
+msgstr "Заголовок канала"
 
 #: gui/dialogs.py:4066
-#, fuzzy
 msgid "Feed URL"
-msgstr "Скопировать URL-адрес канала"
+msgstr "URL-адрес канала"
 
 #: gui/dialogs.py:4102
 msgid "Refresh interval for this feed"
 msgstr "Интервал обновления для этого канала"
 
 #: gui/dialogs.py:4138
-#, fuzzy
 msgid "Custom request headers"
-msgstr ""
-"Пользовательские заголовки запросов (по одному на строку, Имя: Значение):"
+msgstr "Пользовательские заголовки запросов"
 
 #: gui/dialogs.py:4154
-#, fuzzy
 msgid "Request timeout seconds"
-msgstr "Ожидание загрузки канала (секунды):"
+msgstr "Время ожидания запроса в секундах"
 
 #: gui/dialogs.py:4160
-#, fuzzy
 msgid "Browser impersonation"
-msgstr "Имитация браузера:"
+msgstr "Имитация браузера"
 
 #: gui/dialogs.py:4180
-#, fuzzy
 msgid "Proxy URL"
-msgstr "Скопировать URL-адрес"
+msgstr "URL-адрес прокси"
 
 #: gui/dialogs.py:4197
-#, fuzzy
 msgid "Feed encoding"
-msgstr "Описание канала"
+msgstr "Кодировка канала"
 
 #: gui/dialogs.py:4212
-#, fuzzy
 msgid "Full text extraction encoding"
-msgstr "Кодировка извлечения полного текста (пусто = автоматически):"
+msgstr "Кодировка извлечения полного текста"
 
 #: gui/dialogs.py:4233
-#, fuzzy
 msgid "Delete behavior for this feed"
-msgstr "Интервал обновления для этого канала"
+msgstr "Поведение при удалении для этого канала"
 
 #: gui/dialogs.py:4494 gui/mainframe.py:7300
 msgid "Category name"
 msgstr "Название категории"
 
 #: gui/dialogs.py:4577
-#, fuzzy
 msgid "Feeds with errors"
 msgstr "Каналы с ошибками"
 
@@ -2239,9 +2167,8 @@ msgid "Failures"
 msgstr "Сбои"
 
 #: gui/dialogs.py:4591
-#, fuzzy
 msgid "Error details"
-msgstr "&Подробности об ошибке:"
+msgstr "Подробности об ошибке"
 
 #: gui/dialogs.py:4626
 msgid "No feeds reported errors during their most recent update."
@@ -2269,28 +2196,24 @@ msgid "Unknown error"
 msgstr "Неизвестная ошибка"
 
 #: gui/dialogs.py:4832
-#, fuzzy
 msgid "this feed"
-msgstr "Удалить этот канал?"
+msgstr "этот канал"
 
 #: gui/dialogs.py:4925
-#, fuzzy
 msgid "Search for a podcast or RSS feed"
-msgstr "Найти и добавить подкаст или RSS-канал"
+msgstr "Найти подкаст или RSS-канал"
 
 #: gui/dialogs.py:4926
 msgid "Podcast name, topic, or site URL"
 msgstr "Название подкаста, тема или URL-адрес сайта"
 
 #: gui/dialogs.py:4933
-#, fuzzy
 msgid "Search source"
-msgstr "Поиск по всем источникам..."
+msgstr "Источник поиска"
 
 #: gui/dialogs.py:4948 gui/dialogs.py:5927
-#, fuzzy
 msgid "Search results"
-msgstr "Поиск по сайтам:"
+msgstr "Результаты поиска"
 
 #: gui/dialogs.py:4951 gui/dialogs.py:5934
 msgid "Details"
@@ -2301,7 +2224,6 @@ msgid "URL"
 msgstr "URL-адрес"
 
 #: gui/dialogs.py:5881
-#, fuzzy
 msgid "Video search"
 msgstr "Поиск видео"
 
@@ -2310,19 +2232,16 @@ msgid "Search videos across sites"
 msgstr "Поиск видео на разных сайтах"
 
 #: gui/dialogs.py:5894
-#, fuzzy
 msgid "Search sites"
-msgstr "Поиск по сайтам:"
+msgstr "Поиск по сайтам"
 
 #: gui/dialogs.py:5898
-#, fuzzy
 msgid "Filter results by site"
-msgstr "Результаты фильтрации:"
+msgstr "Фильтровать результаты по сайтам"
 
 #: gui/dialogs.py:5905
-#, fuzzy
 msgid "Sort results"
-msgstr "{n} результат"
+msgstr "Сортировка результатов"
 
 #: gui/dialogs.py:5906
 msgid "Relevance"
@@ -2366,19 +2285,16 @@ msgid "Copy URL"
 msgstr "Скопировать URL-адрес"
 
 #: gui/dialogs.py:7340
-#, fuzzy
 msgid "Subscribed (native)"
-msgstr "Подписаться"
+msgstr "Подписанный (родной)"
 
 #: gui/dialogs.py:7343
-#, fuzzy
 msgid "Subscribed (source)"
-msgstr "Ошибка подписки"
+msgstr "Подписанный (исходный)"
 
 #: gui/dialogs.py:7373
-#, fuzzy
 msgid "Saved searches"
-msgstr "Сохранённые поиски:"
+msgstr "Сохранённые поиски"
 
 #: gui/dialogs.py:7405
 msgid "Search query:"
@@ -2458,7 +2374,7 @@ msgstr "Хорошо: распознано как источник YouTube"
 
 #: gui/dialogs.py:287
 msgid "OK: Supported by yt-dlp"
-msgstr ""
+msgstr "Хорошо: Поддерживается yt-dlp"
 
 #: gui/dialogs.py:386 gui/mainframe.py:12199 gui/mainframe.py:12218
 #: gui/mainframe.py:14129
@@ -3512,12 +3428,16 @@ msgstr "Уведомления на этой платформе не подде�
 #: gui/dialogs.py:2132
 msgid "Check Windows notification permissions and Focus Assist."
 msgstr ""
+"Проверьте разрешения Windows на отправку уведомлений и Фокусировку внимания."
 
 #: gui/dialogs.py:2134
 msgid ""
 "Check the app's notification permission in System Settings > Notifications "
 "and that Do Not Disturb is off."
 msgstr ""
+"Проверьте разрешения приложения на отправку уведомлений  в настройках по "
+"пути \"Система\" > \"Уведомления\", а также, что кнопка \"Не беспокоить\" не "
+"нажата."
 
 #: gui/dialogs.py:2259
 msgid "Enter your Inoreader App ID and App Key first."
@@ -3525,9 +3445,8 @@ msgstr ""
 "Сначала введите свой идентификатор приложения Inoreader и ключ приложения."
 
 #: gui/dialogs.py:2287
-#, fuzzy
 msgid "Redirected URL"
-msgstr "URI перенаправления:"
+msgstr "Перенаправленный URL-адрес"
 
 #: gui/dialogs.py:2288
 msgid "Paste the full URL from your browser address bar"
@@ -3547,11 +3466,14 @@ msgid ""
 "\n"
 "Export one with the extension first, or choose the file manually."
 msgstr ""
+"В ваших загрузках не найден ни один недавно экспортированный cookies.txt от "
+"YouTube.\n"
+"\n"
+"Сначала экспортируйте его при помощи расширения, или выберите файл вручную."
 
 #: gui/dialogs.py:2691
-#, fuzzy
 msgid "No export found"
-msgstr "Статей не найдено."
+msgstr "Экспорт не найден"
 
 #: gui/dialogs.py:2694
 msgid "Choose file..."
@@ -3596,19 +3518,16 @@ msgid "Provider information"
 msgstr "Сведения о поставщике"
 
 #: gui/dialogs.py:3083
-#, fuzzy
 msgid "Inoreader App ID"
-msgstr "Идентификатор приложения Inoreader:"
+msgstr "Идентификатор приложения Inoreader"
 
 #: gui/dialogs.py:3090
-#, fuzzy
 msgid "Inoreader App Key"
-msgstr "Ключ приложения Inoreader:"
+msgstr "Ключ приложения Inoreader"
 
 #: gui/dialogs.py:3097
-#, fuzzy
 msgid "Redirect URI"
-msgstr "URI перенаправления:"
+msgstr "URI перенаправления"
 
 #: gui/dialogs.py:3183
 msgid "Enable Sound Notifications"
@@ -3808,18 +3727,16 @@ msgid "Load More Results (+80/site)"
 msgstr "Загрузить больше результатов (+80/сайт)"
 
 #: gui/dialogs.py:6541
-#, fuzzy
 msgid "All searchable sites"
-msgstr "Нет сайтов для поиска."
+msgstr "Все сайты с возможностью поиска"
 
 #: gui/dialogs.py:6544
 msgid "Adult sites (all)"
-msgstr ""
+msgstr "Сайты для взрослых (все)"
 
 #: gui/dialogs.py:6554
-#, fuzzy
 msgid "All sites"
-msgstr "Все файлы"
+msgstr "Все сайты"
 
 #: gui/dialogs.py:6846
 msgid "No searchable sites."
@@ -3833,12 +3750,11 @@ msgstr[1] "{completed}/{total} сайта"
 msgstr[2] "{completed}/{total} сайтов"
 
 #: gui/dialogs.py:7046
-#, fuzzy
 msgid "{count} result"
 msgid_plural "{count} results"
-msgstr[0] "{n} результат"
-msgstr[1] "{n} результата"
-msgstr[2] "{n} результатов"
+msgstr[0] "{count} результат"
+msgstr[1] "{count} результата"
+msgstr[2] "{count} результатов"
 
 #: gui/dialogs.py:7311
 msgid "Parent window does not support subscribing from this dialog."
@@ -4250,15 +4166,25 @@ msgid ""
 "Redirect URI:\n"
 "{redirect_uri}"
 msgstr ""
+"После авторизации в браузере, он будет перенаправлен на ваш URI "
+"перенаправления.\n"
+"Если страница перенаправления не загружается (обычно для HTTPS localhost), "
+"скопируйте полный URL из\n"
+"адресной строки браузера и вставьте его ниже.\n"
+"\n"
+"URI перенаправления:\n"
+"{redirect_uri}"
 
 #: gui/dialogs.py:2339
 msgid ""
 "Complete authorization in your browser, then paste the redirected URL..."
 msgstr ""
+"Завершите авторизацию в вашем браузере, а затем вставьте URL-адрес "
+"перенаправления..."
 
 #: gui/dialogs.py:2368
 msgid "No access token returned from Inoreader."
-msgstr ""
+msgstr "Из Inoreader не возвращён токин доступа."
 
 #: gui/dialogs.py:2418
 msgid ""
@@ -4270,7 +4196,7 @@ msgstr ""
 
 #: gui/dialogs.py:2516
 msgid "Unnamed Device"
-msgstr ""
+msgstr "Безымянное устройство"
 
 #: gui/dialogs.py:2628
 msgid "Removed {n} file, freed {size}."
@@ -4293,6 +4219,13 @@ msgid ""
 "\n"
 "Save settings to start using it."
 msgstr ""
+"Импортированный cookie-файл YouTube из:\n"
+"{source}\n"
+"\n"
+"Сохранён как:\n"
+"{destination}\n"
+"\n"
+"Сохраните настройки, чтобы начать его использовать."
 
 #: gui/dialogs.py:2741
 msgid "Executables"
@@ -4379,35 +4312,32 @@ msgid "Clear Authorization"
 msgstr "Очистить авторизацию"
 
 #: gui/dialogs.py:3144
-#, fuzzy
 msgid "Authorized"
-msgstr "Автор"
+msgstr "Авторизованный"
 
 #: gui/dialogs.py:3153
-#, fuzzy
 msgid "Miniflux URL:"
-msgstr "URL-адрес мультимедиа:"
+msgstr "URL-адрес Miniflux:"
 
 #: gui/dialogs.py:3154
-#, fuzzy
 msgid "Miniflux API Key:"
-msgstr "API-ключ Gemini:"
+msgstr "API-ключ Miniflux:"
 
 #: gui/dialogs.py:3157
 msgid "The Old Reader Email:"
-msgstr ""
+msgstr "Электронная почта Old Reader:"
 
 #: gui/dialogs.py:3158
 msgid "The Old Reader Password:"
-msgstr ""
+msgstr "Пароль Old Reader:"
 
 #: gui/dialogs.py:3162
 msgid "BazQux Email:"
-msgstr ""
+msgstr "Электронная почта BazQux:"
 
 #: gui/dialogs.py:3163
 msgid "BazQux Password:"
-msgstr ""
+msgstr "Пароль BazQux:"
 
 #: gui/dialogs.py:3245
 msgid "Max notifications per refresh (0 = no limit):"
@@ -4637,7 +4567,7 @@ msgstr[2] "{action} {n} сайтов..."
 
 #: gui/dialogs.py:7058
 msgid "{sites}, {results}. {label} +{added}"
-msgstr ""
+msgstr "{sites}, {results}. {label} +{added}"
 
 #: gui/dialogs.py:7319
 msgid "Subscribe Error"
@@ -4676,7 +4606,7 @@ msgstr[2] "Загружено {n} моделей OpenRouter."
 
 #: gui/dialogs.py:2140
 msgid "Notification APIs were unavailable. {hint}"
-msgstr ""
+msgstr "Интерфейсы (API) уведомлений были недоступны. {hint}"
 
 #: gui/dialogs.py:2164
 msgid ""
@@ -4687,24 +4617,26 @@ msgstr ""
 "объявления работают."
 
 #: gui/dialogs.py:2349
-#, fuzzy
 msgid "Authorization cancelled."
-msgstr "Очистить авторизацию"
+msgstr "Авторизация отменена."
 
 #: gui/dialogs.py:2355
 msgid "No authorization code found in the pasted URL."
-msgstr ""
+msgstr "Во вставленном URL-адресе не найден авторизационный код."
 
 #: gui/dialogs.py:2358
-#, fuzzy
 msgid ""
 "Missing state parameter; paste the full redirected URL from your browser "
 "address bar."
-msgstr "Вставьте полный URL из адресной строки вашего браузера"
+msgstr ""
+"Отсутствует параметр состояния; вставьте полный перенаправленный URL из "
+"адресной строки вашего браузера."
 
 #: gui/dialogs.py:2362
 msgid "Invalid state (redirect does not match this authorization attempt)."
 msgstr ""
+"Недопустимое состояние (перенаправление не соответствует этой попытке "
+"авторизации)."
 
 #: gui/dialogs.py:2613
 msgid "The playback cache is already empty."
@@ -4733,15 +4665,19 @@ msgid ""
 "\n"
 "Check that your browser opened https://example.com/ as expected."
 msgstr ""
+"Запустил тестовую команду с примером URL-адреса:\n"
+"\n"
+"{command}\n"
+"\n"
+"Проверьте, что ваш браузер открыл https://example.com/ как и ожидалось."
 
 #: gui/dialogs.py:2850
-#, fuzzy
 msgid ""
 "The command could not be run:\n"
 "\n"
 "{error}"
 msgstr ""
-"Не удалось применить правила.\n"
+"Не удалось выполнить команду:\n"
 "\n"
 "{error}"
 
@@ -4783,6 +4719,9 @@ msgid ""
 "\n"
 "This deletes the feed and all of its articles."
 msgstr ""
+"Удалить канал «{title}»?\n"
+"\n"
+"Это удалит канал и все его статьи."
 
 #: gui/dialogs.py:5105
 msgid "Searching {label}..."
@@ -4794,7 +4733,7 @@ msgstr "Тематический новостной канал"
 
 #: gui/dialogs.py:5739
 msgid "Website scan"
-msgstr ""
+msgstr "Сканирование веб-сайта"
 
 #: gui/dialogs.py:5759
 msgid "Found {n} result."
@@ -4805,11 +4744,11 @@ msgstr[2] "Найдено {n} результатов."
 
 #: gui/dialogs.py:5918
 msgid "yt-dlp global search (max {count} concurrent)"
-msgstr ""
+msgstr "Глобальный поиск yt-dlp (одновременно максимально {count})"
 
 #: gui/dialogs.py:7051
 msgid "{sites}, {results}. {label}: error"
-msgstr ""
+msgstr "{sites}, {results}. {label}: ошибка"
 
 #: gui/dialogs.py:7091
 msgid "Stopped. {n} result."
@@ -4871,11 +4810,11 @@ msgstr "Не удалось загрузить модель OpenRouter: {error}"
 
 #: gui/dialogs.py:2347
 msgid "Timed out waiting for the redirected URL."
-msgstr ""
+msgstr "Истёк срок ожидания перенаправленного URL-адреса."
 
 #: gui/dialogs.py:2534
 msgid "Saved device (currently unavailable): {device}"
-msgstr ""
+msgstr "Сохранённое устройство (в настоящее время недоступно): {device}"
 
 #: gui/dialogs.py:2715
 msgid ""
@@ -4883,14 +4822,19 @@ msgid ""
 "\n"
 "{error}"
 msgstr ""
+"Этот файл не пригоден для экспорта cookies YouTube:\n"
+"\n"
+"{error}"
 
 #: gui/dialogs.py:2722
-#, fuzzy
 msgid ""
 "Could not import the cookies file:\n"
 "\n"
 "{error}"
-msgstr "Не удалось прочитать cookie-файлы из {browser}."
+msgstr ""
+"Не удалось импортировать cookie-файл:\n"
+"\n"
+"{error}"
 
 #: gui/dialogs.py:2778
 msgid "Detected {nm}: {path} (failed version check)"
@@ -4906,15 +4850,17 @@ msgid ""
 "\n"
 "{error}"
 msgstr ""
+"Не удалось выполнить синтаксический анализ команды:\n"
+"\n"
+"{error}"
 
 #: gui/dialogs.py:2986
 msgid "Detected {label}: checking…"
 msgstr "Обнаруженный {label}: проверка…"
 
 #: gui/dialogs.py:3199
-#, fuzzy
 msgid "Choose {label}"
-msgstr "Выберите файл..."
+msgstr "Выберите {label}"
 
 #: gui/dialogs.py:3745
 msgid ""
@@ -4934,11 +4880,11 @@ msgstr ""
 
 #: gui/dialogs.py:5363
 msgid "Google News: {term}"
-msgstr ""
+msgstr "Google Новости: {term}"
 
 #: gui/dialogs.py:6548
 msgid "Adult: {site}"
-msgstr ""
+msgstr "Для взрослых: {site}"
 
 #: gui/dialogs.py:7094
 msgid "Loaded more. {n} result."
@@ -4963,11 +4909,8 @@ msgid "A preset named \"{name}\" already exists. Overwrite it?"
 msgstr "Предустановка с названием \"{name}\" уже существует. Перезаписать её?"
 
 #: gui/dialogs.py:2353
-#, fuzzy
 msgid "Inoreader authorization failed: {error}"
-msgstr ""
-"Не удалось выполнить авторизацию Inoreader:\n"
-"{message}"
+msgstr "Не удалось выполнить авторизацию Inoreader: {error}"
 
 #: gui/dialogs.py:2973
 msgid "{tool} path:"
@@ -4979,7 +4922,7 @@ msgstr "WAV файлы"
 
 #: gui/dialogs.py:5371
 msgid "Google News: {topic} headlines"
-msgstr ""
+msgstr "Google Новости: заголовки {topic}"
 
 #: gui/dialogs.py:7235 gui/mainframe.py:1803 gui/player.py:4082
 #: gui/player.py:6556
@@ -5000,7 +4943,7 @@ msgstr ""
 
 #: gui/dialogs.py:5388
 msgid "Bing News: {term}"
-msgstr ""
+msgstr "Bing Новости: {term}"
 
 #: gui/dialogs.py:7237 gui/mainframe.py:1803 gui/player.py:6612
 #: gui/player.py:6629
@@ -5028,74 +4971,64 @@ msgid "Connecting: {title}"
 msgstr "Подключение: {title}"
 
 #: gui/mainframe.py:135
-#, fuzzy
 msgid "(no condition)"
-msgstr "Условие"
+msgstr "(без условий)"
 
 #: gui/mainframe.py:137
-#, fuzzy
 msgid "Content"
-msgstr "Содержимое статьи"
+msgstr "Содержимое"
 
 #: gui/mainframe.py:140
 msgid "Feed / Publication"
-msgstr ""
+msgstr "Канал / Публикация"
 
 #: gui/mainframe.py:141
 msgid "Link (URL)"
-msgstr ""
+msgstr "Ссылка (URL)"
 
 #: gui/mainframe.py:142
-#, fuzzy
 msgid "Tag / Site category"
-msgstr "Добавить новую категорию"
+msgstr "Тег / Категория сайта"
 
 #: gui/mainframe.py:143
-#, fuzzy
 msgid "Is unread"
 msgstr "Непрочитано"
 
 #: gui/mainframe.py:144
-#, fuzzy
 msgid "Is read"
-msgstr "Непрочитано"
+msgstr "Прочитано"
 
 #: gui/mainframe.py:145
-#, fuzzy
 msgid "Is favorite"
-msgstr "Отметить как &избранное"
+msgstr "Являеттся избранным"
 
 #: gui/mainframe.py:146
-#, fuzzy
 msgid "Is not favorite"
-msgstr "Добавлено в избранное"
+msgstr "Не является избранным"
 
 #: gui/mainframe.py:147
 msgid "Has been opened"
-msgstr ""
+msgstr "Было открыто"
 
 #: gui/mainframe.py:148
 msgid "Has not been opened"
-msgstr ""
+msgstr "Не было открыто"
 
 #: gui/mainframe.py:149
 msgid "Was updated since first fetch"
-msgstr ""
+msgstr "Было обновлено с момента первого извлечения"
 
 #: gui/mainframe.py:150
-#, fuzzy
 msgid "Was not updated"
-msgstr "Запуск обновления"
+msgstr "Не было обновлено"
 
 #: gui/mainframe.py:264
-#, fuzzy
 msgid "Load more items (Enter)"
-msgstr "Загрузить больше результатов (+80/сайт)"
+msgstr "Загрузить больше элементов (Enter)"
 
 #: gui/mainframe.py:265
-#, fuzzy
 msgid "Loading more..."
-msgstr "Загрузка ещё"
+msgstr "Загрузка ещё..."
 
 #: gui/mainframe.py:4031 gui/mainframe.py:4163
 msgid "New article available."
@@ -5107,19 +5040,16 @@ msgid "Read"
 msgstr "Прочитано"
 
 #: gui/mainframe.py:12387
-#, fuzzy
 msgid "yt-dlp download failed"
-msgstr "Ошибка загрузки: {title}"
+msgstr "Ошибка загрузки yt-dlp"
 
 #: gui/mainframe.py:13039
-#, fuzzy
 msgid "Could not update feed."
-msgstr "Не удалось обновить правило."
+msgstr "Не удалось обновить канал."
 
 #: gui/mainframe.py:13090
-#, fuzzy
 msgid "Could not reset feed title."
-msgstr "Не удалось восстановить статью."
+msgstr "Не удалось сбросить заголовок канала."
 
 #: gui/mainframe.py:629 gui/mainframe.py:608
 msgid "Shortcuts"
@@ -5127,17 +5057,15 @@ msgstr "Ярлыки"
 
 #: gui/mainframe.py:647
 msgid "Feeds and folders"
-msgstr ""
+msgstr "Каналы и папки"
 
 #: gui/mainframe.py:649
-#, fuzzy
 msgid "All Feeds"
-msgstr "Каналы"
+msgstr "Все каналы"
 
 #: gui/mainframe.py:656
-#, fuzzy
 msgid "Search articles"
-msgstr "Поиск совпадений:"
+msgstr "Поиск статей"
 
 #: gui/mainframe.py:887
 msgid "Configure Persistent Search..."
@@ -5146,7 +5074,7 @@ msgstr "&Настройка постоянного поиска..."
 #: gui/mainframe.py:1603 gui/mainframe.py:1647 gui/mainframe.py:9027
 #: gui/mainframe.py:9156
 msgid "No matches."
-msgstr ""
+msgstr "Нет соответствий."
 
 #: gui/mainframe.py:2186
 msgid "&Add Feed"
@@ -5467,14 +5395,12 @@ msgstr "&Вид"
 
 #: gui/mainframe.py:3932 gui/mainframe.py:4044 gui/mainframe.py:4078
 #: gui/mainframe.py:4182
-#, fuzzy
 msgid "New article"
-msgstr "эта статья"
+msgstr "Новая статья"
 
 #: gui/mainframe.py:4799
-#, fuzzy
 msgid "this Smart Folder"
-msgstr "Смарт-папка"
+msgstr "эта смарт-папка"
 
 #: gui/mainframe.py:4869
 msgid "Open Article"
@@ -5489,14 +5415,12 @@ msgid "Detect Audio"
 msgstr "Обнаружение аудио"
 
 #: gui/mainframe.py:6276
-#, fuzzy
 msgid "Versions"
-msgstr "Персидский"
+msgstr "Версии"
 
 #: gui/mainframe.py:6286
-#, fuzzy
 msgid "Version content"
-msgstr "Содержимое статьи"
+msgstr "Содержимое версии"
 
 #: gui/mainframe.py:7341 gui/mainframe.py:4577
 msgid "Add Subcategory"
@@ -5516,11 +5440,11 @@ msgstr "Обновление завершено"
 
 #: gui/mainframe.py:9953
 msgid "No more occurrences of \"{term}\"."
-msgstr ""
+msgstr "Больше никаких вхождений \"{term}\"."
 
 #: gui/mainframe.py:9955
 msgid "No previous occurrences of \"{term}\"."
-msgstr ""
+msgstr "Ранее \"{term}\" не встречался."
 
 #: gui/mainframe.py:11462 gui/mainframe.py:1368 gui/mainframe.py:11442
 msgid "Unread"
@@ -5531,9 +5455,8 @@ msgid "Mark all items in all feeds as read?"
 msgstr "Отметить все элементы во всех каналах как прочитанные?"
 
 #: gui/mainframe.py:11623
-#, fuzzy
 msgid "Failed to mark all items as read."
-msgstr "По&метить все элементы как прочитанные"
+msgstr "Не удалось пометить все элементы как прочитанные."
 
 #: gui/mainframe.py:12236
 msgid "Choose the format to download this item in:"
@@ -5584,62 +5507,58 @@ msgid "Starting update..."
 msgstr "Запуск обновления..."
 
 #: gui/mainframe.py:13995
-#, fuzzy
 msgid "Choose category:"
-msgstr "Свернуть категорию"
+msgstr "Выберите категорию:"
 
 #: gui/mainframe.py:14263
-#, fuzzy
 msgid "Folder name"
-msgstr "&Название папки:"
+msgstr "Название папки"
 
 #: gui/mainframe.py:14346 gui/mainframe.py:14255 gui/mainframe.py:8487
 msgid "Smart Folder"
 msgstr "Смарт-папка"
 
 #: gui/mainframe.py:14394
-#, fuzzy
 msgid "Rule name"
-msgstr "&Название правила:"
+msgstr "Название правила"
 
 #: gui/mainframe.py:14433
 msgid "Then do this"
-msgstr ""
+msgstr "Тогда сделать это"
 
 #: gui/mainframe.py:14441
 msgid "Move to category (full path, blank for none)"
 msgstr ""
+"Переместить в категорию  (полный путь, пусто для отказа от этого действия)"
 
 #: gui/mainframe.py:14452
 msgid "Also show under category (label, blank for none)"
 msgstr ""
+"Также показывать под категорией (метка, пусто для отказа от этого действия)"
 
 #: gui/mainframe.py:14566
-#, fuzzy
 msgid "Filter rules"
 msgstr "Правила фильтрации"
 
 #: gui/mainframe.py:14624
 msgid " [stop]"
-msgstr ""
+msgstr " [остановка]"
 
 #: gui/mainframe.py:14682
-#, fuzzy
 msgid "this rule"
-msgstr "эта статья"
+msgstr "это правило"
 
 #: gui/mainframe.py:622
 msgid "OK"
-msgstr ""
+msgstr "ОК"
 
 #: gui/mainframe.py:622
-#, fuzzy
 msgid "Failed"
-msgstr "Сбои"
+msgstr "Сбой"
 
 #: gui/mainframe.py:626
 msgid "No shortcut actions were performed."
-msgstr ""
+msgstr "Никаких быстрых действий выполнено не было."
 
 #: gui/mainframe.py:658 gui/mainframe.py:661
 msgid "Filter current view (Enter)"
@@ -5866,7 +5785,6 @@ msgid "Open Play Queue..."
 msgstr "Открыть очередь воспроизведения..."
 
 #: gui/mainframe.py:5220 gui/mainframe.py:5211
-#, fuzzy
 msgid "Feed description"
 msgstr "Описание канала"
 
@@ -5883,14 +5801,12 @@ msgid "Article History"
 msgstr "История статьи"
 
 #: gui/mainframe.py:6280
-#, fuzzy
 msgid "unknown time"
-msgstr "(неизвестно)"
+msgstr "неизвестное время"
 
 #: gui/mainframe.py:6281
-#, fuzzy
 msgid " (current)"
-msgstr "[Текущий]"
+msgstr " (текущий)"
 
 #: gui/mainframe.py:6335
 msgid "Chapters available"
@@ -5960,9 +5876,8 @@ msgid "Refresh stopped"
 msgstr "Обновление остановлено"
 
 #: gui/mainframe.py:8861 gui/mainframe.py:9734
-#, fuzzy
 msgid "Loading..."
-msgstr "Загрузка мультимедиа..."
+msgstr "Загрузка..."
 
 #: gui/mainframe.py:11883 gui/mainframe.py:11890
 msgid "No audio"
@@ -5993,13 +5908,12 @@ msgid "Failed to add feed."
 msgstr "Не удалось добавить канал."
 
 #: gui/mainframe.py:12863
-#, fuzzy
 msgid "BlindRSS - Removing feed..."
-msgstr "BlindRSS - Чтение архива YouTube..."
+msgstr "BlindRSS - Удаление канала..."
 
 #: gui/mainframe.py:12911
 msgid "Please try again."
-msgstr ""
+msgstr "Пожалуйста, попробуйте снова."
 
 #: gui/mainframe.py:13005
 msgid ""
@@ -6014,9 +5928,8 @@ msgid "Feed URL not supported"
 msgstr "URL-адрес канала не поддерживается"
 
 #: gui/mainframe.py:13099
-#, fuzzy
 msgid "BlindRSS - Importing OPML..."
-msgstr "BlindRSS - Импортирование архива YouTube..."
+msgstr "BlindRSS - Импортирование OPML..."
 
 #: gui/mainframe.py:13147
 msgid "Subscribed channels ({count})"
@@ -6158,7 +6071,7 @@ msgstr "Применить к уже &существующим статьям"
 
 #: gui/mainframe.py:14620
 msgid "{name}: if {condition} then {actions}"
-msgstr ""
+msgstr "{name}: если {condition}, то {actions}"
 
 #: gui/mainframe.py:14685
 msgid "Delete Rule"
@@ -6248,7 +6161,7 @@ msgstr "Копировать"
 
 #: gui/mainframe.py:6281
 msgid " (original)"
-msgstr ""
+msgstr " (оригинал)"
 
 #: gui/mainframe.py:6427
 msgid "not played"
@@ -6332,9 +6245,8 @@ msgid "Downloading: {title}"
 msgstr "Загрузка: {title}"
 
 #: gui/mainframe.py:12902
-#, fuzzy
 msgid "Could not remove feed."
-msgstr "Не удалось удалить категорию."
+msgstr "Не удалось удалить канал."
 
 #: gui/mainframe.py:12959
 msgid "This provider does not support editing feeds."
@@ -6375,14 +6287,12 @@ msgid "Refreshing category: {title}..."
 msgstr "Обновление категории: {title}..."
 
 #: gui/mainframe.py:13494
-#, fuzzy
 msgid "Export failed for category \"{category}\"."
-msgstr "Отметить все элементы в категории \"{category}\" как прочитанные?"
+msgstr "Не удалось выполнить экспорт категории \"{category}\"."
 
 #: gui/mainframe.py:13502
-#, fuzzy
 msgid "Export \"{category}\" Category OPML"
-msgstr "Экспортировать категорию в OPML..."
+msgstr "Экспорт категории \"{category}\" в OPML"
 
 #: gui/mainframe.py:13869
 msgid "Update Check Failed"
@@ -6397,9 +6307,8 @@ msgid "Unable to determine update status."
 msgstr "Не удаётся определить статус обновления."
 
 #: gui/mainframe.py:14001 gui/mainframe.py:12617
-#, fuzzy
 msgid "BlindRSS - Adding feed {url}..."
-msgstr "BlindRSS - Чтение архива YouTube..."
+msgstr "BlindRSS - Добавление канала {url}..."
 
 #: gui/mainframe.py:14076
 msgid ""
@@ -6423,11 +6332,11 @@ msgstr "&Название папки:"
 
 #: gui/mainframe.py:14269 gui/mainframe.py:14400
 msgid "All conditions (AND)"
-msgstr ""
+msgstr "Все условия (И)"
 
 #: gui/mainframe.py:14269 gui/mainframe.py:14400
 msgid "Any condition (OR)"
-msgstr ""
+msgstr "Любое условие (ИЛИ)"
 
 #: gui/mainframe.py:14277 gui/mainframe.py:14409
 msgid "Field"
@@ -6629,18 +6538,16 @@ msgid "Smart Folders"
 msgstr "Смарт-папки"
 
 #: gui/mainframe.py:11033
-#, fuzzy
 msgid "No text available.\n"
-msgstr "Недоступен"
+msgstr "Текст недоступен.\n"
 
 #: gui/mainframe.py:11174
-#, fuzzy
 msgid ". Link: {url}"
-msgstr " Ссылка: {url}"
+msgstr ". Ссылка: {url}"
 
 #: gui/mainframe.py:12417
 msgid "yt-dlp download timed out"
-msgstr ""
+msgstr "Время ожидания загрузки yt-dlp истекло"
 
 #: gui/mainframe.py:12510 gui/mainframe.py:12433
 msgid "Download complete"
@@ -6674,13 +6581,12 @@ msgid "Are you sure you want to remove this feed?"
 msgstr "Вы действительно хотите удалить этот канал?"
 
 #: gui/mainframe.py:12861
-#, fuzzy
 msgid "BlindRSS - Removing feed {title}..."
-msgstr "Обновление канала: {title}..."
+msgstr "BlindRSS - Удаление канала {title}..."
 
 #: gui/mainframe.py:12907
 msgid "It may be busy due to another operation."
-msgstr ""
+msgstr "Возможно, он занят из-за другой операции."
 
 #: gui/mainframe.py:13096 gui/mainframe.py:13454 gui/mainframe.py:13503
 msgid "OPML files"
@@ -6699,9 +6605,8 @@ msgid "Export failed."
 msgstr "Не удалось выполнить экспорт."
 
 #: gui/mainframe.py:13490
-#, fuzzy
 msgid "No feeds found in category \"{category}\"."
-msgstr "Отметить все элементы в категории \"{category}\" как прочитанные?"
+msgstr "Не найдено каналов в категории \"{category}\"."
 
 #: gui/mainframe.py:13578
 msgid "Storage Location"
@@ -6720,18 +6625,16 @@ msgid "Storage Location Changed"
 msgstr "Местоположение хранилища изменено"
 
 #: gui/mainframe.py:14284 gui/mainframe.py:14416
-#, fuzzy
 msgid "Condition {n} field"
-msgstr "Условие"
+msgstr "Поле условия {n}"
 
 #: gui/mainframe.py:14287 gui/mainframe.py:14419
 msgid "Condition {n} operator"
-msgstr ""
+msgstr "Оператор условия {n}"
 
 #: gui/mainframe.py:14290 gui/mainframe.py:14422
-#, fuzzy
 msgid "Condition {n} value"
-msgstr "Условие"
+msgstr "Значение условия {n}"
 
 #: gui/mainframe.py:14684
 msgid ""
@@ -6742,7 +6645,7 @@ msgstr ""
 
 #: gui/mainframe.py:14754
 msgid "Scanned {scanned} articles; {changed} matched a rule."
-msgstr ""
+msgstr "Просканировано {scanned} статей; {changed} соответствует правилу."
 
 #: gui/mainframe.py:505
 msgid "VLC Media Player (required for playback)"
@@ -6762,9 +6665,8 @@ msgid "Install Dependencies"
 msgstr "Установить зависимости"
 
 #: gui/mainframe.py:517 gui/mainframe.py:531
-#, fuzzy
 msgid "Installing dependencies..."
-msgstr "Установить зависимости"
+msgstr "Установка зависимостей..."
 
 #: gui/mainframe.py:525
 msgid ""
@@ -6819,15 +6721,14 @@ msgid "{hidden} new article notification(s) were suppressed by your cap."
 msgstr "{hidden} уведомлений о новых статьях были скрыты вашим ограничением."
 
 #: gui/mainframe.py:4421
-#, fuzzy
 msgid "{count} new article notification was suppressed by your cap."
 msgid_plural "{count} new article notifications were suppressed by your cap."
 msgstr[0] ""
-"{hidden} уведомлений о новых статьях были скрыты вашим ограничением."
+"{count} уведомление о новых статьях было спрятано вашим ограничением."
 msgstr[1] ""
-"{hidden} уведомлений о новых статьях были скрыты вашим ограничением."
+"{count} уведомления о новых статьях были спрятаны вашим ограничением."
 msgstr[2] ""
-"{hidden} уведомлений о новых статьях были скрыты вашим ограничением."
+"{count} уведомлений о новых статьях были спрятаны вашим ограничением."
 
 #: gui/mainframe.py:4604
 msgid "Mark all items in \"{feed}\" as read?"
@@ -6867,7 +6768,7 @@ msgstr "Открыть {chapter}"
 
 #: gui/mainframe.py:6050
 msgid "Audio detected and added!"
-msgstr ""
+msgstr "Аудио обнаружено и добавлено!"
 
 #: gui/mainframe.py:6055
 msgid "Provider does not support updating media."
@@ -6894,9 +6795,8 @@ msgid "Refreshing: {done} out of {total}"
 msgstr "Обновление: {done} из {total}"
 
 #: gui/mainframe.py:9032 gui/mainframe.py:9161 gui/mainframe.py:9655
-#, fuzzy
 msgid "Filter: {shown} of {total}"
-msgstr "Отфильтровано: {count} из {total}"
+msgstr "Фильтр: {shown} из {total}"
 
 #: gui/mainframe.py:11794
 msgid ""
@@ -6919,23 +6819,20 @@ msgid "Download failed: {error}"
 msgstr "Ошибка загрузки. {error}"
 
 #: gui/mainframe.py:12900
-#, fuzzy
 msgid "Could not remove feed '{title}'."
-msgstr "Не удалось переместить конфигурационный файл."
+msgstr "Не удалось удалить канал \"{title}\"."
 
 #: gui/mainframe.py:13577
 msgid "Could not move config file."
 msgstr "Не удалось переместить конфигурационный файл."
 
 #: gui/mainframe.py:13662
-#, fuzzy
 msgid "Could not update startup registration."
-msgstr "Не удалось обновить настройки автозагрузки в macOS: {error}"
+msgstr "Не удалось обновить регистрацию автозапуска."
 
 #: gui/mainframe.py:13860
-#, fuzzy
 msgid "Update check failed: {error}"
-msgstr "Не удалось выполнить проверку обновления"
+msgstr "Не удалось выполнить проверку обновления: {error}"
 
 #: gui/mainframe.py:14642
 msgid "Could not create the rule."
@@ -7003,9 +6900,8 @@ msgstr ""
 "Не удалось полностью настроить необходимые компоненты уведомлений Windows."
 
 #: gui/mainframe.py:10417
-#, fuzzy
 msgid "Translation failed: {error}"
-msgstr "Ошибка установки: {error}"
+msgstr "Ошибка перевода: {error}"
 
 #: gui/mainframe.py:12412
 msgid ""
@@ -7054,51 +6950,44 @@ msgid "No Track Loaded"
 msgstr "Трек не загружен"
 
 #: gui/player.py:4409
-#, fuzzy
 msgid "download failed"
-msgstr "Загрузка отключена"
+msgstr "ошибка загрузки"
 
 #: gui/player.py:422
 msgid "Scanning..."
 msgstr "Сканирование..."
 
 #: gui/player.py:2016
-#, fuzzy
 msgid "Playback Status"
-msgstr "Скорость воспроизведения"
+msgstr "Статус воспроизведения"
 
 #: gui/player.py:2021
-#, fuzzy
 msgid "Playback Position"
-msgstr "Время воспроизведения"
+msgstr "Позиция воспроизведения"
 
 #: gui/player.py:2033
 msgid "Elapsed Time: 00:00"
 msgstr "Прошло времени: 00:00"
 
 #: gui/player.py:2035
-#, fuzzy
 msgid "Total Time: 00:00"
-msgstr "Прошло времени: 00:00"
+msgstr "Общее время: 00:00"
 
 #: gui/player.py:2050
 msgid "Playback Time"
 msgstr "Время воспроизведения"
 
 #: gui/player.py:2058
-#, fuzzy
 msgid "Rewind 10 seconds"
-msgstr "30 секунд"
+msgstr "Перемотка назад на 10 секунд"
 
 #: gui/player.py:2074
-#, fuzzy
 msgid "Fast Forward 10 seconds"
-msgstr "Перемотать вперёд"
+msgstr "Перемотка вперёд на 10 секунд"
 
 #: gui/player.py:2092
-#, fuzzy
 msgid "Chapters Menu"
-msgstr "&Тайм-коды"
+msgstr "Меню тайм-кодов"
 
 #: gui/player.py:2103 gui/player.py:2100 gui/tray.py:122
 msgid "Volume"
@@ -7130,7 +7019,7 @@ msgstr "Прошло времени"
 
 #: gui/player.py:5473
 msgid "Total Time"
-msgstr ""
+msgstr "Общее время"
 
 #: gui/player.py:6668 gui/player.py:6780 gui/player.py:4562
 msgid "Stopped"
@@ -7193,9 +7082,8 @@ msgid "&Chapters"
 msgstr "&Тайм-коды"
 
 #: gui/player.py:2314
-#, fuzzy
 msgid "Open Link for Selected Chapter"
-msgstr "Открыть ссылку на {chapter}"
+msgstr "Открыть ссылку на выделенный тайм-код"
 
 #: gui/player.py:2652
 msgid "Cast device disconnected; resuming local playback"
@@ -7208,6 +7096,9 @@ msgid ""
 "{content_type} instead of a media file, which often means the item needs you "
 "to sign in, or the feed has no downloadable enclosure."
 msgstr ""
+"По этой ссылке открывается веб-страница, а не аудио или видео. Сервер вернул "
+"{content_type} вместо мультимедийного файла. Зачастую это означает, что "
+"элемент требует входа в систему, либо у канала нет загружаемого вложения."
 
 #: gui/player.py:3457 gui/player.py:3997
 msgid "Failed to load media"
@@ -7242,18 +7133,16 @@ msgid "Connection failed: {error}"
 msgstr "Не удалось установить соединение: {error}"
 
 #: gui/player.py:859
-#, fuzzy
 msgid "VLC Error"
-msgstr "Ошибка"
+msgstr "Ошибка VLC"
 
 #: gui/player.py:2109
 msgid "Volume Level: {percent}%"
-msgstr ""
+msgstr "Уровень громкости: {percent}%"
 
 #: gui/player.py:2214
-#, fuzzy
 msgid "Chapter at {timestamp}"
-msgstr "Тайм-код {index}: {timestamp}, {title}."
+msgstr "Тайм-код на {timestamp}"
 
 #: gui/player.py:2241
 msgid "Chapter link unavailable"
@@ -7264,26 +7153,24 @@ msgid "Could not open chapter link"
 msgstr "Не удалось открыть ссылку на тайм-коды"
 
 #: gui/player.py:2262
-#, fuzzy
 msgid "Chapters, none available"
-msgstr "Доступны тайм-коды"
+msgstr "Тайм-коды недоступны"
 
 #: gui/player.py:3473
 msgid "Cannot play this item"
-msgstr ""
+msgstr "Не удаётся воспроизвести этот элемент"
 
 #: gui/player.py:5467
 msgid "{name}: {value}"
-msgstr ""
+msgstr "{name}: {value}"
 
 #: gui/player.py:5494
 msgid "Elapsed {elapsed}"
 msgstr "Прошло {elapsed}"
 
 #: gui/player.py:5606
-#, fuzzy
 msgid "Volume Level"
-msgstr "Увеличить громкость"
+msgstr "Уровень громкости"
 
 #: gui/player.py:6360
 msgid "End of track"
@@ -7299,11 +7186,13 @@ msgstr "{title} (локально)"
 
 #: gui/player.py:3506 gui/player.py:3846 gui/player.py:3859 gui/player.py:3810
 msgid "Media Stream"
-msgstr ""
+msgstr "Мультимедийный поток"
 
 #: gui/player.py:4453
 msgid "Could not play this YouTube item. yt-dlp could not fetch it: {error}"
 msgstr ""
+"Не получилось воспроизвести этот элемент с YouTube. yt-dlp не удалось его "
+"извлечь: {error}"
 
 #: gui/player.py:5591
 msgid "Pause"
@@ -7327,16 +7216,18 @@ msgid ""
 "\n"
 "Please ensure VLC media player is installed (64-bit version recommended)."
 msgstr ""
+"Не удалось инициализировать VLC: {error}\n"
+"\n"
+"Пожалуйста, убедитесь, что установлен медиапроигрыватель VLC (рекомендуется "
+"64-битная версия)."
 
 #: gui/player.py:2269
-#, fuzzy
 msgid "Chapters, {count} available, current chapter {current}"
-msgstr "Доступно тайм-кодов: {count}."
+msgstr "Тайм-коды, доступно {count}, текущий тайм-код {current}"
 
 #: gui/player.py:2275
-#, fuzzy
 msgid "Chapters, {count} available"
-msgstr "Доступны тайм-коды"
+msgstr "Тайм-коды, доступно {count}"
 
 #: gui/player.py:2316
 msgid "Open Link for {chapter}"
@@ -7351,10 +7242,13 @@ msgid ""
 "Rokfin post is listed but not streamable right now: Rokfin returned an "
 "invalid playback ID for this post."
 msgstr ""
+"Запись Rokfin есть в списке, но прямо сейчас недоступна для потокового "
+"воспроизведения: Rokfin вернул неверный идентификатор воспроизведения для "
+"этой записи."
 
 #: gui/player.py:5608
 msgid "Volume: {percent}%"
-msgstr ""
+msgstr "Громкость: {percent}%"
 
 #: gui/player.py:2330
 msgid "[Current]"
@@ -7365,15 +7259,16 @@ msgid "Casting failed: {error}"
 msgstr "Не удалось выполнить трансляцию: {error}"
 
 #: gui/player.py:3874
-#, fuzzy
 msgid "yt-dlp resolve failed: {error}"
-msgstr "Не удалось выполнить экспорт: {error}"
+msgstr "Ошибка разрешения yt-dlp: {error}"
 
 #: gui/player.py:3881
 msgid ""
 "Rokfin post is not anonymously streamable right now. Rokfin requires a login/"
 "cookies to play this post."
 msgstr ""
+"Запись Rokfin сейчас недоступна для анонимного потокового воспроизведения. "
+"Rokfin требует входа/cookie-файла для воспроизведения этой записи."
 
 #: gui/player.py:3886
 msgid ""
@@ -7381,6 +7276,10 @@ msgid ""
 "could not be loaded on this Windows session (DPAPI). Try running BlindRSS as "
 "your normal Windows user and restart the app."
 msgstr ""
+"Ошибка разрешения yt-dlp: для этого мультимедиа может потребоваться вход в "
+"систему, но браузерные cookie-файлы не удалось загрузить в этой сессии "
+"Windows (DPAPI). Попробуйте запустить BlindRSS как обычный пользователь "
+"Windows и перезапустить приложение."
 
 #: gui/tray.py:101
 msgid "Restore"
