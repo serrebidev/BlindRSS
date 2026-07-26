@@ -139,7 +139,7 @@ msgstr ""
 "полный текст не может быть получен автоматически. Откройте исходную ссылку в "
 "вашем браузере, чтобы прочитать её."
 
-#: core/article_extractor.py:218
+#: core/article_extractor.py:224
 msgid ""
 "The page has no readable article text — only navigation or related-story "
 "links were found (common for video-only pages). Open the original link in "
@@ -149,7 +149,7 @@ msgstr ""
 "ссылки на связанные сюжеты (обычное явление для страниц, содержащих только "
 "видео). Откройте исходную ссылку в вашем браузере, чтобы просмотреть её."
 
-#: core/article_extractor.py:285
+#: core/article_extractor.py:300
 msgid ""
 "This article is behind a paywall (subscription required), so the full text "
 "can't be fetched automatically. Open the original link in your browser to "
@@ -159,7 +159,7 @@ msgstr ""
 "текст не может быть получен автоматически. Откройте исходную ссылку в вашем "
 "браузере, чтобы прочитать её."
 
-#: core/article_extractor.py:320
+#: core/article_extractor.py:335
 msgid ""
 "Only the free preview of this article is published on the page — the rest "
 "requires a subscription. Open the original link in your browser to read it."
@@ -168,7 +168,7 @@ msgstr ""
 "статьи — для остального требуется подписка. Откройте исходную ссылку в вашем "
 "браузере, чтобы это прочитать."
 
-#: core/article_extractor.py:2797
+#: core/article_extractor.py:2812
 msgid ""
 "Google News could not resolve the original publisher link. Open the original "
 "link in your browser to read it."
@@ -176,28 +176,28 @@ msgstr ""
 "Google News не смог найти исходную ссылку на издателя. Откройте исходную "
 "ссылку в вашем браузере, чтобы прочитать её."
 
-#: core/article_extractor.py:4270 gui/dialogs.py:4688
+#: core/article_extractor.py:4285 gui/dialogs.py:4688
 msgid "(unknown)"
 msgstr "(неизвестно)"
 
-#: core/article_extractor.py:4328
+#: core/article_extractor.py:4343
 msgid "Could not extract full text from the webpage or from feed content."
 msgstr ""
 "Не удалось извлечь полный текст с веб-страницы или из содержимого канала."
 
-#: core/article_extractor.py:4103
+#: core/article_extractor.py:4118
 msgid ""
 "trafilatura is not installed or failed to import. Reinstall requirements."
 msgstr ""
 "trafilatura не установлена или её не удалось импортировать. Переустановите "
 "требуемые компоненты."
 
-#: core/article_extractor.py:4196
+#: core/article_extractor.py:4211
 msgid "Download failed (site blocked, offline, or connection problem)."
 msgstr ""
 "Ошибка загрузки (сайт заблокирован, отключён или проблема с подключением)."
 
-#: core/article_extractor.py:4216
+#: core/article_extractor.py:4231
 msgid "Downloaded page, but could not extract readable text (empty result)."
 msgstr ""
 "Страница загружена, но не удалось извлечь удобочитаемый текст (пустой "
@@ -216,20 +216,20 @@ msgstr ""
 "Откройте страницу в {browser}, и BlindRSS автоматически восстановит доступ в "
 "течение минуты."
 
-#: core/article_extractor.py:4271 gui/dialogs.py:4057
+#: core/article_extractor.py:4286 gui/dialogs.py:4057
 msgid "Title:"
 msgstr "Заголовок:"
 
-#: core/article_extractor.py:4272 gui/accessibility.py:1493
+#: core/article_extractor.py:4287 gui/accessibility.py:1493
 #: gui/mainframe.py:5898 gui/mainframe.py:9754
 msgid "Author:"
 msgstr "Автор:"
 
-#: core/article_extractor.py:4089 core/article_extractor.py:4100
+#: core/article_extractor.py:4104 core/article_extractor.py:4115
 msgid "Could not retrieve YouTube video details."
 msgstr "Не удалось получить подробную информацию о видео с YouTube."
 
-#: core/article_extractor.py:4319
+#: core/article_extractor.py:4334
 msgid "Unknown extraction error"
 msgstr "Неизвестная ошибка извлечения"
 
@@ -6644,8 +6644,11 @@ msgstr ""
 "распределены, не изменятся."
 
 #: gui/mainframe.py:14754
-msgid "Scanned {scanned} articles; {changed} matched a rule."
-msgstr "Просканировано {scanned} статей; {changed} соответствует правилу."
+msgid "Scanned {scanned} article; {changed} matched a rule."
+msgid_plural "Scanned {scanned} articles; {changed} matched a rule."
+msgstr[0] "Просканирована {scanned} статья; {changed} соответствует правилу."
+msgstr[1] "Просканировано {scanned} статьи; {changed} соответствует правилу."
+msgstr[2] "Просканировано {scanned} статей; {changed} соответствует правилу."
 
 #: gui/mainframe.py:505
 msgid "VLC Media Player (required for playback)"

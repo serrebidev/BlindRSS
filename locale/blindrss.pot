@@ -126,40 +126,40 @@ msgstr ""
 msgid "This page is behind an anti-bot / human-verification check (e.g. Cloudflare or a \"you're not a robot\" page), so the full text can't be fetched automatically. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:218
+#: core/article_extractor.py:224
 msgid "The page has no readable article text — only navigation or related-story links were found (common for video-only pages). Open the original link in your browser to view it."
 msgstr ""
 
-#: core/article_extractor.py:285
+#: core/article_extractor.py:300
 msgid "This article is behind a paywall (subscription required), so the full text can't be fetched automatically. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:320
+#: core/article_extractor.py:335
 msgid "Only the free preview of this article is published on the page — the rest requires a subscription. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:2797
+#: core/article_extractor.py:2812
 msgid "Google News could not resolve the original publisher link. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:4270
+#: core/article_extractor.py:4285
 #: gui/dialogs.py:4688
 msgid "(unknown)"
 msgstr ""
 
-#: core/article_extractor.py:4328
+#: core/article_extractor.py:4343
 msgid "Could not extract full text from the webpage or from feed content."
 msgstr ""
 
-#: core/article_extractor.py:4103
+#: core/article_extractor.py:4118
 msgid "trafilatura is not installed or failed to import. Reinstall requirements."
 msgstr ""
 
-#: core/article_extractor.py:4196
+#: core/article_extractor.py:4211
 msgid "Download failed (site blocked, offline, or connection problem)."
 msgstr ""
 
-#: core/article_extractor.py:4216
+#: core/article_extractor.py:4231
 msgid "Downloaded page, but could not extract readable text (empty result)."
 msgstr ""
 
@@ -167,24 +167,24 @@ msgstr ""
 msgid "This page is behind an anti-bot / human-verification check, and the access BlindRSS had for this site has expired — these checks only stay valid for a short time. Open the page in {browser} and BlindRSS will pick the access back up automatically within a minute."
 msgstr ""
 
-#: core/article_extractor.py:4271
+#: core/article_extractor.py:4286
 #: gui/dialogs.py:4057
 msgid "Title:"
 msgstr ""
 
-#: core/article_extractor.py:4272
+#: core/article_extractor.py:4287
 #: gui/accessibility.py:1493
 #: gui/mainframe.py:5898
 #: gui/mainframe.py:9754
 msgid "Author:"
 msgstr ""
 
-#: core/article_extractor.py:4089
-#: core/article_extractor.py:4100
+#: core/article_extractor.py:4104
+#: core/article_extractor.py:4115
 msgid "Could not retrieve YouTube video details."
 msgstr ""
 
-#: core/article_extractor.py:4319
+#: core/article_extractor.py:4334
 msgid "Unknown extraction error"
 msgstr ""
 
@@ -6402,8 +6402,10 @@ msgid "Delete filter rule \"{name}\"? Articles it already filed are not changed.
 msgstr ""
 
 #: gui/mainframe.py:14754
-msgid "Scanned {scanned} articles; {changed} matched a rule."
-msgstr ""
+msgid "Scanned {scanned} article; {changed} matched a rule."
+msgid_plural "Scanned {scanned} articles; {changed} matched a rule."
+msgstr[0] ""
+msgstr[1] ""
 
 #: gui/mainframe.py:505
 msgid "VLC Media Player (required for playback)"
