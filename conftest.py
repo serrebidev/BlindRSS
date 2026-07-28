@@ -2,9 +2,15 @@
 # This file is part of BlindRSS
 # SPDX-License-Identifier: MIT
 
+import functools
 import os
+import socket
 import sys
+import threading
+import time
 from pathlib import Path
+
+import pytest
 
 # Below-normal on Windows; a modest positive nice value elsewhere.
 _WINDOWS_BELOW_NORMAL_PRIORITY_CLASS = 0x00004000
@@ -66,6 +72,87 @@ def _can_use_temp_base(path: Path) -> bool:
             return True
     except OSError:
         return False
+
+
+@functools.lru_cache(maxsize=1)
+def local_tcp_stream_delivery_works() -> bool:
+    """Can a local TCP server still deliver a second write to a client?
+
+    A machine can end up in a state where everything a local server sends
+    after its first write is swallowed: the client gets the response headers
+    and then nothing -- not the body, not even the FIN, and its socket never
+    becomes readable. Seen on Windows 11 in July 2026, affecting only
+    medium-integrity (non-elevated) processes; the same code run elevated was
+    fine, UDP was fine, and remote connections were fine. A reboot clears it.
+
+    Tests that stand up a mock origin server cannot run at all in that state,
+    and they fail in a way that looks exactly like a proxy bug, so they check
+    this first and skip with an explanation instead.
+    """
+    head, body = b"H" * 32, b"BODY"
+
+    # Setting the probe up must never be confused with the condition it looks
+    # for: if the sockets cannot even be created, say "healthy" and let the
+    # real tests report whatever is wrong. Only the read below decides.
+    try:
+        srv = socket.socket()
+        srv.settimeout(3.0)
+        srv.bind(("127.0.0.1", 0))
+        srv.listen(1)
+        port = srv.getsockname()[1]
+
+        def serve():
+            try:
+                conn, _ = srv.accept()
+                conn.recv(64)
+                conn.sendall(head)
+                time.sleep(0.02)   # force a second, separate write
+                conn.sendall(body)
+                time.sleep(0.2)
+                conn.close()
+            except Exception:
+                pass
+            finally:
+                try:
+                    srv.close()
+                except Exception:
+                    pass
+
+        worker = threading.Thread(target=serve, daemon=True)
+        worker.start()
+        client = socket.create_connection(("127.0.0.1", port), timeout=3.0)
+    except Exception:
+        return True
+
+    got = b""
+    try:
+        client.sendall(b"probe")
+        while len(got) < len(head) + len(body):
+            chunk = client.recv(256)
+            if not chunk:
+                break
+            got += chunk
+    except Exception:
+        # A read timeout here IS the condition: the second write never landed.
+        pass
+    finally:
+        try:
+            client.close()
+        except Exception:
+            pass
+        worker.join(timeout=2.0)
+    return got.endswith(body)
+
+
+@pytest.fixture(scope="session")
+def local_tcp_server():
+    """Skip when this machine cannot deliver a local TCP response body."""
+    if not local_tcp_stream_delivery_works():
+        pytest.skip(
+            "local TCP delivery is broken on this machine: a server's second "
+            "write never reaches the client, so a mock origin cannot serve a "
+            "response body. Not a BlindRSS fault -- reboot to clear it."
+        )
 
 
 def pytest_configure(config):

@@ -102,7 +102,7 @@ def _new_entry(url, cache_dir):
     )
 
 
-def test_fetch_range_reresolves_expired_signed_url():
+def test_fetch_range_reresolves_expired_signed_url(local_tcp_server):
     server, state = _make_server()
     port = server.server_address[1]
     t = threading.Thread(target=server.serve_forever, daemon=True)
@@ -136,7 +136,7 @@ def test_fetch_range_reresolves_expired_signed_url():
         server.server_close()  # shutdown() alone leaks the listening socket
 
 
-def test_stream_origin_range_reresolves_expired_signed_url():
+def test_stream_origin_range_reresolves_expired_signed_url(local_tcp_server):
     server, state = _make_server()
     port = server.server_address[1]
     t = threading.Thread(target=server.serve_forever, daemon=True)
@@ -168,7 +168,7 @@ def test_stream_origin_range_reresolves_expired_signed_url():
         server.server_close()  # shutdown() alone leaks the listening socket
 
 
-def test_refresh_real_url_updates_from_original():
+def test_refresh_real_url_updates_from_original(local_tcp_server):
     server, state = _make_server()
     port = server.server_address[1]
     t = threading.Thread(target=server.serve_forever, daemon=True)
