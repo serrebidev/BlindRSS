@@ -1,4 +1,5 @@
-wxPython
+wxPython==4.2.5; sys_platform == "linux"
+wxPython; sys_platform != "linux"
 # Accessible wx.html2.WebView surfaces for the opt-in rich full-text reader
 # (renders links, embedded videos, and social posts; reads in NVDA/JAWS).
 wx-accessible-webview>=0.2.0

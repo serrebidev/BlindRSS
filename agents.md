@@ -61,6 +61,10 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
   `build_windows=false` because `build.bat` already built, signed, and uploaded
   Windows locally; macOS/Linux release dispatches keep the default true so CI
   produces all three platforms.
+- Linux packaging pins wxPython 4.2.5 through both `requirements.txt` and a
+  workflow constraint. Keep the constraint for existing-tag re-dispatches:
+  unpinned pip otherwise prefers the source-only wxPython 4.3.0 release over the
+  compatible Ubuntu 22.04 wheel and fails while compiling wxWidgets.
 - Env toggles (full list in `build.md`): `SKIP_SIGN=1` (build mode only), `SIGNTOOL_PATH`, `SIGN_CERT_THUMBPRINT`, `GITHUB_REPO_SLUG`, `RELEASE_REMOTE`, `BLINDRSS_VLC_*`, `BLINDRSS_*CODESIGN*`.
 
 ## File Structure & Responsibilities
