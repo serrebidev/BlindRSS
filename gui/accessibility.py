@@ -1427,7 +1427,9 @@ class AccessibleBrowserFrame(wx.Frame):
         if sel_idx is not None:
             selected_id = self.mainframe._article_cache_id(self._current_articles[sel_idx])
         filtered = self.mainframe._filter_articles(self._base_articles, query)
-        self._current_articles = self.mainframe._sort_articles_for_display(filtered)
+        self._current_articles = self.mainframe._sort_articles_for_display(
+            filtered, view_id=self.current_view_id
+        )
         if not self._current_articles:
             self.article_list.Set([_("No articles found.")])
             self.content_ctrl.SetValue("")

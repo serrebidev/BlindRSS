@@ -1099,8 +1099,68 @@ class MainFrame(wx.Frame):
                 out.append(a)
         return out
 
-    def _sort_articles_for_display(self, articles):
-        items = self._apply_media_filter(list(articles or []))
+    def _read_filter_mode_for_view(self, view_id=None):
+        """The read-status filter the given view was fetched with, or None.
+
+        The filter travels in the view id as an "unread:"/"read:" prefix (see
+        _wrap_view_id_with_filter), so views the filter deliberately skips
+        (Smart Folders, Deleted) are never filtered here either.
+        """
+        if view_id is None:
+            view_id = getattr(self, "current_feed_id", None)
+        view_id = str(view_id or "")
+        if view_id.startswith("unread:"):
+            return "unread"
+        if view_id.startswith("read:"):
+            return "read"
+        return None
+
+    def _apply_read_filter(self, articles, view_id=None):
+        """Drop rows whose read status no longer matches the view's filter.
+
+        The provider applies the filter when the page is fetched, but statuses
+        change locally afterwards (the user reads an article, Mark All Read
+        runs, a cached view is re-shown), so a merged or cached list can still
+        hold rows that no longer belong (issue #96). This runs only when the
+        list is (re)built -- never on the mark-read path itself -- so a row the
+        user just read stays put under their focus until the next refresh,
+        reload, or view switch.
+        """
+        mode = self._read_filter_mode_for_view(view_id)
+        if mode is None:
+            return list(articles or [])
+        want_read = (mode == "read")
+        out = []
+        for a in (articles or []):
+            try:
+                is_read = bool(getattr(a, "is_read", False))
+            except Exception:
+                is_read = False
+            if is_read == want_read:
+                out.append(a)
+        return out
+
+    def _has_stale_read_filter_rows(self, articles=None, view_id=None) -> bool:
+        """True when displayed rows no longer match the view's read filter."""
+        mode = self._read_filter_mode_for_view(view_id)
+        if mode is None:
+            return False
+        if articles is None:
+            articles = getattr(self, "current_articles", None)
+        want_read = (mode == "read")
+        for a in (articles or []):
+            try:
+                is_read = bool(getattr(a, "is_read", False))
+            except Exception:
+                is_read = False
+            if is_read != want_read:
+                return True
+        return False
+
+    def _sort_articles_for_display(self, articles, view_id=None):
+        # view_id defaults to the main window's current view; the accessible
+        # browser passes its own so its list is filtered by the id it fetched.
+        items = self._apply_read_filter(self._apply_media_filter(list(articles or [])), view_id)
         if len(items) <= 1:
             return items
 
@@ -6106,6 +6166,23 @@ class MainFrame(wx.Frame):
         except Exception:
             pass
 
+    def _sync_read_flag_in_cached_views(self, article_id: str, is_read: bool) -> None:
+        """Copy a new read state onto the article's copies in other views.
+
+        Each view caches its own Article objects, so marking an item read in
+        "All Articles" left the same item looking unread in a cached category
+        or feed view -- where an Unread Only filter would then keep showing it
+        (issue #96).
+        """
+        try:
+            with getattr(self, "_view_cache_lock", threading.Lock()):
+                for st in (self.view_cache or {}).values():
+                    for a in (st.get("articles") or []):
+                        if self._article_cache_id(a) == article_id:
+                            a.is_read = bool(is_read)
+        except Exception:
+            log.exception("Error syncing read flag in cached views")
+
     def _supports_favorites(self) -> bool:
         try:
             return bool(getattr(self.provider, "supports_favorites", lambda: False)())
@@ -7898,6 +7975,13 @@ class MainFrame(wx.Frame):
             self.refresh_feeds()
         elif getattr(self, "_article_refresh_dirty", False):
             self._schedule_article_reload()
+        elif self._has_stale_read_filter_rows():
+            # Nothing in the model changed, so neither branch above runs -- but
+            # rows the user read since the last load no longer belong in an
+            # Unread Only / Read Only view, and a refresh is when they expect
+            # them gone (issue #96). Re-render from the already-loaded
+            # articles; no fetch, and focus/selection are restored.
+            self._refresh_articles_for_sort_change()
 
     def _on_feed_refresh_progress(self, state, batch_token: int | None = None):
         # Called from worker threads inside provider.refresh; batch and marshal to UI thread.
@@ -9491,7 +9575,12 @@ class MainFrame(wx.Frame):
         # Ensure we're still looking at the same view
         if feed_id != getattr(self, "current_feed_id", None):
             return
-        if not latest_page:
+        # Rows the user has read (or unread) since the last load no longer match
+        # an active unread:/read: view and must go, even when the top-up page
+        # brought nothing new -- a refresh with no new entries is exactly the
+        # case reported in issue #96.
+        stale_rows = self._has_stale_read_filter_rows(view_id=feed_id)
+        if not latest_page and not stale_rows:
             return
 
         page_size = self.article_page_size
@@ -9509,7 +9598,7 @@ class MainFrame(wx.Frame):
 
         existing_ids = {self._article_cache_id(a) for a in base_articles}
         new_entries = [a for a in latest_page if self._article_cache_id(a) not in existing_ids]
-        if not new_entries:
+        if not new_entries and not stale_rows:
             return
 
         # Remember selection and focus by article id
@@ -9553,8 +9642,11 @@ class MainFrame(wx.Frame):
             except Exception:
                 pass
 
-            # If no change in order or content after truncation, skip
-            if [self._article_cache_id(a) for a in combined] == [self._article_cache_id(a) for a in base_articles]:
+            # If no change in order or content after truncation, skip -- unless
+            # stale rows still have to be filtered out of the displayed list.
+            if not stale_rows and [self._article_cache_id(a) for a in combined] == [
+                self._article_cache_id(a) for a in base_articles
+            ]:
                 return
 
             old_display = list(getattr(self, "current_articles", []) or [])
@@ -9596,6 +9688,9 @@ class MainFrame(wx.Frame):
                 not self._is_search_active()
                 and not getattr(self, "_article_render_inflight", False)
                 and old_display
+                # An emptied list must go through the full rebuild so the
+                # "No articles found." row is announced instead of silence.
+                and self.current_articles
             ):
                 expected = len(old_display) + (1 if getattr(self, "_loading_more_placeholder", False) else 0)
                 try:
@@ -11431,6 +11526,7 @@ class MainFrame(wx.Frame):
             # batch will pick the status up from the article model.
             self._set_or_defer_status_cell(idx, article, _("Read"))
             self._update_feed_unread_count_ui(article.feed_id, -1)
+            self._sync_read_flag_in_cached_views(self._article_cache_id(article), True)
 
     def mark_article_unread(self, idx):
         if idx < 0 or idx >= len(self.current_articles):
@@ -11441,6 +11537,7 @@ class MainFrame(wx.Frame):
             article.is_read = False
             self._set_or_defer_status_cell(idx, article, _("Unread"))
             self._update_feed_unread_count_ui(article.feed_id, 1)
+            self._sync_read_flag_in_cached_views(self._article_cache_id(article), False)
 
     def toggle_selected_article_read_status(self):
         """Toggle read/unread on the selected article.

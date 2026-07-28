@@ -117,7 +117,7 @@ class _StubMainFrame(wx.Frame):
     def _filter_articles(self, articles, _q):
         return list(articles or [])
 
-    def _sort_articles_for_display(self, articles):
+    def _sort_articles_for_display(self, articles, view_id=None):
         return list(articles or [])
 
     def _get_display_title(self, article):

@@ -203,8 +203,14 @@ class _RefreshUiBatchHost:
     _schedule_article_reload = mainframe.MainFrame._schedule_article_reload
     _cancel_pending_article_reload = mainframe.MainFrame._cancel_pending_article_reload
     _run_pending_article_reload = mainframe.MainFrame._run_pending_article_reload
+    _read_filter_mode_for_view = mainframe.MainFrame._read_filter_mode_for_view
+    _has_stale_read_filter_rows = mainframe.MainFrame._has_stale_read_filter_rows
 
     def __init__(self):
+        # No read-status filter here, so the end-of-refresh stale-row re-render
+        # (issue #96) never triggers in these tests.
+        self.current_feed_id = "all"
+        self.current_articles = []
         self._refresh_progress_lock = threading.Lock()
         self._refresh_progress_pending = {}
         self._refresh_progress_flush_scheduled = False

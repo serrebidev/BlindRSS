@@ -409,6 +409,8 @@ def test_quick_merge_updates_capped_page_without_full_native_rebuild():
         _plan_incremental_list_update = mainframe.MainFrame._plan_incremental_list_update
         _set_base_articles = mainframe.MainFrame._set_base_articles
         _capture_top_article_for_restore = mainframe.MainFrame._capture_top_article_for_restore
+        _read_filter_mode_for_view = mainframe.MainFrame._read_filter_mode_for_view
+        _has_stale_read_filter_rows = mainframe.MainFrame._has_stale_read_filter_rows
 
         def __init__(self):
             super().__init__(first_chunk=4, batch_size=4)
