@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.124.4 - 2026-07-28
+
+- Drop articles from Unread Only / Read Only lists once their status changes.
+
 ## v1.124.3 - 2026-07-25
 
 - Stop discarding NPR program pages as "no readable article text".
