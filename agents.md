@@ -459,6 +459,7 @@ sync-claude-memory.py after writing one:
 - [Settings dialog lazy pages](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\settings-dialog-lazy-pages.md) — pages built on first show; get_data() must force-build all or it writes defaults; focus the tab control so General is announced
 - [Large reader render & swap](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\large-reader-render-and-swap.md) — 16 KB threshold path (ChangeValue/Freeze, async WebView subtree); issue #91 stale text = synchronous SetFocus re-entering the swap
 - [YouTube full text via yt-dlp](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\youtube-fulltext-via-ytdlp.md) — description/transcript/threaded comments/chapters from the extractor, never the hydrated watch page
+- [Local TCP delivery killed by BBR2](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\local-tcp-delivery-bbr2.md) — Windows congestion provider bbr2 dropped every local server's response body; app now probes and falls back to direct playback
 - [Skip Silence CPU cost](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\skip-silence-cpu-cost.md) — podcast playback CPU is the silence scan (ffmpeg + VAD + forced proxy), not VLC; pacing + measurement recipes
 - [SetName is the NVDA accessible name](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\setname-is-the-nvda-accessible-name.md) — wx SetName() must be gettext-wrapped; PR #94 tried to un-translate it, which would mute localized control names
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\MEMORY.md
@@ -487,6 +488,7 @@ sync-claude-memory.py after writing one:
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\gsmarena-headings-and-richedit-rtl.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\installed-app-debug-landscape.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\large-reader-render-and-swap.md
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\local-tcp-delivery-bbr2.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\localization-guardrails.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\macos-parity-v1112-2.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\miniflux-refresh-streaming.md
