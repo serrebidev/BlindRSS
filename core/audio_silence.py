@@ -5,8 +5,9 @@
 import math
 import shutil
 import subprocess
+import time
 from array import array
-from typing import Iterable, List, Optional, Sequence, Tuple
+from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 
 try:
     import webrtcvad
@@ -110,7 +111,16 @@ def _detect_vad_ranges(
     aggressiveness: int,
     merge_gap_ms: int,
     threshold_db: float,
+    progress_callback: Optional[Callable[[List[Tuple[int, int]], int], None]] = None,
+    progress_interval_ms: int = 5000,
 ) -> List[Tuple[int, int]]:
+    """Detect silent spans in a PCM stream.
+
+    ``progress_callback(ranges_so_far, scanned_ms)`` is called roughly every
+    ``progress_interval_ms`` of scanned audio so a caller can act on early
+    results instead of waiting for the whole source (see the paced scan in
+    scan_audio_for_silence).
+    """
     if webrtcvad is None:
         raise RuntimeError("webrtcvad not available; install the webrtcvad package")
     vad = webrtcvad.Vad(int(max(0, min(3, aggressiveness))))
@@ -125,6 +135,7 @@ def _detect_vad_ranges(
     ranges: List[Tuple[int, int]] = []
     is_speech_fn = vad.is_speech
     threshold = float(threshold_db)
+    last_progress_ms = 0
 
     for chunk in pcm_stream:
         if not chunk:
@@ -154,6 +165,13 @@ def _detect_vad_ranges(
                     silence_start = None
             offset_ms += frame_ms
         buf = buf[pos:] if pos else buf
+
+        if progress_callback is not None and offset_ms - last_progress_ms >= progress_interval_ms:
+            last_progress_ms = offset_ms
+            try:
+                progress_callback(merge_ranges_with_gap(ranges, gap_ms=max(0, merge_gap_ms)), offset_ms)
+            except Exception:
+                pass
 
     if silence_start is not None:
         if (offset_ms - silence_start) >= min_silence_ms:
@@ -269,12 +287,23 @@ def scan_audio_for_silence(
     headers: Optional[dict] = None,
     threads: Optional[int] = None,
     low_priority: bool = False,
+    position_provider: Optional[Callable[[], Optional[int]]] = None,
+    lead_ms: int = 0,
+    progress_callback: Optional[Callable[[List[Tuple[int, int]], int], None]] = None,
 ) -> List[Tuple[int, int]]:
     """
     Use ffmpeg to decode an arbitrary URL/file to PCM and detect silent spans.
     Returns a list of (start_ms, end_ms) pairs.
 
     detection_mode: "vad" (WebRTC VAD) or "rms" (volume-based fallback for tests).
+
+    Pacing: with ``position_provider`` and a positive ``lead_ms``, the scan stops
+    reading once it is that far ahead of the reported playback position. ffmpeg
+    then blocks on its own stdout pipe, so decoding a whole episode at full
+    speed the moment playback starts becomes a slow trickle that follows the
+    listener. Pair it with ``progress_callback`` so partial results are usable
+    while the scan is still running -- otherwise pacing would delay every
+    result until the end of the file.
     """
     if not source:
         return []
@@ -398,8 +427,12 @@ def scan_audio_for_silence(
         assert proc.stdout is not None
         stderr_data = b""
 
+        bytes_per_ms = (int(sample_rate) * 2 * max(1, int(channels))) / 1000.0
+        paced = bool(position_provider) and int(lead_ms) > 0
+
         def _pcm_iter():
             nonlocal aborted
+            read_bytes = 0
             while True:
                 if abort_event is not None and getattr(abort_event, "is_set", lambda: False)():
                     aborted = True
@@ -408,11 +441,33 @@ def scan_audio_for_silence(
                     except Exception:
                         pass
                     return
+                if paced:
+                    # Stay `lead_ms` ahead of the listener and no further. While
+                    # we hold off reading, ffmpeg blocks writing to the pipe, so
+                    # it stops burning CPU too.
+                    scanned_ms = read_bytes / bytes_per_ms if bytes_per_ms else 0.0
+                    try:
+                        pos_ms = position_provider()
+                    except Exception:
+                        pos_ms = None
+                    if pos_ms is not None and scanned_ms - float(pos_ms) > float(lead_ms):
+                        if abort_event is not None and getattr(abort_event, "wait", None):
+                            if abort_event.wait(0.5):
+                                aborted = True
+                                try:
+                                    proc.terminate()
+                                except Exception:
+                                    pass
+                                return
+                        else:
+                            time.sleep(0.5)
+                        continue
                 # 64 KB, not 4 KB: the frame loop re-buffers every read, so
                 # small reads multiplied both the syscall and the copy count.
                 chunk = proc.stdout.read(65536)
                 if not chunk:
                     return
+                read_bytes += len(chunk)
                 yield chunk
 
         ranges: List[Tuple[int, int]]
@@ -425,6 +480,7 @@ def scan_audio_for_silence(
                 aggressiveness=vad_aggressiveness,
                 merge_gap_ms=merge_gap_ms,
                 threshold_db=threshold_db,
+                progress_callback=progress_callback,
             )
         else:
             for chunk in _pcm_iter():

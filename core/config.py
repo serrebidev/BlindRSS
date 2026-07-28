@@ -275,6 +275,11 @@ DEFAULT_CONFIG = {
     "silence_skip_merge_gap_ms": 260,
     "silence_skip_resume_backoff_ms": 360,
     "silence_skip_retrigger_backoff_ms": 1400,
+    # How far ahead of the listener the silence scan is allowed to run. It then
+    # waits, so ffmpeg stops decoding and the scan's CPU cost is spread across
+    # playback instead of a full-speed pass over the whole episode at play time.
+    # 0 disables pacing (scan the whole file up front, the pre-1.125 behavior).
+    "silence_scan_lead_seconds": 300,
     "close_to_tray": True,
     "minimize_to_tray": True,
     "start_maximized": False,

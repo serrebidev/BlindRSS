@@ -2882,6 +2882,9 @@ class PlayerFrame(wx.Frame):
         self._silence_scan_abort = abort_evt
 
         def _worker() -> None:
+            # Declared before the try so the failure path can always ask whether
+            # anything was published already.
+            published = {"count": 0}
             try:
                 try:
                     base_rate = int(self.config_manager.get("silence_scan_sample_rate", 16000) or 16000)
@@ -2922,6 +2925,42 @@ class PlayerFrame(wx.Frame):
                     low_priority = bool(self.config_manager.get("silence_scan_low_priority", True))
                 except Exception:
                     low_priority = True
+                try:
+                    lead_s = int(self.config_manager.get("silence_scan_lead_seconds", 300) or 300)
+                except Exception:
+                    lead_s = 300
+
+                def _publish(ranges) -> bool:
+                    """Pad, merge and hand a result set to the skip logic.
+
+                    Returns False once this scan is stale. Rebinding the list
+                    (never mutating it) keeps the UI thread's iteration safe.
+                    """
+                    if abort_evt.is_set() or int(getattr(self, "_active_load_seq", 0)) != int(load_seq):
+                        return False
+                    padded = []
+                    for s, e in ranges or []:
+                        padded.append((max(0, int(s) - pad_ms), int(e) + pad_ms))
+                    self._silence_ranges = merge_ranges_with_gap(padded, gap_ms=merge_gap)
+                    self._silence_scan_ready = True
+                    published["count"] += 1
+                    return True
+
+                def _on_progress(ranges, scanned_ms) -> None:
+                    # A paced scan only finishes when the listener reaches the
+                    # end, so results have to be usable while it runs.
+                    if not _publish(ranges):
+                        abort_evt.set()
+
+                def _position_ms():
+                    if self.is_casting:
+                        return None
+                    try:
+                        pos = int(self.player.get_time() or 0)
+                    except Exception:
+                        return None
+                    return pos if pos >= 0 else 0
+
                 ranges = scan_audio_for_silence(
                     url,
                     sample_rate=sample_rate,
@@ -2936,23 +2975,21 @@ class PlayerFrame(wx.Frame):
                     headers=headers,
                     threads=threads,
                     low_priority=low_priority,
+                    position_provider=_position_ms if lead_s > 0 else None,
+                    lead_ms=max(0, lead_s) * 1000,
+                    progress_callback=_on_progress,
                 )
                 if abort_evt.is_set():
                     return
-                padded = []
-                for s, e in ranges:
-                    start = max(0, int(s) - pad_ms)
-                    end = int(e) + pad_ms
-                    padded.append((start, end))
-                merged = merge_ranges_with_gap(padded, gap_ms=merge_gap)
-                if abort_evt.is_set() or int(getattr(self, "_active_load_seq", 0)) != int(load_seq):
-                    return
-                self._silence_ranges = merged
-                self._silence_scan_ready = True
-                log.debug("Silence scan ready (%s ranges)", len(merged))
+                if _publish(ranges):
+                    log.debug("Silence scan complete (%s ranges)", len(self._silence_ranges))
             except Exception as e:
+                # Keep whatever a paced scan already published: a mid-scan
+                # network drop should degrade to "no new ranges", not to
+                # "silence skipping stops working".
                 log.debug("Silence scan failed: %s", e)
-                self._silence_scan_ready = False
+                if not published.get("count"):
+                    self._silence_scan_ready = False
 
         try:
             t = threading.Thread(target=_worker, daemon=True)
@@ -3355,13 +3392,14 @@ class PlayerFrame(wx.Frame):
             # That still holds for YouTube live HLS, so this check comes first.
             if ".m3u8" in low:
                 return url
+            # Only googlevideo genuinely needs the proxy (truthful Content-Length
+            # for seeking, plus re-resolve on throttled/expiring links). Skip
+            # Silence used to force it for every media URL as well, so podcasts
+            # were relayed through Python and written to the disk cache even with
+            # the range cache switched off in settings -- real CPU and I/O for a
+            # cache the user declined. The scan now paces itself instead.
             force_youtube_proxy = _is_googlevideo_url(url)
             force_proxy = force_youtube_proxy
-            if not force_proxy:
-                try:
-                    force_proxy = bool(self.config_manager.get("skip_silence", False))
-                except Exception:
-                    force_proxy = False
             if not force_proxy:
                 if not bool(self.config_manager.get('range_cache_enabled', True)):
                     return url

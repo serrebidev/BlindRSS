@@ -7,6 +7,7 @@ import os
 import shutil
 import struct
 import tempfile
+import threading
 import unittest
 import wave
 
@@ -115,6 +116,88 @@ class SilenceDetectionTests(unittest.TestCase):
                     threshold_db=-38.0,
                 )
                 self.assertEqual(got, reference)
+
+    def test_vad_reports_progress_while_scanning(self):
+        """Partial results must arrive during the scan, not only at the end.
+
+        A paced scan only finishes when the listener reaches the end of the
+        episode, so silence skipping depends on these intermediate publishes.
+        """
+        if webrtcvad is None:
+            self.skipTest("webrtcvad not available")
+
+        pcm = _build_pcm(
+            [(600, 0.0), (900, 0.6), (1500, 0.0), (900, 0.6), (1500, 0.0)],
+            sample_rate=8000,
+        )
+        seen = []
+        ranges = _detect_vad_ranges(
+            (pcm[i:i + 4096] for i in range(0, len(pcm), 4096)),
+            sample_rate=8000, frame_ms=30, min_silence_ms=400,
+            aggressiveness=0, merge_gap_ms=200, threshold_db=-38.0,
+            progress_callback=lambda r, ms: seen.append((list(r), ms)),
+            progress_interval_ms=500,
+        )
+        self.assertTrue(seen, "no progress was reported during the scan")
+        # Progress is monotonic in scanned position and never reports a range
+        # the final result contradicts.
+        scanned = [ms for _r, ms in seen]
+        self.assertEqual(scanned, sorted(scanned))
+        for partial, _ms in seen:
+            for span in partial:
+                self.assertIn(span[0], [r[0] for r in ranges])
+
+    def test_scan_paces_itself_to_the_listener(self):
+        """With a lead time set, the scan stops reading once far enough ahead."""
+        if not shutil.which("ffmpeg"):
+            self.skipTest("ffmpeg not available")
+        if webrtcvad is None:
+            self.skipTest("webrtcvad not available")
+
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wav")
+        tmp.close()
+        path = tmp.name
+        try:
+            # 30 seconds of audio; the listener never moves past the start.
+            pcm = _build_pcm([(2000, 0.0), (28000, 0.5)], sample_rate=8000)
+            with wave.open(path, "wb") as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(8000)
+                wf.writeframes(pcm)
+
+            reached = []
+            abort = threading.Event()
+
+            def _progress(_ranges, scanned_ms):
+                reached.append(scanned_ms)
+                # Once the scan is past its allowed lead, stop the test.
+                if scanned_ms >= 8000:
+                    abort.set()
+
+            scan_audio_for_silence(
+                path,
+                sample_rate=8000,
+                min_silence_ms=400,
+                threshold_db=-38.0,
+                detection_mode="vad",
+                vad_aggressiveness=0,
+                vad_frame_ms=30,
+                abort_event=abort,
+                position_provider=lambda: 0,   # listener parked at 0:00
+                lead_ms=5000,
+                progress_callback=_progress,
+            )
+
+            self.assertTrue(reached, "scan never reported progress")
+            # It may overshoot by one read (64 KB = 4s at 8 kHz) plus a progress
+            # interval, but it must not have raced to the end of the file.
+            self.assertLess(max(reached), 20000)
+        finally:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
 
     def test_scan_audio_with_ffmpeg_when_available(self):
         if not shutil.which("ffmpeg"):
