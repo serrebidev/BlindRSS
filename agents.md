@@ -459,6 +459,7 @@ sync-claude-memory.py after writing one:
 - [Settings dialog lazy pages](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\settings-dialog-lazy-pages.md) — pages built on first show; get_data() must force-build all or it writes defaults; focus the tab control so General is announced
 - [Large reader render & swap](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\large-reader-render-and-swap.md) — 16 KB threshold path (ChangeValue/Freeze, async WebView subtree); issue #91 stale text = synchronous SetFocus re-entering the swap
 - [YouTube full text via yt-dlp](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\youtube-fulltext-via-ytdlp.md) — description/transcript/threaded comments/chapters from the extractor, never the hydrated watch page
+- [Skip Silence CPU cost](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\skip-silence-cpu-cost.md) — podcast playback CPU is the silence scan (ffmpeg + VAD + forced proxy), not VLC; pacing + measurement recipes
 - [SetName is the NVDA accessible name](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\setname-is-the-nvda-accessible-name.md) — wx SetName() must be gettext-wrapped; PR #94 tried to un-translate it, which would mute localized control names
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\MEMORY.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\aa-heading-loss-not-reproducible.md
@@ -508,6 +509,7 @@ sync-claude-memory.py after writing one:
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\shortcut-registry-full-coverage.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\silent-noop-ui-failures.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\site-cookies-challenge-fetch.md
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\skip-silence-cpu-cost.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\soundcloud-mixcloud-feeds.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\speed-shortcut-interception.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\test-suite-live-stream-hazard.md
