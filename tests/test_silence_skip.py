@@ -10,7 +10,16 @@ import tempfile
 import unittest
 import wave
 
-from core.audio_silence import detect_silence_ranges_from_pcm, scan_audio_for_silence
+from core.audio_silence import (
+    _detect_vad_ranges,
+    detect_silence_ranges_from_pcm,
+    scan_audio_for_silence,
+)
+
+try:
+    import webrtcvad
+except Exception:  # pragma: no cover - optional dependency
+    webrtcvad = None
 
 
 def _build_pcm(segments, sample_rate=16000):
@@ -69,6 +78,43 @@ class SilenceDetectionTests(unittest.TestCase):
         self.assertEqual(len(ranges), 2)
         self.assertLess(abs(ranges[0][0] - 0), 40)
         self.assertLess(abs(ranges[1][0] - 700), 80)
+
+    def test_vad_framing_is_independent_of_chunk_size(self):
+        """The VAD loop must frame identically however the PCM arrives.
+
+        It buffers whatever ffmpeg hands it and slices fixed frames out by
+        index; a boundary bug there would shift every timestamp after the first
+        odd-sized read, so this pins byte-for-byte identical output across chunk
+        sizes far smaller and larger than one frame.
+        """
+        if webrtcvad is None:
+            self.skipTest("webrtcvad not available")
+
+        # 8 kHz, 30 ms frames = 480 bytes per frame; the chunk sizes below sit
+        # above, below, and exactly on that boundary.
+        pcm = _build_pcm(
+            [(600, 0.0), (900, 0.6), (1500, 0.0), (700, 0.6)],
+            sample_rate=8000,
+        )
+
+        def _chunks(size):
+            return (pcm[i:i + size] for i in range(0, len(pcm), size))
+
+        reference = _detect_vad_ranges(
+            _chunks(65536), sample_rate=8000, frame_ms=30, min_silence_ms=400,
+            aggressiveness=0, merge_gap_ms=200, threshold_db=-38.0,
+        )
+        # A silent stretch must actually be found, or this proves nothing.
+        self.assertTrue(reference)
+
+        for size in (4096, 1000, 480, 481, 7):
+            with self.subTest(chunk=size):
+                got = _detect_vad_ranges(
+                    _chunks(size), sample_rate=8000, frame_ms=30,
+                    min_silence_ms=400, aggressiveness=0, merge_gap_ms=200,
+                    threshold_db=-38.0,
+                )
+                self.assertEqual(got, reference)
 
     def test_scan_audio_with_ffmpeg_when_available(self):
         if not shutil.which("ffmpeg"):
