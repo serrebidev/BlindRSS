@@ -3457,6 +3457,25 @@ class PlayerFrame(wx.Frame):
             if 'promodj.com' in host:
                 req_headers['Referer'] = 'https://promodj.com/'
             
+            # Some machines cannot deliver a local server's response body at all
+            # (seen on Windows 11 with the experimental BBR2 congestion
+            # provider): VLC would get the proxy's headers, then silence, and
+            # only the stall recovery would rescue playback ~20s later. One
+            # cached local round trip tells us up front; when it fails, play the
+            # real URL directly. Seeking on googlevideo is worse without the
+            # proxy, but it plays -- which beats silence.
+            try:
+                if hasattr(proxy, "can_deliver_body") and not proxy.can_deliver_body():
+                    log.warning(
+                        "Local range-cache proxy cannot deliver a response body on this "
+                        "machine; playing %s directly instead", host or url
+                    )
+                    self._last_used_range_proxy = False
+                    self._last_vlc_url = url
+                    return url
+            except Exception as e:
+                log.debug("Proxy delivery probe failed, continuing: %s", e)
+
             self._last_used_range_proxy = True
             self._last_range_proxy_headers = dict(req_headers)
             self._last_range_proxy_cache_dir = cache_dir if cache_dir else None

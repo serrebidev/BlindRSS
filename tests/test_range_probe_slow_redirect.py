@@ -16,6 +16,7 @@ back to honest pass-through streaming when the total cannot be learned at all.
 """
 
 import os
+import shutil
 import sys
 import tempfile
 import threading
@@ -98,27 +99,31 @@ def test_slow_redirect_chain_still_reports_real_total(monkeypatch):
     server = _make_origin(redirect_delay_s=0.15)
     port = server.server_address[1]
     proxy = None
+    # mkdtemp + rmtree(ignore_errors), not TemporaryDirectory: a handler thread
+    # can still be finalising a cache chunk when the test body ends, and the
+    # strict cleanup then fails the test for a scratch directory.
+    cache_dir = tempfile.mkdtemp()
     try:
-        with tempfile.TemporaryDirectory() as cache_dir:
-            proxy = _make_proxy(cache_dir)
-            url = proxy.proxify(f"http://127.0.0.1:{port}/redirect")
+        proxy = _make_proxy(cache_dir)
+        url = proxy.proxify(f"http://127.0.0.1:{port}/redirect")
 
-            # VLC's first request arrives before the probe has resolved.
-            r = requests.get(url, headers={"Range": "bytes=0-"}, timeout=30)
-            assert r.status_code == 206
-            cr = r.headers.get("Content-Range", "")
-            assert cr.endswith(f"/{_TOTAL}"), (
-                f"proxy answered {cr!r} before the probe finished; VLC would "
-                f"treat the inline window as the whole file"
-            )
-            served = int(r.headers.get("Content-Length", "0"))
-            assert served == proxy.inline_window_bytes
-            assert r.content == _BODY[:served]
+        # VLC's first request arrives before the probe has resolved.
+        r = requests.get(url, headers={"Range": "bytes=0-"}, timeout=30)
+        assert r.status_code == 206
+        cr = r.headers.get("Content-Range", "")
+        assert cr.endswith(f"/{_TOTAL}"), (
+            f"proxy answered {cr!r} before the probe finished; VLC would "
+            f"treat the inline window as the whole file"
+        )
+        served = int(r.headers.get("Content-Length", "0"))
+        assert served == proxy.inline_window_bytes
+        assert r.content == _BODY[:served]
     finally:
         if proxy is not None:
             proxy.stop()
         server.shutdown()
         server.server_close()
+        shutil.rmtree(cache_dir, ignore_errors=True)
 
 
 def test_unknown_total_falls_back_to_passthrough():
@@ -127,22 +132,23 @@ def test_unknown_total_falls_back_to_passthrough():
     server = _make_origin(reveal_total=False)
     port = server.server_address[1]
     proxy = None
+    cache_dir = tempfile.mkdtemp()
     try:
-        with tempfile.TemporaryDirectory() as cache_dir:
-            proxy = _make_proxy(cache_dir)
-            url = proxy.proxify(f"http://127.0.0.1:{port}/file")
+        proxy = _make_proxy(cache_dir)
+        url = proxy.proxify(f"http://127.0.0.1:{port}/file")
 
-            r = requests.get(url, headers={"Range": "bytes=0-"}, timeout=30)
-            assert r.status_code == 206
-            # Forwarded from the origin verbatim: honest unknown total, and the
-            # full body rather than a window masquerading as the file.
-            assert r.headers.get("Content-Range", "").endswith("/*")
-            assert r.content == _BODY
+        r = requests.get(url, headers={"Range": "bytes=0-"}, timeout=30)
+        assert r.status_code == 206
+        # Forwarded from the origin verbatim: honest unknown total, and the
+        # full body rather than a window masquerading as the file.
+        assert r.headers.get("Content-Range", "").endswith("/*")
+        assert r.content == _BODY
     finally:
         if proxy is not None:
             proxy.stop()
         server.shutdown()
         server.server_close()
+        shutil.rmtree(cache_dir, ignore_errors=True)
 
 
 def test_probe_does_not_take_total_from_206_content_length():

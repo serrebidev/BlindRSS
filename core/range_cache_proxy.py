@@ -1174,6 +1174,11 @@ class _Entry:
 class RangeCacheProxy:
     #: How long a successful /health probe is trusted before we re-verify.
     _READY_RECHECK_SECONDS = 5.0
+    #: How long a "this machine can deliver a response body" verdict is trusted.
+    _DELIVERY_OK_SECONDS = 600.0
+    #: How long a *negative* delivery verdict sticks before we re-check. Short,
+    #: because the machine can be repaired while the app is running.
+    _DELIVERY_BAD_SECONDS = 120.0
 
     def __init__(
         self,
@@ -1211,6 +1216,11 @@ class RangeCacheProxy:
 
         # Monotonic timestamp of the last successful /health round trip.
         self._last_ready_check = 0.0
+        # Cached verdict from /health-split: can this machine actually deliver a
+        # response body that is written after the headers (what media serving
+        # does)? None = not probed yet.
+        self._delivery_ok: Optional[bool] = None
+        self._delivery_checked_at = 0.0
         self._server: Optional[_ThreadingHTTPServer] = None
         self._thread: Optional[threading.Thread] = None
         self._host = "127.0.0.1"
@@ -1386,6 +1396,25 @@ class RangeCacheProxy:
                         except Exception:
                             pass
 
+                def _send_split_health(self) -> None:
+                    # The opposite of _send_health on purpose: headers first,
+                    # body in a SECOND write, exactly like the media path. Some
+                    # machines get into a state where nothing after a server's
+                    # first write is ever delivered (seen with the experimental
+                    # BBR2 congestion provider on Windows 11); serving media
+                    # through the proxy is impossible there, and this is how the
+                    # player finds that out before it hands VLC a proxy URL.
+                    body = b"ok"
+                    self.send_response(200)
+                    self.send_header("Content-Type", "text/plain; charset=utf-8")
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    try:
+                        self.wfile.write(body)
+                        self.wfile.flush()
+                    except Exception:
+                        pass
+
                 def do_HEAD(self) -> None:
                     parsed = urlparse(self.path)
                     if parsed.path == "/health":
@@ -1431,6 +1460,9 @@ class RangeCacheProxy:
                     if parsed.path == "/health":
                         proxy._ready.set()
                         self._send_health()
+                        return
+                    if parsed.path == "/health-split":
+                        self._send_split_health()
                         return
                     if parsed.path != "/media":
                         self.send_error(404, "Not Found")
@@ -1772,6 +1804,61 @@ class RangeCacheProxy:
             return ok
         except Exception:
             return False
+
+    def can_deliver_body(self, timeout: float = 1.0) -> bool:
+        """Can this machine actually stream a response body from the proxy?
+
+        /health answers in a single flush, so it passes even where a server's
+        *second* write is never delivered -- and media serving is all second
+        writes. /health-split reproduces the real shape, so this is what decides
+        whether handing VLC a proxy URL would mean silence.
+
+        Cheap by design: one local round trip, cached (a positive verdict for
+        ten minutes, a negative one for two, since the machine can be repaired
+        while the app is running). Callers fall back to the direct URL when it
+        returns False.
+        """
+        import http.client
+
+        now = time.monotonic()
+        cached = self._delivery_ok
+        if cached is not None:
+            age = now - float(self._delivery_checked_at or 0.0)
+            ttl = self._DELIVERY_OK_SECONDS if cached else self._DELIVERY_BAD_SECONDS
+            if age < ttl:
+                return cached
+
+        ok = False
+        conn = None
+        try:
+            self.start()
+            with self._lock:
+                port = self._port
+            if port is None:
+                return True  # not started; nothing to say about delivery yet
+            conn = http.client.HTTPConnection(self._host, port, timeout=max(0.2, float(timeout)))
+            conn.request("GET", "/health-split")
+            resp = conn.getresponse()
+            body = resp.read()
+            ok = (resp.status == 200) and (body == b"ok")
+        except Exception as e:
+            self._debug("delivery probe failed: %s", e)
+            ok = False
+        finally:
+            try:
+                if conn is not None:
+                    conn.close()
+            except Exception:
+                pass
+
+        self._delivery_ok = bool(ok)
+        self._delivery_checked_at = now
+        if not ok:
+            self._warn(
+                "RangeCacheProxy cannot deliver a response body on this machine; "
+                "media will be played directly instead of through the local cache"
+            )
+        return bool(ok)
 
     @property
     def base_url(self) -> str:
