@@ -4,6 +4,12 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.124.5 - 2026-07-28
+
+- Play directly when the local proxy cannot deliver a response body.
+- Pace the silence scan to the listener and stop forcing the proxy.
+- Cut 75% of the skip-silence scan's CPU cost.
+
 ## v1.124.4 - 2026-07-28
 
 - Drop articles from Unread Only / Read Only lists once their status changes.
