@@ -117,7 +117,12 @@ def extract_article_body(
     fallback_html = getattr(article, "content", "") or ""
     fallback_title = getattr(article, "title", "") or ""
     fallback_author = getattr(article, "author", "") or ""
-    has_web_target = bool(url) and not article_extractor._looks_like_media_url(url)
+    # MP3 enclosures are extractable only when the feed did not already supply
+    # authored notes; then the bounded leading ID3 tag is the fallback source.
+    # Other media types remain ineligible for webpage extraction.
+    has_web_target = article_extractor.is_extractable_fulltext_url(url) and not (
+        article_extractor._looks_like_id3_media_url(url) and fallback_html.strip()
+    )
 
     # Always ATTEMPT web extraction for a real URL (the generic ">2500 chars" prefer-feed
     # heuristic wrongly suppressed it for substantial feeds like Miniflux). But web

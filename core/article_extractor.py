@@ -58,6 +58,7 @@ class FullArticle:
     title: str
     author: str
     text: str
+    html: str = ""
 
 
 _MEDIA_EXTS = (
@@ -357,6 +358,22 @@ def _looks_like_media_url(url: str) -> bool:
         return any(path.endswith(ext) for ext in _MEDIA_EXTS)
     except Exception:
         return False
+
+
+def _looks_like_id3_media_url(url: str) -> bool:
+    """True for MP3 paths whose leading ID3 tag can contain readable notes."""
+    try:
+        return (urlsplit(url).path or "").lower().endswith(".mp3")
+    except Exception:
+        return False
+
+
+def is_extractable_fulltext_url(url: str) -> bool:
+    """Whether a URL can yield webpage text or bounded embedded media text."""
+    value = str(url or "").strip()
+    return bool(value) and (
+        not _looks_like_media_url(value) or _looks_like_id3_media_url(value)
+    )
 
 
 def _normalize_whitespace(text: str) -> str:
@@ -4088,8 +4105,28 @@ def extract_full_article(
     Sink errors are swallowed — they must never affect extraction.
     """
     url = (url or "").strip()
-    if not url or _looks_like_media_url(url):
+    if not url:
         return None
+
+    # A direct podcast enclosure has no webpage to scrape, but many MP3s carry
+    # complete show notes/transcripts in a bounded leading ID3 tag.  Reuse the
+    # same safe range reader as chapter extraction so classic Full Text and Rich
+    # View can still expose that authored content without downloading the audio.
+    if _looks_like_media_url(url):
+        metadata = utils.embedded_id3_metadata(url)
+        if not metadata:
+            return None
+        raw_content = str(metadata.get("content") or "").strip()
+        text = utils.html_to_text(raw_content, include_images=True).strip()
+        if not text:
+            return None
+        return FullArticle(
+            url=url,
+            title=str(metadata.get("title") or "").strip(),
+            author=str(metadata.get("author") or "").strip(),
+            text=text,
+            html=raw_content,
+        )
 
     # YouTube's browser page progressively hydrates its description and
     # comments, collapses reply branches, and exposes subtitles separately.
@@ -4298,9 +4335,23 @@ def render_full_article(
         return (_normalize_whitespace("\n".join(parts)) + "\n")
 
     # No usable URL: fall back to feed content.
-    if not url or _looks_like_media_url(url):
+    if not url:
         art = extract_from_html(fallback_html, "", title=fallback_title, author=fallback_author)
         if art:
+            return _render(art)
+        return None
+
+    # Feed-authored content remains the fastest/best source for enclosures. If
+    # it is absent, try bounded embedded ID3 show notes before giving up.
+    if _looks_like_media_url(url):
+        art = extract_from_html(fallback_html, "", title=fallback_title, author=fallback_author)
+        if not art:
+            art = extract_full_article(url, max_pages=1, timeout=timeout)
+        if art:
+            if fallback_title and not art.title:
+                art.title = fallback_title
+            if fallback_author and not art.author:
+                art.author = fallback_author
             return _render(art)
         return None
 

@@ -1402,6 +1402,11 @@ def humanize_article_date(date_str: str, now_utc: datetime = None) -> str:
 _MAX_CHAPTER_JSON_BYTES = 2_000_000
 _MAX_CHAPTER_COUNT = 10_000
 _MAX_CHAPTER_REDIRECTS = 5
+# Podcast analytics chains can legitimately be longer than chapter-JSON
+# redirects (Podtrac -> pdst -> Podsights -> Magellan -> Megaphone -> CDN).
+# Every hop remains manually public-host validated; only the bounded count is
+# wider for media prefix reads.
+_MAX_MEDIA_REDIRECTS = 12
 _CHAPTER_REFRESH_SECONDS = 15 * 60
 _CHAPTER_JSON_MIME_TYPES = {
     "application/json",
@@ -2129,6 +2134,7 @@ def _read_prefix_bytes(url: str, *, headers: dict, max_bytes: int, timeout_s: in
         headers=headers,
         timeout=int(timeout_s),
         purpose="media",
+        max_redirects=_MAX_MEDIA_REDIRECTS,
     )
     try:
         if not getattr(resp, "ok", False):
@@ -2154,6 +2160,139 @@ def _read_prefix_bytes(url: str, *, headers: dict, max_bytes: int, timeout_s: in
             pass
 
 
+def _read_embedded_id3(media_url, media_type=""):
+    """Return a bounded MP3 ID3 tag for local or public HTTP(S) media.
+
+    Remote podcast files can carry useful chapters and complete show notes in
+    the leading ID3 tag.  Read only that declared tag instead of downloading an
+    episode, and retain the same redirect/SSRF validation used by chapter
+    extraction.
+    """
+    media_url_str = str(media_url or "").strip()
+    if not media_url_str:
+        return None
+    media_type_l = canonical_media_type(media_type)
+    media_path_l = urllib.parse.urlsplit(media_url_str).path.lower() or media_url_str.lower()
+    local_path = _local_media_path(media_url_str)
+
+    if local_path:
+        suffix = Path(local_path).suffix.lower()
+        if suffix != ".mp3" and media_type_l not in {"audio/mpeg", "audio/mp3"}:
+            return None
+        from mutagen.id3 import ID3
+
+        return ID3(local_path)
+
+    if not (
+        media_path_l.endswith(".mp3")
+        or media_type_l == "audio/mpeg"
+        or media_type_l == "audio/mp3"
+    ):
+        return None
+
+    from mutagen.id3 import ID3
+
+    hdr = _read_prefix_bytes(
+        media_url_str,
+        headers={"Range": "bytes=0-9"},
+        max_bytes=10,
+        timeout_s=6,
+    )
+    if len(hdr) < 10 or hdr[:3] != b"ID3":
+        return None
+    flags = int(hdr[5])
+    ss = hdr[6:10]
+    tag_size = (
+        ((ss[0] & 0x7F) << 21)
+        | ((ss[1] & 0x7F) << 14)
+        | ((ss[2] & 0x7F) << 7)
+        | (ss[3] & 0x7F)
+    )
+    total = int(tag_size) + 10 + (10 if flags & 0x10 else 0)
+    if total <= 10 or total > 1_000_000:
+        return None
+    tag_bytes = _read_prefix_bytes(
+        media_url_str,
+        headers={"Range": f"bytes=0-{total - 1}"},
+        max_bytes=total,
+        timeout_s=12,
+    )
+    if len(tag_bytes) < total or tag_bytes[:3] != b"ID3":
+        return None
+    return ID3(BytesIO(tag_bytes))
+
+
+def embedded_id3_metadata(media_url, media_type=""):
+    """Return readable title/author/show-note fields from an MP3 ID3 tag.
+
+    Podcast publishers commonly place HTML show notes in ``USLT`` or ``COMM``.
+    The raw content is returned so the rich reader can preserve links after its
+    normal sanitizer runs; the classic reader converts it to accessible text.
+    """
+    try:
+        id3 = _read_embedded_id3(media_url, media_type)
+    except (ImportError, OSError, ValueError):
+        return None
+    except Exception as exc:
+        log.info("Embedded ID3 metadata parse failed for %s: %s", media_url, exc)
+        return None
+    if id3 is None:
+        return None
+
+    def _frame_text(frame_name):
+        try:
+            frames = id3.getall(frame_name)
+        except Exception:
+            frames = []
+        for frame in frames or []:
+            value = getattr(frame, "text", None)
+            if isinstance(value, (list, tuple)):
+                value = " ".join(str(part) for part in value if str(part).strip())
+            value = str(value or "").strip()
+            if value:
+                return value
+        return ""
+
+    content_candidates = []
+    for frame_name in ("USLT", "COMM"):
+        try:
+            frames = id3.getall(frame_name)
+        except Exception:
+            frames = []
+        for frame in frames or []:
+            value = getattr(frame, "text", None)
+            if isinstance(value, (list, tuple)):
+                value = "\n".join(str(part) for part in value if str(part).strip())
+            value = str(value or "").strip()
+            if value and value not in content_candidates:
+                content_candidates.append(value)
+
+    try:
+        txxx_frames = id3.getall("TXXX")
+    except Exception:
+        txxx_frames = []
+    useful_descriptions = {"description", "summary", "show notes", "shownotes", "transcript"}
+    for frame in txxx_frames or []:
+        desc = str(getattr(frame, "desc", "") or "").strip().lower()
+        if desc not in useful_descriptions:
+            continue
+        value = getattr(frame, "text", None)
+        if isinstance(value, (list, tuple)):
+            value = "\n".join(str(part) for part in value if str(part).strip())
+        value = str(value or "").strip()
+        if value and value not in content_candidates:
+            content_candidates.append(value)
+
+    content = max(content_candidates, key=len, default="")
+    if not content:
+        return None
+    return {
+        "title": _frame_text("TIT2"),
+        "author": _frame_text("TPE1") or _frame_text("TPE2"),
+        "content": content,
+    }
+
+
 def _embedded_media_chapters(media_url, media_type):
     media_url_str = str(media_url or "")
     media_type_l = canonical_media_type(media_type)
@@ -2163,8 +2302,7 @@ def _embedded_media_chapters(media_url, media_type):
     if local_path:
         suffix = Path(local_path).suffix.lower()
         if suffix == ".mp3" or media_type_l == "audio/mpeg":
-            from mutagen.id3 import ID3
-            return _chapters_from_id3(ID3(local_path))
+            return _chapters_from_id3(_read_embedded_id3(media_url_str, media_type_l))
         if suffix in {".m4a", ".m4b", ".mp4"} or media_type_l in {
             "audio/mp4",
             "video/mp4",
@@ -2193,35 +2331,8 @@ def _embedded_media_chapters(media_url, media_type):
     ):
         return []
 
-    from mutagen.id3 import ID3
-    hdr = _read_prefix_bytes(
-        media_url_str,
-        headers={"Range": "bytes=0-9"},
-        max_bytes=10,
-        timeout_s=6,
-    )
-    if len(hdr) < 10 or hdr[:3] != b"ID3":
-        return []
-    flags = int(hdr[5])
-    ss = hdr[6:10]
-    tag_size = (
-        ((ss[0] & 0x7F) << 21)
-        | ((ss[1] & 0x7F) << 14)
-        | ((ss[2] & 0x7F) << 7)
-        | (ss[3] & 0x7F)
-    )
-    total = int(tag_size) + 10 + (10 if flags & 0x10 else 0)
-    if total <= 10 or total > 1_000_000:
-        return []
-    tag_bytes = _read_prefix_bytes(
-        media_url_str,
-        headers={"Range": f"bytes=0-{total - 1}"},
-        max_bytes=total,
-        timeout_s=12,
-    )
-    if len(tag_bytes) < 10 or tag_bytes[:3] != b"ID3":
-        return []
-    return _chapters_from_id3(ID3(BytesIO(tag_bytes)))
+    id3 = _read_embedded_id3(media_url_str, media_type_l)
+    return _chapters_from_id3(id3) if id3 is not None else []
 
 
 def fetch_and_store_chapters(

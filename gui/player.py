@@ -52,6 +52,20 @@ _SEEKABLE_EXTENSIONS = (
     ".mov",
 )
 
+_PODCAST_TRACKING_HOSTS = (
+    "op3.dev",
+    "pdst.fm",
+    "pscrb.fm",
+    "chrt.fm",
+    "chtbl.com",
+    "podtrac.com",
+    "mgln.ai",
+    "blubrry.com",
+    "podcasts.apple.com",
+    "anchor.fm",
+    "spotify.com",
+)
+
 # Prefer AAC/M4A for broader compatibility with older/bundled VLC builds.
 # Fall back to the previous bestaudio behavior when M4A is unavailable. Some
 # live streams expose no audio-only rendition at all (yt-dlp's "bestaudio" then
@@ -157,6 +171,29 @@ def _is_googlevideo_url(url: str | None) -> bool:
         return bool(host) and host.endswith("googlevideo.com")
     except Exception:
         return False
+
+
+def _is_podcast_tracking_url(url: str | None) -> bool:
+    try:
+        host = str(urlparse(str(url or "").strip()).hostname or "").strip().lower()
+    except Exception:
+        return False
+    return bool(host) and any(
+        host == tracking_host or host.endswith("." + tracking_host)
+        for tracking_host in _PODCAST_TRACKING_HOSTS
+    )
+
+
+def _should_resolve_direct_media_url(url: str | None) -> bool:
+    """Resolve page-like URLs and podcast trackers, but skip ordinary files."""
+    try:
+        raw = str(url or "").strip()
+        path = str(urlparse(raw).path or raw).lower()
+        if path.endswith(_SEEKABLE_EXTENSIONS):
+            return _is_podcast_tracking_url(raw)
+    except Exception:
+        pass
+    return True
 
 
 def _should_force_local_stream_proxy(url: str | None, *, is_frozen: bool) -> bool:
@@ -3392,14 +3429,17 @@ class PlayerFrame(wx.Frame):
             # That still holds for YouTube live HLS, so this check comes first.
             if ".m3u8" in low:
                 return url
-            # Only googlevideo genuinely needs the proxy (truthful Content-Length
-            # for seeking, plus re-resolve on throttled/expiring links). Skip
-            # Silence used to force it for every media URL as well, so podcasts
-            # were relayed through Python and written to the disk cache even with
-            # the range cache switched off in settings -- real CPU and I/O for a
-            # cache the user declined. The scan now paces itself instead.
+            # Googlevideo always needs the proxy (truthful Content-Length for
+            # seeking, plus re-resolution on throttled/expiring links). An
+            # unresolved podcast tracker also needs it because direct libVLC can
+            # stop at 0 ms. Skip Silence no longer forces every ordinary podcast
+            # through Python when the optional cache is disabled.
             force_youtube_proxy = _is_googlevideo_url(url)
-            force_proxy = force_youtube_proxy
+            # A tracker URL left unchanged means the bounded pre-resolve timed
+            # out or failed. Direct libVLC can stop at 0 ms on these multi-hop
+            # paths; let the local proxy finish resolving with its longer probe.
+            force_podcast_proxy = _is_podcast_tracking_url(url)
+            force_proxy = force_youtube_proxy or force_podcast_proxy
             if not force_proxy:
                 if not bool(self.config_manager.get('range_cache_enabled', True)):
                     return url
@@ -3957,41 +3997,7 @@ class PlayerFrame(wx.Frame):
                 maxr = int(self.config_manager.get('http_max_redirects', 30))
             except Exception:
                 maxr = 30
-            should_resolve = True
-            try:
-                low = str(final_url or "").lower()
-                if low:
-                    try:
-                        path = urlparse(low).path or low
-                    except Exception:
-                        path = low
-                    # Only skip redirect resolution for local files or already-proxied URLs
-                    # Podcast tracking URLs (op3.dev, etc.) need resolution even if they end in .mp3
-                    if path.endswith(_SEEKABLE_EXTENSIONS):
-                        # Check if this looks like a tracking/redirect URL that needs resolution
-                        try:
-                            parsed = urlparse(low)
-                            host = (parsed.netloc or "").lower()
-                            # Known podcast tracking/analytics hosts that always redirect
-                            tracking_hosts = ("op3.dev", "pdst.fm", "chrt.fm", "chtbl.com", "podtrac.com", 
-                                            "blubrry.com", "podcasts.apple.com", "anchor.fm", "spotify.com")
-                            if any(th in host for th in tracking_hosts):
-                                should_resolve = True
-                            else:
-                                should_resolve = False
-                        except Exception:
-                            should_resolve = False
-            except Exception:
-                should_resolve = True
-
-            try:
-                if should_resolve and bool(self.config_manager.get("skip_silence", False)):
-                    # When skip-silence is enabled, playback is forced through the local range-cache proxy,
-                    # which can follow redirects. Avoid blocking startup on a pre-resolve round-trip.
-                    if low.startswith("http") and ".m3u8" not in low:
-                        should_resolve = False
-            except Exception:
-                pass
+            should_resolve = _should_resolve_direct_media_url(final_url)
 
             if should_resolve:
                 try:

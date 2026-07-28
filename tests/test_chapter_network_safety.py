@@ -179,6 +179,30 @@ def test_remote_media_probe_uses_manual_bounded_redirect_validation(monkeypatch)
     assert all(kwargs["allow_redirects"] is False for _url, kwargs in calls)
 
 
+def test_remote_media_probe_allows_six_public_redirects(monkeypatch):
+    calls = []
+
+    def fake_get(url, **kwargs):
+        calls.append((url, kwargs))
+        if len(calls) <= 6:
+            return _Response(
+                status_code=302,
+                headers={"Location": f"https://tracker{len(calls)}.example/next"},
+            )
+        return _Response(content=b"ID3payload", status_code=206)
+
+    monkeypatch.setattr(utils, "safe_requests_get", fake_get)
+
+    assert utils._read_prefix_bytes(
+        "https://media.example/episode.mp3",
+        headers={"Range": "bytes=0-9"},
+        max_bytes=10,
+        timeout_s=6,
+    ) == b"ID3payload"
+    assert len(calls) == 7
+    assert all(kwargs["allow_redirects"] is False for _url, kwargs in calls)
+
+
 def test_remote_media_redirect_rejects_private_dns_target(monkeypatch):
     calls = []
 
@@ -224,7 +248,7 @@ def test_remote_media_redirect_count_is_bounded(monkeypatch):
             timeout_s=6,
         )
 
-    assert len(calls) == utils._MAX_CHAPTER_REDIRECTS + 1
+    assert len(calls) == utils._MAX_MEDIA_REDIRECTS + 1
 
 
 @pytest.mark.parametrize(

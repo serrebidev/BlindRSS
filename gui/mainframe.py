@@ -10985,7 +10985,10 @@ class MainFrame(wx.Frame):
             except Exception:
                 looks_like_media = False
 
-            is_web_eligible = bool(url) and not looks_like_media
+            is_web_eligible = article_extractor.is_extractable_fulltext_url(url)
+            looks_like_id3_media = bool(
+                getattr(article_extractor, "_looks_like_id3_media_url", lambda _u: False)(url)
+            )
             render_source = None
             prefer_feed_first = False
 
@@ -11039,7 +11042,13 @@ class MainFrame(wx.Frame):
                         rendered = None
             else:
                 if is_web_eligible:
-                    prefer_feed_first = self._should_prefer_feed_fulltext(url, fallback_html)
+                    # A feed description remains authoritative for an enclosure;
+                    # consult embedded ID3 show notes only when it is absent.
+                    prefer_feed_first = (
+                        bool(fallback_html.strip())
+                        if looks_like_id3_media
+                        else self._should_prefer_feed_fulltext(url, fallback_html)
+                    )
 
                 # Try web extraction first (no fallback HTML so we can tell if it really worked).
                 if not rendered and is_web_eligible:

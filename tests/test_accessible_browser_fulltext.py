@@ -201,6 +201,28 @@ def test_extract_body_skips_web_for_media_url(monkeypatch):
     assert cacheable is True  # feed is authoritative for a media item with no web target
 
 
+def test_extract_body_uses_id3_notes_when_mp3_has_no_feed_content(monkeypatch):
+    calls = []
+
+    def _track(url, **kw):
+        calls.append(url)
+        return SimpleNamespace(text="Embedded ID3 episode show notes")
+
+    monkeypatch.setattr(article_extractor, "extract_full_article", _track)
+    article = SimpleNamespace(
+        url="https://example.com/ep1.mp3",
+        content="",
+        title="",
+        author="",
+    )
+
+    body, cacheable = extract_article_body(article)
+
+    assert calls == ["https://example.com/ep1.mp3"]
+    assert body == "Embedded ID3 episode show notes"
+    assert cacheable is True
+
+
 def test_extract_body_none_when_no_content():
     body, cacheable = extract_article_body(SimpleNamespace(url="", content="", title="", author=""))
     assert body is None

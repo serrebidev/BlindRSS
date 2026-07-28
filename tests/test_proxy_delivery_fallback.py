@@ -146,6 +146,10 @@ class _PlayerHost:
 
 
 MEDIA_URL = "https://cdn.example.com/show/episode-42.mp3"
+PODTRAC_URL = (
+    "https://www.podtrac.com/pts/redirect.mp3/pdst.fm/e/pscrb.fm/rss/p/"
+    "mgln.ai/e/257/traffic.megaphone.fm/VMP1047667987.mp3"
+)
 
 
 @pytest.fixture
@@ -187,3 +191,38 @@ def test_youtube_also_falls_back_rather_than_playing_silence(host, monkeypatch):
 
     assert out == yt
     assert host._last_used_range_proxy is False
+
+
+def test_unresolved_podcast_tracker_forces_proxy_when_cache_disabled(host, monkeypatch):
+    stub = _StubProxy(deliverable=True)
+    host.config_manager.values["range_cache_enabled"] = False
+    monkeypatch.setattr(player_mod, "get_range_cache_proxy", lambda **kw: stub)
+
+    out = host._maybe_range_cache_url(PODTRAC_URL)
+
+    assert out.startswith("http://127.0.0.1:")
+    assert host._last_used_range_proxy is True
+    assert stub.proxify_calls == 1
+
+
+def test_resolved_podcast_cdn_stays_direct_when_cache_disabled(host, monkeypatch):
+    stub = _StubProxy(deliverable=True)
+    host.config_manager.values["range_cache_enabled"] = False
+    monkeypatch.setattr(player_mod, "get_range_cache_proxy", lambda **kw: stub)
+    resolved = "https://dcs-cached.megaphone.fm/episode.mp3?key=fresh"
+
+    out = host._maybe_range_cache_url(resolved)
+
+    assert out == resolved
+    assert host._last_used_range_proxy is False
+    assert stub.proxify_calls == 0
+
+
+def test_podcast_tracker_resolution_is_not_disabled_by_skip_silence():
+    assert player_mod._should_resolve_direct_media_url(PODTRAC_URL) is True
+    assert (
+        player_mod._should_resolve_direct_media_url(
+            "https://dcs-cached.megaphone.fm/episode.mp3?key=fresh"
+        )
+        is False
+    )

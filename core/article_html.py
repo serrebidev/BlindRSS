@@ -974,6 +974,26 @@ def render_full_article_html(
     metered_preview = False  # page served only the free excerpt (e.g. NYT)
     structured_youtube = False
 
+    if url and ae._looks_like_id3_media_url(url) and not fallback_html.strip():
+        # Direct podcast enclosure: preserve links from bounded embedded ID3
+        # show notes.  The normal cleaner below sanitizes this publisher-owned
+        # HTML before it reaches WebView.
+        try:
+            article = ae.extract_full_article(url, max_pages=1, timeout=timeout)
+        except Exception:
+            article = None
+        if article:
+            title = article.title or title
+            author = article.author or author
+            if article.html:
+                body = clean_article_html(article.html, url, use_traf_prune=False)
+            if not body and article.text:
+                body = "".join(
+                    f"<p>{_html.escape(block)}</p>"
+                    for block in re.split(r"\n{2,}", article.text)
+                    if block.strip()
+                )
+
     if url and not ae._looks_like_media_url(url):
         # Use the exact same complete YouTube reconstruction as classic full
         # text. Cleaning the watch-page DOM would lose subtitles, comments, and
