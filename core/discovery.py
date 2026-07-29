@@ -673,6 +673,21 @@ def cookie_arg_for_ytdlp(source) -> str | None:
     return browser
 
 
+def is_ytdlp_dpapi_cookie_error(exc_or_msg) -> bool:
+    """True when a yt-dlp failure is Windows browser-cookie decryption, not the media.
+
+    Chromium v127+ App-Bound Encryption (yt-dlp #10927) makes
+    ``--cookies-from-browser`` fail on Chrome/Brave/Edge. That failure says
+    nothing about whether the item itself is playable, so callers must never
+    report it as *the* reason a public video failed: it hides the real error
+    from the anonymous attempt that ran first.
+    """
+    text = str(exc_or_msg or "").lower()
+    if not text:
+        return False
+    return "dpapi" in text or "failed to decrypt with dpapi" in text
+
+
 def get_rumble_cookie_sources(url: str) -> list[tuple]:
     """Return cookiesfrombrowser candidates for rumble URLs."""
     if not is_rumble_url(url):

@@ -83,6 +83,9 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
     options = {
         "skip_download": True,
         "quiet": True,
+        # A watch URL carrying &list= must still resolve to the one video; without
+        # this yt-dlp routes to the playlist extractor and walks the whole list.
+        "noplaylist": True,
         "no_warnings": True,
         "socket_timeout": max(5, int(timeout or 20)),
         "retries": 2,

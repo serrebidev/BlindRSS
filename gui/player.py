@@ -235,10 +235,7 @@ def _is_ytdlp_cookie_load_error(exc_or_msg) -> bool:
 
 
 def _is_ytdlp_dpapi_cookie_error(exc_or_msg) -> bool:
-    text = str(exc_or_msg or "").lower()
-    if not text:
-        return False
-    return "dpapi" in text or "failed to decrypt with dpapi" in text
+    return discovery.is_ytdlp_dpapi_cookie_error(exc_or_msg)
 
 
 def _extract_ytdlp_info_via_cli(
@@ -3667,6 +3664,14 @@ class PlayerFrame(wx.Frame):
                     base_opts = {
                         'format': _ytdlp_audio_format_for(url),
                         'quiet': True,
+                        # Playing one item means extracting one item. A YouTube
+                        # watch URL carrying &list= (especially an endless RD…
+                        # radio mix from "start radio") otherwise routes to the
+                        # playlist extractor, which enumerates the whole mix
+                        # before we ever see a media URL — playback times out and
+                        # falls back to the browser. The CLI helper has always
+                        # passed --no-playlist; the embedded path must match.
+                        'noplaylist': True,
                         'no_warnings': True,
                         'user_agent': utils.HEADERS.get('User-Agent', ''),
                         'referer': url,
@@ -3942,11 +3947,17 @@ class PlayerFrame(wx.Frame):
                         ytdlp_headers = {}
                         resolved_title = title or _("Media Stream")
                     else:
-                        # Handle playlists/multi-video pages
+                        # Handle playlists/multi-video pages. yt-dlp hands back a
+                        # lazy entries sequence, so take only the first item:
+                        # list()-ing it would extract every video in the playlist
+                        # (endless for a YouTube radio mix) just to discard them.
                         if 'entries' in info:
-                            entries = list(info['entries'])
-                            if entries:
-                                info = entries[0]
+                            try:
+                                first_entry = next(iter(info['entries'] or []), None)
+                            except Exception:
+                                first_entry = None
+                            if isinstance(first_entry, dict):
+                                info = first_entry
 
                         final_url = info.get('url')
                         if not final_url:
@@ -4443,18 +4454,18 @@ class PlayerFrame(wx.Frame):
 
         # Anonymous first, then cookies.txt, then browser cookies — same order as
         # the merged download, so this works wherever downloads work.
-        attempts = [[]]
+        attempts = [("base", [])]
         try:
             cookiefile = str(self.config_manager.get("ytdlp_cookies_file", "") or "").strip()
             if cookiefile and os.path.isfile(cookiefile):
-                attempts.append(["--cookies", cookiefile])
+                attempts.append(("cookiefile", ["--cookies", cookiefile]))
         except Exception:
             pass
         try:
             for src in discovery.get_ytdlp_cookie_sources(page_url) or []:
                 arg = discovery.cookie_arg_for_ytdlp(src)
                 if arg:
-                    attempts.append(["--cookies-from-browser", arg])
+                    attempts.append(("cookies", ["--cookies-from-browser", arg]))
         except Exception:
             pass
 
@@ -4470,8 +4481,15 @@ class PlayerFrame(wx.Frame):
 
         produced = None
         last_err = _("download failed")
+        base_err = ""
+        dpapi_seen = False
         wider = False
-        for extra in attempts:
+        for kind, extra in attempts:
+            # See the merged downloader: once browser cookies fail to decrypt on
+            # Windows, every other browser source fails identically and the error
+            # would mask the anonymous attempt's real reason.
+            if kind == "cookies" and dpapi_seen:
+                continue
             try:
                 if int(load_seq) != int(getattr(self, "_active_load_seq", 0) or 0):
                     return  # a newer load superseded us
@@ -4498,16 +4516,28 @@ class PlayerFrame(wx.Frame):
                 produced = self._resolve_printed_filepath(res.stdout, cache_dir)
                 if produced:
                     break
-            last_err = (res.stderr or res.stdout or last_err).strip() or last_err
+            attempt_err = (res.stderr or res.stdout or "").strip()
+            if kind == "cookies" and discovery.is_ytdlp_dpapi_cookie_error(attempt_err):
+                dpapi_seen = True
+                _log("YouTube download-to-play: browser cookies unusable (Windows DPAPI); skipping the rest")
+                continue
+            last_err = attempt_err or last_err
+            if kind == "base":
+                # The wider-client retry appends another "base" attempt; its
+                # error is the more complete one, so let it win.
+                base_err = attempt_err or base_err
             # On the last anonymous/cookie attempt, retry once with the wider pool.
-            if not wider and extra == attempts[-1]:
+            if not wider and (kind, extra) == attempts[-1]:
                 wider = True
                 base_cmd[base_cmd.index("--extractor-args") + 1] = discovery.youtube_player_client_arg(
                     discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK
                 )
-                attempts.append([])
+                attempts.append(("base", []))
 
         if not produced:
+            # The anonymous attempt's error is the one that explains a public item.
+            if base_err:
+                last_err = base_err
             _log(f"YouTube download-to-play failed: {last_err}")
             wx.CallAfter(
                 self._handle_media_load_error,
