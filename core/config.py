@@ -377,6 +377,13 @@ DEFAULT_CONFIG = {
     "translation_gemini_api_key": "",
     "translation_qwen_model": "",
     "translation_qwen_api_key": "",
+    # Optional paid CAPTCHA-solving service (2captcha/SolveCaptcha) used only as
+    # the last-resort tier when a challenge page defeats both the SeleniumBase
+    # UC session and the pydoll Turnstile auto-click. Off by default; the key
+    # stays in this local config and is never logged.
+    "captcha_solver_enabled": False,
+    "captcha_solver_provider": "2captcha",
+    "captcha_solver_api_key": "",
     "article_sort_by": "date",
     "article_sort_ascending": False,
     "providers": {

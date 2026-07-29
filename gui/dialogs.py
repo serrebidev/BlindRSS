@@ -1716,6 +1716,12 @@ class SettingsDialog(wx.Dialog):
         # Advanced Tab
         self._register_lazy_page(notebook, _("Advanced"), self._build_advanced_page)
 
+        # CAPTCHA Solving Tab (opt-in paid solver for last-resort challenge
+        # escalation). Appended last: inserting a page mid-notebook renumbers
+        # every tab after it, and Ctrl+Tab positions are muscle memory for
+        # screen-reader users.
+        self._register_lazy_page(notebook, _("CAPTCHA Solving"), self._build_captcha_solver_page)
+
         # Main Sizer
         main_sizer = wx.BoxSizer(wx.VERTICAL)
         main_sizer.Add(notebook, 1, wx.EXPAND | wx.ALL, 5)
@@ -3693,6 +3699,58 @@ class SettingsDialog(wx.Dialog):
         self._openrouter_models_loading = False
         self._update_translation_provider_controls()
 
+    def _build_captcha_solver_page(self, panel, sizer):
+        """Built on first view; see _register_lazy_page."""
+        config = self.config
+        solver_panel = panel
+        solver_sizer = sizer
+
+        note = _(
+            "Optional paid CAPTCHA-solving service for sites whose Cloudflare\n"
+            "challenge defeats every automated browser attempt. BlindRSS then\n"
+            "sends only the challenge parameters to the service and injects the\n"
+            "solved token. The service sees which blocked URL is being solved.\n"
+            "Your API key is stored locally in config.json."
+        )
+        solver_sizer.Add(wx.StaticText(solver_panel, label=note), 0, wx.ALL, 8)
+
+        self.captcha_solver_enabled_chk = wx.CheckBox(
+            solver_panel,
+            label=_("Enable CAPTCHA solving service (last resort, per-solve fees apply)"),
+        )
+        self.captcha_solver_enabled_chk.SetValue(bool(config.get("captcha_solver_enabled", False)))
+        solver_sizer.Add(self.captcha_solver_enabled_chk, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        provider_row = wx.BoxSizer(wx.HORIZONTAL)
+        provider_row.Add(wx.StaticText(solver_panel, label=_("Service:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        self._captcha_solver_display_to_key = {
+            "2captcha": "2captcha",
+            "SolveCaptcha": "solvecaptcha",
+        }
+        self.captcha_solver_provider_ctrl = wx.Choice(
+            solver_panel, choices=list(self._captcha_solver_display_to_key.keys())
+        )
+        _saved_provider = str(config.get("captcha_solver_provider", "2captcha") or "2captcha").strip().lower()
+        for _display, _key in self._captcha_solver_display_to_key.items():
+            if _key == _saved_provider:
+                self.captcha_solver_provider_ctrl.SetStringSelection(_display)
+                break
+        if self.captcha_solver_provider_ctrl.GetSelection() == wx.NOT_FOUND:
+            self.captcha_solver_provider_ctrl.SetSelection(0)
+        provider_row.Add(self.captcha_solver_provider_ctrl, 0, wx.ALIGN_CENTER_VERTICAL)
+        solver_sizer.Add(provider_row, 0, wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
+        api_key_row = wx.BoxSizer(wx.HORIZONTAL)
+        api_key_row.Add(wx.StaticText(solver_panel, label=_("API key:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.RIGHT, 8)
+        self.captcha_solver_api_key_ctrl = wx.TextCtrl(
+            solver_panel,
+            value=str(config.get("captcha_solver_api_key", "") or ""),
+            style=wx.TE_PASSWORD,
+        )
+        self.captcha_solver_api_key_ctrl.SetName(_("CAPTCHA solving service API key"))
+        api_key_row.Add(self.captcha_solver_api_key_ctrl, 1, wx.ALIGN_CENTER_VERTICAL)
+        solver_sizer.Add(api_key_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
     def _build_advanced_page(self, panel, sizer):
         """Built on first view; see _register_lazy_page."""
         config = self.config
@@ -4012,6 +4070,12 @@ class SettingsDialog(wx.Dialog):
             "translation_gemini_api_key": (self.translation_gemini_api_key_ctrl.GetValue() or "").strip(),
             "translation_qwen_model": (self.translation_qwen_model_ctrl.GetValue() or "").strip(),
             "translation_qwen_api_key": (self.translation_qwen_api_key_ctrl.GetValue() or "").strip(),
+            "captcha_solver_enabled": self.captcha_solver_enabled_chk.GetValue(),
+            "captcha_solver_provider": self._captcha_solver_display_to_key.get(
+                str(self.captcha_solver_provider_ctrl.GetStringSelection() or ""),
+                "2captcha",
+            ),
+            "captcha_solver_api_key": (self.captcha_solver_api_key_ctrl.GetValue() or "").strip(),
             "enable_adult_search": self.enable_adult_search_chk.GetValue(),
             "user_agent_mode": self._user_agent_choices[
                 max(0, self.user_agent_mode_ctrl.GetSelection())

@@ -279,6 +279,12 @@ class RSSApp(wx.App):
             })
         except Exception:
             pass
+        try:
+            from core import captcha_solver
+
+            captcha_solver.configure_from_config(self.config_manager.get)
+        except Exception:
+            pass
         _enable_debug_console(self.config_manager)
         self.log_path = _configure_file_logging(self.config_manager)
         if sys.platform.startswith("win"):

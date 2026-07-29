@@ -12,6 +12,7 @@ import types
 import pytest
 
 from core import browser_feed
+from core import captcha_solver
 from core import site_cookies
 
 # conftest stubs _fetch_browser_document suite-wide so mocked HTTP tests never
@@ -46,9 +47,11 @@ _CHALLENGE_HTML = (
 def _clean_state():
     browser_feed._negative_results.clear()
     browser_feed._pydoll_unavailable = False
+    captcha_solver.configure({})
     yield
     browser_feed._negative_results.clear()
     browser_feed._pydoll_unavailable = False
+    captcha_solver.configure({})
 
 
 def _stub_uc_failure(monkeypatch, tmp_path, page_source):
@@ -156,6 +159,10 @@ class _FakeOptions:
 class _FakeTab:
     def __init__(self, pages):
         self._pages = list(pages)
+        self.commands = []
+        self.navigations = []
+        self.solved_token = None
+        self.turnstile_params = None
 
     @contextlib.asynccontextmanager
     async def expect_and_bypass_cloudflare_captcha(self, **kwargs):
@@ -163,13 +170,33 @@ class _FakeTab:
 
     async def go_to(self, url, timeout=300):
         self.url = url
+        self.navigations.append(url)
+
+    async def _execute_command(self, command):
+        self.commands.append(command)
+        return {}
 
     @property
     async def page_source(self):
-        return self._pages.pop(0) if self._pages else _RSS_XML
+        # Once the solved token is delivered, the page clears to the document.
+        if self.solved_token is not None:
+            return _RSS_XML
+        return self._pages.pop(0) if self._pages else _CHALLENGE_HTML
 
     async def execute_script(self, script, **kwargs):
-        value = "https://example.com/final" if "location.href" in script else "FakeChrome/1.0"
+        if "__blindrssTurnstileCallback" in script:
+            import json as _json
+            import re as _re
+
+            match = _re.search(r"\)\((.*)\)\s*$", script.strip(), _re.S)
+            self.solved_token = _json.loads(match.group(1)) if match else None
+            value = None
+        elif "__blindrssTurnstile" in script:
+            value = self.turnstile_params
+        elif "location.href" in script:
+            value = "https://example.com/final"
+        else:
+            value = "FakeChrome/1.0"
         return {"result": {"result": {"value": value}}}
 
     async def get_cookies(self):
@@ -181,6 +208,7 @@ class _FakeChrome:
 
     def __init__(self, options=None):
         self.options = options
+        self.tab = None
         _FakeChrome.instances.append(self)
 
     async def __aenter__(self):
@@ -190,7 +218,17 @@ class _FakeChrome:
         return False
 
     async def start(self):
-        return _FakeTab([_CHALLENGE_HTML, _RSS_XML])
+        self.tab = _FakeTab([_CHALLENGE_HTML, _RSS_XML])
+        return self.tab
+
+
+class _FakePageCommands:
+    calls = []
+
+    @staticmethod
+    def add_script_to_evaluate_on_new_document(source, **kwargs):
+        _FakePageCommands.calls.append(source)
+        return {"method": "Page.addScriptToEvaluateOnNewDocument", "params": {"source": source}}
 
 
 def _install_fake_pydoll(monkeypatch):
@@ -200,10 +238,15 @@ def _install_fake_pydoll(monkeypatch):
     options_mod.ChromiumOptions = _FakeOptions
     browser_pkg = types.ModuleType("pydoll.browser")
     pydoll_pkg = types.ModuleType("pydoll")
+    commands_pkg = types.ModuleType("pydoll.commands")
+    page_commands = types.ModuleType("pydoll.commands.page_commands")
+    page_commands.PageCommands = _FakePageCommands
     monkeypatch.setitem(sys.modules, "pydoll", pydoll_pkg)
     monkeypatch.setitem(sys.modules, "pydoll.browser", browser_pkg)
     monkeypatch.setitem(sys.modules, "pydoll.browser.chromium", chromium)
     monkeypatch.setitem(sys.modules, "pydoll.browser.options", options_mod)
+    monkeypatch.setitem(sys.modules, "pydoll.commands", commands_pkg)
+    monkeypatch.setitem(sys.modules, "pydoll.commands.page_commands", page_commands)
 
 
 def test_pydoll_attempt_settles_past_challenge_and_harvests(monkeypatch, tmp_path):
@@ -260,3 +303,148 @@ def test_pydoll_attempt_returns_none_when_page_never_becomes_usable(monkeypatch,
         )
     )
     assert result is None
+
+
+class _SolverChrome(_FakeChrome):
+    """Challenge page that never clears on the auto-click, with hookable params."""
+
+    async def start(self):
+        self.tab = _FakeTab([_CHALLENGE_HTML] * 1000)
+        self.tab.turnstile_params = {
+            "sitekey": "0xSITE",
+            "pageurl": "https://example.com/feed.xml",
+            "data": "cd",
+            "pagedata": "pd",
+            "action": "managed",
+            "userAgent": "FakeChrome/1.0",
+        }
+        return self.tab
+
+
+def _fast_tier4(monkeypatch):
+    monkeypatch.setattr(browser_feed, "_PYDOLL_AUTOCLICK_MAX_WITH_SOLVER_SECONDS", 0.5)
+    monkeypatch.setattr(browser_feed, "_PYDOLL_PARAMS_WAIT_MAX_SECONDS", 5.0)
+    monkeypatch.setattr(browser_feed, "_PYDOLL_SETTLE_POLL_SECONDS", 0.05)
+    _FakePageCommands.calls = []
+
+
+def test_tier4_solver_solves_after_autoclick_fails(monkeypatch, tmp_path):
+    _install_fake_pydoll(monkeypatch)
+    _fast_tier4(monkeypatch)
+    chromium = sys.modules["pydoll.browser.chromium"]
+    monkeypatch.setattr(chromium, "Chrome", _SolverChrome)
+    captcha_solver.configure({"enabled": True, "provider": "2captcha", "api_key": "key"})
+    solve_calls = []
+    monkeypatch.setattr(
+        captcha_solver,
+        "solve_turnstile",
+        lambda **kwargs: solve_calls.append(kwargs) or "solver-token",
+    )
+
+    result = asyncio.run(
+        browser_feed._pydoll_attempt(
+            "https://example.com/feed.xml",
+            budget_s=15.0,
+            feed_only=True,
+            cancel_event=None,
+            proxy=None,
+            profile_dir=str(tmp_path),
+            runtime_dir=str(tmp_path),
+        )
+    )
+
+    assert result is not None
+    text, final_url, cookies, user_agent = result
+    assert "Escalated Feed" in text
+    assert final_url == "https://example.com/final"
+    assert cookies[0]["name"] == "cf_clearance"
+    assert user_agent == "FakeChrome/1.0"
+
+    tab = _FakeChrome.instances[-1].tab
+    # The page was reloaded once with the render hook installed.
+    assert tab.navigations == ["https://example.com/feed.xml"] * 2
+    assert _FakePageCommands.calls and "window.turnstile.render" in _FakePageCommands.calls[0]
+    # The intercepted parameters went to the solver, and its token went back
+    # to the page through the stored widget callback.
+    assert solve_calls[0]["sitekey"] == "0xSITE"
+    assert solve_calls[0]["data"] == "cd"
+    assert solve_calls[0]["pagedata"] == "pd"
+    assert solve_calls[0]["action"] == "managed"
+    assert solve_calls[0]["user_agent"] == "FakeChrome/1.0"
+    assert solve_calls[0]["provider"] == "2captcha"
+    assert solve_calls[0]["api_key"] == "key"
+    assert tab.solved_token == "solver-token"
+
+
+def test_tier4_skipped_when_solver_disabled(monkeypatch, tmp_path):
+    _install_fake_pydoll(monkeypatch)
+    _fast_tier4(monkeypatch)
+    chromium = sys.modules["pydoll.browser.chromium"]
+    monkeypatch.setattr(chromium, "Chrome", _SolverChrome)
+
+    result = asyncio.run(
+        browser_feed._pydoll_attempt(
+            "https://example.com/feed.xml",
+            budget_s=2.0,
+            feed_only=True,
+            cancel_event=None,
+            proxy=None,
+            profile_dir=str(tmp_path),
+            runtime_dir=str(tmp_path),
+        )
+    )
+
+    assert result is None
+    tab = _FakeChrome.instances[-1].tab
+    # No reload, no hook, no solver call: exactly the pre-solver behavior.
+    assert tab.navigations == ["https://example.com/feed.xml"]
+    assert _FakePageCommands.calls == []
+
+
+def test_tier4_solver_failure_returns_none(monkeypatch, tmp_path):
+    _install_fake_pydoll(monkeypatch)
+    _fast_tier4(monkeypatch)
+    chromium = sys.modules["pydoll.browser.chromium"]
+    monkeypatch.setattr(chromium, "Chrome", _SolverChrome)
+    captcha_solver.configure({"enabled": True, "provider": "2captcha", "api_key": "key"})
+    monkeypatch.setattr(captcha_solver, "solve_turnstile", lambda **kwargs: None)
+
+    result = asyncio.run(
+        browser_feed._pydoll_attempt(
+            "https://example.com/feed.xml",
+            budget_s=15.0,
+            feed_only=True,
+            cancel_event=None,
+            proxy=None,
+            profile_dir=str(tmp_path),
+            runtime_dir=str(tmp_path),
+        )
+    )
+
+    assert result is None
+    tab = _FakeChrome.instances[-1].tab
+    assert tab.navigations == ["https://example.com/feed.xml"] * 2
+    assert tab.solved_token is None
+
+
+def test_tier4_skipped_when_enabled_without_api_key(monkeypatch, tmp_path):
+    _install_fake_pydoll(monkeypatch)
+    _fast_tier4(monkeypatch)
+    chromium = sys.modules["pydoll.browser.chromium"]
+    monkeypatch.setattr(chromium, "Chrome", _SolverChrome)
+    captcha_solver.configure({"enabled": True, "provider": "2captcha", "api_key": ""})
+
+    result = asyncio.run(
+        browser_feed._pydoll_attempt(
+            "https://example.com/feed.xml",
+            budget_s=2.0,
+            feed_only=True,
+            cancel_event=None,
+            proxy=None,
+            profile_dir=str(tmp_path),
+            runtime_dir=str(tmp_path),
+        )
+    )
+
+    assert result is None
+    assert _FakePageCommands.calls == []

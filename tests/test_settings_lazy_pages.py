@@ -74,6 +74,9 @@ def test_tab_titles_and_order(parent):
             "Translate",
             "List Headers",
             "Advanced",
+            # Opt-in paid solver settings (tier-4 challenge escalation).
+            # Appended last so no existing tab's Ctrl+Tab position moves.
+            "CAPTCHA Solving",
         ]
     finally:
         dlg.Destroy()

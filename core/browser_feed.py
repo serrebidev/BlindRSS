@@ -448,8 +448,41 @@ def _settle_page(sb, *, timeout_s: float, feed_only: bool, cancel_event) -> str 
 # ---------------------------------------------------------------------------
 _PYDOLL_PROFILE_DIRNAME = "feed_browser_pydoll_profile"
 _PYDOLL_BUDGET_MAX_SECONDS = 90.0
+_PYDOLL_BUDGET_MAX_WITH_SOLVER_SECONDS = 240.0
 _PYDOLL_SETTLE_POLL_SECONDS = 0.5
+# With a solver configured, cap the auto-click phase so the paid solve still
+# fits inside the total budget; the solver round-trip is by far the slow part.
+_PYDOLL_AUTOCLICK_MAX_WITH_SOLVER_SECONDS = 45.0
+_PYDOLL_PARAMS_WAIT_MAX_SECONDS = 25.0
 _pydoll_unavailable = False  # process-lifetime once import/setup fails
+
+# Installed via Page.addScriptToEvaluateOnNewDocument before the tier-4 reload.
+# Hijacks window.turnstile.render to capture the dynamically generated
+# challenge parameters (which never appear in the HTML) and stalls the widget
+# while the solving service works; the solved token is delivered through the
+# stored callback. Adapted from the documented 2captcha challenge-page flow.
+_TURNSTILE_HOOK_JS = r"""
+(function () {
+  const timer = setInterval(() => {
+    if (!window.turnstile || !window.turnstile.render) return;
+    clearInterval(timer);
+    window.turnstile.render = (container, params) => {
+      try {
+        window.__blindrssTurnstile = {
+          sitekey: params.sitekey,
+          pageurl: location.href,
+          data: params.cData,
+          pagedata: params.chlPageData,
+          action: params.action,
+          userAgent: navigator.userAgent
+        };
+        window.__blindrssTurnstileCallback = params.callback;
+      } catch (e) {}
+      return;  // stall the widget while the token is solved externally
+    };
+  }, 50);
+})();
+"""
 
 
 def _pydoll_binary_location(runtime_dir: str) -> str | None:
@@ -474,6 +507,133 @@ def _pydoll_binary_location(runtime_dir: str) -> str | None:
     return None
 
 
+async def _pydoll_collect_result(tab, text: str, target: str):
+    """Build the (text, final_url, cookies, ua) success tuple for a pydoll page."""
+    final_url = target
+    user_agent = ""
+    try:
+        response = await tab.execute_script("return location.href", return_by_value=True)
+        value = str(response["result"]["result"].get("value") or "").strip()
+        if value:
+            final_url = value
+    except Exception:
+        log.debug("Could not read the pydoll browser URL", exc_info=True)
+    try:
+        response = await tab.execute_script("return navigator.userAgent", return_by_value=True)
+        user_agent = str(response["result"]["result"].get("value") or "").strip()
+    except Exception:
+        log.debug("Could not read the pydoll browser User-Agent", exc_info=True)
+    try:
+        cookies = await tab.get_cookies()
+    except Exception:
+        log.debug("Could not read cookies from the pydoll session", exc_info=True)
+        cookies = []
+    return text, final_url, cookies, user_agent
+
+
+async def _pydoll_solve_turnstile(
+    tab,
+    target: str,
+    *,
+    feed_only: bool,
+    cancel_event,
+    deadline: float,
+    nav_timeout: int,
+):
+    """Tier 4: solve the challenge through the user's paid solving service.
+
+    The auto-click lost, so the page is reloaded with the turnstile.render
+    hook installed; the intercepted parameters go to the solver and the
+    returned token is delivered through the stored widget callback. Off
+    entirely unless the user enabled a solver in Settings.
+    """
+    import asyncio
+    import json as _json
+
+    from pydoll.commands.page_commands import PageCommands
+
+    from core import captcha_solver
+
+    settings = captcha_solver.current_settings()
+    if not (
+        settings.get("enabled") and settings.get("api_key")
+    ):
+        return None
+
+    try:
+        await tab._execute_command(
+            PageCommands.add_script_to_evaluate_on_new_document(_TURNSTILE_HOOK_JS)
+        )
+        await tab.go_to(target, timeout=nav_timeout)
+    except Exception:
+        log.info("Tier-4 solver reload failed for %s", target, exc_info=True)
+        return None
+
+    # Wait for the hook to capture the challenge parameters. The widget is
+    # stalled by the hook, so the page cannot clear on its own meanwhile.
+    params = None
+    params_deadline = min(deadline, time.monotonic() + _PYDOLL_PARAMS_WAIT_MAX_SECONDS)
+    while not _cancelled(cancel_event) and time.monotonic() < params_deadline:
+        try:
+            response = await tab.execute_script(
+                "return window.__blindrssTurnstile || null", return_by_value=True
+            )
+            value = response["result"]["result"].get("value")
+            if isinstance(value, dict) and value.get("sitekey"):
+                params = value
+                break
+        except Exception:
+            log.debug("Could not read intercepted Turnstile parameters", exc_info=True)
+        await asyncio.sleep(_PYDOLL_SETTLE_POLL_SECONDS)
+    if params is None:
+        log.info("Tier-4 solver saw no Turnstile widget parameters for %s", target)
+        return None
+
+    remaining = deadline - time.monotonic()
+    if remaining <= 5.0 or _cancelled(cancel_event):
+        return None
+    log.info("Solving Turnstile challenge via %s for %s", settings["provider"], target)
+    token = await asyncio.to_thread(
+        captcha_solver.solve_turnstile,
+        api_key=settings["api_key"],
+        provider=settings["provider"],
+        sitekey=str(params.get("sitekey") or ""),
+        pageurl=str(params.get("pageurl") or target),
+        data=params.get("data"),
+        pagedata=params.get("pagedata"),
+        action=params.get("action"),
+        user_agent=str(params.get("userAgent") or ""),
+        timeout_s=remaining,
+        cancel_event=cancel_event,
+    )
+    if not token or _cancelled(cancel_event):
+        return None
+
+    try:
+        await tab.execute_script(
+            "(function(t){ if (window.__blindrssTurnstileCallback) "
+            "{ window.__blindrssTurnstileCallback(t); } })(%s)" % _json.dumps(token),
+            return_by_value=True,
+        )
+    except Exception:
+        log.info("Could not deliver the solved Turnstile token for %s", target, exc_info=True)
+        return None
+
+    while not _cancelled(cancel_event):
+        try:
+            source = str(await tab.page_source or "")
+        except Exception:
+            source = ""
+        text = _usable_document(source, feed_only=feed_only)
+        if text is not None:
+            log.info("Tier-4 solver cleared the challenge for %s", target)
+            return await _pydoll_collect_result(tab, text, target)
+        if time.monotonic() >= deadline:
+            return None
+        await asyncio.sleep(_PYDOLL_SETTLE_POLL_SECONDS)
+    return None
+
+
 async def _pydoll_attempt(
     target: str,
     *,
@@ -490,6 +650,8 @@ async def _pydoll_attempt(
     from pydoll.browser.chromium import Chrome
     from pydoll.browser.options import ChromiumOptions
 
+    from core import captcha_solver
+
     options = ChromiumOptions()
     # The browser must stay completely invisible (same rule as headless2).
     options.headless = True
@@ -500,7 +662,13 @@ async def _pydoll_attempt(
     if proxy:
         options.add_argument(f"--proxy-server={str(proxy).strip()}")
 
+    solver_ready = captcha_solver.solver_available()
     deadline = time.monotonic() + budget_s
+    autoclick_deadline = (
+        min(deadline, time.monotonic() + _PYDOLL_AUTOCLICK_MAX_WITH_SOLVER_SECONDS)
+        if solver_ready
+        else deadline
+    )
     async with Chrome(options=options) as browser:
         tab = await browser.start()
         nav_timeout = max(10, min(int(budget_s), 45))
@@ -515,33 +683,19 @@ async def _pydoll_attempt(
                 source = ""
             text = _usable_document(source, feed_only=feed_only)
             if text is not None:
-                final_url = target
-                user_agent = ""
-                try:
-                    response = await tab.execute_script(
-                        "return location.href", return_by_value=True
-                    )
-                    value = str(response["result"]["result"].get("value") or "").strip()
-                    if value:
-                        final_url = value
-                except Exception:
-                    log.debug("Could not read the pydoll browser URL", exc_info=True)
-                try:
-                    response = await tab.execute_script(
-                        "return navigator.userAgent", return_by_value=True
-                    )
-                    user_agent = str(response["result"]["result"].get("value") or "").strip()
-                except Exception:
-                    log.debug("Could not read the pydoll browser User-Agent", exc_info=True)
-                try:
-                    cookies = await tab.get_cookies()
-                except Exception:
-                    log.debug("Could not read cookies from the pydoll session", exc_info=True)
-                    cookies = []
-                return text, final_url, cookies, user_agent
-            if time.monotonic() >= deadline:
-                return None
+                return await _pydoll_collect_result(tab, text, target)
+            if time.monotonic() >= autoclick_deadline:
+                break
             await asyncio.sleep(_PYDOLL_SETTLE_POLL_SECONDS)
+        if solver_ready and not _cancelled(cancel_event) and time.monotonic() < deadline:
+            return await _pydoll_solve_turnstile(
+                tab,
+                target,
+                feed_only=feed_only,
+                cancel_event=cancel_event,
+                deadline=deadline,
+                nav_timeout=nav_timeout,
+            )
     return None
 
 
@@ -576,7 +730,14 @@ def _fetch_with_pydoll(
         _pydoll_unavailable = True
         return None
 
-    budget_s = min(max(float(timeout_s or 90.0), 20.0), _PYDOLL_BUDGET_MAX_SECONDS)
+    from core import captcha_solver
+
+    budget_cap = (
+        _PYDOLL_BUDGET_MAX_WITH_SOLVER_SECONDS
+        if captcha_solver.solver_available()
+        else _PYDOLL_BUDGET_MAX_SECONDS
+    )
+    budget_s = min(max(float(timeout_s or 90.0), 20.0), budget_cap)
     log.info("Escalating to pydoll browser fetch url=%s", target)
     try:
         result = asyncio.run(

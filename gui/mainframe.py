@@ -13782,6 +13782,15 @@ class MainFrame(wx.Frame):
             except Exception:
                 pass
 
+            # Same for the opt-in CAPTCHA-solving service (tier-4 challenge
+            # escalation); changes apply without restarting.
+            try:
+                from core import captcha_solver
+
+                captcha_solver.configure_from_config(self.config_manager.get)
+            except Exception:
+                pass
+
             try:
                 new_start_on_login = bool(self.config_manager.get("start_on_windows_login", False))
             except Exception:
