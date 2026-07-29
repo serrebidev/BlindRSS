@@ -4,6 +4,11 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.125.2 - 2026-07-29
+
+- Correct the yt-dlp refresh invocation in build.bat.
+- Keep yt-dlp up to date instead of shipping a stale copy.
+
 ## v1.125.1 - 2026-07-29
 
 - Play and download YouTube "start radio" watch URLs.
