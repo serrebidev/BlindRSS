@@ -790,18 +790,38 @@ def _ensure_tool_on_path(tool_name):
         _set_vlc_lib_path(bin_dir)
     return True
 
-def _should_check_updates(marker_name):
-    """Throttles specific checks to once every 24 hours."""
+def _update_marker_path(marker_name):
     temp_dir = os.environ.get("TEMP", os.environ.get("TMP", tempfile.gettempdir()))
-    marker = os.path.join(temp_dir, f"blindrss_last_{marker_name}.txt")
+    return os.path.join(temp_dir, f"blindrss_last_{marker_name}.txt")
+
+
+def _mark_update_checked(marker_name):
+    """Start the 24h throttle window for a check that actually succeeded."""
+    try:
+        with open(_update_marker_path(marker_name), "w") as f:
+            f.write(str(time.time()))
+    except Exception:
+        pass
+
+
+def _should_check_updates(marker_name, mark=True):
+    """Throttles specific checks to once every 24 hours.
+
+    ``mark=False`` only reads the throttle; the caller then calls
+    :func:`_mark_update_checked` once the update has actually succeeded. That
+    matters for yt-dlp: marking up front meant a *failed* update still burned
+    the 24h window, so a copy that could not update stayed stale indefinitely
+    and YouTube extraction broke a few weeks later.
+    """
+    marker = _update_marker_path(marker_name)
     try:
         if os.path.isfile(marker):
             mtime = os.path.getmtime(marker)
             if (time.time() - mtime) < 86400:
                 _log(f"Throttle active for {marker_name} (last check: {time.ctime(mtime)})")
                 return False
-        with open(marker, "w") as f:
-            f.write(str(time.time()))
+        if mark:
+            _mark_update_checked(marker_name)
     except: pass
     return True
 
@@ -1248,6 +1268,111 @@ def _ytdlp_runtime_bin_dir():
     return os.path.join(base_dir, "bin")
 
 
+YTDLP_LATEST_EXE_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
+_YTDLP_LATEST_API_URL = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
+
+
+def ytdlp_version(path, timeout=10):
+    """Version string reported by a yt-dlp executable, or "" if it won't run."""
+    try:
+        res = subprocess.run(
+            [path, "--version"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            stdin=subprocess.DEVNULL,
+            creationflags=0x08000000 if platform.system().lower() == "windows" else 0,
+            startupinfo=_get_startup_info(),
+            timeout=timeout,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+        )
+        if res.returncode == 0:
+            return str(res.stdout or "").strip().splitlines()[0].strip() if res.stdout else ""
+    except Exception:
+        pass
+    return ""
+
+
+def latest_ytdlp_version(timeout=10):
+    """Newest published yt-dlp release tag, or "" when GitHub can't be reached.
+
+    Best-effort: an empty result means "don't know", never "up to date".
+    """
+    try:
+        from core import utils
+
+        resp = utils.safe_requests_get(_YTDLP_LATEST_API_URL, timeout=timeout)
+        resp.raise_for_status()
+        return str((resp.json() or {}).get("tag_name") or "").strip()
+    except Exception as e:
+        _log(f"Could not query the latest yt-dlp release: {e}")
+        return ""
+
+
+def download_latest_ytdlp(dest_path, works=None):
+    """Replace ``dest_path`` with the newest yt-dlp.exe, atomically.
+
+    Downloads beside the target and only swaps it in once the new binary has
+    been verified to run, so a failed or truncated download can never leave the
+    app without a working yt-dlp.
+    """
+    staging = f"{dest_path}.new"
+    try:
+        if not _download_file(YTDLP_LATEST_EXE_URL, staging):
+            return False
+        if works is not None and not works(staging):
+            _log("Downloaded yt-dlp.exe did not run; keeping the existing copy.")
+            return False
+        os.replace(staging, dest_path)
+        return True
+    except Exception as e:
+        _log(f"Could not install the downloaded yt-dlp: {e}")
+        return False
+    finally:
+        try:
+            if os.path.isfile(staging):
+                os.remove(staging)
+        except Exception:
+            pass
+
+
+def _update_managed_ytdlp(local_exe, works):
+    """Bring our own yt-dlp copy up to the newest release. True if now current.
+
+    ``yt-dlp -U`` is tried first (small patch download), but its exit code is not
+    trusted: a copy that cannot replace itself reports success in some cases and
+    silently stays behind in others. The version is re-read afterwards and, if
+    still not the newest, the full binary is fetched. YouTube breaks extraction
+    every few weeks, so "probably updated" is not good enough.
+    """
+    before = ytdlp_version(local_exe)
+    latest = latest_ytdlp_version()
+
+    if latest and before == latest:
+        _log(f"yt-dlp is current ({before}).")
+        return True
+
+    _log(f"Updating yt-dlp (have {before or 'unknown'}, latest {latest or 'unknown'})...")
+    _run_quiet([local_exe, "-U"], timeout=300)
+
+    after = ytdlp_version(local_exe)
+    if latest and after == latest:
+        _log(f"yt-dlp updated to {after}.")
+        return True
+
+    # -U did not get us there (read-only copy, blocked network, or it lied).
+    _log(f"yt-dlp -U left version {after or 'unknown'}; downloading the latest build.")
+    if not download_latest_ytdlp(local_exe, works=works):
+        return False
+
+    final = ytdlp_version(local_exe)
+    _log(f"yt-dlp is now {final or 'unknown'}.")
+    # Without a known latest we cannot claim success, but a fresh download of
+    # "latest" is the best available state, so treat a working binary as current.
+    return bool(final) and (not latest or final == latest)
+
+
 def _ensure_yt_dlp_cli():
     """Throttled update/install of yt-dlp binary. Prioritizes working version."""
     if platform.system().lower() != "windows":
@@ -1274,6 +1399,9 @@ def _ensure_yt_dlp_cli():
 
     # Check for working yt-dlp
     exe = None
+    # The copy we own and may overwrite. Anything else (a system/PATH install)
+    # only ever gets offered "-U".
+    managed_exes = {local_exe}
 
     # 0. Bundled copy shipped with the app (sys._MEIPASS/bin/yt-dlp.exe).
     bundled_exe = None
@@ -1283,23 +1411,29 @@ def _ensure_yt_dlp_cli():
         if os.path.isfile(candidate) and works(candidate):
             bundled_exe = candidate
             if not is_windows_installed_build():
-                # Portable builds run from a writable folder and can self-update
-                # the bundled copy in place, so use it directly.
+                # Portable builds run from a writable folder, so the bundled copy
+                # is ours to update. It used to be used as-is and never touched,
+                # which pinned portable installs to whatever shipped in the
+                # release — months stale, and YouTube extraction breaks fast.
                 _log(f"Using bundled yt-dlp at {candidate}")
                 current_path = os.environ.get("PATH", "")
                 if bundled_bin not in current_path:
                     os.environ["PATH"] = os.pathsep.join([bundled_bin, current_path])
-                return
-            # Installed (Program Files) builds can't write to the bundled copy, so
-            # seed a writable per-user copy from it and manage/update that instead.
-            if not (os.path.isfile(local_exe) and works(local_exe)):
-                try:
-                    shutil.copy2(candidate, local_exe)
-                    _log(f"Seeded writable yt-dlp copy at {local_exe}")
-                except Exception as e:
-                    _log(f"Could not seed writable yt-dlp copy: {e}")
+                managed_exes.add(candidate)
+                exe = candidate
+            else:
+                # Installed (Program Files) builds can't write to the bundled copy, so
+                # seed a writable per-user copy from it and manage/update that instead.
+                if not (os.path.isfile(local_exe) and works(local_exe)):
+                    try:
+                        shutil.copy2(candidate, local_exe)
+                        _log(f"Seeded writable yt-dlp copy at {local_exe}")
+                    except Exception as e:
+                        _log(f"Could not seed writable yt-dlp copy: {e}")
 
-    if os.path.isfile(local_exe) and works(local_exe):
+    if exe:
+        pass  # portable bundled copy, handled by the shared update block below
+    elif os.path.isfile(local_exe) and works(local_exe):
         exe = local_exe
         _log(f"Using local yt-dlp at {exe}")
     elif bundled_exe:
@@ -1318,9 +1452,20 @@ def _ensure_yt_dlp_cli():
             _log(f"Using system yt-dlp at {exe}")
 
     if exe:
-        if _should_check_updates("ytdlp_cli_update"):
-            _log("Updating yt-dlp CLI...")
-            _run_quiet([exe, "-U"])
+        # Only start the 24h throttle once the update has actually landed, so a
+        # copy that fails to update retries on the next launch instead of
+        # sitting stale for a day at a time (which is how it fell a month
+        # behind and started failing YouTube extraction outright).
+        if _should_check_updates("ytdlp_cli_update", mark=False):
+            if exe in managed_exes:
+                if _update_managed_ytdlp(exe, works):
+                    _mark_update_checked("ytdlp_cli_update")
+            else:
+                # Someone else's yt-dlp (system/PATH install): offer -U but never
+                # overwrite a binary we do not manage.
+                _log("Updating system yt-dlp CLI...")
+                if _run_quiet([exe, "-U"], timeout=300) == 0:
+                    _mark_update_checked("ytdlp_cli_update")
         # When using our own managed copy, make sure its bin dir is searched first.
         if exe == local_exe:
             current = os.environ.get("PATH", "")

@@ -213,11 +213,27 @@ if errorlevel 1 (
     echo [WARN] Extraction-stack upgrade failed; continuing with the pinned versions.
 )
 
-echo [BlindRSS Build] Ensuring yt-dlp binary is present...
-"%VENV_PYTHON%" -c "from core.dependency_check import _ensure_yt_dlp_cli; _ensure_yt_dlp_cli()"
-if not exist "%SCRIPT_DIR%bin\\yt-dlp.exe" (
-    echo [BlindRSS Build] Downloading yt-dlp.exe...
-    "%VENV_PYTHON%" -c "import pathlib, urllib.request; p=pathlib.Path(r'%SCRIPT_DIR%bin\\yt-dlp.exe'); p.parent.mkdir(parents=True, exist_ok=True); urllib.request.urlretrieve('https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe', p.as_posix())"
+REM Same trap, and it bites harder: the embedded yt_dlp module is frozen into the
+REM bundle and can never self-update at runtime, so whatever version the venv
+REM holds at build time is what that release is stuck with forever. YouTube
+REM breaks extraction every few weeks, so this must be the newest on every build.
+echo [BlindRSS Build] Upgrading the embedded yt-dlp module to the latest release...
+"%VENV_PYTHON%" -m pip install --upgrade "yt-dlp[default]"
+if errorlevel 1 (
+    echo [X] Could not upgrade the embedded yt-dlp module. Build cannot continue.
+    exit /b 1
+)
+"%VENV_PYTHON%" -c "import yt_dlp; print('embedded yt_dlp:', yt_dlp.version.__version__)"
+
+REM Always refresh the bundled yt-dlp to the newest release. It used to be
+REM downloaded only when missing, so once bin\yt-dlp.exe existed every later
+REM release shipped that same stale binary (a month old by the time YouTube
+REM extraction started failing outright). bin\ is untracked build output.
+echo [BlindRSS Build] Updating bundled yt-dlp binary to the latest release...
+"%VENV_PYTHON%" -c "import pathlib, sys; sys.path.insert(0, r'%SCRIPT_DIR%'); from core.dependency_check import download_latest_ytdlp, ytdlp_version; p=pathlib.Path(r'%SCRIPT_DIR%bin\\yt-dlp.exe'); p.parent.mkdir(parents=True, exist_ok=True); ok=download_latest_ytdlp(str(p), works=lambda c: bool(ytdlp_version(c))); print('bundled yt-dlp:', ytdlp_version(str(p)) or 'MISSING'); sys.exit(0 if (ok or p.exists()) else 1)"
+if errorlevel 1 (
+    echo [X] Could not obtain a working yt-dlp.exe. Build cannot continue.
+    exit /b 1
 )
 if not exist "%SCRIPT_DIR%bin\\yt-dlp.exe" (
     echo [X] yt-dlp.exe not found in "%SCRIPT_DIR%bin". Build cannot continue.
