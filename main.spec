@@ -122,6 +122,10 @@ packages_to_collect = [
     # ordinary HTTP attempt fails, so PyInstaller cannot discover it from the
     # normal startup graph. Browser/driver binaries are downloaded per-user.
     'seleniumbase', 'selenium', 'mycdp',
+    # Tier-3 challenge escalation (driverless CDP Chromium + Turnstile
+    # auto-click), likewise imported lazily and only after the UC session
+    # settles on a challenge it cannot clear.
+    'pydoll', 'websockets', 'aiofiles',
     # extruct/mf2py: metadata enrichment. mf2py ships a 'backcompat-rules'
     # data directory it loads at import time; without collecting it, every
     # `import extruct` in the frozen app dies with FileNotFoundError.

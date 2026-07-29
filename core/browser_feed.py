@@ -8,6 +8,11 @@ SeleniumBase is imported lazily and is never involved in the normal refresh
 path. The UC/CDP Chromium session always uses SeleniumBase's ``headless2``
 mode so no browser window, taskbar button, or user interaction is exposed.
 
+When the UC session settles on a challenge it cannot clear, one escalated
+attempt runs through pydoll (driverless CDP Chromium with a Turnstile
+auto-clicker), which reaches managed challenges that patched-WebDriver
+sessions cannot. pydoll is likewise imported lazily and fails closed.
+
 The entry point fails closed.  It returns a small requests-compatible response
 only after the browser body has been structurally validated as RSS, Atom, CDF,
 or JSON Feed; browser errors, ordinary HTML pages, and missing optional runtime
@@ -433,6 +438,184 @@ def _settle_page(sb, *, timeout_s: float, feed_only: bool, cancel_event) -> str 
     return None
 
 
+# ---------------------------------------------------------------------------
+# Tier-3 escalation: pydoll (driverless CDP Chromium with a Turnstile
+# auto-clicker). SeleniumBase UC patches WebDriver; pydoll has no WebDriver at
+# all and performs a humanized click on the Turnstile widget, which clears
+# some managed challenges that defeat the UC session. It runs at most once per
+# fetch, only after the UC session settled on a challenge it could not clear,
+# and it fails closed exactly like the primary path.
+# ---------------------------------------------------------------------------
+_PYDOLL_PROFILE_DIRNAME = "feed_browser_pydoll_profile"
+_PYDOLL_BUDGET_MAX_SECONDS = 90.0
+_PYDOLL_SETTLE_POLL_SECONDS = 0.5
+_pydoll_unavailable = False  # process-lifetime once import/setup fails
+
+
+def _pydoll_binary_location(runtime_dir: str) -> str | None:
+    """Return an explicit browser binary for pydoll, or None for auto-detect.
+
+    pydoll has no driver download of its own (it needs none), so when no system
+    Chrome exists it reuses the Chrome-for-Testing runtime SeleniumBase may
+    already have downloaded into the writable data directory.
+    """
+    if _google_chrome_available():
+        return None
+    candidates = (
+        ("chrome-win64", "chrome.exe"),
+        ("chrome-linux64", "chrome"),
+        ("chrome-mac-x64", "Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing"),
+        ("chrome-mac-arm64", "Google Chrome for Testing.app", "Contents", "MacOS", "Google Chrome for Testing"),
+    )
+    for parts in candidates:
+        path = os.path.join(runtime_dir, *parts)
+        if os.path.isfile(path):
+            return path
+    return None
+
+
+async def _pydoll_attempt(
+    target: str,
+    *,
+    budget_s: float,
+    feed_only: bool,
+    cancel_event,
+    proxy: str | None,
+    profile_dir: str,
+    runtime_dir: str,
+):
+    """Run one bounded pydoll fetch; return (text, final_url, cookies, ua)."""
+    import asyncio
+
+    from pydoll.browser.chromium import Chrome
+    from pydoll.browser.options import ChromiumOptions
+
+    options = ChromiumOptions()
+    # The browser must stay completely invisible (same rule as headless2).
+    options.headless = True
+    binary = _pydoll_binary_location(runtime_dir)
+    if binary:
+        options.binary_location = binary
+    options.add_argument(f"--user-data-dir={profile_dir}")
+    if proxy:
+        options.add_argument(f"--proxy-server={str(proxy).strip()}")
+
+    deadline = time.monotonic() + budget_s
+    async with Chrome(options=options) as browser:
+        tab = await browser.start()
+        nav_timeout = max(10, min(int(budget_s), 45))
+        # Registers the Turnstile auto-clicker for the load that follows; on a
+        # page without a challenge it is a bounded no-op.
+        async with tab.expect_and_bypass_cloudflare_captcha(time_to_wait_captcha=5):
+            await tab.go_to(target, timeout=nav_timeout)
+        while not _cancelled(cancel_event):
+            try:
+                source = str(await tab.page_source or "")
+            except Exception:
+                source = ""
+            text = _usable_document(source, feed_only=feed_only)
+            if text is not None:
+                final_url = target
+                user_agent = ""
+                try:
+                    response = await tab.execute_script(
+                        "return location.href", return_by_value=True
+                    )
+                    value = str(response["result"]["result"].get("value") or "").strip()
+                    if value:
+                        final_url = value
+                except Exception:
+                    log.debug("Could not read the pydoll browser URL", exc_info=True)
+                try:
+                    response = await tab.execute_script(
+                        "return navigator.userAgent", return_by_value=True
+                    )
+                    user_agent = str(response["result"]["result"].get("value") or "").strip()
+                except Exception:
+                    log.debug("Could not read the pydoll browser User-Agent", exc_info=True)
+                try:
+                    cookies = await tab.get_cookies()
+                except Exception:
+                    log.debug("Could not read cookies from the pydoll session", exc_info=True)
+                    cookies = []
+                return text, final_url, cookies, user_agent
+            if time.monotonic() >= deadline:
+                return None
+            await asyncio.sleep(_PYDOLL_SETTLE_POLL_SECONDS)
+    return None
+
+
+def _fetch_with_pydoll(
+    target: str,
+    *,
+    timeout_s: float,
+    feed_only: bool,
+    cancel_event,
+    proxy: str | None,
+) -> BrowserPageResponse | None:
+    """Escalate a challenge-blocked UC attempt to pydoll; fail closed to None."""
+    global _pydoll_unavailable
+    if _pydoll_unavailable or _cancelled(cancel_event):
+        return None
+    try:
+        import pydoll  # noqa: F401
+    except Exception:
+        log.info("pydoll escalation is unavailable because pydoll could not be imported")
+        _pydoll_unavailable = True
+        return None
+
+    import asyncio
+
+    data_dir = config_mod.get_data_dir()
+    runtime_dir = os.path.join(data_dir, _RUNTIME_DIRNAME)
+    profile_dir = os.path.join(data_dir, _PYDOLL_PROFILE_DIRNAME)
+    try:
+        os.makedirs(profile_dir, exist_ok=True)
+    except OSError:
+        log.exception("Could not prepare the pydoll browser profile directory")
+        _pydoll_unavailable = True
+        return None
+
+    budget_s = min(max(float(timeout_s or 90.0), 20.0), _PYDOLL_BUDGET_MAX_SECONDS)
+    log.info("Escalating to pydoll browser fetch url=%s", target)
+    try:
+        result = asyncio.run(
+            asyncio.wait_for(
+                _pydoll_attempt(
+                    target,
+                    budget_s=budget_s,
+                    feed_only=feed_only,
+                    cancel_event=cancel_event,
+                    proxy=proxy,
+                    profile_dir=profile_dir,
+                    runtime_dir=runtime_dir,
+                ),
+                timeout=budget_s + 15.0,  # launch/teardown slack beyond the poll budget
+            )
+        )
+    except Exception:
+        log.info("pydoll browser fetch failed for %s", target, exc_info=True)
+        return None
+    if result is None or _cancelled(cancel_event):
+        return None
+
+    text, final_url, cookies, user_agent = result
+    try:
+        from core import site_cookies
+
+        site_cookies.record_browser_session(final_url, cookies, user_agent)
+    except Exception:
+        log.debug("Could not store the pydoll clearance cookies", exc_info=True)
+    log.info(
+        "pydoll browser %s fetch succeeded bytes=%s url=%s",
+        "feed" if feed_only else "page",
+        len(text.encode("utf-8")),
+        final_url,
+    )
+    response_type = BrowserFeedResponse if feed_only else BrowserPageResponse
+    return response_type(text=text, url=final_url)
+
+
 def _fetch_browser_document(
     url: str,
     *,
@@ -498,6 +681,7 @@ def _fetch_browser_document(
         log.info("Attempting automated browser feed fallback url=%s", target)
         text = None
         final_url = target
+        sb = None
         # A warm session can still have been killed off-process (crash, driver
         # restart), and that only shows up on use. One retry from scratch covers it.
         for attempt in range(2):
@@ -524,6 +708,28 @@ def _fetch_browser_document(
                 if remember_failures and not _cancelled(cancel_event):
                     _record_negative_result(target)
                 return None
+
+        if text is None and not _cancelled(cancel_event):
+            # Tier-3 escalation: only when the UC session settled on a challenge
+            # it could not clear. One extra page-source read decides; a page that
+            # simply failed for another reason never pays the second launch.
+            challenge_seen = False
+            if sb is not None:
+                try:
+                    challenge_seen = _looks_like_challenge_page(sb.get_page_source() or "")
+                except Exception:
+                    log.debug("Could not re-read page source for challenge check", exc_info=True)
+            if challenge_seen:
+                response = _fetch_with_pydoll(
+                    target,
+                    timeout_s=timeout_s,
+                    feed_only=feed_only,
+                    cancel_event=cancel_event,
+                    proxy=proxy,
+                )
+                if response is not None:
+                    _clear_negative_result(target)
+                    return response
 
         if text is not None:
             log.info(

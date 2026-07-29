@@ -63,6 +63,11 @@ packages_to_collect = [
     "seleniumbase",
     "selenium",
     "mycdp",
+    # Tier-3 challenge escalation (driverless CDP Chromium + Turnstile
+    # auto-click), imported lazily like the primary browser fallback.
+    "pydoll",
+    "websockets",
+    "aiofiles",
     # extruct/mf2py: metadata enrichment. mf2py ships a 'backcompat-rules'
     # data directory it loads at import time; without collecting it, every
     # `import extruct` in the frozen app dies with FileNotFoundError.
