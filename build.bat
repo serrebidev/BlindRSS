@@ -230,7 +230,9 @@ REM downloaded only when missing, so once bin\yt-dlp.exe existed every later
 REM release shipped that same stale binary (a month old by the time YouTube
 REM extraction started failing outright). bin\ is untracked build output.
 echo [BlindRSS Build] Updating bundled yt-dlp binary to the latest release...
-"%VENV_PYTHON%" -c "import pathlib, sys; sys.path.insert(0, r'%SCRIPT_DIR%'); from core.dependency_check import download_latest_ytdlp, ytdlp_version; p=pathlib.Path(r'%SCRIPT_DIR%bin\\yt-dlp.exe'); p.parent.mkdir(parents=True, exist_ok=True); ok=download_latest_ytdlp(str(p), works=lambda c: bool(ytdlp_version(c))); print('bundled yt-dlp:', ytdlp_version(str(p)) or 'MISSING'); sys.exit(0 if (ok or p.exists()) else 1)"
+REM Run from the repo root (as the other -c invocations here do) so core/ is
+REM importable: %SCRIPT_DIR% ends in a backslash and cannot go in a raw string.
+"%VENV_PYTHON%" -c "import pathlib, sys; from core.dependency_check import download_latest_ytdlp, ytdlp_version; p=pathlib.Path('bin')/'yt-dlp.exe'; p.parent.mkdir(parents=True, exist_ok=True); ok=download_latest_ytdlp(str(p), works=lambda c: bool(ytdlp_version(c))); print('bundled yt-dlp:', ytdlp_version(str(p)) or 'MISSING'); sys.exit(0 if (ok or p.exists()) else 1)"
 if errorlevel 1 (
     echo [X] Could not obtain a working yt-dlp.exe. Build cannot continue.
     exit /b 1
