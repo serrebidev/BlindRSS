@@ -2,6 +2,7 @@
 # This file is part of BlindRSS
 # SPDX-License-Identifier: MIT
 
+import io
 import math
 import os
 import shutil
@@ -10,17 +11,14 @@ import tempfile
 import threading
 import unittest
 import wave
+from unittest import mock
 
 from core.audio_silence import (
     _detect_vad_ranges,
     detect_silence_ranges_from_pcm,
     scan_audio_for_silence,
+    webrtcvad,
 )
-
-try:
-    import webrtcvad
-except Exception:  # pragma: no cover - optional dependency
-    webrtcvad = None
 
 
 def _build_pcm(segments, sample_rate=16000):
@@ -38,6 +36,49 @@ def _build_pcm(segments, sample_rate=16000):
 
 
 class SilenceDetectionTests(unittest.TestCase):
+    def test_python314_uses_native_vad_without_pkg_resources(self):
+        """The wheels' legacy wrapper must not disable its working extension."""
+        if webrtcvad is None:
+            self.skipTest("native _webrtcvad extension not installed")
+        vad = webrtcvad.Vad(0)
+        self.assertFalse(vad.is_speech(bytes(480), 8000))
+
+    def test_vad_mode_falls_back_to_rms_when_native_extension_is_absent(self):
+        """An optional-extension failure must not disable Silence Skip."""
+        pcm = _build_pcm([(400, 0.0), (500, 0.6)], sample_rate=8000)
+
+        class _FakeProcess:
+            def __init__(self):
+                self.stdout = io.BytesIO(pcm)
+                self.stderr = io.BytesIO()
+                self.returncode = 0
+
+            def poll(self):
+                return self.returncode
+
+            def wait(self, timeout=None):
+                return self.returncode
+
+            def kill(self):
+                self.returncode = -9
+
+        with (
+            mock.patch("core.audio_silence.webrtcvad", None),
+            mock.patch("core.audio_silence.shutil.which", return_value="ffmpeg"),
+            mock.patch("core.audio_silence.subprocess.Popen", return_value=_FakeProcess()),
+        ):
+            ranges = scan_audio_for_silence(
+                "episode.mp3",
+                sample_rate=8000,
+                window_ms=30,
+                min_silence_ms=300,
+                threshold_db=-38.0,
+                detection_mode="vad",
+            )
+
+        self.assertTrue(ranges)
+        self.assertLess(abs(ranges[0][1] - 400), 80)
+
     def test_detect_silence_from_pcm(self):
         # 0-400ms silence, 400-1100ms tone, 1100-2000ms silence, 2000-2600ms tone
         pcm = _build_pcm([

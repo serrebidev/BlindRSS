@@ -12,16 +12,13 @@ from PyInstaller.utils.hooks import collect_all
 
 # Build-time warning hygiene (keep in sync with portable.spec). These
 # UserWarnings fire while PyInstaller imports third-party packages to scan
-# them; neither is fixable in this repo and neither affects the app at
-# runtime:
+# them; the remaining warning is not fixable in this repo and does not affect
+# the app at runtime:
 # - pydantic (transitive dep of the pyatv casting stack) warns that its
 #   bundled V1 compat shim is unsupported on Python >= 3.14. pyatv still uses
 #   the V1 API, so pydantic.v1 must stay in the bundle.
-# - webrtcvad imports the deprecated pkg_resources API (already filtered for
-#   the test suite in pytest.ini).
 _BUILD_WARNING_IGNORES = (
     "Core Pydantic V1 functionality",
-    "pkg_resources is deprecated as an API",
 )
 for _msg in _BUILD_WARNING_IGNORES:
     # Filter this (spec/Analysis) process; `message` is a regex matched at the
@@ -172,11 +169,8 @@ hiddenimports = [
     'core.translation_updates',
 ]
 
-try:
-    import webrtcvad  # noqa: F401
-    hiddenimports.append('webrtcvad')
-except Exception:
-    pass
+if importlib.util.find_spec('_webrtcvad') is not None:
+    hiddenimports.append('_webrtcvad')
 
 if importlib.util.find_spec('win32com') is not None:
     hiddenimports.extend(['pythoncom', 'pywintypes', 'win32com', 'win32com.client'])

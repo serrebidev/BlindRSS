@@ -1066,6 +1066,7 @@ class MinifluxProvider(RSSProvider):
                     if batch_5xx_limit > 0
                     else worker_count
                 )
+                probing = batch_5xx_limit > 0 and worker_count > 1
                 _fill_window(max(1, probe_window))
                 while futures:
                     done, _pending = concurrent.futures.wait(
@@ -1081,10 +1082,17 @@ class MinifluxProvider(RSSProvider):
                     if self._targeted_refresh_route_in_cooldown():
                         for pending in futures:
                             pending.cancel()
+                    elif probing:
+                        # Let the complete initial probe group settle before
+                        # submitting anything else. Refilling this window after
+                        # each individual completion let feeds 4 and 5 reach the
+                        # wire while the third probe was still pending, making
+                        # the three-failure breaker leak requests in production.
+                        if not futures:
+                            probing = False
+                            _fill_window(worker_count)
                     else:
-                        with batch_lock:
-                            route_proven = bool(batch_state["route_proven"])
-                        _fill_window(worker_count if route_proven else max(1, probe_window))
+                        _fill_window(worker_count)
 
         return results
 

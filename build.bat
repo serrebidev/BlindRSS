@@ -200,7 +200,7 @@ if exist "requirements.txt" (
 	    )
 ) else (
     echo [WARN] requirements.txt not found. Installing defaults...
-    "%VENV_PYTHON%" -m pip install wxPython feedparser requests beautifulsoup4 yt-dlp python-dateutil mutagen python-vlc pychromecast async-upnp-client pyatv trafilatura^>=2.1.0 webrtcvad-wheels brotli curl_cffi html5lib lxml setuptools^<81
+    "%VENV_PYTHON%" -m pip install wxPython feedparser requests beautifulsoup4 yt-dlp python-dateutil mutagen python-vlc pychromecast async-upnp-client pyatv trafilatura^>=2.1.0 webrtcvad-wheels brotli curl_cffi html5lib lxml setuptools^>=83
     if errorlevel 1 exit /b 1
 )
 

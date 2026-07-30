@@ -5,6 +5,7 @@
 
 import glob
 import importlib.util
+import importlib.util
 import os
 import sys
 import warnings
@@ -13,12 +14,10 @@ from pathlib import Path
 from PyInstaller.utils.hooks import collect_all
 
 # Build-time warning hygiene (keep in sync with the audit note in main.spec):
-# pydantic's V1 shim warns on Python >= 3.14 (pyatv still needs it) and
-# webrtcvad imports the deprecated pkg_resources API. Both fire while
-# PyInstaller imports packages to scan them and are not fixable here.
+# pydantic's V1 shim warns on Python >= 3.14 (pyatv still needs it). It fires
+# while PyInstaller imports packages to scan them and is not fixable here.
 _BUILD_WARNING_IGNORES = (
     "Core Pydantic V1 functionality",
-    "pkg_resources is deprecated as an API",
 )
 for _msg in _BUILD_WARNING_IGNORES:
     warnings.filterwarnings("ignore", message=_msg, category=UserWarning)
@@ -229,12 +228,8 @@ for pkg in packages_to_collect:
 datas = [item for item in datas if not _is_foreign_selenium_manager(item)]
 binaries = [item for item in binaries if not _is_foreign_selenium_manager(item)]
 
-try:
-    import webrtcvad  # noqa: F401
-
-    hiddenimports.append("webrtcvad")
-except Exception:
-    pass
+if importlib.util.find_spec("_webrtcvad") is not None:
+    hiddenimports.append("_webrtcvad")
 
 add_data(ROOT / "sounds", "sounds")
 add_data(ROOT / "README.md", ".")

@@ -10,8 +10,8 @@ from array import array
 from typing import Callable, Iterable, List, Optional, Sequence, Tuple
 
 try:
-    import webrtcvad
-except Exception:
+    from . import webrtcvad_compat as webrtcvad
+except (ImportError, OSError):
     webrtcvad = None
 
 
@@ -295,7 +295,9 @@ def scan_audio_for_silence(
     Use ffmpeg to decode an arbitrary URL/file to PCM and detect silent spans.
     Returns a list of (start_ms, end_ms) pairs.
 
-    detection_mode: "vad" (WebRTC VAD) or "rms" (volume-based fallback for tests).
+    detection_mode: "vad" (WebRTC VAD when available) or "rms". If the
+    optional native VAD extension is unavailable, "vad" safely falls back to
+    RMS detection instead of disabling Silence Skip.
 
     Pacing: with ``position_provider`` and a positive ``lead_ms``, the scan stops
     reading once it is that far ahead of the reported playback position. ffmpeg
@@ -396,11 +398,7 @@ def scan_audio_for_silence(
             except Exception:
                 preexec_fn = None
 
-    use_vad = (detection_mode == "vad")
-    if use_vad and webrtcvad is None:
-        # Check before spawning ffmpeg: raising after Popen leaked a running
-        # child process (ResourceWarning: subprocess ... is still running).
-        raise RuntimeError("webrtcvad not available; install the webrtcvad package")
+    use_vad = detection_mode == "vad" and webrtcvad is not None
 
     proc = subprocess.Popen(
         cmd,

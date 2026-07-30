@@ -87,21 +87,44 @@ def test_batch_of_5xx_trips_the_breaker_and_stops_the_rest_of_the_batch():
 
 
 def test_parallel_batch_probes_only_to_breaker_limit_before_expanding():
-    """The production multi-worker path must stop at three network calls too."""
+    """Do not refill the probe window while its final request is pending."""
     p = _bare_provider(miniflux_targeted_refresh_workers=15)
     attempted = []
     attempted_lock = threading.Lock()
+    first_two_done = threading.Event()
+    release_third = threading.Event()
+    completed = 0
 
     def _fake_targeted(fid, cancel_event=None):
+        nonlocal completed
         with attempted_lock:
             attempted.append(str(fid))
+        if str(fid) == "3":
+            assert release_third.wait(timeout=5), "test did not release third probe"
+        else:
+            with attempted_lock:
+                completed += 1
+                if completed == 2:
+                    first_two_done.set()
         return {"ok": False, "status_code": 500, "used_cache": False,
                 "endpoint": f"/v1/feeds/{fid}/refresh", "method": "PUT",
                 "error_body": None}
 
     p._request_targeted_refresh = _fake_targeted  # type: ignore[method-assign]
-    p._refresh_targeted_feeds([str(i) for i in range(1, 16)])
+    worker = threading.Thread(
+        target=p._refresh_targeted_feeds,
+        args=([str(i) for i in range(1, 16)],),
+    )
+    worker.start()
 
+    assert first_two_done.wait(timeout=5), "initial probes did not complete"
+    with attempted_lock:
+        assert set(attempted) == {"1", "2", "3"}, attempted
+
+    release_third.set()
+    worker.join(timeout=5)
+
+    assert not worker.is_alive()
     assert p._targeted_refresh_route_in_cooldown()
     assert len(attempted) == 3, attempted
 
