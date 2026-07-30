@@ -363,6 +363,7 @@ def test_apply_windows_installer_verifies_and_launches_helper(monkeypatch, tmp_p
         "_verify_authenticode_signature",
         lambda path, thumbs: (path == str(installer) and thumbs == ("AABBCC",), ""),
     )
+    monkeypatch.setattr(updater.tempfile, "gettempdir", lambda: str(tmp_path))
     captured = {}
 
     def fake_launch(helper, parent_pid, install_dir, staging_root, **kwargs):
@@ -413,6 +414,7 @@ def test_apply_windows_prefers_helper_from_target_release(monkeypatch, tmp_path)
         signing_thumbprints=("AABBCC",),
     )
     monkeypatch.setattr(updater, "_verify_authenticode_signature", lambda *_args: (True, ""))
+    monkeypatch.setattr(updater.tempfile, "gettempdir", lambda: str(tmp_path))
 
     captured = {}
 
@@ -436,6 +438,7 @@ def test_apply_windows_prefers_helper_from_target_release(monkeypatch, tmp_path)
     assert ok, message
     assert captured["helper_text"] == "fixed target helper"
     assert captured["staging_root"] == str(stage)
+    assert os.path.commonpath([captured["helper"], str(temp_root)]) != str(temp_root)
 
 
 def test_startup_cleanup_preserves_fresh_helper_artifacts(monkeypatch, tmp_path):

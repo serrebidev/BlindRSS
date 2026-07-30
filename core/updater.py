@@ -599,6 +599,31 @@ def _launch_update_helper(
         return False, _("Failed to start update helper: {error}").format(error=e)
 
 
+def _copy_windows_update_helper(helper_path: str) -> str:
+    """Copy the helper outside the work root it must delete on success.
+
+    The batch helper cannot synchronously remove a temp root that contains the
+    running batch file.  A uniquely named system-temp copy lets the helper make
+    removal of the download/extraction root its final synchronous success step;
+    the batch then uses its synchronous self-delete epilogue for this tiny copy.
+    """
+    fd, helper_copy = tempfile.mkstemp(
+        prefix="BlindRSS_update_helper_",
+        suffix=".bat",
+        dir=tempfile.gettempdir(),
+    )
+    os.close(fd)
+    try:
+        shutil.copy2(helper_path, helper_copy)
+    except Exception:
+        try:
+            os.remove(helper_copy)
+        except OSError:
+            pass
+        raise
+    return helper_copy
+
+
 def _make_update_temp_root(install_dir: str) -> str:
     """Create a temp working directory for updates.
 
@@ -862,13 +887,10 @@ def _apply_windows(info, install_dir, temp_root, extract_dir, debug_mode, report
 
     report(_("Preparing restart…"), None)
 
-    helper_run_path = helper_path
     try:
-        helper_temp = os.path.join(temp_root, WINDOWS_UPDATE_HELPER_NAME)
-        shutil.copy2(helper_path, helper_temp)
-        helper_run_path = helper_temp
-    except Exception:
-        helper_run_path = helper_path
+        helper_run_path = _copy_windows_update_helper(helper_path)
+    except Exception as e:
+        return False, _("Failed to start update helper: {error}").format(error=e)
 
     show_log = False
     try:
@@ -890,6 +912,10 @@ def _apply_windows(info, install_dir, temp_root, extract_dir, debug_mode, report
         show_log=show_log,
     )
     if not ok:
+        try:
+            os.remove(helper_run_path)
+        except OSError:
+            pass
         return False, msg
 
     return True, "Update prepared. The app will restart after it exits."
@@ -915,13 +941,10 @@ def _apply_windows_installer(
         return False, msg
 
     report(_("Preparing restart…"), None)
-    helper_run_path = helper_path
     try:
-        helper_temp = os.path.join(temp_root, WINDOWS_UPDATE_HELPER_NAME)
-        shutil.copy2(helper_path, helper_temp)
-        helper_run_path = helper_temp
-    except Exception:
-        helper_run_path = helper_path
+        helper_run_path = _copy_windows_update_helper(helper_path)
+    except Exception as e:
+        return False, _("Failed to start update helper: {error}").format(error=e)
 
     show_log = False
     try:
@@ -944,6 +967,10 @@ def _apply_windows_installer(
         installer_path=installer_path,
     )
     if not ok:
+        try:
+            os.remove(helper_run_path)
+        except OSError:
+            pass
         return False, msg
     return True, "Installer update prepared. The app will restart after it exits."
 

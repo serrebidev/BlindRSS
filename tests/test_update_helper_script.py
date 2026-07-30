@@ -58,6 +58,8 @@ def test_update_helper_relocated_batch_shell_exits_cleanly():
 
     assert 'start "" /b cmd /d /c call "!TMP_HELPER!"' in text
     assert 'start "" /b "!TMP_HELPER!"' not in text
+    assert "TrimEnd('\\') + '\\'" in text
+    assert "[StringComparison]::OrdinalIgnoreCase" in text
 
 
 def test_update_helper_supports_signed_installer_updates():
@@ -125,13 +127,14 @@ def test_update_helper_terminates_orphaned_bundled_executable(tmp_path):
         return
 
     install = tmp_path / "BlindRSS"
-    staging = tmp_path / "staging"
+    temp_root = tmp_path / "BlindRSS_update_work"
+    staging = temp_root / "extract" / "BlindRSS"
     helper_bin = install / "_internal" / "bin"
     helper_bin.mkdir(parents=True)
-    staging.mkdir()
+    staging.mkdir(parents=True)
 
     locker_exe = helper_bin / "yt-dlp.exe"
-    helper_copy = tmp_path / "helper.bat"
+    helper_copy = tmp_path / "BlindRSS_update_helper_test.bat"
     shutil.copy2(HELPER, helper_copy)
     shutil.copy2(ping_exe, locker_exe)
     shutil.copy2(where_exe, install / "BlindRSS.exe")
@@ -150,7 +153,7 @@ def test_update_helper_terminates_orphaned_bundled_executable(tmp_path):
         completed = subprocess.run(
             [
                 str(cmd_exe), "/d", "/q", "/c", helper_copy.name,
-                "0", str(install), str(staging), "BlindRSS.exe", "", "0",
+                "0", str(install), str(staging), "BlindRSS.exe", str(temp_root), "0",
             ],
             cwd=tmp_path,
             capture_output=True,
@@ -161,8 +164,24 @@ def test_update_helper_terminates_orphaned_bundled_executable(tmp_path):
 
         assert completed.returncode == 0, completed.stdout + completed.stderr
         assert (install / "updated.txt").read_text(encoding="utf-8") == "new build"
+        assert not temp_root.exists(), "successful update left its temp root behind"
+        for _ in range(100):
+            if not helper_copy.exists():
+                break
+            time.sleep(0.05)
+        assert not helper_copy.exists(), "successful update left its helper copy behind"
         locker.wait(timeout=5)
     finally:
         if locker.poll() is None:
             locker.kill()
             locker.wait(timeout=5)
+
+
+def test_success_cleanup_is_final_and_synchronous():
+    text = _helper_text()
+
+    cleanup = text.index(':cleanup_temp_root_now')
+    fallback = text.index('if errorlevel 1 call :schedule_temp_cleanup', cleanup)
+    assert cleanup < fallback
+    assert 'Cleaned temp root' in text
+    assert '(goto) 2>nul & del /f /q "%~f0"' in text

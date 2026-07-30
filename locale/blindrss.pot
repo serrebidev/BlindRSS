@@ -786,24 +786,24 @@ msgstr ""
 msgid "Authenticode verification failed: PowerShell was not found."
 msgstr ""
 
-#: core/updater.py:805
+#: core/updater.py:830
 msgid "Verifying download…"
 msgstr ""
 
-#: core/updater.py:820
+#: core/updater.py:845
 msgid "Extracting update…"
 msgstr ""
 
-#: core/updater.py:858
-#: core/updater.py:912
-#: core/updater.py:990
+#: core/updater.py:883
+#: core/updater.py:938
+#: core/updater.py:1017
 msgid "Verifying signature…"
 msgstr ""
 
-#: core/updater.py:863
-#: core/updater.py:917
-#: core/updater.py:995
-#: core/updater.py:1015
+#: core/updater.py:888
+#: core/updater.py:943
+#: core/updater.py:1022
+#: core/updater.py:1042
 msgid "Preparing restart…"
 msgstr ""
 
@@ -835,45 +835,45 @@ msgstr ""
 msgid "Update manifest has an invalid SHA-256 hash."
 msgstr ""
 
-#: core/updater.py:760
+#: core/updater.py:785
 msgid "Auto-update is not available for this build."
 msgstr ""
 
-#: core/updater.py:808
+#: core/updater.py:833
 msgid "Downloaded update failed SHA-256 verification."
 msgstr ""
 
-#: core/updater.py:910
+#: core/updater.py:936
 msgid "Downloaded Windows installer is missing."
 msgstr ""
 
-#: core/updater.py:978
+#: core/updater.py:1005
 msgid "Could not locate the running .app bundle to update."
 msgstr ""
 
-#: core/updater.py:986
+#: core/updater.py:1013
 msgid "Update package does not contain a BlindRSS.app bundle."
 msgstr ""
 
-#: core/updater.py:988
+#: core/updater.py:1015
 msgid "Update package .app is missing its executable."
 msgstr ""
 
-#: core/updater.py:1013
+#: core/updater.py:1040
 msgid "Update package is missing the BlindRSS executable."
 msgstr ""
 
-#: core/updater.py:792
-#: core/updater.py:800
+#: core/updater.py:817
+#: core/updater.py:825
 msgid "Downloading update…"
 msgstr ""
 
-#: core/updater.py:833
+#: core/updater.py:858
 #: core/updater.py:218
 msgid "Auto-update is not supported on this platform ({platform})."
 msgstr ""
 
-#: core/updater.py:972
+#: core/updater.py:999
 msgid "Update signature verification failed: {error}"
 msgstr ""
 
@@ -925,17 +925,17 @@ msgstr ""
 msgid "Authenticode verification failed: {error}"
 msgstr ""
 
-#: core/updater.py:840
+#: core/updater.py:865
 msgid "Update package is missing {name}."
 msgstr ""
 
-#: core/updater.py:854
-#: core/updater.py:908
-#: core/updater.py:1009
+#: core/updater.py:879
+#: core/updater.py:934
+#: core/updater.py:1036
 msgid "{name} is missing from the install directory."
 msgstr ""
 
-#: core/updater.py:982
+#: core/updater.py:1009
 msgid "{name} is missing from the app bundle."
 msgstr ""
 
@@ -956,15 +956,17 @@ msgid "Unsupported update archive type: {type}"
 msgstr ""
 
 #: core/updater.py:599
-#: core/updater.py:1073
+#: core/updater.py:893
+#: core/updater.py:947
+#: core/updater.py:1100
 msgid "Failed to start update helper: {error}"
 msgstr ""
 
-#: core/updater.py:803
+#: core/updater.py:828
 msgid "Failed to download update: {error}"
 msgstr ""
 
-#: core/updater.py:824
+#: core/updater.py:849
 msgid "Failed to extract update: {error}"
 msgstr ""
 

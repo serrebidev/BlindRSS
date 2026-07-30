@@ -9,6 +9,9 @@ rem Always log updater output so failures aren't silent when running hidden.
 for /f %%T in ('powershell -NoProfile -InputFormat None -Command "(Get-Date).ToString(\"yyyyMMddHHmmss\")"') do set "RUNSTAMP=%%T"
 set "LOG_FILE=%TEMP%\BlindRSS_update_!RUNSTAMP!_!RANDOM!.log"
 set "SENTINEL=__BLINDRSS_UPDATE_DONE__"
+set "DELETE_SELF=0"
+set "HELPER_BASENAME=%~n0"
+if /I "!HELPER_BASENAME:~0,23!"=="BlindRSS_update_helper_" set "DELETE_SELF=1"
 
 set "UPDATE_MODE=archive"
 if /I "%~1"=="--installer" (
@@ -39,7 +42,14 @@ if %RC% equ 0 (
     rem Failure - write sentinel so any running log window will close
     echo %SENTINEL%>>"%LOG_FILE%"
 )
-exit /b %RC%
+if not "%RC%"=="0" exit /b %RC%
+if "!DELETE_SELF!"=="1" (
+    rem End the batch context before deleting this external helper copy. This
+    rem is synchronous and avoids both a lingering cleanup process and cmd's
+    rem noisy "batch file cannot be found" message.
+    (goto) 2>nul & del /f /q "%~f0" >nul 2>nul
+)
+exit /b 0
 
 :main
 echo [BlindRSS Update] Log: "%LOG_FILE%"
@@ -56,7 +66,7 @@ if /I "%UPDATE_MODE%"=="installer" (
 rem Ensure we are not running from within the install directory
 if not defined BLINDRSS_UPDATE_HELPER_RELOCATED (
     set "SCRIPT_PATH=%~f0"
-    powershell -NoProfile -InputFormat None -Command "$sp=[string]$env:SCRIPT_PATH; $inst=[string]$env:INSTALL_DIR; if ($sp -and $inst -and $sp.ToLower().StartsWith($inst.ToLower())) { exit 0 } else { exit 1 }" >nul 2>nul
+    powershell -NoProfile -InputFormat None -Command "$sp=[IO.Path]::GetFullPath([string]$env:SCRIPT_PATH); $inst=([IO.Path]::GetFullPath([string]$env:INSTALL_DIR)).TrimEnd('\') + '\'; if ($sp -and $inst -and $sp.StartsWith($inst, [StringComparison]::OrdinalIgnoreCase)) { exit 0 } else { exit 1 }" >nul 2>nul
     if not errorlevel 1 (
         set "BLINDRSS_UPDATE_HELPER_RELOCATED=1"
         for /f %%T in ('powershell -NoProfile -InputFormat None -Command "(Get-Date).ToString(\"yyyyMMddHHmmss\")"') do set "HSTAMP=%%T"
@@ -187,7 +197,10 @@ if not exist "%INSTALL_DIR%\.windows-installed" (
 
 echo [BlindRSS Update] Launching app...
 start "" /b "%INSTALL_DIR%\%EXE_NAME%"
-if not "%TEMP_ROOT%"=="" call :schedule_temp_cleanup "%TEMP_ROOT%"
+if not "%TEMP_ROOT%"=="" (
+    call :cleanup_temp_root_now "%TEMP_ROOT%"
+    if errorlevel 1 call :schedule_temp_cleanup "%TEMP_ROOT%"
+)
 exit /b 0
 
 :installer_failure
@@ -301,7 +314,8 @@ if "%TEMP_ROOT%"=="" (
 )
 
 if not "%TEMP_ROOT%"=="" (
-    call :schedule_temp_cleanup "%TEMP_ROOT%"
+    call :cleanup_temp_root_now "%TEMP_ROOT%"
+    if errorlevel 1 call :schedule_temp_cleanup "%TEMP_ROOT%"
 )
 
 endlocal
@@ -360,6 +374,45 @@ if /I "%PARENT_NAME%"=="extract" (
 :derive_done
 endlocal & set "TEMP_ROOT="
 exit /b 0
+
+:cleanup_temp_root_now
+setlocal enabledelayedexpansion
+set "CLEAN_ROOT=%~1"
+if "!CLEAN_ROOT!"=="" goto :cleanup_root_ok
+
+for %%I in ("!CLEAN_ROOT!") do set "CLEAN_ROOT=%%~fI"
+if not exist "!CLEAN_ROOT!" goto :cleanup_root_ok
+if /I "!CLEAN_ROOT!"=="%INSTALL_DIR%" goto :cleanup_root_failed
+if /I "!CLEAN_ROOT!"=="%SystemRoot%" goto :cleanup_root_failed
+if /I "!CLEAN_ROOT!"=="%SystemDrive%\" goto :cleanup_root_failed
+echo(!CLEAN_ROOT!| find /I "BlindRSS_update_" >nul
+if errorlevel 1 goto :cleanup_root_failed
+
+set "CLEAN_ATTEMPTS=0"
+:cleanup_root_retry
+set /a CLEAN_ATTEMPTS+=1
+rmdir /s /q "!CLEAN_ROOT!" >nul 2>nul
+if not exist "!CLEAN_ROOT!" goto :cleanup_root_removed
+if !CLEAN_ATTEMPTS! geq 5 goto :cleanup_root_failed
+powershell -NoProfile -InputFormat None -Command "Start-Sleep -Seconds 1" >nul 2>nul
+goto :cleanup_root_retry
+
+:cleanup_root_removed
+echo [BlindRSS Update] Cleaned temp root "!CLEAN_ROOT!"
+for %%I in ("!CLEAN_ROOT!\..") do set "CLEAN_PARENT=%%~fI"
+for %%I in ("!CLEAN_PARENT!") do set "CLEAN_PARENT_NAME=%%~nxI"
+if /I "!CLEAN_PARENT_NAME!"=="_BlindRSS_update_tmp" (
+    rmdir "!CLEAN_PARENT!" >nul 2>nul
+)
+
+:cleanup_root_ok
+endlocal
+exit /b 0
+
+:cleanup_root_failed
+echo [WARN] Could not remove successful-update temp root synchronously: "!CLEAN_ROOT!"
+endlocal
+exit /b 1
 
 :schedule_temp_cleanup
 setlocal
