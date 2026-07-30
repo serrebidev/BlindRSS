@@ -86,6 +86,26 @@ def test_batch_of_5xx_trips_the_breaker_and_stops_the_rest_of_the_batch():
     assert attempted == ["1", "2", "3"]
 
 
+def test_parallel_batch_probes_only_to_breaker_limit_before_expanding():
+    """The production multi-worker path must stop at three network calls too."""
+    p = _bare_provider(miniflux_targeted_refresh_workers=15)
+    attempted = []
+    attempted_lock = threading.Lock()
+
+    def _fake_targeted(fid, cancel_event=None):
+        with attempted_lock:
+            attempted.append(str(fid))
+        return {"ok": False, "status_code": 500, "used_cache": False,
+                "endpoint": f"/v1/feeds/{fid}/refresh", "method": "PUT",
+                "error_body": None}
+
+    p._request_targeted_refresh = _fake_targeted  # type: ignore[method-assign]
+    p._refresh_targeted_feeds([str(i) for i in range(1, 16)])
+
+    assert p._targeted_refresh_route_in_cooldown()
+    assert len(attempted) == 3, attempted
+
+
 def test_a_working_feed_resets_the_consecutive_counter():
     """Isolated bad feeds must not park a route that is otherwise healthy."""
     p = _bare_provider()

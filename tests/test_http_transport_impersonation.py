@@ -87,6 +87,26 @@ def test_plain_get_merges_default_headers(monkeypatch):
     assert sent["Referer"] == "https://example.com/"
 
 
+def test_caller_user_agent_replaces_stale_client_hints(monkeypatch):
+    rec = _Recorder("requests")
+    monkeypatch.setattr(utils, "requests", rec)
+    ua = (
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+        "(KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36"
+    )
+
+    utils.safe_requests_get(
+        "https://example.com/feed",
+        headers={"User-Agent": ua},
+        site_cookies=False,
+    )
+
+    sent = rec.calls[0][2]["headers"]
+    assert sent["User-Agent"] == ua
+    assert '"Google Chrome";v="146"' in sent["sec-ch-ua"]
+    assert 'v="151"' not in sent["sec-ch-ua"]
+
+
 def test_plain_post_merges_default_headers_and_payload(monkeypatch):
     rec = _Recorder("requests")
     monkeypatch.setattr(utils, "requests", rec)
@@ -165,3 +185,23 @@ def test_request_logging_redacts_secrets(monkeypatch, caplog):
     assert "sid=abc" not in blob
     assert "<redacted>" in blob
     assert "X-Public" in blob  # non-sensitive headers are still logged
+
+
+def test_request_logging_redacts_query_credentials(monkeypatch, caplog):
+    req_rec = _Recorder("requests")
+    monkeypatch.setattr(utils, "requests", req_rec)
+    secret = "signed-secret-value"
+    with caplog.at_level(logging.DEBUG, logger=utils.log.name):
+        utils.safe_requests_get(f"https://media.example/file?sig={secret}")
+    blob = "\n".join(record.getMessage() for record in caplog.records)
+    assert secret not in blob
+    assert "?<redacted>" in blob
+
+
+def test_proxy_capability_is_redacted_from_logged_url():
+    secret = "unguessable-capability"
+    rendered = utils.redact_url_for_log(
+        f"http://127.0.0.1:1234/{secret}/proxy?url=https%3A%2F%2Fexample.com"
+    )
+    assert secret not in rendered
+    assert "/<capability>/proxy" in rendered

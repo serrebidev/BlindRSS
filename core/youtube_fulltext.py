@@ -59,6 +59,9 @@ def is_youtube_video_url(url: str) -> bool:
 
 
 class _YtdlpLogger:
+    def __init__(self):
+        self.incomplete_data = False
+
     def debug(self, message):
         LOG.debug("yt-dlp: %s", message)
 
@@ -66,6 +69,8 @@ class _YtdlpLogger:
         LOG.debug("yt-dlp: %s", message)
 
     def warning(self, message):
+        if "incomplete data received" in str(message or "").lower():
+            self.incomplete_data = True
         LOG.warning("yt-dlp: %s", message)
 
     def error(self, message):
@@ -85,6 +90,7 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
 
     extract_url = normalize_ytdlp_single_item_url(url)
 
+    logger = _YtdlpLogger()
     options = {
         "skip_download": True,
         "quiet": True,
@@ -94,6 +100,7 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
         "no_warnings": True,
         "socket_timeout": max(5, int(timeout or 20)),
         "retries": 2,
+        "extractor_retries": 6,
         "extractor_args": {
             "youtube": {
                 "player_client": youtube_player_client_list(),
@@ -104,11 +111,47 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
             }
         },
         "getcomments": bool(include_comments),
-        "logger": _YtdlpLogger(),
+        "logger": logger,
     }
     with yt_dlp.YoutubeDL(options) as ydl:
         info = ydl.extract_info(extract_url, download=False)
-    return info if isinstance(info, dict) else {}
+    if not isinstance(info, dict):
+        return {}
+
+    # YouTube occasionally cuts off a comment continuation with "Incomplete
+    # data received" while still returning a partial document. Retry the whole
+    # extraction once and union comments by id so a transient failure does not
+    # silently truncate the accessible discussion.
+    if include_comments and logger.incomplete_data:
+        retry_logger = _YtdlpLogger()
+        retry_options = dict(options)
+        retry_options["logger"] = retry_logger
+        try:
+            with yt_dlp.YoutubeDL(retry_options) as ydl:
+                retry_info = ydl.extract_info(extract_url, download=False)
+            if isinstance(retry_info, dict):
+                merged = []
+                seen = set()
+                for item in list(info.get("comments") or []) + list(retry_info.get("comments") or []):
+                    if not isinstance(item, dict):
+                        continue
+                    key = str(item.get("id") or "").strip() or json.dumps(item, sort_keys=True, default=str)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    merged.append(item)
+                retry_info["comments"] = merged
+                info = retry_info
+                logger = retry_logger
+        except Exception:
+            LOG.debug("YouTube comment completeness retry failed", exc_info=True)
+        if logger.incomplete_data:
+            info["_blindrss_comments_incomplete"] = True
+            LOG.warning(
+                "YouTube returned an incomplete public-comment continuation after retry; "
+                "preserving all comments received"
+            )
+    return info
 
 
 def chapters_from_info(info: dict, url: str = "") -> list[dict]:
@@ -312,6 +355,10 @@ def article_fields_from_info(info: dict, url: str, *, timeout: int = 20) -> dict
         sections.append("No subtitles were available.")
 
     sections.append("Comments")
+    if info.get("_blindrss_comments_incomplete"):
+        sections.append(
+            "YouTube returned an incomplete comment page after retry; all comments received are shown below."
+        )
     comment_lines = format_comments(info.get("comments"))
     sections.extend(comment_lines or ["No public comments were available."])
     return {

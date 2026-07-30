@@ -16,12 +16,14 @@
 
 import base64
 import hashlib
+import hmac
 import http.server
 import json
 import logging
 import mimetypes
 import os
 import shutil
+import secrets
 import socket
 import socketserver
 import subprocess
@@ -303,7 +305,28 @@ class StreamProxyHandler(http.server.BaseHTTPRequestHandler):
     # HEAD + Range.
     protocol_version = "HTTP/1.1"
 
+    def _authorized(self, path: str, query_string: str) -> bool:
+        """Require the unguessable capability embedded in every generated URL."""
+        try:
+            supplied = str(path or "").lstrip("/").split("/", 1)[0]
+            if not supplied:
+                supplied = (urllib.parse.parse_qs(query_string).get("token") or [""])[0]
+            expected = str(getattr(self.server, "proxy_token", "") or "")
+            return bool(expected and supplied and hmac.compare_digest(str(supplied), expected))
+        except Exception:
+            return False
+
+    def _reject_unauthorized(self) -> None:
+        self.send_response(403)
+        self.send_header("Content-Length", "0")
+        self.send_header("Connection", "close")
+        self.end_headers()
+
     def do_OPTIONS(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if not self._authorized(parsed.path, parsed.query):
+            self._reject_unauthorized()
+            return
         # CORS preflight support (harmless for media fetchers).
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -321,16 +344,25 @@ class StreamProxyHandler(http.server.BaseHTTPRequestHandler):
     def _handle_request(self, send_body: bool):
         parsed = urllib.parse.urlparse(self.path)
 
+        # The server is reachable from the LAN for casting. Treat its random token
+        # as a capability so another machine cannot use /proxy as an open proxy or
+        # /file as an arbitrary local-file reader merely by discovering the port.
+        if not self._authorized(parsed.path, parsed.query):
+            self._reject_unauthorized()
+            return
+        token_prefix = "/" + str(getattr(self.server, "proxy_token", "") or "")
+        route_path = parsed.path[len(token_prefix):] if parsed.path.startswith(token_prefix) else parsed.path
+
         # --- Route: /transcode/<session_id>/<filename> ---
-        if parsed.path.startswith("/transcode/"):
-            return self._serve_transcode(parsed.path, send_body)
+        if route_path.startswith("/transcode/"):
+            return self._serve_transcode(route_path, send_body)
 
         # --- Route: /file ---
-        if parsed.path == "/file":
+        if route_path == "/file":
             return self._serve_local_file(parsed.query, send_body)
 
         # --- Route: /proxy ---
-        if parsed.path == "/proxy":
+        if route_path == "/proxy":
             return self._serve_proxy(parsed.query, send_body)
 
         self.send_error(404, "Not Found")
@@ -518,7 +550,11 @@ class StreamProxyHandler(http.server.BaseHTTPRequestHandler):
         method = "GET" if send_body else "HEAD"
 
         try:
-            LOG.info("Proxying (%s): %s", method, target_url)
+            try:
+                target_host = urllib.parse.urlsplit(target_url).hostname or "unknown"
+            except Exception:
+                target_host = "unknown"
+            LOG.debug("Proxying %s media from host=%s", method, target_host)
             req = urllib.request.Request(target_url, headers=req_headers, method=method)
 
             with urllib.request.urlopen(req, timeout=15) as response:
@@ -569,6 +605,9 @@ class StreamProxyHandler(http.server.BaseHTTPRequestHandler):
                         headers_param = ""
                         if headers_val:
                             headers_param = "&headers=" + urllib.parse.quote(headers_val, safe="")
+                        token_path = urllib.parse.quote(
+                            str(getattr(self.server, "proxy_token", "") or ""), safe=""
+                        )
 
                         for line in text.splitlines():
                             s = line.strip()
@@ -579,7 +618,10 @@ class StreamProxyHandler(http.server.BaseHTTPRequestHandler):
                             # Relative segment/playlist -> absolute
                             abs_url = urllib.parse.urljoin(base_url, s)
                             # Point back through proxy so segments carry headers/range too
-                            new_lines.append(f"/proxy?url={urllib.parse.quote(abs_url, safe='')}{headers_param}")
+                            new_lines.append(
+                                f"/{token_path}/proxy?url={urllib.parse.quote(abs_url, safe='')}"
+                                f"{headers_param}"
+                            )
 
                         out_text = "\n".join(new_lines) + "\n"
                         out = out_text.encode("utf-8")
@@ -620,9 +662,13 @@ class StreamProxyHandler(http.server.BaseHTTPRequestHandler):
             except Exception:
                 pass
 
-    # Uncomment to silence request logs entirely.
-    # def log_message(self, format, *args):
-    #     pass
+    def log_message(self, format, *args):
+        """Never expose capability tokens, signed media URLs, paths, or headers."""
+        if LOG.isEnabledFor(logging.DEBUG):
+            try:
+                LOG.debug("StreamProxy client=%s status=%s", self.client_address[0], args[1])
+            except Exception:
+                pass
 
 
 class StreamProxy:
@@ -634,6 +680,7 @@ class StreamProxy:
         self.lock = threading.Lock()
         self._cleanup_thread: Optional[threading.Thread] = None
         self._running = False
+        self._token = secrets.token_urlsafe(32)
 
     def start(self):
         if self.server:
@@ -641,6 +688,7 @@ class StreamProxy:
 
         # Bind to all interfaces so Chromecast/TV can connect.
         self.server = _QuietThreadingTCPServer(("0.0.0.0", 0), StreamProxyHandler)
+        self.server.proxy_token = self._token
         self.port = self.server.server_address[1]
         self._running = True
 
@@ -706,7 +754,8 @@ class StreamProxy:
 
         query = urllib.parse.urlencode(params)
         host = self._get_url_host(device_ip)
-        return f"http://{host}:{self.port}/proxy?{query}"
+        token = urllib.parse.quote(self._token, safe="")
+        return f"http://{host}:{self.port}/{token}/proxy?{query}"
 
     def get_transcoded_url(self, target_url: str, headers: Optional[Dict[str, str]] = None, device_ip: Optional[str] = None):
         if not self.server:
@@ -721,7 +770,8 @@ class StreamProxy:
                 self.converters[session_id].touch()
 
         host = self._get_url_host(device_ip)
-        return f"http://{host}:{self.port}/transcode/{session_id}/stream.m3u8"
+        token = urllib.parse.quote(self._token, safe="")
+        return f"http://{host}:{self.port}/{token}/transcode/{session_id}/stream.m3u8"
 
     def get_file_url(self, file_path: str, device_ip: Optional[str] = None) -> str:
         if not self.server:
@@ -729,7 +779,9 @@ class StreamProxy:
 
         host = self._get_url_host(device_ip)
         b64_path = _safe_b64encode(file_path.encode("utf-8"))
-        return f"http://{host}:{self.port}/file?path={urllib.parse.quote(b64_path, safe='')}"
+        query = urllib.parse.urlencode({"path": b64_path})
+        token = urllib.parse.quote(self._token, safe="")
+        return f"http://{host}:{self.port}/{token}/file?{query}"
 
     def get_converter(self, session_id):
         with self.lock:

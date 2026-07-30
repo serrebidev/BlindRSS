@@ -595,7 +595,11 @@ class ChromecastCaster(BaseCaster):
             
                 if proxy and file_path:
                     proxied_url = proxy.get_file_url(file_path, device_ip=device_ip)
-                    LOG.info('Casting local file via StreamProxy: %s -> %s', proxied_url, file_path)
+                    LOG.info(
+                        'Casting local file via StreamProxy: %s file=%s',
+                        utils.redact_url_for_log(proxied_url),
+                        os.path.basename(file_path),
+                    )
                 else:
                     needs_proxy = False
             
@@ -616,10 +620,17 @@ class ChromecastCaster(BaseCaster):
                             proxied_url = proxy.get_transcoded_url(url, headers, device_ip=device_ip)
                             stream_type = 'LIVE'
                             content_type_actual = 'application/x-mpegURL'
-                            LOG.info('Remuxing MPEG-TS to HLS via proxy: %s', proxied_url)
+                            LOG.info(
+                                'Remuxing MPEG-TS to HLS via proxy: %s',
+                                utils.redact_url_for_log(proxied_url),
+                            )
                         else:
                             proxied_url = proxy.get_proxied_url(url, headers, device_ip=device_ip)
-                            LOG.info('Casting to Chromecast via proxy: %s -> %s', proxied_url, url)
+                            LOG.info(
+                                'Casting to Chromecast via proxy: %s source=%s',
+                                utils.redact_url_for_log(proxied_url),
+                                utils.redact_url_for_log(url),
+                            )
                     else:
                         proxied_url = url
             

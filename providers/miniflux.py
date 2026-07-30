@@ -990,7 +990,7 @@ class MinifluxProvider(RSSProvider):
         results: dict[str, dict[str, Any]] = {}
         worker_count = self._targeted_refresh_worker_count(len(ordered_ids))
         batch_5xx_limit = self._targeted_refresh_route_batch_5xx_limit()
-        batch_state = {"consecutive_5xx": 0}
+        batch_state = {"consecutive_5xx": 0, "route_proven": False}
         batch_lock = threading.Lock()
 
         def _note_route_health(info: dict[str, Any]) -> None:
@@ -1009,6 +1009,7 @@ class MinifluxProvider(RSSProvider):
                 else:
                     # Any non-5xx answer proves the route still works.
                     batch_state["consecutive_5xx"] = 0
+                    batch_state["route_proven"] = True
                     tripped, count = False, 0
             if tripped:
                 self._trip_targeted_refresh_route_breaker(count)
@@ -1040,39 +1041,50 @@ class MinifluxProvider(RSSProvider):
                 max_workers=worker_count,
                 thread_name_prefix="miniflux-refresh",
             ) as executor:
-                futures = {
-                    executor.submit(self._request_targeted_refresh, fid, cancel_event): fid
-                    for fid in ordered_ids
-                    if not self._refresh_cancelled(cancel_event)
-                }
-                for future in concurrent.futures.as_completed(futures):
+                # Probe only up to the breaker threshold initially. Submitting the
+                # entire batch at once made the breaker cosmetic: all 15 workers
+                # could reach the wire before the third 5xx was observed. Once any
+                # non-5xx proves the route works, fill the normal worker window.
+                queued_ids = iter(ordered_ids)
+                futures: dict[concurrent.futures.Future, str] = {}
+
+                def _fill_window(limit: int) -> None:
+                    while len(futures) < limit and not self._refresh_cancelled(cancel_event):
+                        if self._targeted_refresh_route_in_cooldown():
+                            return
+                        try:
+                            next_id = next(queued_ids)
+                        except StopIteration:
+                            return
+                        future = executor.submit(
+                            self._request_targeted_refresh, next_id, cancel_event
+                        )
+                        futures[future] = next_id
+
+                probe_window = (
+                    min(worker_count, batch_5xx_limit)
+                    if batch_5xx_limit > 0
+                    else worker_count
+                )
+                _fill_window(max(1, probe_window))
+                while futures:
+                    done, _pending = concurrent.futures.wait(
+                        tuple(futures),
+                        return_when=concurrent.futures.FIRST_COMPLETED,
+                    )
                     if self._refresh_cancelled(cancel_event):
                         for pending in futures:
                             pending.cancel()
-                    fid = futures[future]
-                    try:
-                        info = future.result()
-                    except concurrent.futures.CancelledError:
-                        info = {
-                            "ok": False,
-                            "used_cache": False,
-                            "status_code": None,
-                            "endpoint": f"/v1/feeds/{fid}/refresh",
-                            "method": "PUT",
-                            "error_body": None,
-                            "cancelled": True,
-                        }
-                    except Exception as e:
-                        log.debug("Miniflux targeted refresh worker failed for feed %s: %s", fid, e)
-                        info = {
-                            "ok": False,
-                            "used_cache": False,
-                            "status_code": None,
-                            "endpoint": f"/v1/feeds/{fid}/refresh",
-                            "method": "PUT",
-                            "error_body": None,
-                        }
-                    _store_result(fid, info)
+                    for future in done:
+                        fid = futures.pop(future)
+                        _store_result(fid, self._future_result_info(future, fid))
+                    if self._targeted_refresh_route_in_cooldown():
+                        for pending in futures:
+                            pending.cancel()
+                    else:
+                        with batch_lock:
+                            route_proven = bool(batch_state["route_proven"])
+                        _fill_window(worker_count if route_proven else max(1, probe_window))
 
         return results
 

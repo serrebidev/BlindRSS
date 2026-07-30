@@ -79,6 +79,48 @@ def test_shared_document_orders_all_sections_and_nests_replies(monkeypatch):
     assert text.index("First thread") < text.index("First reply") < text.index("Nested reply")
 
 
+def test_incomplete_comment_notice_is_exposed_to_reader(monkeypatch):
+    monkeypatch.setattr(utils, "safe_requests_get", lambda *args, **kwargs: _SubtitleResponse())
+    info = _info()
+    info["_blindrss_comments_incomplete"] = True
+    text = youtube_fulltext.article_fields_from_info(info, URL)["text"]
+    assert "incomplete comment page after retry" in text
+
+
+def test_incomplete_comment_extraction_retries_and_unions_comments(monkeypatch):
+    import yt_dlp
+
+    attempts = []
+    payloads = [
+        {"id": "abcDEF12345", "comments": [{"id": "one", "text": "First"}]},
+        {"id": "abcDEF12345", "comments": [{"id": "two", "text": "Second"}]},
+    ]
+
+    class _FakeYoutubeDL:
+        def __init__(self, options):
+            self.options = options
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def extract_info(self, _url, download=False):
+            index = len(attempts)
+            attempts.append(index)
+            if index == 0:
+                self.options["logger"].warning("Incomplete data received. Giving up")
+            return payloads[index]
+
+    monkeypatch.setattr(yt_dlp, "YoutubeDL", _FakeYoutubeDL)
+    info = youtube_fulltext.extract_video_info(URL, include_comments=True)
+
+    assert attempts == [0, 1]
+    assert [comment["id"] for comment in info["comments"]] == ["one", "two"]
+    assert not info.get("_blindrss_comments_incomplete")
+
+
 def test_automatic_english_subtitles_beat_authored_non_english():
     info = {
         "subtitles": {"es": [{"ext": "vtt", "url": "https://subs.example/es"}]},

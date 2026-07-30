@@ -895,12 +895,40 @@ def _redact_headers(headers: dict) -> dict:
     return redacted
 
 
+def redact_url_for_log(url: str) -> str:
+    """Return a diagnostic URL with credentials, queries, and signed paths removed."""
+    try:
+        parts = urllib.parse.urlsplit(str(url or ""))
+        if not parts.scheme or not parts.netloc:
+            return "<local-or-invalid-url>"
+        host = parts.hostname or ""
+        port = f":{parts.port}" if parts.port is not None else ""
+        netloc = f"[{host}]{port}" if ":" in host else f"{host}{port}"
+        path = parts.path or "/"
+        if host.lower().endswith("googlevideo.com"):
+            path = "/<signed-media-path>"
+        else:
+            segments = path.lstrip("/").split("/")
+            if len(segments) >= 2 and segments[1] in {"proxy", "file", "transcode"}:
+                path = f"/<capability>/{segments[1]}"
+        suffix = "?<redacted>" if parts.query else ""
+        return urllib.parse.urlunsplit((parts.scheme, netloc, path, suffix[1:], ""))
+    except Exception:
+        return "<unparseable-url>"
+
+
 def _log_http_request(method: str, url: str, headers: dict, transport: str) -> None:
     """Log an outgoing request (headers redacted) at DEBUG for diagnostics (issue #29)."""
     if not log.isEnabledFor(logging.DEBUG):
         return
     try:
-        log.debug("HTTP %s %s via %s headers=%s", method, url, transport, _redact_headers(headers))
+        log.debug(
+            "HTTP %s %s via %s headers=%s",
+            method,
+            redact_url_for_log(url),
+            transport,
+            _redact_headers(headers),
+        )
     except Exception:
         pass
 
@@ -1021,6 +1049,28 @@ def _request_safe_headers(headers: dict) -> dict:
             safe_headers[key] = encode_non_ascii_url(str(value))
         else:
             safe_headers[key] = value
+    # A caller-supplied or imported UA must never travel with the application's
+    # client hints from a different browser/version. This final normalization
+    # covers every request path, including callers that intentionally disable
+    # the managed site-cookie jar.
+    try:
+        from core import user_agents
+
+        ua = next(
+            (str(value) for key, value in safe_headers.items() if str(key).lower() == "user-agent"),
+            "",
+        )
+        if ua:
+            identity = user_agents.identity_from_string(ua)
+            safe_headers = {
+                key: value
+                for key, value in safe_headers.items()
+                if str(key).lower() not in user_agents.CLIENT_HINT_HEADERS
+            }
+            if identity is not None:
+                safe_headers.update(identity.hints)
+    except Exception:
+        log.debug("Could not synchronize User-Agent client hints", exc_info=True)
     return safe_headers
 
 

@@ -1929,7 +1929,7 @@ class PlayerFrame(wx.Frame):
         load_seq: int | None = None,
         http_headers: dict | None = None,
     ) -> None:
-        log.debug("load_vlc_url: %s", final_url)
+        log.debug("load_vlc_url: %s", utils.redact_url_for_log(final_url))
         try:
             if load_seq is None:
                 load_seq = int(getattr(self, '_active_load_seq', 0))
@@ -3218,8 +3218,8 @@ class PlayerFrame(wx.Frame):
                 self._note_seek_probe_content(url, content_type, content_len, is_hls)
                 log.info(
                     "HTTP seek probe: url=%s final=%s status=%s accept_ranges=%s content_range=%s content_type=%s content_length=%s hls=%s",
-                    url,
-                    final_url,
+                    utils.redact_url_for_log(url),
+                    utils.redact_url_for_log(final_url),
                     status,
                     accept_ranges,
                     content_range,
@@ -3228,7 +3228,7 @@ class PlayerFrame(wx.Frame):
                     is_hls,
                 )
             except Exception as e:
-                log.info("HTTP seek probe failed: url=%s err=%s", url, e)
+                log.info("HTTP seek probe failed: url=%s err=%s", utils.redact_url_for_log(url), e)
             finally:
                 try:
                     if resp is not None:
@@ -3532,7 +3532,12 @@ class PlayerFrame(wx.Frame):
             self._last_range_proxy_initial_inline_kb = initial_inline_kb
             
             proxied = proxy.proxify(register_url, headers=req_headers, skip_redirect_resolve=register_skip_resolve)
-            log.debug("Proxy URL generated: %s (register=%s skip_redirect_resolve=%s)", proxied, register_url, register_skip_resolve)
+            log.debug(
+                "Proxy URL generated: %s (register=%s skip_redirect_resolve=%s)",
+                utils.redact_url_for_log(proxied),
+                utils.redact_url_for_log(register_url),
+                register_skip_resolve,
+            )
             try:
                 if hasattr(proxy, "is_ready") and (proxy.is_ready() is False):
                     log.debug("Proxy not ready yet; proceeding without blocking")
@@ -4304,8 +4309,8 @@ class PlayerFrame(wx.Frame):
                 is_hls_hint = ".m3u8" in low
                 log.info(
                     "Media resolved: input=%s final=%s ytdlp=%s hls_hint=%s",
-                    input_url,
-                    final_url,
+                    utils.redact_url_for_log(input_url),
+                    utils.redact_url_for_log(final_url),
                     bool(use_ytdlp),
                     bool(is_hls_hint),
                 )
@@ -4347,7 +4352,7 @@ class PlayerFrame(wx.Frame):
                 proxied = bool(self._last_used_range_proxy or self._last_used_stream_proxy)
                 log.info(
                     "VLC URL: %s proxied=%s range_proxy=%s stream_proxy=%s",
-                    final_url,
+                    utils.redact_url_for_log(final_url),
                     proxied,
                     bool(self._last_used_range_proxy),
                     bool(self._last_used_stream_proxy),
