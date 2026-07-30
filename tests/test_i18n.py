@@ -141,6 +141,20 @@ def test_russian_ui_plural_forms(tmp_path, monkeypatch):
     assert i18n.ngettext(singular, plural, 5) == forms[2]
 
 
+def test_filter_rule_summary_has_complete_plural_forms_in_every_catalog():
+    singular = "Scanned {scanned} article; {changed} matched a rule."
+    plural = "Scanned {scanned} articles; {changed} matched a rule."
+    key = f"{singular}\0{plural}"
+
+    for po_path in sorted(Path("locale").glob("*/LC_MESSAGES/blindrss.po")):
+        messages = compile_translations.read_po(po_path)
+        forms = messages[key].split("\0")
+        assert all(forms), f"{po_path}: incomplete filter-rule summary translation"
+        assert all("{scanned}" in form and "{changed}" in form for form in forms), (
+            f"{po_path}: filter-rule summary placeholders were not preserved"
+        )
+
+
 def test_extractor_resolves_deferred_module_string_constants(tmp_path):
     source = tmp_path / "deferred.py"
     source.write_text(
