@@ -103,6 +103,17 @@ def _enable_debug_console(config_manager):
 
 # Essential imports
 from core.dependency_check import check_and_install_dependencies, set_user_tool_paths
+
+# A runtime-updated yt_dlp package (downloaded in the background by
+# ensure_ytdlp_module_updated) must shadow the frozen-in bundled copy BEFORE
+# anything imports yt_dlp; every app import of it is lazy, so doing it here at
+# module import time is early enough. No-op for source checkouts (pip-managed).
+try:
+    from core.dependency_check import prefer_updated_ytdlp_module
+    prefer_updated_ytdlp_module()
+except Exception:
+    pass
+
 import wx
 from core.config import ConfigManager
 from core.factory import get_provider

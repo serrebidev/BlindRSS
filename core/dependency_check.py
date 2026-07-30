@@ -11,6 +11,7 @@ import os
 import ntpath
 import glob
 import ctypes
+import re
 import time
 import tempfile
 import zipfile
@@ -1337,6 +1338,231 @@ def download_latest_ytdlp(dest_path, works=None):
             pass
 
 
+def _ytdlp_runtime_pkg_dir():
+    """Directory holding the runtime-updated embedded yt_dlp package.
+
+    The embedded yt_dlp module frozen into a release can never self-update, so
+    newer versions are downloaded as plain wheels into this writable directory
+    and put on sys.path ahead of the bundled copy (see
+    prefer_updated_ytdlp_module). Mirrors _ytdlp_runtime_bin_dir: per-user
+    LocalAppData for installed builds, beside the app for portable builds.
+    """
+    if is_windows_installed_build():
+        base_dir = os.path.join(
+            os.environ.get("LOCALAPPDATA") or tempfile.gettempdir(), "BlindRSS"
+        )
+    elif getattr(sys, "frozen", False):
+        base_dir = os.path.dirname(os.path.abspath(sys.executable))
+    else:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+    return os.path.join(base_dir, "yt-dlp-module")
+
+
+# (distribution name, top-level import package) pairs updated as a set: newer
+# yt_dlp releases can require a matching yt_dlp_ejs, so both wheels are fetched
+# together rather than letting the fresh module fall back to a stale helper.
+_YTDLP_MODULE_PACKAGES = (("yt-dlp", "yt_dlp"), ("yt-dlp-ejs", "yt_dlp_ejs"))
+_YTDLP_PKG_VERSION_RE = re.compile(r"__version__\s*=\s*['\"]([^'\"]+)['\"]")
+
+
+def _ytdlp_version_key(version):
+    """Comparable tuple for yt-dlp's date-like versions ("2026.07.04")."""
+    try:
+        return tuple(int(p) for p in re.findall(r"\d+", str(version or "")))
+    except Exception:
+        return ()
+
+
+def _read_pkg_version(pkg_path):
+    """Version string from an extracted package's version.py, without importing."""
+    try:
+        with open(os.path.join(pkg_path, "version.py"), "r", encoding="utf-8") as f:
+            m = _YTDLP_PKG_VERSION_RE.search(f.read())
+            return m.group(1).strip() if m else ""
+    except Exception:
+        return ""
+
+
+def _installed_dist_version(dist_name):
+    try:
+        return str(importlib.metadata.version(dist_name) or "").strip()
+    except Exception:
+        return ""
+
+
+def prefer_updated_ytdlp_module():
+    """Put a previously downloaded newer yt_dlp package ahead of the bundled one.
+
+    The embedded yt_dlp module is frozen into each release and cannot update
+    itself; ensure_ytdlp_module_updated() downloads newer wheels into
+    _ytdlp_runtime_pkg_dir() in the background. Call this once at startup,
+    BEFORE anything imports yt_dlp (every app import of it is lazy), so the
+    newer package wins the first import. Frozen builds only — source checkouts
+    upgrade yt-dlp through pip. Fails closed: any problem leaves the bundled
+    module in use.
+    """
+    if not getattr(sys, "frozen", False):
+        return False
+    try:
+        pkg_dir = _ytdlp_runtime_pkg_dir()
+        managed = _read_pkg_version(os.path.join(pkg_dir, "yt_dlp"))
+        if not managed:
+            return False
+        bundled = _installed_dist_version("yt-dlp")
+        if not bundled:
+            _log("Bundled yt_dlp version unknown; keeping the bundled module.")
+            return False
+        if _ytdlp_version_key(managed) <= _ytdlp_version_key(bundled):
+            return False
+        if "yt_dlp" in sys.modules:
+            return False
+        if pkg_dir not in sys.path:
+            sys.path.insert(0, pkg_dir)
+            importlib.invalidate_caches()
+        _log(f"Using runtime-updated yt_dlp {managed} (bundled {bundled}).")
+        return True
+    except Exception as e:
+        _log(f"Could not activate runtime-updated yt_dlp: {e}")
+        return False
+
+
+def _pypi_latest_wheel(dist_name, timeout=15):
+    """(version, wheel URL, sha256) for the latest wheel on PyPI, or None."""
+    try:
+        from core import utils
+
+        resp = utils.safe_requests_get(
+            f"https://pypi.org/pypi/{dist_name}/json", timeout=timeout
+        )
+        resp.raise_for_status()
+        data = resp.json() or {}
+        version = str((data.get("info") or {}).get("version") or "").strip()
+        for f in data.get("urls") or []:
+            if (
+                str(f.get("packagetype") or "") == "bdist_wheel"
+                and str(f.get("filename") or "").endswith(".whl")
+            ):
+                url = str(f.get("url") or "")
+                sha = str((f.get("digests") or {}).get("sha256") or "")
+                if version and url:
+                    return version, url, sha
+    except Exception as e:
+        _log(f"Could not query PyPI for {dist_name}: {e}")
+    return None
+
+
+def _extract_wheel_package(wheel_path, top_package, dest_dir):
+    """Extract only ``top_package/**`` from a wheel zip into dest_dir."""
+    prefix = top_package.replace(".", "/") + "/"
+    count = 0
+    with zipfile.ZipFile(wheel_path) as zf:
+        for info in zf.infolist():
+            name = str(info.filename or "")
+            if not name.startswith(prefix) or name.endswith("/"):
+                continue
+            rel = os.path.normpath(name)
+            if rel.startswith("..") or os.path.isabs(rel):
+                continue
+            target = os.path.join(dest_dir, rel)
+            os.makedirs(os.path.dirname(target), exist_ok=True)
+            with zf.open(info) as src, open(target, "wb") as out:
+                shutil.copyfileobj(src, out)
+            count += 1
+    return count
+
+
+def ensure_ytdlp_module_updated():
+    """Background self-update of the embedded yt_dlp module (frozen builds).
+
+    Downloads the newest yt-dlp (and matching yt-dlp-ejs) wheels from PyPI
+    into _ytdlp_runtime_pkg_dir(); prefer_updated_ytdlp_module() puts them on
+    sys.path at the NEXT startup, so a running process is never disturbed.
+    Same throttle semantics as the CLI updater: the 24h marker is only set
+    once the update has actually landed (or the module is already current), so
+    a failed update retries on the next launch instead of sitting stale.
+    """
+    if not getattr(sys, "frozen", False):
+        return
+    if not _should_check_updates("ytdlp_module_update", mark=False):
+        return
+    staging = ""
+    try:
+        pkg_dir = _ytdlp_runtime_pkg_dir()
+        # The active version is whichever module would be imported now: the
+        # runtime-updated copy when one was activated, else the bundled one.
+        active = _installed_dist_version("yt-dlp")
+        runtime = _read_pkg_version(os.path.join(pkg_dir, "yt_dlp"))
+        if runtime and (
+            not active or _ytdlp_version_key(runtime) > _ytdlp_version_key(active)
+        ):
+            active = runtime
+        latest_info = _pypi_latest_wheel("yt-dlp")
+        if not latest_info:
+            return  # "don't know" is never "up to date"; retry next launch
+        latest, _url, _sha = latest_info
+        if active and _ytdlp_version_key(active) >= _ytdlp_version_key(latest):
+            _mark_update_checked("ytdlp_module_update")
+            return
+        _log(
+            f"Updating embedded yt_dlp module (have {active or 'unknown'}, "
+            f"latest {latest})..."
+        )
+        staging = pkg_dir + ".new"
+        shutil.rmtree(staging, ignore_errors=True)
+        os.makedirs(staging, exist_ok=True)
+        ok = True
+        for dist_name, top_pkg in _YTDLP_MODULE_PACKAGES:
+            info = latest_info if dist_name == "yt-dlp" else _pypi_latest_wheel(dist_name)
+            if not info:
+                ok = False
+                break
+            _ver, url, sha256 = info
+            wheel_path = os.path.join(staging, f"{top_pkg}.whl")
+            if not _download_file(url, wheel_path):
+                ok = False
+                break
+            if sha256:
+                import hashlib
+
+                digest = hashlib.sha256()
+                with open(wheel_path, "rb") as f:
+                    for chunk in iter(lambda: f.read(1 << 20), b""):
+                        digest.update(chunk)
+                if digest.hexdigest().lower() != sha256.lower():
+                    _log(f"{dist_name} wheel hash mismatch; aborting module update.")
+                    ok = False
+                    break
+            if _extract_wheel_package(wheel_path, top_pkg, staging) <= 0:
+                ok = False
+                break
+            try:
+                os.remove(wheel_path)
+            except Exception:
+                pass
+        new_version = _read_pkg_version(os.path.join(staging, "yt_dlp"))
+        if ok and _ytdlp_version_key(new_version) != _ytdlp_version_key(latest):
+            _log("Extracted yt_dlp version did not match PyPI; aborting module update.")
+            ok = False
+        if ok:
+            try:
+                if os.path.isdir(pkg_dir):
+                    shutil.rmtree(pkg_dir, ignore_errors=True)
+                os.replace(staging, pkg_dir)
+                staging = ""
+                _log(
+                    f"Embedded yt_dlp module updated to {new_version}; "
+                    "active next launch."
+                )
+                _mark_update_checked("ytdlp_module_update")
+            except Exception as e:
+                _log(f"Could not install updated yt_dlp module: {e}")
+    except Exception as e:
+        _log(f"yt_dlp module self-update failed: {e}")
+    finally:
+        if staging:
+            shutil.rmtree(staging, ignore_errors=True)
+
+
 def _update_managed_ytdlp(local_exe, works):
     """Bring our own yt-dlp copy up to the newest release. True if now current.
 
@@ -1533,6 +1759,8 @@ def check_and_install_dependencies():
     if getattr(sys, "frozen", False):
         _maybe_add_windows_path()
         _ensure_yt_dlp_cli()
+        try: ensure_ytdlp_module_updated()
+        except: pass
         try: ensure_media_tools()
         except: pass
         _log("--- Dependency Check Finished (Frozen) ---")
