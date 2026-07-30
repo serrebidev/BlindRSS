@@ -92,6 +92,33 @@ def test_extract_ytdlp_info_via_cli_uses_bare_keyword_for_default_profile():
     assert "firefox" in cmd  # bare keyword when no profile path is detected
 
 
+def test_extract_ytdlp_info_via_cli_passes_cookie_file_and_impersonation():
+    captured_cmd = {}
+
+    def _fake_run(cmd, **_kwargs):
+        captured_cmd["cmd"] = list(cmd)
+        return _FakeCompletedProcess(
+            returncode=0,
+            stdout='{"url":"https://cdn.example/audio.m4a","title":"Example"}',
+        )
+
+    with patch("gui.player.subprocess.run", side_effect=_fake_run), patch(
+        "gui.player.discovery._resolve_ytdlp_cli_path", return_value="/tmp/yt-dlp"
+    ), patch("gui.player.platform.system", return_value="Windows"), patch(
+        "core.dependency_check._get_startup_info", return_value=None
+    ):
+        _extract_ytdlp_info_via_cli(
+            "https://music.youtube.com/watch?v=abc123",
+            cookie_file=r"C:\Users\alice\youtube_cookies.txt",
+            impersonate="chrome",
+        )
+
+    cmd = captured_cmd["cmd"]
+    assert cmd[cmd.index("--cookies") + 1] == r"C:\Users\alice\youtube_cookies.txt"
+    assert cmd[cmd.index("--impersonate") + 1] == "chrome"
+    assert "--cookies-from-browser" not in cmd
+
+
 def test_extract_ytdlp_info_via_cli_passes_player_client_override():
     captured_cmd = {}
 

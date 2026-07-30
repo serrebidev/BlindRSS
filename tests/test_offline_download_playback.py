@@ -367,6 +367,113 @@ def test_ytdlp_download_retries_with_wider_player_client_pool(tmp_path, monkeypa
     assert messages and messages[-1][1] == "Download complete"
 
 
+def test_ytdlp_download_recovers_through_youtube_music_frontend(tmp_path, monkeypatch):
+    """If both canonical client pools say unavailable, retry an official
+    alternate frontend with browser impersonation before failing."""
+    host = _host(tmp_path)
+    article = _article(title="YouTube Video")
+    article.url = (
+        "https://www.youtube.com/watch?v=A3TU_p5kLJI"
+        "&list=RDA3TU_p5kLJI&start_radio=1"
+    )
+    article.media_url = article.url
+    article.media_type = "video/youtube"
+    messages = []
+    commands = []
+
+    monkeypatch.setattr(
+        mainframe,
+        "wx",
+        SimpleNamespace(
+            CallAfter=lambda fn, *args, **kwargs: fn(*args, **kwargs),
+            MessageBox=lambda *args, **kwargs: messages.append(args),
+            ICON_ERROR=1,
+        ),
+    )
+    monkeypatch.setattr(mainframe.core.discovery, "_resolve_ytdlp_cli_path", lambda: "/tmp/yt-dlp")
+    monkeypatch.setattr(mainframe.core.discovery, "get_ytdlp_cookie_sources", lambda _url: [])
+    monkeypatch.setattr(mainframe.dependency_check, "_find_executable_path", lambda _name: "/tmp/ffmpeg")
+
+    def fake_run(cmd, **_kwargs):
+        commands.append(list(cmd))
+        if cmd[-1].startswith("https://music.youtube.com/watch?"):
+            target_dir = host._download_dir_for_article(article)
+            with open(os.path.join(target_dir, "YouTube Video.mp4"), "wb") as f:
+                f.write(b"merged-video")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(
+            returncode=1,
+            stdout="",
+            stderr="ERROR: [youtube] A3TU_p5kLJI: Video unavailable",
+        )
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    host._download_article_via_ytdlp(article, article.url)
+
+    assert len(commands) == 3
+    assert commands[0][-1] == "https://www.youtube.com/watch?v=A3TU_p5kLJI"
+    assert commands[1][-1] == "https://www.youtube.com/watch?v=A3TU_p5kLJI"
+    assert commands[2][-1] == "https://music.youtube.com/watch?v=A3TU_p5kLJI"
+    assert commands[2][commands[2].index("--impersonate") + 1] == "chrome"
+    assert host._downloaded_media_path_for_article(article).endswith("YouTube Video.mp4")
+    assert messages and messages[-1][1] == "Download complete"
+
+
+def test_ytdlp_download_keeps_firefox_after_chromium_dpapi(tmp_path, monkeypatch):
+    host = _host(tmp_path)
+    article = _article(title="YouTube Video")
+    article.url = "https://www.youtube.com/watch?v=A3TU_p5kLJI"
+    article.media_url = article.url
+    article.media_type = "video/youtube"
+    messages = []
+    commands = []
+
+    monkeypatch.setattr(
+        mainframe,
+        "wx",
+        SimpleNamespace(
+            CallAfter=lambda fn, *args, **kwargs: fn(*args, **kwargs),
+            MessageBox=lambda *args, **kwargs: messages.append(args),
+            ICON_ERROR=1,
+        ),
+    )
+    monkeypatch.setattr(mainframe.core.discovery, "_resolve_ytdlp_cli_path", lambda: "/tmp/yt-dlp")
+    monkeypatch.setattr(
+        mainframe.core.discovery,
+        "get_ytdlp_cookie_sources",
+        lambda _url: [("chrome",), ("edge",), ("firefox",)],
+    )
+    monkeypatch.setattr(mainframe.dependency_check, "_find_executable_path", lambda _name: "/tmp/ffmpeg")
+
+    def fake_run(cmd, **_kwargs):
+        commands.append(list(cmd))
+        if "--cookies-from-browser" not in cmd:
+            return SimpleNamespace(returncode=1, stdout="", stderr="ERROR: Video unavailable")
+        source = cmd[cmd.index("--cookies-from-browser") + 1]
+        if source == "chrome":
+            return SimpleNamespace(
+                returncode=1,
+                stdout="",
+                stderr="ERROR: Failed to decrypt with DPAPI",
+            )
+        assert source == "firefox"
+        target_dir = host._download_dir_for_article(article)
+        with open(os.path.join(target_dir, "YouTube Video.mp4"), "wb") as f:
+            f.write(b"merged-video")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    host._download_article_via_ytdlp(article, article.url)
+
+    cookie_calls = [c for c in commands if "--cookies-from-browser" in c]
+    cookie_sources = [c[c.index("--cookies-from-browser") + 1] for c in cookie_calls]
+    assert cookie_sources == ["chrome", "firefox"]
+    assert host._downloaded_media_path_for_article(article).endswith("YouTube Video.mp4")
+    assert messages and messages[-1][1] == "Download complete"
+
+
 def test_ytdlp_download_skips_fallback_pool_when_primary_succeeds(tmp_path, monkeypatch):
     """The wider client pool is a last resort: a working primary attempt
     must not pay for a second extraction."""

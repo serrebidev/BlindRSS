@@ -12497,28 +12497,39 @@ class MainFrame(wx.Frame):
         dpapi_seen = False
         timed_out = False
         # Phase 1 uses the primary player-client pool with every cookie
-        # source. If all of that fails, phase 2 retries with the wider
+        # source. If all of that fails, later phases retry with the wider
         # YOUTUBE_PLAYER_CLIENTS_FALLBACK pool (anonymous + cookies.txt only;
-        # browser cookies already failed and DPAPI churn tells us nothing),
-        # mirroring the player.py fallback: YouTube blocks individual clients,
-        # so the wider pool frequently resolves videos the primary set
-        # reports as "unavailable".
+        # browser cookies already failed and DPAPI churn tells us nothing), then
+        # the official YouTube Music and privacy-enhanced embed frontends with
+        # browser impersonation. This mirrors player.py's recovery ladder.
         fallback_attempts = [("base", [])]
         if cookiefile and os.path.isfile(cookiefile):
             fallback_attempts.append(("cookiefile", ["--cookies", cookiefile]))
-        attempt_phases = ((attempts, False), (fallback_attempts, True))
-        for phase_attempts, is_fallback in attempt_phases:
+        attempt_phases = [
+            (url, attempts, False, False),
+            (url, fallback_attempts, True, False),
+        ]
+        attempt_phases.extend(
+            (recovery_url, fallback_attempts, True, True)
+            for recovery_url in core.discovery.youtube_single_item_recovery_urls(url)
+        )
+        for target_url, phase_attempts, is_fallback, impersonate in attempt_phases:
             if is_fallback:
                 log.info(
-                    "yt-dlp download: primary attempts failed; retrying with "
-                    "the wider player-client fallback pool"
+                    "yt-dlp download: retrying with the wider player-client "
+                    "fallback pool%s",
+                    f" via {urlsplit(target_url).netloc}" if target_url != url else "",
                 )
             for kind, extra in phase_attempts:
-                # A browser-cookie source that cannot be decrypted (Chromium App-Bound
-                # Encryption, yt-dlp #10927) tells us nothing about the media, and every
-                # remaining browser source fails the same way. Stop, and keep reporting
-                # the anonymous attempt's real error instead of the DPAPI noise.
-                if kind == "cookies" and dpapi_seen:
+                # Chromium App-Bound Encryption (yt-dlp #10927) tells us nothing
+                # about the media. Skip later Chromium stores after it occurs, but
+                # still try Firefox/LibreWolf because their cookies remain readable.
+                cookie_source = extra[1] if kind == "cookies" and len(extra) > 1 else ""
+                if (
+                    kind == "cookies"
+                    and dpapi_seen
+                    and core.discovery.is_chromium_ytdlp_cookie_source(cookie_source)
+                ):
                     continue
                 # Audio presets never mux video, so the MKV rescue below does not
                 # apply to them: one attempt per cookie source is the whole loop.
@@ -12531,11 +12542,13 @@ class MainFrame(wx.Frame):
                                 core.discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK
                             )
                         )
+                    if impersonate:
+                        cmd.extend(["--impersonate", "chrome"])
                     if not audio_only:
                         cmd[cmd.index("--merge-output-format") + 1] = merge_format
                     try:
                         res = subprocess.run(
-                            cmd + extra + [url],
+                            cmd + extra + [target_url],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
                             stdin=subprocess.DEVNULL,
@@ -12579,8 +12592,8 @@ class MainFrame(wx.Frame):
                     if kind == "cookies" and core.discovery.is_ytdlp_dpapi_cookie_error(attempt_err):
                         dpapi_seen = True
                         log.info(
-                            "yt-dlp download: browser cookies unusable (Windows DPAPI); "
-                            "skipping remaining browser cookie sources"
+                            "yt-dlp download: Chromium cookies unusable (Windows DPAPI); "
+                            "retaining Firefox/LibreWolf cookie sources"
                         )
                         break
                     last_err = attempt_err or last_err

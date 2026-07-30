@@ -243,8 +243,10 @@ def _extract_ytdlp_info_via_cli(
     *,
     headers: dict | None = None,
     cookie_source: tuple | None = None,
+    cookie_file: str | None = None,
     timeout_s: int = 30,
     player_clients=None,
+    impersonate: str | None = None,
 ) -> dict:
     target_url = discovery.normalize_ytdlp_single_item_url(url)
     if not target_url:
@@ -295,6 +297,11 @@ def _extract_ytdlp_info_via_cli(
         cookie_arg = discovery.cookie_arg_for_ytdlp(cookie_source)
         if cookie_arg:
             cmd.extend(["--cookies-from-browser", cookie_arg])
+    elif cookie_file:
+        cmd.extend(["--cookies", str(cookie_file)])
+
+    if impersonate:
+        cmd.extend(["--impersonate", str(impersonate)])
 
     cmd.append(target_url)
 
@@ -3702,20 +3709,23 @@ class PlayerFrame(wx.Frame):
                     last_err = None
                     base_err = None
                     dpapi_cookie_err = None
-                    skip_cookie_attempts = False
+                    skip_chromium_cookie_attempts = False
                     tried_cookie_sources = []
                     cookie_sources = list(discovery.get_ytdlp_cookie_sources(url) or [])
                     if bool(getattr(self, "_ytdlp_browser_cookies_dpapi_unavailable", False)):
                         if cookie_sources and not bool(getattr(self, "_ytdlp_browser_cookies_dpapi_notice_shown", False)):
                             try:
-                                _log("yt-dlp browser cookies disabled for this session after a Windows DPAPI cookie decryption failure")
+                                _log("yt-dlp Chromium cookies disabled for this session after a Windows DPAPI cookie decryption failure; Firefox/LibreWolf remain enabled")
                             except Exception:
                                 pass
                             try:
                                 self._ytdlp_browser_cookies_dpapi_notice_shown = True
                             except Exception:
                                 pass
-                        cookie_sources = []
+                        cookie_sources = [
+                            source for source in cookie_sources
+                            if not discovery.is_chromium_ytdlp_cookie_source(source)
+                        ]
                     prefer_cookies = False
                     try:
                         if parsed_url and parsed_url.netloc:
@@ -3746,7 +3756,11 @@ class PlayerFrame(wx.Frame):
                             attempts.append(("cookies", source))
 
                     for kind, source in attempts:
-                        if kind == "cookies" and skip_cookie_attempts:
+                        if (
+                            kind == "cookies"
+                            and skip_chromium_cookie_attempts
+                            and discovery.is_chromium_ytdlp_cookie_source(source)
+                        ):
                             continue
                         opts = dict(base_opts)
                         if kind == "cookiefile" and source:
@@ -3770,7 +3784,7 @@ class PlayerFrame(wx.Frame):
                             if kind == "cookies" and source:
                                 if _is_ytdlp_dpapi_cookie_error(e):
                                     dpapi_cookie_err = e
-                                    skip_cookie_attempts = True
+                                    skip_chromium_cookie_attempts = True
                                     try:
                                         self._ytdlp_browser_cookies_dpapi_unavailable = True
                                         self._ytdlp_browser_cookies_dpapi_notice_shown = True
@@ -3779,7 +3793,7 @@ class PlayerFrame(wx.Frame):
                                     try:
                                         _log(
                                             f"yt-dlp cookies failed ({source[0]}): Windows DPAPI decryption unavailable; "
-                                            "skipping remaining browser cookie attempts this session"
+                                            "skipping Chromium cookie stores but retaining Firefox/LibreWolf"
                                         )
                                     except Exception:
                                         pass
@@ -3792,7 +3806,7 @@ class PlayerFrame(wx.Frame):
                         cli_last_err = None
                         cli_base_err = None
                         cli_dpapi_err = None
-                        cli_skip_cookie_attempts = bool(skip_cookie_attempts)
+                        cli_skip_chromium_cookie_attempts = bool(skip_chromium_cookie_attempts)
                         try:
                             cli_timeout_s = int(
                                 max(
@@ -3809,14 +3823,20 @@ class PlayerFrame(wx.Frame):
                         # Frozen builds can keep an up-to-date yt-dlp CLI on disk between releases.
                         # Try it before failing when embedded Python yt_dlp extraction breaks.
                         for kind, source in attempts:
-                            if kind == "cookies" and cli_skip_cookie_attempts:
+                            if (
+                                kind == "cookies"
+                                and cli_skip_chromium_cookie_attempts
+                                and discovery.is_chromium_ytdlp_cookie_source(source)
+                            ):
                                 continue
                             cli_source = source if kind == "cookies" else None
+                            cli_cookie_file = source if kind == "cookiefile" else None
                             try:
                                 info = _extract_ytdlp_info_via_cli(
                                     extract_url,
                                     headers=ytdlp_headers,
                                     cookie_source=cli_source,
+                                    cookie_file=cli_cookie_file,
                                     timeout_s=cli_timeout_s,
                                 )
                                 if kind == "cookies" and source:
@@ -3830,7 +3850,7 @@ class PlayerFrame(wx.Frame):
                                 if kind == "cookies" and source:
                                     if _is_ytdlp_dpapi_cookie_error(cli_e):
                                         cli_dpapi_err = cli_e
-                                        cli_skip_cookie_attempts = True
+                                        cli_skip_chromium_cookie_attempts = True
                                         try:
                                             self._ytdlp_browser_cookies_dpapi_unavailable = True
                                             self._ytdlp_browser_cookies_dpapi_notice_shown = True
@@ -3839,7 +3859,7 @@ class PlayerFrame(wx.Frame):
                                         try:
                                             _log(
                                                 f"yt-dlp CLI cookies failed ({source[0]}): Windows DPAPI decryption unavailable; "
-                                                "skipping remaining browser cookie attempts this session"
+                                                "skipping Chromium cookie stores but retaining Firefox/LibreWolf"
                                             )
                                         except Exception:
                                             pass
@@ -3892,6 +3912,42 @@ class PlayerFrame(wx.Frame):
                                 _log("yt-dlp resolved via CLI wider player-client fallback")
                             except Exception as fb_cli_e:
                                 last_err = fb_cli_e
+
+                    if info is None:
+                        # Some videos (notably music/art-track items) return a
+                        # different playability status on the ordinary watch
+                        # frontend than on YouTube Music or the privacy-enhanced
+                        # embedded player.  Make those official frontends the
+                        # final extraction routes and use curl_cffi's browser TLS
+                        # impersonation when the bundled CLI supports it.
+                        for recovery_url in discovery.youtube_single_item_recovery_urls(extract_url):
+                            recovery_headers = dict(ytdlp_headers)
+                            try:
+                                recovery_parsed = urlparse(recovery_url)
+                                recovery_headers["Origin"] = (
+                                    f"{recovery_parsed.scheme}://{recovery_parsed.netloc}"
+                                )
+                            except Exception:
+                                pass
+                            recovery_cookie_files = [None]
+                            if cookiefile:
+                                recovery_cookie_files.append(cookiefile)
+                            for recovery_cookie_file in recovery_cookie_files:
+                                try:
+                                    info = _extract_ytdlp_info_via_cli(
+                                        recovery_url,
+                                        headers=recovery_headers,
+                                        cookie_file=recovery_cookie_file,
+                                        timeout_s=30,
+                                        player_clients=discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK,
+                                        impersonate="chrome",
+                                    )
+                                    _log(f"yt-dlp resolved via alternate YouTube frontend: {urlparse(recovery_url).netloc}")
+                                    break
+                                except Exception as recovery_e:
+                                    last_err = recovery_e
+                            if info is not None:
+                                break
 
                     if info is None:
                         rokfin_probe = None
@@ -4503,56 +4559,85 @@ class PlayerFrame(wx.Frame):
         last_err = _("download failed")
         base_err = ""
         dpapi_seen = False
-        wider = False
-        for kind, extra in attempts:
-            # See the merged downloader: once browser cookies fail to decrypt on
-            # Windows, every other browser source fails identically and the error
-            # would mask the anonymous attempt's real reason.
-            if kind == "cookies" and dpapi_seen:
-                continue
-            try:
-                if int(load_seq) != int(getattr(self, "_active_load_seq", 0) or 0):
-                    return  # a newer load superseded us
-            except Exception:
-                return
-            cmd = list(base_cmd) + extra + [extract_url]
-            try:
-                res = subprocess.run(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    stdin=subprocess.DEVNULL,
-                    creationflags=creationflags,
-                    startupinfo=startupinfo,
-                    timeout=900,
-                    text=True,
-                    encoding="utf-8",
-                    errors="replace",
-                )
-            except Exception as e:
-                last_err = str(e)
-                continue
-            if int(getattr(res, "returncode", -1) or 0) == 0:
-                produced = self._resolve_printed_filepath(res.stdout, cache_dir)
-                if produced:
-                    break
-            attempt_err = (res.stderr or res.stdout or "").strip()
-            if kind == "cookies" and discovery.is_ytdlp_dpapi_cookie_error(attempt_err):
-                dpapi_seen = True
-                _log("YouTube download-to-play: browser cookies unusable (Windows DPAPI); skipping the rest")
-                continue
-            last_err = attempt_err or last_err
-            if kind == "base":
-                # The wider-client retry appends another "base" attempt; its
-                # error is the more complete one, so let it win.
-                base_err = attempt_err or base_err
-            # On the last anonymous/cookie attempt, retry once with the wider pool.
-            if not wider and (kind, extra) == attempts[-1]:
-                wider = True
-                base_cmd[base_cmd.index("--extractor-args") + 1] = discovery.youtube_player_client_arg(
-                    discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK
-                )
-                attempts.append(("base", []))
+        cookiefile_extra = next(
+            (extra for kind, extra in attempts if kind == "cookiefile"),
+            None,
+        )
+        fallback_attempts = [("base", [])]
+        if cookiefile_extra:
+            fallback_attempts.append(("cookiefile", cookiefile_extra))
+        phases = [
+            (extract_url, discovery.YOUTUBE_PLAYER_CLIENTS, attempts, False),
+            (
+                extract_url,
+                discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK,
+                fallback_attempts,
+                False,
+            ),
+        ]
+        phases.extend(
+            (
+                recovery_url,
+                discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK,
+                fallback_attempts,
+                True,
+            )
+            for recovery_url in discovery.youtube_single_item_recovery_urls(extract_url)
+        )
+
+        for target_url, clients, phase_attempts, impersonate in phases:
+            for kind, extra in phase_attempts:
+                cookie_source = extra[1] if kind == "cookies" and len(extra) > 1 else ""
+                if (
+                    kind == "cookies"
+                    and dpapi_seen
+                    and discovery.is_chromium_ytdlp_cookie_source(cookie_source)
+                ):
+                    continue
+                try:
+                    if int(load_seq) != int(getattr(self, "_active_load_seq", 0) or 0):
+                        return  # a newer load superseded us
+                except Exception:
+                    return
+                cmd = list(base_cmd)
+                cmd[cmd.index("--extractor-args") + 1] = discovery.youtube_player_client_arg(clients)
+                if impersonate:
+                    cmd.extend(["--impersonate", "chrome"])
+                cmd.extend(extra)
+                cmd.append(target_url)
+                try:
+                    res = subprocess.run(
+                        cmd,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.PIPE,
+                        stdin=subprocess.DEVNULL,
+                        creationflags=creationflags,
+                        startupinfo=startupinfo,
+                        timeout=900,
+                        text=True,
+                        encoding="utf-8",
+                        errors="replace",
+                    )
+                except Exception as e:
+                    last_err = str(e)
+                    continue
+                if int(getattr(res, "returncode", -1) or 0) == 0:
+                    produced = self._resolve_printed_filepath(res.stdout, cache_dir)
+                    if produced:
+                        break
+                attempt_err = (res.stderr or res.stdout or "").strip()
+                if kind == "cookies" and discovery.is_ytdlp_dpapi_cookie_error(attempt_err):
+                    dpapi_seen = True
+                    _log(
+                        "YouTube download-to-play: Chromium cookies unusable "
+                        "(Windows DPAPI); retaining Firefox/LibreWolf attempts"
+                    )
+                    continue
+                last_err = attempt_err or last_err
+                if kind == "base" and target_url == extract_url and not base_err:
+                    base_err = attempt_err or base_err
+            if produced:
+                break
 
         if not produced:
             # The anonymous attempt's error is the one that explains a public item.

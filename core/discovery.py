@@ -153,6 +153,10 @@ YOUTUBE_PLAYER_CLIENTS_FALLBACK = (
     "default",
     "android_vr",
     "web_safari",
+    "web_embedded",
+    "web_music",
+    "tv_simply",
+    "tv_downgraded",
     "tv",
     "ios",
     "mweb",
@@ -214,6 +218,38 @@ def normalize_ytdlp_single_item_url(url: str) -> str:
     except Exception:
         return raw
     return raw
+
+
+def youtube_single_item_recovery_urls(url: str) -> list[str]:
+    """Return alternate official YouTube frontends for one video.
+
+    A video's playability response can differ between the ordinary watch page,
+    YouTube Music, and the privacy-enhanced embedded player.  yt-dlp normally
+    needs only the canonical watch URL, so these routes are deliberately
+    last-resort retries after its maintained default clients and BlindRSS's
+    wider client pool have both failed.
+    """
+    canonical = normalize_ytdlp_single_item_url(url)
+    try:
+        parsed = urlparse(canonical)
+        host = str(parsed.hostname or "").lower().rstrip(".")
+        if host.startswith("www."):
+            host = host[4:]
+        if host.startswith("m."):
+            host = host[2:]
+        if host != "youtube.com" or (parsed.path or "").rstrip("/") != "/watch":
+            return []
+        query = parse_qs(parsed.query or "", keep_blank_values=True)
+        video_id = str((query.get("v") or [""])[0] or "").strip()
+        if not re.fullmatch(r"[A-Za-z0-9_-]{6,}", video_id):
+            return []
+        encoded = quote(video_id, safe="-_")
+        return [
+            f"https://music.youtube.com/watch?v={encoded}",
+            f"https://www.youtube-nocookie.com/embed/{encoded}",
+        ]
+    except Exception:
+        return []
 
 
 def _resolve_ytdlp_cli_path() -> str:
@@ -715,6 +751,28 @@ def cookie_arg_for_ytdlp(source) -> str | None:
     if profile:
         return f"{browser}:{profile}"
     return browser
+
+
+def is_chromium_ytdlp_cookie_source(source) -> bool:
+    """True for cookie stores affected by Chromium App-Bound Encryption.
+
+    ``source`` may be the tuple used by yt-dlp's Python API or the formatted
+    ``browser:profile`` CLI value.  Firefox/LibreWolf must remain eligible after
+    Chrome, Edge, or another Chromium browser reports a DPAPI failure.
+    """
+    if isinstance(source, (tuple, list)):
+        browser = source[0] if source else ""
+    else:
+        browser = str(source or "").split(":", 1)[0]
+    return str(browser or "").strip().lower() in {
+        "brave",
+        "chrome",
+        "chromium",
+        "vivaldi",
+        "edge",
+        "opera",
+        "whale",
+    }
 
 
 def is_ytdlp_dpapi_cookie_error(exc_or_msg) -> bool:

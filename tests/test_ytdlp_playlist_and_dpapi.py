@@ -108,7 +108,10 @@ def test_download_to_play_reports_the_anonymous_error_not_dpapi(monkeypatch, tmp
     def _fake_run(cmd, **_kwargs):
         calls.append(list(cmd))
         if "--cookies-from-browser" in cmd:
-            return _Res(1, stderr=DPAPI_ERR)
+            source = cmd[cmd.index("--cookies-from-browser") + 1]
+            if source == "chrome":
+                return _Res(1, stderr=DPAPI_ERR)
+            return _Res(1, stderr="ERROR: Video unavailable")
         return _Res(1, stderr="ERROR: Video unavailable")
 
     monkeypatch.setattr(player_mod.subprocess, "run", _fake_run)
@@ -141,15 +144,20 @@ def test_download_to_play_reports_the_anonymous_error_not_dpapi(monkeypatch, tmp
     player_mod.PlayerFrame._ytdlp_download_and_play_worker(_Stub(), 7, RADIO_URL)
 
     cookie_calls = [c for c in calls if "--cookies-from-browser" in c]
-    # Only the first browser source is tried; the rest fail identically.
-    assert len(cookie_calls) == 1
+    # Edge is skipped after Chrome's DPAPI failure, but Firefox uses a different
+    # cookie store and must still be attempted.
+    assert len(cookie_calls) == 2
+    cookie_sources = [c[c.index("--cookies-from-browser") + 1] for c in cookie_calls]
+    assert cookie_sources == ["chrome", "firefox"]
     # And the surfaced reason is the anonymous attempt's, not the cookie noise.
     message = " ".join(str(a) for a in reported.get("args", ()))
     assert "Video unavailable" in message
     assert "DPAPI" not in message
     # The radio-mix wrapper is never sent to yt-dlp, and a final failure stays
     # inside BlindRSS instead of opening the webpage in the browser.
-    assert calls and all(
-        c[-1] == "https://www.youtube.com/watch?v=A3TU_p5kLJI" for c in calls
-    )
+    assert calls and calls[0][-1] == "https://www.youtube.com/watch?v=A3TU_p5kLJI"
+    assert any(c[-1].startswith("https://music.youtube.com/watch?") for c in calls)
+    assert any(c[-1].startswith("https://www.youtube-nocookie.com/embed/") for c in calls)
+    recovery_calls = [c for c in calls if c[-1] != "https://www.youtube.com/watch?v=A3TU_p5kLJI"]
+    assert recovery_calls and all("--impersonate" in c for c in recovery_calls)
     assert reported.get("args", ())[-1] is False

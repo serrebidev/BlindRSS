@@ -49,6 +49,34 @@ class TestYoutubePlayerClients(unittest.TestCase):
         self.assertGreater(len(fallback), len(primary))
         # Plain "android" now needs PO tokens; keep it out of the anonymous fallback.
         self.assertNotIn("android", discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK)
+        self.assertIn("web_music", discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK)
+        self.assertIn("web_embedded", discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK)
+
+    def test_radio_item_has_official_frontend_recovery_urls(self):
+        urls = discovery.youtube_single_item_recovery_urls(
+            "https://www.youtube.com/watch?v=A3TU_p5kLJI"
+            "&list=RDA3TU_p5kLJI&start_radio=1"
+        )
+        self.assertEqual(
+            urls,
+            [
+                "https://music.youtube.com/watch?v=A3TU_p5kLJI",
+                "https://www.youtube-nocookie.com/embed/A3TU_p5kLJI",
+            ],
+        )
+
+    def test_non_youtube_item_has_no_youtube_recovery_urls(self):
+        self.assertEqual(
+            discovery.youtube_single_item_recovery_urls("https://example.com/watch?v=abc123"),
+            [],
+        )
+
+    def test_dpapi_source_classification_keeps_firefox_available(self):
+        self.assertTrue(discovery.is_chromium_ytdlp_cookie_source(("chrome",)))
+        self.assertTrue(
+            discovery.is_chromium_ytdlp_cookie_source("edge:C:\\Profiles\\Edge")
+        )
+        self.assertFalse(discovery.is_chromium_ytdlp_cookie_source(("firefox",)))
 
     def test_client_override_threads_through_arg_and_list(self):
         override = ("web", "ios")
