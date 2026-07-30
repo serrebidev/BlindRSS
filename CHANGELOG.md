@@ -4,6 +4,11 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.127.3 - 2026-07-30
+
+- Preserve reader position and harden YouTube fallback.
+- Bootstrap YouTube extraction through hidden browser sessions.
+
 ## v1.127.2 - 2026-07-30
 
 - Recover YouTube playback through alternate official frontends.
