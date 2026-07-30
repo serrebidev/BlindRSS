@@ -126,7 +126,7 @@ set "BACKUP_ATTEMPTS=0"
 set /a BACKUP_ATTEMPTS+=1
 robocopy "%INSTALL_DIR%" "%BACKUP_DIR%" /E /MOVE /R:10 /W:3 /NFL /NDL /XD .git .venv __pycache__
 set RC=%ERRORLEVEL%
-if %RC% gtr 8 (
+if %RC% geq 8 (
     echo [X] Backup failed with robocopy code %RC%.
     goto :rollback
 )
@@ -144,7 +144,7 @@ goto :backup_move_attempt
 echo [BlindRSS Update] Applying update...
 robocopy "%STAGING_DIR%" "%INSTALL_DIR%" /E /MOVE /R:10 /W:3 /NFL /NDL
 set RC=%ERRORLEVEL%
-if %RC% gtr 8 (
+if %RC% geq 8 (
     echo [X] Update application failed with robocopy code %RC%.
     goto :rollback
 )
@@ -204,20 +204,32 @@ if not "%SHOW_LOG%"=="" if /I not "%SHOW_LOG%"=="0" (
     call :start_log_window "%LOG_FILE%" "%SENTINEL%"
 )
 if not "%BACKUP_DIR%"=="" if exist "%BACKUP_DIR%" (
-    robocopy "%BACKUP_DIR%" "%INSTALL_DIR%" /E /MOVE /R:10 /W:3 /NFL /NDL
+    rem Copy rather than move during recovery. A lock or duplicate that caused
+    rem the original failure must not be allowed to consume the only backup.
+    robocopy "%BACKUP_DIR%" "%INSTALL_DIR%" /E /COPY:DAT /R:10 /W:3 /NFL /NDL
+    set "ROLLBACK_RC=!ERRORLEVEL!"
+    if !ROLLBACK_RC! geq 8 (
+        echo [X] Backup restore failed with robocopy code !ROLLBACK_RC!. Backup kept at "%BACKUP_DIR%".
+    ) else (
+        echo [BlindRSS Update] Backup restored; recovery copy kept at "%BACKUP_DIR%".
+    )
 )
-start "" /b "%INSTALL_DIR%\%EXE_NAME%"
+if exist "%INSTALL_DIR%\%EXE_NAME%" (
+    start "" /b "%INSTALL_DIR%\%EXE_NAME%"
+) else (
+    echo [X] Restored application executable is missing: "%INSTALL_DIR%\%EXE_NAME%"
+)
 powershell -NoProfile -InputFormat None -Command "param([string]$log) try { Add-Type -AssemblyName PresentationFramework | Out-Null; $msg = 'BlindRSS update failed.' + \"`n`n\" + 'Log file:' + \"`n\" + $log; [System.Windows.MessageBox]::Show($msg, 'BlindRSS Update', 'OK', 'Error') | Out-Null } catch { }" "%LOG_FILE%" >nul 2>nul
 exit /b 1
 
 :ensure_app_stopped
-echo [BlindRSS Update] Waiting for process %PID% and install-owned app instances to exit...
-powershell -NoProfile -InputFormat None -Command "$ErrorActionPreference='SilentlyContinue'; $exe=[IO.Path]::GetFileNameWithoutExtension([string]$env:EXE_NAME); $install=([IO.Path]::GetFullPath([string]$env:INSTALL_DIR)).TrimEnd('\') + '\'; function Get-BlindRssProc { $items=@(); if ($exe) { $items += @(Get-Process -Name $exe -ErrorAction SilentlyContinue) }; $target=0; if ([int]::TryParse([string]$env:PID, [ref]$target)) { $p=Get-Process -Id $target -ErrorAction SilentlyContinue; if ($p) { $items += $p } }; $items | Sort-Object Id -Unique | Where-Object { try { $p=[IO.Path]::GetFullPath([string]$_.Path); $p.StartsWith($install, [StringComparison]::OrdinalIgnoreCase) } catch { $false } } }; function Wait-Gone([int]$seconds) { $deadline=(Get-Date).AddSeconds($seconds); while ((Get-Date) -lt $deadline) { $procs=@(Get-BlindRssProc); if ($procs.Count -eq 0) { return $true }; Start-Sleep -Milliseconds 500 }; return (@(Get-BlindRssProc).Count -eq 0) }; if (-not (Wait-Gone 20)) { $procs=@(Get-BlindRssProc); if ($procs.Count -gt 0) { Write-Host ('[BlindRSS Update] Asking remaining app instance(s) to close: ' + (($procs | ForEach-Object Id) -join ', ')); foreach ($p in $procs) { try { $null=$p.CloseMainWindow() } catch { } } } }; if (-not (Wait-Gone 10)) { $procs=@(Get-BlindRssProc); if ($procs.Count -gt 0) { Write-Host ('[BlindRSS Update] Forcing remaining app instance(s) to exit: ' + (($procs | ForEach-Object Id) -join ', ')); foreach ($p in $procs) { try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { } } } }; if (-not (Wait-Gone 10)) { $procs=@(Get-BlindRssProc); Write-Host ('[X] BlindRSS is still running from the install folder: ' + (($procs | ForEach-Object Id) -join ', ')); exit 1 }; Start-Sleep -Milliseconds 1500; exit 0"
+echo [BlindRSS Update] Waiting for process %PID%, app instances, and install-owned helpers to exit...
+powershell -NoProfile -InputFormat None -Command "$ErrorActionPreference='SilentlyContinue'; $exe=[IO.Path]::GetFileNameWithoutExtension([string]$env:EXE_NAME); $install=([IO.Path]::GetFullPath([string]$env:INSTALL_DIR)).TrimEnd('\') + '\'; function In-Install($p) { try { $path=[IO.Path]::GetFullPath([string]$p.Path); return $path.StartsWith($install, [StringComparison]::OrdinalIgnoreCase) } catch { return $false } }; function Get-AppProc { $items=@(); if ($exe) { $items += @(Get-Process -Name $exe -ErrorAction SilentlyContinue) }; $target=0; if ([int]::TryParse([string]$env:PID, [ref]$target)) { $p=Get-Process -Id $target -ErrorAction SilentlyContinue; if ($p) { $items += $p } }; @($items | Sort-Object Id -Unique | Where-Object { In-Install $_ }) }; function Get-InstallProc { @(Get-Process -ErrorAction SilentlyContinue | Where-Object { In-Install $_ }) }; function Wait-AppGone([int]$seconds) { $deadline=(Get-Date).AddSeconds($seconds); while ((Get-Date) -lt $deadline) { if (@(Get-AppProc).Count -eq 0) { return $true }; Start-Sleep -Milliseconds 500 }; return (@(Get-AppProc).Count -eq 0) }; function Wait-InstallGone([int]$seconds) { $deadline=(Get-Date).AddSeconds($seconds); while ((Get-Date) -lt $deadline) { if (@(Get-InstallProc).Count -eq 0) { return $true }; Start-Sleep -Milliseconds 250 }; return (@(Get-InstallProc).Count -eq 0) }; if (-not (Wait-AppGone 20)) { $procs=@(Get-AppProc); if ($procs.Count -gt 0) { Write-Host ('[BlindRSS Update] Asking remaining app instance(s) to close: ' + (($procs | ForEach-Object Id) -join ', ')); foreach ($p in $procs) { try { $null=$p.CloseMainWindow() } catch { } } } }; if (-not (Wait-AppGone 10)) { $procs=@(Get-AppProc); if ($procs.Count -gt 0) { Write-Host ('[BlindRSS Update] Forcing remaining app instance(s) to exit: ' + (($procs | ForEach-Object Id) -join ', ')); foreach ($p in $procs) { try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { } } } }; if (-not (Wait-AppGone 10)) { $procs=@(Get-AppProc); Write-Host ('[X] BlindRSS is still running from the install folder: ' + (($procs | ForEach-Object Id) -join ', ')); exit 1 }; $helpers=@(Get-InstallProc); if ($helpers.Count -gt 0) { Write-Host ('[BlindRSS Update] Stopping install-owned helper process(es): ' + (($helpers | ForEach-Object { $_.ProcessName + ' (' + $_.Id + ')' }) -join ', ')); foreach ($p in $helpers) { try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { } } }; if (-not (Wait-InstallGone 10)) { $procs=@(Get-InstallProc); Write-Host ('[X] Install-owned processes are still running: ' + (($procs | ForEach-Object { $_.ProcessName + ' (' + $_.Id + ')' }) -join ', ')); exit 1 }; Start-Sleep -Milliseconds 1500; exit 0"
 exit /b %ERRORLEVEL%
 
 :verify_install_unlocked
 echo [BlindRSS Update] Verifying install files are unlocked...
-powershell -NoProfile -InputFormat None -Command "$ErrorActionPreference='SilentlyContinue'; $install=[string]$env:INSTALL_DIR; $exe=[string]$env:EXE_NAME; $paths=@((Join-Path $install $exe),(Join-Path $install '_internal\VCRUNTIME140.dll'),(Join-Path $install '_internal\python314.dll'),(Join-Path $install '_internal\python313.dll'),(Join-Path $install '_internal\python312.dll'),(Join-Path $install '_internal\python311.dll')); $locked=@(); foreach ($path in $paths) { if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { continue }; $ok=$false; for ($i=0; $i -lt 8 -and -not $ok; $i++) { try { $fs=[IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None); $fs.Close(); $ok=$true } catch { Start-Sleep -Milliseconds 500 } }; if (-not $ok) { $locked += $path } }; if ($locked.Count -gt 0) { Write-Host '[X] Install files are still locked:'; $locked | ForEach-Object { Write-Host ('    ' + $_) }; exit 1 }; exit 0"
+powershell -NoProfile -InputFormat None -Command "$ErrorActionPreference='SilentlyContinue'; $install=[string]$env:INSTALL_DIR; $exe=[string]$env:EXE_NAME; $paths=@((Join-Path $install $exe),(Join-Path $install '_internal\VCRUNTIME140.dll'),(Join-Path $install '_internal\python314.dll'),(Join-Path $install '_internal\python313.dll'),(Join-Path $install '_internal\python312.dll'),(Join-Path $install '_internal\python311.dll')); foreach ($dir in @((Join-Path $install '_internal\bin'),(Join-Path $install 'bin'))) { if (Test-Path -LiteralPath $dir -PathType Container) { $paths += @(Get-ChildItem -LiteralPath $dir -File -Filter '*.exe' -ErrorAction SilentlyContinue | ForEach-Object FullName) } }; $paths=@($paths | Sort-Object -Unique); $locked=@(); foreach ($path in $paths) { if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { continue }; $ok=$false; for ($i=0; $i -lt 8 -and -not $ok; $i++) { try { $fs=[IO.File]::Open($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::None); $fs.Close(); $ok=$true } catch { Start-Sleep -Milliseconds 500 } }; if (-not $ok) { $locked += $path } }; if ($locked.Count -gt 0) { Write-Host '[X] Install files are still locked:'; $locked | ForEach-Object { Write-Host ('    ' + $_) }; exit 1 }; exit 0"
 exit /b %ERRORLEVEL%
 
 :verify_install_drained

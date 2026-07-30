@@ -2,6 +2,11 @@
 # This file is part of BlindRSS
 # SPDX-License-Identifier: MIT
 
+import os
+import shutil
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 
@@ -25,6 +30,9 @@ def test_update_helper_stops_running_install_instances_before_file_moves():
     assert "CloseMainWindow" in text
     assert "Stop-Process -Id $p.Id -Force" in text
     assert "[X] BlindRSS is still running from the install folder" in text
+    assert "Get-InstallProc" in text
+    assert "Stopping install-owned helper process(es)" in text
+    assert "[X] Install-owned processes are still running" in text
 
 
 def test_update_helper_checks_for_partial_backup_before_applying_update():
@@ -84,3 +92,77 @@ def test_update_helper_retries_backup_move_on_transient_lock():
     retry_label = text.index(":backup_move_attempt")
     apply_move = text.index('robocopy "%STAGING_DIR%" "%INSTALL_DIR%"')
     assert retry_label < apply_move
+
+
+def test_update_helper_probes_bundled_helper_executables_for_locks():
+    text = _helper_text()
+
+    assert "'_internal\\bin'" in text
+    assert "Get-ChildItem -LiteralPath $dir -File -Filter '*.exe'" in text
+
+
+def test_update_helper_preserves_backup_during_rollback():
+    text = _helper_text()
+    rollback_start = text.index("\n:rollback\n")
+    rollback = text[rollback_start:text.index("\n:ensure_app_stopped\n")]
+
+    assert 'robocopy "%BACKUP_DIR%" "%INSTALL_DIR%" /E /COPY:DAT' in rollback
+    assert 'robocopy "%BACKUP_DIR%" "%INSTALL_DIR%" /E /MOVE' not in rollback
+    assert 'if exist "%INSTALL_DIR%\\%EXE_NAME%"' in rollback
+    assert "if %RC% geq 8" in text
+
+
+def test_update_helper_terminates_orphaned_bundled_executable(tmp_path):
+    """A surviving yt-dlp child must not block an archive update on Windows."""
+    if sys.platform != "win32":
+        return
+
+    system32 = Path(os.environ.get("SystemRoot", r"C:\Windows")) / "System32"
+    cmd_exe = system32 / "cmd.exe"
+    ping_exe = system32 / "ping.exe"
+    where_exe = system32 / "where.exe"
+    if not cmd_exe.is_file() or not ping_exe.is_file() or not where_exe.is_file():
+        return
+
+    install = tmp_path / "BlindRSS"
+    staging = tmp_path / "staging"
+    helper_bin = install / "_internal" / "bin"
+    helper_bin.mkdir(parents=True)
+    staging.mkdir()
+
+    locker_exe = helper_bin / "yt-dlp.exe"
+    helper_copy = tmp_path / "helper.bat"
+    shutil.copy2(HELPER, helper_copy)
+    shutil.copy2(ping_exe, locker_exe)
+    shutil.copy2(where_exe, install / "BlindRSS.exe")
+    shutil.copy2(where_exe, staging / "BlindRSS.exe")
+    (staging / "updated.txt").write_text("new build", encoding="utf-8")
+
+    locker = subprocess.Popen(
+        [str(locker_exe), "-n", "120", "127.0.0.1"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    try:
+        time.sleep(0.2)
+        assert locker.poll() is None
+        completed = subprocess.run(
+            [
+                str(cmd_exe), "/d", "/q", "/c", helper_copy.name,
+                "0", str(install), str(staging), "BlindRSS.exe", "", "0",
+            ],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+
+        assert completed.returncode == 0, completed.stdout + completed.stderr
+        assert (install / "updated.txt").read_text(encoding="utf-8") == "new build"
+        locker.wait(timeout=5)
+    finally:
+        if locker.poll() is None:
+            locker.kill()
+            locker.wait(timeout=5)
