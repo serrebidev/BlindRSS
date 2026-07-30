@@ -320,6 +320,7 @@ def test_ytdlp_download_retries_with_wider_player_client_pool(tmp_path, monkeypa
     article.media_type = "video/youtube"
     messages = []
     client_args = []
+    commands = []
 
     monkeypatch.setattr(
         mainframe,
@@ -340,6 +341,7 @@ def test_ytdlp_download_retries_with_wider_player_client_pool(tmp_path, monkeypa
     )
 
     def fake_run(cmd, **_kwargs):
+        commands.append(list(cmd))
         client_args.append(cmd[cmd.index("--extractor-args") + 1])
         if len(client_args) == 1:
             return SimpleNamespace(
@@ -357,6 +359,10 @@ def test_ytdlp_download_retries_with_wider_player_client_pool(tmp_path, monkeypa
     host._download_article_via_ytdlp(article, article.url)
 
     assert client_args == [primary_arg, fallback_arg]
+    assert all(
+        cmd[-1] == "https://www.youtube.com/watch?v=A3TU_p5kLJI"
+        for cmd in commands
+    )
     assert host._downloaded_media_path_for_article(article).endswith("YouTube Video.mp4")
     assert messages and messages[-1][1] == "Download complete"
 

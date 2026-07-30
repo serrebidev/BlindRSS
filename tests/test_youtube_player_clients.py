@@ -8,6 +8,20 @@ from core import discovery
 
 
 class TestYoutubePlayerClients(unittest.TestCase):
+    def test_radio_mix_url_is_canonicalized_for_single_item_extraction(self):
+        url = (
+            "https://www.youtube.com/watch?v=A3TU_p5kLJI"
+            "&list=RDA3TU_p5kLJI&start_radio=1"
+        )
+        self.assertEqual(
+            discovery.normalize_ytdlp_single_item_url(url),
+            "https://www.youtube.com/watch?v=A3TU_p5kLJI",
+        )
+
+    def test_ordinary_youtube_url_is_not_rewritten(self):
+        url = "https://www.youtube.com/watch?v=A3TU_p5kLJI&t=30s"
+        self.assertEqual(discovery.normalize_ytdlp_single_item_url(url), url)
+
     def test_cli_arg_form(self):
         arg = discovery.youtube_player_client_arg()
         self.assertTrue(arg.startswith("youtube:player_client="))

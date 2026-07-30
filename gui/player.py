@@ -246,7 +246,7 @@ def _extract_ytdlp_info_via_cli(
     timeout_s: int = 30,
     player_clients=None,
 ) -> dict:
-    target_url = str(url or "").strip()
+    target_url = discovery.normalize_ytdlp_single_item_url(url)
     if not target_url:
         raise RuntimeError("yt-dlp CLI: empty URL")
 
@@ -3589,6 +3589,10 @@ class PlayerFrame(wx.Frame):
         should_resolve = True
 
         if use_ytdlp:
+            # Keep the original URL as the playback/resume identity, but do not
+            # send an endless YouTube RD/start_radio wrapper to a single-item
+            # extractor.
+            extract_url = discovery.normalize_ytdlp_single_item_url(url)
             rumble_handled = False
             try:
                 from core import rumble as rumble_mod
@@ -3674,7 +3678,7 @@ class PlayerFrame(wx.Frame):
                         'noplaylist': True,
                         'no_warnings': True,
                         'user_agent': utils.HEADERS.get('User-Agent', ''),
-                        'referer': url,
+                        'referer': extract_url,
                         'noprogress': True,
                         'color': 'never',
                         'logger': ytdlp_logger,
@@ -3692,7 +3696,7 @@ class PlayerFrame(wx.Frame):
 
                     def _extract_with_opts(opts):
                         with yt_dlp.YoutubeDL(opts) as ydl:
-                            return ydl.extract_info(url, download=False)
+                            return ydl.extract_info(extract_url, download=False)
 
                     info = None
                     last_err = None
@@ -3810,7 +3814,7 @@ class PlayerFrame(wx.Frame):
                             cli_source = source if kind == "cookies" else None
                             try:
                                 info = _extract_ytdlp_info_via_cli(
-                                    url,
+                                    extract_url,
                                     headers=ytdlp_headers,
                                     cookie_source=cli_source,
                                     timeout_s=cli_timeout_s,
@@ -3879,7 +3883,7 @@ class PlayerFrame(wx.Frame):
                         if info is None:
                             try:
                                 info = _extract_ytdlp_info_via_cli(
-                                    url,
+                                    extract_url,
                                     headers=ytdlp_headers,
                                     cookie_source=None,
                                     timeout_s=30,
@@ -3931,11 +3935,26 @@ class PlayerFrame(wx.Frame):
                                     "Rokfin did not provide a playable stream URL for this post"
                                 )
 
-                        # Last resort: hand the original page URL to VLC directly.
-                        # VLC's own (lua) extractors are an independent code path from
-                        # yt-dlp, so this can occasionally play when every yt-dlp
-                        # attempt failed. VLC emits its own error if it cannot handle
-                        # the URL, so we let it try rather than pre-empting with a raise.
+                        # Last resort for non-YouTube sites: hand the original page
+                        # URL to VLC so its independent Lua extractors can try. A
+                        # YouTube watch page is not media and may launch the browser;
+                        # raise into BlindRSS's local download-to-play fallback instead.
+                        is_youtube_url = False
+                        try:
+                            host = str(parsed_url.hostname or "").lower() if parsed_url else ""
+                            is_youtube_url = (
+                                host == "youtu.be"
+                                or host == "youtube.com"
+                                or host.endswith(".youtube.com")
+                            )
+                        except Exception:
+                            is_youtube_url = False
+                        if is_youtube_url:
+                            raise RuntimeError(
+                                last_err
+                                or base_err
+                                or "YouTube extraction returned no playable media"
+                            )
                         if dpapi_cookie_err is not None and base_err is not None:
                             _log(
                                 "yt-dlp failed (browser cookies/DPAPI unavailable); "
@@ -4000,7 +4019,7 @@ class PlayerFrame(wx.Frame):
                     # if yt-dlp can fetch the file (downloads work), play it locally.
                     if self.maybe_play_ytdlp_via_download(int(load_seq), reason="resolve-failed"):
                         return
-                    wx.CallAfter(self._handle_media_load_error, int(load_seq), url, ui_msg, True)
+                    wx.CallAfter(self._handle_media_load_error, int(load_seq), url, ui_msg, False)
                     return
         else:
             resolved_title = title or _("Playing Audio...")
@@ -4427,6 +4446,7 @@ class PlayerFrame(wx.Frame):
         return True
 
     def _ytdlp_download_and_play_worker(self, load_seq: int, page_url: str) -> None:
+        extract_url = discovery.normalize_ytdlp_single_item_url(page_url)
         cache_dir = self._ytdlp_play_cache_dir()
         out_template = os.path.join(cache_dir, "%(id)s.%(ext)s")
         cli = discovery._resolve_ytdlp_cli_path()
@@ -4495,7 +4515,7 @@ class PlayerFrame(wx.Frame):
                     return  # a newer load superseded us
             except Exception:
                 return
-            cmd = list(base_cmd) + extra + [page_url]
+            cmd = list(base_cmd) + extra + [extract_url]
             try:
                 res = subprocess.run(
                     cmd,
@@ -4546,7 +4566,7 @@ class PlayerFrame(wx.Frame):
                 _("Could not play this YouTube item. yt-dlp could not fetch it: {error}").format(
                     error=last_err
                 ),
-                True,
+                False,
             )
             return
 

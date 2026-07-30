@@ -59,6 +59,7 @@ def test_youtube_fulltext_extraction_never_walks_the_playlist():
             return False
 
         def extract_info(self, _url, download=False):
+            captured["url"] = _url
             return {"id": "A3TU_p5kLJI", "title": "Example"}
 
     fake_mod = type("_FakeYtDlp", (), {"YoutubeDL": _FakeYDL})
@@ -70,6 +71,7 @@ def test_youtube_fulltext_extraction_never_walks_the_playlist():
 
     assert info["id"] == "A3TU_p5kLJI"
     assert captured["options"].get("noplaylist") is True
+    assert captured["url"] == "https://www.youtube.com/watch?v=A3TU_p5kLJI"
 
 
 def test_player_stream_options_set_noplaylist():
@@ -145,3 +147,9 @@ def test_download_to_play_reports_the_anonymous_error_not_dpapi(monkeypatch, tmp
     message = " ".join(str(a) for a in reported.get("args", ()))
     assert "Video unavailable" in message
     assert "DPAPI" not in message
+    # The radio-mix wrapper is never sent to yt-dlp, and a final failure stays
+    # inside BlindRSS instead of opening the webpage in the browser.
+    assert calls and all(
+        c[-1] == "https://www.youtube.com/watch?v=A3TU_p5kLJI" for c in calls
+    )
+    assert reported.get("args", ())[-1] is False

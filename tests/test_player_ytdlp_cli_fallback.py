@@ -41,7 +41,7 @@ def test_extract_ytdlp_info_via_cli_returns_first_playlist_entry_and_keeps_profi
         "gui.player.platform.system", return_value="Windows"
     ), patch("core.dependency_check._get_startup_info", return_value=None):
         info = _extract_ytdlp_info_via_cli(
-            "https://www.youtube.com/watch?v=abc123",
+            "https://www.youtube.com/watch?v=abc123&list=RDabc123&start_radio=1",
             headers={"Accept-Language": "en-US,en;q=0.9", "Origin": "https://www.youtube.com"},
             cookie_source=("edge", profile),
             timeout_s=20,
@@ -63,6 +63,7 @@ def test_extract_ytdlp_info_via_cli_returns_first_playlist_entry_and_keeps_profi
     assert "--format" in cmd
     assert "--add-header" in cmd
     assert "Accept-Language: en-US,en;q=0.9" in cmd
+    assert cmd[-1] == "https://www.youtube.com/watch?v=abc123"
 
 
 def test_extract_ytdlp_info_via_cli_uses_bare_keyword_for_default_profile():

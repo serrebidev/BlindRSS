@@ -172,6 +172,50 @@ def youtube_player_client_arg(clients=None) -> str:
     )
 
 
+def normalize_ytdlp_single_item_url(url: str) -> str:
+    """Remove YouTube radio-mix context when extracting one watch item.
+
+    ``list=RD...&start_radio=1`` describes an endless generated mix, not the
+    selected video. ``--no-playlist`` normally avoids enumerating that mix, but
+    some YouTube player clients still return an unavailable response while the
+    radio context remains. Callers keep the original URL for display/history;
+    only yt-dlp receives this canonical single-video URL.
+    """
+    raw = str(url or "").strip()
+    if not raw:
+        return raw
+    try:
+        parsed = urlparse(raw)
+        host = str(parsed.hostname or "").lower().rstrip(".")
+        if host.startswith("www."):
+            host = host[4:]
+        if host.startswith("m."):
+            host = host[2:]
+
+        query = parse_qs(parsed.query or "", keep_blank_values=True)
+        video_id = ""
+        if host == "youtube.com" and (parsed.path or "").rstrip("/") == "/watch":
+            video_id = str((query.get("v") or [""])[0] or "").strip()
+        elif host == "youtu.be":
+            video_id = str((parsed.path or "").strip("/").split("/", 1)[0]).strip()
+        else:
+            return raw
+
+        mix_id = str((query.get("list") or [""])[0] or "").strip()
+        start_radio = (
+            str((query.get("start_radio") or [""])[0] or "").strip().lower()
+        )
+        if (
+            video_id
+            and mix_id.upper().startswith("RD")
+            and start_radio in {"1", "true", "yes"}
+        ):
+            return "https://www.youtube.com/watch?v=" + quote(video_id, safe="-_")
+    except Exception:
+        return raw
+    return raw
+
+
 def _resolve_ytdlp_cli_path() -> str:
     try:
         from core.dependency_check import _find_executable_path
@@ -1613,7 +1657,7 @@ def _prefetch_quick_titles_for_entries(entries, limit: int = 10) -> dict[str, st
 
 def _extract_ytdlp_info_for_url(url: str, timeout: int = 10):
     """Best-effort yt-dlp info extraction for a URL (used by search enrichment)."""
-    target_url = str(url or "").strip()
+    target_url = normalize_ytdlp_single_item_url(url)
     if not target_url:
         return None
 

@@ -12438,6 +12438,8 @@ class MainFrame(wx.Frame):
         import platform as _platform
         from core import download_formats
 
+        url = core.discovery.normalize_ytdlp_single_item_url(url)
+
         fmt = download_formats.normalize_download_format(
             download_format
             if download_format is not None

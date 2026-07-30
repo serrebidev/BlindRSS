@@ -78,7 +78,12 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
         return {}
     import yt_dlp
 
-    from core.discovery import youtube_player_client_list
+    from core.discovery import (
+        normalize_ytdlp_single_item_url,
+        youtube_player_client_list,
+    )
+
+    extract_url = normalize_ytdlp_single_item_url(url)
 
     options = {
         "skip_download": True,
@@ -102,7 +107,7 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
         "logger": _YtdlpLogger(),
     }
     with yt_dlp.YoutubeDL(options) as ydl:
-        info = ydl.extract_info(url, download=False)
+        info = ydl.extract_info(extract_url, download=False)
     return info if isinstance(info, dict) else {}
 
 
