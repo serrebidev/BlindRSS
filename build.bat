@@ -452,7 +452,7 @@ set "ZIP_NAME=BlindRSS-v%VERSION_NO_V%.zip"
 set "ZIP_PATH=%SCRIPT_DIR%dist\%ZIP_NAME%"
 if exist "%ZIP_PATH%" del /f /q "%ZIP_PATH%"
 echo [BlindRSS Build] Creating zip "%ZIP_NAME%"...
-powershell -NoProfile -Command "Compress-Archive -Path '%SCRIPT_DIR%dist\BlindRSS' -DestinationPath '%ZIP_PATH%' -Force" >nul
+"%TOOL_PY%" tools\build_utils.py zip-directory --input "%SCRIPT_DIR%dist\BlindRSS" --output "%ZIP_PATH%"
 if errorlevel 1 exit /b 1
 copy /Y "%ZIP_PATH%" "%SCRIPT_DIR%BlindRSS.zip" >nul
 exit /b 0

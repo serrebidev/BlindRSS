@@ -3954,6 +3954,28 @@ class PlayerFrame(wx.Frame):
                                 break
 
                     if info is None and discovery.youtube_single_item_recovery_urls(extract_url):
+                        # pytubefix is a small independent extractor and can
+                        # survive YouTube changes that temporarily break every
+                        # yt-dlp client.  Try it before launching the much
+                        # heavier invisible Chromium identity bootstrap.
+                        try:
+                            wx.CallAfter(self._set_status, _("Trying pytubefix..."))
+                        except Exception:
+                            pass
+                        try:
+                            from core.youtube_pytubefix import resolve_stream
+
+                            info = resolve_stream(
+                                extract_url,
+                                audio_only=True,
+                                timeout_s=20,
+                            )
+                        except Exception:
+                            info = None
+                        if info is not None:
+                            _log("YouTube resolved via pytubefix fallback")
+
+                    if info is None and discovery.youtube_single_item_recovery_urls(extract_url):
                         # A real YouTube browser player can receive a current
                         # anonymous visitor identity even when every direct
                         # extractor client is told the video is unavailable.
@@ -4614,11 +4636,12 @@ class PlayerFrame(wx.Frame):
         if cookiefile_extra:
             fallback_attempts.append(("cookiefile", cookiefile_extra))
         phases = [
-            (extract_url, discovery.YOUTUBE_PLAYER_CLIENTS, attempts, False, False),
+            (extract_url, discovery.YOUTUBE_PLAYER_CLIENTS, attempts, False, False, False),
             (
                 extract_url,
                 discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK,
                 fallback_attempts,
+                False,
                 False,
                 False,
             ),
@@ -4630,6 +4653,7 @@ class PlayerFrame(wx.Frame):
                 fallback_attempts,
                 True,
                 False,
+                False,
             )
             for recovery_url in discovery.youtube_single_item_recovery_urls(extract_url)
         )
@@ -4639,14 +4663,58 @@ class PlayerFrame(wx.Frame):
                     extract_url,
                     discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK,
                     [],
-                    True,
+                    False,
+                    False,
                     True,
                 )
             )
+            phases.append(
+                (
+                    extract_url,
+                    discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK,
+                    [],
+                    True,
+                    True,
+                    False,
+                )
+            )
 
-        for target_url, clients, phase_attempts, impersonate, browser_bootstrap in phases:
+        for (
+            target_url,
+            clients,
+            phase_attempts,
+            impersonate,
+            browser_bootstrap,
+            pytubefix_resolve,
+        ) in phases:
             visitor_data = ""
             browser_user_agent = ""
+            pytubefix_referer = ""
+            if pytubefix_resolve:
+                try:
+                    wx.CallAfter(self._set_status, _("Trying pytubefix..."))
+                except Exception:
+                    pass
+                try:
+                    from core.youtube_pytubefix import resolve_stream
+
+                    pytubefix_info = resolve_stream(
+                        target_url,
+                        audio_only=True,
+                        timeout_s=30,
+                    )
+                except Exception:
+                    pytubefix_info = None
+                if not pytubefix_info:
+                    continue
+                target_url = str(pytubefix_info.get("url") or "").strip()
+                if not target_url:
+                    continue
+                phase_attempts = [("base", [])]
+                pytubefix_headers = dict(pytubefix_info.get("http_headers") or {})
+                browser_user_agent = str(pytubefix_headers.get("User-Agent") or "")
+                pytubefix_referer = str(pytubefix_headers.get("Referer") or "")
+                _log("YouTube download-to-play resolved via pytubefix fallback")
             if browser_bootstrap:
                 try:
                     wx.CallAfter(self._set_status, _("Preparing YouTube browser session..."))
@@ -4687,6 +4755,8 @@ class PlayerFrame(wx.Frame):
                     cmd.extend(["--impersonate", "chrome"])
                 if browser_user_agent:
                     cmd.extend(["--user-agent", browser_user_agent])
+                if pytubefix_referer:
+                    cmd.extend(["--referer", pytubefix_referer])
                 cmd.extend(extra)
                 cmd.append(target_url)
                 try:

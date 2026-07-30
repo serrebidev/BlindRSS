@@ -4,8 +4,10 @@
 
 import argparse
 import hashlib
+import os
 import re
 import subprocess
+import zipfile
 from pathlib import Path
 
 
@@ -42,6 +44,33 @@ def sha256_file(input_path: Path) -> str:
     return h.hexdigest()
 
 
+def zip_directory(input_dir: Path, output_path: Path) -> None:
+    """Create a streaming ZIP containing ``input_dir`` as its top-level dir."""
+    source = input_dir.resolve(strict=True)
+    if not source.is_dir():
+        raise SystemExit(f"ZIP input is not a directory: {source}")
+    destination = output_path.resolve()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name(destination.name + ".tmp")
+    try:
+        with zipfile.ZipFile(
+            temporary,
+            "w",
+            compression=zipfile.ZIP_DEFLATED,
+            compresslevel=6,
+            allowZip64=True,
+        ) as archive:
+            for path in sorted(source.rglob("*")):
+                if path.is_file():
+                    archive.write(path, Path(source.name) / path.relative_to(source))
+        os.replace(temporary, destination)
+    finally:
+        try:
+            temporary.unlink(missing_ok=True)
+        except OSError:
+            pass
+
+
 def signtool_thumbprint(signtool_exe: Path, exe_path: Path) -> str:
     result = subprocess.run(
         [str(signtool_exe), "verify", "/pa", "/v", str(exe_path)],
@@ -67,6 +96,10 @@ def main():
     p_hash.add_argument("--input", required=True)
     p_hash.add_argument("--output")
 
+    p_zip = sub.add_parser("zip-directory", help="Create a streaming ZIP archive")
+    p_zip.add_argument("--input", required=True)
+    p_zip.add_argument("--output", required=True)
+
     p_sig = sub.add_parser("signtool-thumbprint", help="Extract signing thumbprint via signtool verify")
     p_sig.add_argument("--signtool", required=True)
     p_sig.add_argument("--exe", required=True)
@@ -85,6 +118,8 @@ def main():
             filter_requirements(Path(args.input), Path(args.output), args.exclude)
         case "sha256":
             _write_output(sha256_file(Path(args.input)))
+        case "zip-directory":
+            zip_directory(Path(args.input), Path(args.output))
         case "signtool-thumbprint":
             _write_output(signtool_thumbprint(Path(args.signtool), Path(args.exe)))
 

@@ -37,6 +37,8 @@ def _force_windows(monkeypatch):
 class _Ctrl:
     def __init__(self, registry, on_focus=None):
         self.value = ""
+        self.insertion = 0
+        self.selection = (0, 0)
         self.shown = True
         self.destroyed = False
         self.focused = False
@@ -47,16 +49,18 @@ class _Ctrl:
         return len(self.value)
 
     def GetSelection(self):
-        return (0, 0)
+        return self.selection
 
     def GetInsertionPoint(self):
-        return 0
+        return self.insertion
 
     def SetInsertionPoint(self, pos):
-        pass
+        self.insertion = pos
+        self.selection = (pos, pos)
 
     def SetSelection(self, start, end):
-        pass
+        self.selection = (start, end)
+        self.insertion = end
 
     def ChangeValue(self, value):
         self.value = value
@@ -219,3 +223,18 @@ def test_small_text_skips_repeat_write_when_already_displayed(monkeypatch):
 
     _set(d, SMALL)
     assert d._reader_displayed_text == SMALL
+
+
+def test_focus_cache_hit_preserves_reader_caret_and_selection(monkeypatch):
+    """Returning focus to unchanged full text must not jump back to its top."""
+    d = _frame(monkeypatch)
+
+    _set(d, SMALL)
+    d.content_ctrl.SetSelection(6, 17)
+
+    # on_content_focus requests the cached body with reset_insertion=True each
+    # time Tab navigation or an NVDA dialog returns focus to the classic view.
+    _set(d, SMALL, reset_insertion=True)
+
+    assert d.content_ctrl.GetSelection() == (6, 17)
+    assert d.content_ctrl.GetInsertionPoint() == 17

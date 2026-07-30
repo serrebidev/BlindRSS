@@ -478,7 +478,7 @@ def test_ytdlp_download_recovers_with_hidden_browser_visitor_session(
     tmp_path,
     monkeypatch,
 ):
-    from core import youtube_browser_session
+    from core import youtube_browser_session, youtube_pytubefix
 
     host = _host(tmp_path)
     article = _article(title="YouTube Video")
@@ -502,6 +502,7 @@ def test_ytdlp_download_recovers_with_hidden_browser_visitor_session(
     monkeypatch.setattr(mainframe.core.discovery, "_resolve_ytdlp_cli_path", lambda: "/tmp/yt-dlp")
     monkeypatch.setattr(mainframe.core.discovery, "get_ytdlp_cookie_sources", lambda _url: [])
     monkeypatch.setattr(mainframe.dependency_check, "_find_executable_path", lambda _name: "/tmp/ffmpeg")
+    monkeypatch.setattr(youtube_pytubefix, "resolve_stream", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(
         youtube_browser_session,
         "bootstrap_youtube_session",
@@ -535,6 +536,67 @@ def test_ytdlp_download_recovers_with_hidden_browser_visitor_session(
     ]
     assert host._downloaded_media_path_for_article(article).endswith("YouTube Video.mp4")
     assert messages and messages[-1][1] == "Download complete"
+
+
+def test_ytdlp_download_tries_pytubefix_before_hidden_browser(tmp_path, monkeypatch):
+    from core import youtube_browser_session, youtube_pytubefix
+
+    host = _host(tmp_path)
+    article = _article(title="YouTube Video")
+    article.url = "https://www.youtube.com/watch?v=A3TU_p5kLJI"
+    article.media_url = article.url
+    article.media_type = "video/youtube"
+    commands = []
+    messages = []
+    browser_calls = []
+
+    monkeypatch.setattr(
+        mainframe,
+        "wx",
+        SimpleNamespace(
+            CallAfter=lambda fn, *args, **kwargs: fn(*args, **kwargs),
+            MessageBox=lambda *args, **kwargs: messages.append(args),
+            ICON_ERROR=1,
+        ),
+    )
+    monkeypatch.setattr(mainframe.core.discovery, "_resolve_ytdlp_cli_path", lambda: "/tmp/yt-dlp")
+    monkeypatch.setattr(mainframe.core.discovery, "get_ytdlp_cookie_sources", lambda _url: [])
+    monkeypatch.setattr(mainframe.dependency_check, "_find_executable_path", lambda _name: "/tmp/ffmpeg")
+    monkeypatch.setattr(
+        youtube_pytubefix,
+        "resolve_stream",
+        lambda *_args, **_kwargs: {
+            "url": "https://media.example/progressive.mp4?sig=ok",
+            "http_headers": {
+                "User-Agent": "pytubefix test UA",
+                "Referer": article.url,
+            },
+        },
+    )
+    monkeypatch.setattr(
+        youtube_browser_session,
+        "bootstrap_youtube_session",
+        lambda *_args, **_kwargs: browser_calls.append(True) or None,
+    )
+
+    def fake_run(cmd, **_kwargs):
+        commands.append(list(cmd))
+        if cmd[-1].startswith("https://media.example/"):
+            target_dir = host._download_dir_for_article(article)
+            with open(os.path.join(target_dir, "YouTube Video.mp4"), "wb") as f:
+                f.write(b"pytubefix-direct")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=1, stdout="", stderr="ERROR: Video unavailable")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    host._download_article_via_ytdlp(article, article.url)
+
+    direct_cmd = next(cmd for cmd in commands if cmd[-1].startswith("https://media.example/"))
+    assert direct_cmd[direct_cmd.index("--user-agent") + 1] == "pytubefix test UA"
+    assert direct_cmd[direct_cmd.index("--referer") + 1] == article.url
+    assert browser_calls == []
+    assert host._downloaded_media_path_for_article(article).endswith("YouTube Video.mp4")
 
 
 def test_ytdlp_download_skips_fallback_pool_when_primary_succeeds(tmp_path, monkeypatch):

@@ -46,6 +46,7 @@ packages_to_collect = [
     # sane_lists), so static import analysis cannot see every required module.
     "markdown",
     "yt_dlp",
+    "pytubefix",
     "aiohttp",
     "zeroconf",
     "pydantic",
@@ -82,6 +83,21 @@ def _is_seleniumbase_runtime_artifact(item):
     """Keep downloaded browsers/drivers out of distributable builds."""
     source = str(item[0] if item else "").replace("\\", "/").lower()
     return "/seleniumbase/drivers/" in source and not source.endswith((".py", ".pyi"))
+
+
+def _is_foreign_selenium_manager(item):
+    """Keep only the Selenium Manager executable for the target platform."""
+    source = str(item[0] if item else "").replace("\\", "/").lower()
+    marker = "selenium/webdriver/common/"
+    if marker not in source or "selenium-manager" not in source:
+        return False
+    if PLATFORM.startswith("win"):
+        expected = "/windows/selenium-manager.exe"
+    elif PLATFORM.startswith("darwin"):
+        expected = "/macos/selenium-manager"
+    else:
+        expected = "/linux/selenium-manager"
+    return not source.endswith(expected)
 
 datas = []
 binaries = []
@@ -203,9 +219,15 @@ for pkg in packages_to_collect:
             and module != "behave"
             and not module.startswith("behave.")
         ]
+    elif pkg == "selenium":
+        d = [item for item in d if not _is_foreign_selenium_manager(item)]
+        b = [item for item in b if not _is_foreign_selenium_manager(item)]
     datas.extend(d)
     binaries.extend(b)
     hiddenimports.extend(h)
+
+datas = [item for item in datas if not _is_foreign_selenium_manager(item)]
+binaries = [item for item in binaries if not _is_foreign_selenium_manager(item)]
 
 try:
     import webrtcvad  # noqa: F401
@@ -246,10 +268,14 @@ a = Analysis(
     runtime_hooks=[],
     # BlindRSS uses SeleniumBase only for its hidden browser fallback, never its
     # optional behave test runner. Keep that legacy package out of frozen builds.
-    excludes=["behave", "seleniumbase.behave"],
+    # Avoid bundling pytubefix's duplicate 100+ MB Node runtime; its signature
+    # worker is routed through the Deno executable already shipped for yt-dlp.
+    excludes=["behave", "seleniumbase.behave", "nodejs_wheel"],
     noarchive=False,
     optimize=0,
 )
+a.datas = [item for item in a.datas if not _is_foreign_selenium_manager(item)]
+a.binaries = [item for item in a.binaries if not _is_foreign_selenium_manager(item)]
 pyz = PYZ(a.pure)
 
 exe = EXE(

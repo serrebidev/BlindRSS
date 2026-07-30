@@ -5397,8 +5397,11 @@ class MainFrame(wx.Frame):
         try:
             same_tracked_text = getattr(self, "_reader_displayed_text", None) == displayed
             if same_tracked_text and self.content_ctrl.GetLastPosition() == len(displayed):
-                if reset_insertion:
-                    self.content_ctrl.SetInsertionPoint(0)
+                # Focus-triggered cache hits request reset_insertion so a newly
+                # installed article starts at the top.  When this exact text is
+                # already installed, however, focus may merely be returning
+                # from another control or an NVDA dialog.  Leave the existing
+                # caret/selection alone in that case.
                 return displayed
             # Record before swapping, not after: _swap_focused_large_reader
             # installs a control that already holds this text and then moves
@@ -12506,18 +12509,55 @@ class MainFrame(wx.Frame):
         if cookiefile and os.path.isfile(cookiefile):
             fallback_attempts.append(("cookiefile", ["--cookies", cookiefile]))
         attempt_phases = [
-            (url, attempts, False, False, False),
-            (url, fallback_attempts, True, False, False),
+            (url, attempts, False, False, False, False),
+            (url, fallback_attempts, True, False, False, False),
         ]
         attempt_phases.extend(
-            (recovery_url, fallback_attempts, True, True, False)
+            (recovery_url, fallback_attempts, True, True, False, False)
             for recovery_url in core.discovery.youtube_single_item_recovery_urls(url)
         )
         if core.discovery.youtube_single_item_recovery_urls(url):
-            attempt_phases.append((url, [], True, True, True))
-        for target_url, phase_attempts, is_fallback, impersonate, browser_bootstrap in attempt_phases:
+            # Independent Python extraction is far cheaper than starting the
+            # invisible browser.  Its signed direct URL is handed back to the
+            # existing yt-dlp generic downloader so format conversion,
+            # retention and destination handling remain unchanged.
+            attempt_phases.append((url, [], True, False, False, True))
+            attempt_phases.append((url, [], True, True, True, False))
+        for (
+            target_url,
+            phase_attempts,
+            is_fallback,
+            impersonate,
+            browser_bootstrap,
+            pytubefix_resolve,
+        ) in attempt_phases:
             visitor_data = ""
             browser_user_agent = ""
+            pytubefix_referer = ""
+            if pytubefix_resolve:
+                self._post_activity_status(
+                    _("Trying pytubefix: {title}").format(title=title)
+                )
+                try:
+                    from core.youtube_pytubefix import resolve_stream
+
+                    pytubefix_info = resolve_stream(
+                        target_url,
+                        audio_only=audio_only,
+                        timeout_s=30,
+                    )
+                except Exception:
+                    pytubefix_info = None
+                if not pytubefix_info:
+                    continue
+                target_url = str(pytubefix_info.get("url") or "").strip()
+                if not target_url:
+                    continue
+                phase_attempts = [("base", [])]
+                pytubefix_headers = dict(pytubefix_info.get("http_headers") or {})
+                browser_user_agent = str(pytubefix_headers.get("User-Agent") or "")
+                pytubefix_referer = str(pytubefix_headers.get("Referer") or "")
+                log.info("yt-dlp download: resolved direct stream via pytubefix")
             if browser_bootstrap:
                 self._post_activity_status(_("Preparing YouTube browser session: {title}").format(title=title))
                 try:
@@ -12566,6 +12606,8 @@ class MainFrame(wx.Frame):
                         cmd.extend(["--impersonate", "chrome"])
                     if browser_user_agent:
                         cmd.extend(["--user-agent", browser_user_agent])
+                    if pytubefix_referer:
+                        cmd.extend(["--referer", pytubefix_referer])
                     if not audio_only:
                         cmd[cmd.index("--merge-output-format") + 1] = merge_format
                     try:

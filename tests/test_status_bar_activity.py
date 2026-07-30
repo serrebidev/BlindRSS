@@ -526,6 +526,8 @@ def test_ytdlp_download_status_sequence_on_success(tmp_path, monkeypatch):
 
 
 def test_ytdlp_download_status_sequence_on_failure(tmp_path, monkeypatch):
+    from core import youtube_browser_session, youtube_pytubefix
+
     host = _host(tmp_path)
     article = _article(title="YouTube Video")
     article.url = "https://www.youtube.com/watch?v=s-59p7kUAaE"
@@ -537,6 +539,12 @@ def test_ytdlp_download_status_sequence_on_failure(tmp_path, monkeypatch):
     monkeypatch.setattr(mainframe.core.discovery, "_resolve_ytdlp_cli_path", lambda: "/tmp/yt-dlp")
     monkeypatch.setattr(mainframe.core.discovery, "get_ytdlp_cookie_sources", lambda _url: [])
     monkeypatch.setattr(mainframe.dependency_check, "_find_executable_path", lambda _name: None)
+    monkeypatch.setattr(youtube_pytubefix, "resolve_stream", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        youtube_browser_session,
+        "bootstrap_youtube_session",
+        lambda *_a, **_k: None,
+    )
 
     def fake_run(cmd, **_kwargs):
         return SimpleNamespace(returncode=1, stdout="", stderr="ERROR: unsupported format")
@@ -545,11 +553,17 @@ def test_ytdlp_download_status_sequence_on_failure(tmp_path, monkeypatch):
 
     host._download_article_via_ytdlp(article, article.url)
 
-    assert host._activity_status_updates == ["Download failed: YouTube Video"]
+    assert host._activity_status_updates == [
+        "Trying pytubefix: YouTube Video",
+        "Preparing YouTube browser session: YouTube Video",
+        "Download failed: YouTube Video",
+    ]
     assert messages and messages[-1][1] == "Download error"
 
 
 def test_ytdlp_download_not_installed_sets_failed_status(tmp_path, monkeypatch):
+    from core import youtube_browser_session, youtube_pytubefix
+
     host = _host(tmp_path)
     article = _article(title="YouTube Video")
     article.url = "https://www.youtube.com/watch?v=s-59p7kUAaE"
@@ -561,6 +575,12 @@ def test_ytdlp_download_not_installed_sets_failed_status(tmp_path, monkeypatch):
     monkeypatch.setattr(mainframe.core.discovery, "_resolve_ytdlp_cli_path", lambda: "/tmp/yt-dlp")
     monkeypatch.setattr(mainframe.core.discovery, "get_ytdlp_cookie_sources", lambda _url: [])
     monkeypatch.setattr(mainframe.dependency_check, "_find_executable_path", lambda _name: None)
+    monkeypatch.setattr(youtube_pytubefix, "resolve_stream", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        youtube_browser_session,
+        "bootstrap_youtube_session",
+        lambda *_a, **_k: None,
+    )
 
     def fake_run(cmd, **_kwargs):
         raise FileNotFoundError()

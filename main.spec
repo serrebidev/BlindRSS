@@ -106,7 +106,7 @@ bin_path = os.path.join(os.getcwd(), 'bin')
 # Packages whose data files / dynamic imports PyInstaller's analysis can miss.
 # Audited 2026-07-08: every entry is either imported directly by the app
 # (casting: pyatv/pychromecast/async_upnp_client; extraction: trafilatura,
-# yt_dlp; transport: curl_cffi) or an installed transitive dependency of one
+# yt_dlp/pytubefix; transport: curl_cffi) or an installed transitive dependency of one
 # (aiohttp/zeroconf/pydantic <- casting stack; lxml/soupsieve <- parsers;
 # sgmllib <- feedparser; six <- html5lib; defusedxml/didl_lite/ifaddr <-
 # async_upnp_client/zeroconf; certifi <- TLS in frozen builds). Dropped dead
@@ -114,7 +114,7 @@ bin_path = os.path.join(os.getcwd(), 'bin')
 # xmltodict, langcodes, language_data.
 packages_to_collect = [
     'pyatv', 'pychromecast', 'async_upnp_client', 'trafilatura', 'markdown',
-    'yt_dlp', 'aiohttp', 'zeroconf', 'pydantic', 'lxml',
+    'yt_dlp', 'pytubefix', 'aiohttp', 'zeroconf', 'pydantic', 'lxml',
     'sgmllib', 'six', 'soupsieve',
     'defusedxml', 'didl_lite', 'ifaddr',
     'certifi', 'curl_cffi',
@@ -145,6 +145,15 @@ def _is_seleniumbase_runtime_artifact(item):
     """Keep downloaded browsers/drivers out of distributable builds."""
     source = str(item[0] if item else "").replace('\\', '/').lower()
     return '/seleniumbase/drivers/' in source and not source.endswith(('.py', '.pyi'))
+
+
+def _is_foreign_selenium_manager(item):
+    """Drop Linux/macOS Selenium Manager binaries from the Windows build."""
+    source = str(item[0] if item else "").replace('\\', '/').lower()
+    marker = 'selenium/webdriver/common/'
+    if marker not in source or 'selenium-manager' not in source:
+        return False
+    return not source.endswith('/windows/selenium-manager.exe')
 
 datas = []
 binaries = [
@@ -229,9 +238,20 @@ for pkg in packages_to_collect:
             and module != 'behave'
             and not module.startswith('behave.')
         ]
+    elif pkg == 'selenium':
+        # The wheel contains manager executables for all three desktop
+        # platforms. They are mutually unusable, and SeleniumBase manages the
+        # actual browser/driver runtime in BlindRSS's per-user data directory.
+        d = [item for item in d if not _is_foreign_selenium_manager(item)]
+        b = [item for item in b if not _is_foreign_selenium_manager(item)]
     datas.extend(d)
     binaries.extend(b)
     hiddenimports.extend(h)
+
+# collect_all(seleniumbase) can pull Selenium's package data transitively
+# before the explicit selenium pass above gets a chance to filter it.
+datas = [item for item in datas if not _is_foreign_selenium_manager(item)]
+binaries = [item for item in binaries if not _is_foreign_selenium_manager(item)]
 
 # Include update helper script in the app directory.
 helper_path = os.path.join(os.getcwd(), 'update_helper.bat')
@@ -275,10 +295,22 @@ a = Analysis(
     # SeleniumBase optionally integrates with behave, but BlindRSS never uses
     # that test-runner path. Excluding it avoids importing behave 1.2.6's
     # Python-3.14-invalid legacy regex strings during frozen-app analysis.
-    excludes=['behave', 'seleniumbase.behave'],
+    # pytubefix normally pulls a complete Node distribution solely for its
+    # signature worker. core.youtube_pytubefix injects the tiny import surface
+    # it needs and runs that worker through BlindRSS's existing bundled Deno.
+    excludes=['behave', 'seleniumbase.behave', 'nodejs_wheel'],
     noarchive=False,
     optimize=0,
 )
+# Hooks can add package data and ctypes aliases after our input lists have been
+# normalized. Apply the platform trim once more to Analysis's final TOCs.
+a.datas = [item for item in a.datas if not _is_foreign_selenium_manager(item)]
+a.binaries = [
+    item for item in a.binaries
+    if not _is_foreign_selenium_manager(item)
+    and str(item[0]).replace('\\', '/').lower()
+    not in {'libvlc.dylib', 'libvlccore.dylib'}
+]
 pyz = PYZ(a.pure)
 
 exe = EXE(

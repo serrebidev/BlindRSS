@@ -96,7 +96,7 @@ def test_download_to_play_reports_the_anonymous_error_not_dpapi(monkeypatch, tmp
     pytest.importorskip("vlc")
 
     import gui.player as player_mod
-    from core import youtube_browser_session
+    from core import youtube_browser_session, youtube_pytubefix
 
     calls = []
 
@@ -126,6 +126,11 @@ def test_download_to_play_reports_the_anonymous_error_not_dpapi(monkeypatch, tmp
     monkeypatch.setattr(
         youtube_browser_session,
         "bootstrap_youtube_session",
+        lambda *_args, **_kwargs: None,
+    )
+    monkeypatch.setattr(
+        youtube_pytubefix,
+        "resolve_stream",
         lambda *_args, **_kwargs: None,
     )
 
