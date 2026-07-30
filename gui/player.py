@@ -247,6 +247,7 @@ def _extract_ytdlp_info_via_cli(
     timeout_s: int = 30,
     player_clients=None,
     impersonate: str | None = None,
+    visitor_data: str | None = None,
 ) -> dict:
     target_url = discovery.normalize_ytdlp_single_item_url(url)
     if not target_url:
@@ -267,7 +268,10 @@ def _extract_ytdlp_info_via_cli(
         "--format",
         _ytdlp_audio_format_for(target_url),
         "--extractor-args",
-        discovery.youtube_player_client_arg(player_clients),
+        discovery.youtube_player_client_arg(
+            player_clients,
+            visitor_data=visitor_data,
+        ),
         "--quiet",
         "--no-warnings",
         "--no-progress",
@@ -3949,6 +3953,49 @@ class PlayerFrame(wx.Frame):
                             if info is not None:
                                 break
 
+                    if info is None and discovery.youtube_single_item_recovery_urls(extract_url):
+                        # A real YouTube browser player can receive a current
+                        # anonymous visitor identity even when every direct
+                        # extractor client is told the video is unavailable.
+                        # Bootstrap that identity in BlindRSS's invisible,
+                        # dedicated Chromium profile, then give it to yt-dlp.
+                        try:
+                            wx.CallAfter(self._set_status, _("Preparing YouTube browser session..."))
+                        except Exception:
+                            pass
+                        try:
+                            from core.youtube_browser_session import bootstrap_youtube_session
+
+                            browser_session = bootstrap_youtube_session(
+                                extract_url,
+                                timeout_s=45,
+                            )
+                        except Exception:
+                            browser_session = None
+                        if browser_session is not None:
+                            browser_headers = dict(ytdlp_headers)
+                            if browser_session.user_agent:
+                                browser_headers["User-Agent"] = browser_session.user_agent
+                            browser_targets = [
+                                extract_url,
+                                *discovery.youtube_single_item_recovery_urls(extract_url),
+                            ]
+                            for browser_target in browser_targets:
+                                try:
+                                    info = _extract_ytdlp_info_via_cli(
+                                        browser_target,
+                                        headers=browser_headers,
+                                        cookie_file=browser_session.cookie_file,
+                                        timeout_s=45,
+                                        player_clients=discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK,
+                                        impersonate="chrome",
+                                        visitor_data=browser_session.visitor_data,
+                                    )
+                                    _log("yt-dlp resolved via hidden-browser visitor session")
+                                    break
+                                except Exception as browser_e:
+                                    last_err = browser_e
+
                     if info is None:
                         rokfin_probe = None
                         is_rokfin_url = False
@@ -4567,11 +4614,12 @@ class PlayerFrame(wx.Frame):
         if cookiefile_extra:
             fallback_attempts.append(("cookiefile", cookiefile_extra))
         phases = [
-            (extract_url, discovery.YOUTUBE_PLAYER_CLIENTS, attempts, False),
+            (extract_url, discovery.YOUTUBE_PLAYER_CLIENTS, attempts, False, False),
             (
                 extract_url,
                 discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK,
                 fallback_attempts,
+                False,
                 False,
             ),
         ]
@@ -4581,11 +4629,42 @@ class PlayerFrame(wx.Frame):
                 discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK,
                 fallback_attempts,
                 True,
+                False,
             )
             for recovery_url in discovery.youtube_single_item_recovery_urls(extract_url)
         )
+        if discovery.youtube_single_item_recovery_urls(extract_url):
+            phases.append(
+                (
+                    extract_url,
+                    discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK,
+                    [],
+                    True,
+                    True,
+                )
+            )
 
-        for target_url, clients, phase_attempts, impersonate in phases:
+        for target_url, clients, phase_attempts, impersonate, browser_bootstrap in phases:
+            visitor_data = ""
+            browser_user_agent = ""
+            if browser_bootstrap:
+                try:
+                    wx.CallAfter(self._set_status, _("Preparing YouTube browser session..."))
+                except Exception:
+                    pass
+                try:
+                    from core.youtube_browser_session import bootstrap_youtube_session
+
+                    browser_session = bootstrap_youtube_session(target_url, timeout_s=45)
+                except Exception:
+                    browser_session = None
+                if browser_session is None:
+                    continue
+                phase_attempts = [
+                    ("cookiefile", ["--cookies", browser_session.cookie_file])
+                ]
+                visitor_data = browser_session.visitor_data
+                browser_user_agent = browser_session.user_agent
             for kind, extra in phase_attempts:
                 cookie_source = extra[1] if kind == "cookies" and len(extra) > 1 else ""
                 if (
@@ -4600,9 +4679,14 @@ class PlayerFrame(wx.Frame):
                 except Exception:
                     return
                 cmd = list(base_cmd)
-                cmd[cmd.index("--extractor-args") + 1] = discovery.youtube_player_client_arg(clients)
+                cmd[cmd.index("--extractor-args") + 1] = discovery.youtube_player_client_arg(
+                    clients,
+                    visitor_data=visitor_data,
+                )
                 if impersonate:
                     cmd.extend(["--impersonate", "chrome"])
+                if browser_user_agent:
+                    cmd.extend(["--user-agent", browser_user_agent])
                 cmd.extend(extra)
                 cmd.append(target_url)
                 try:

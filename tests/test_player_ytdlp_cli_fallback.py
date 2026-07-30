@@ -111,12 +111,14 @@ def test_extract_ytdlp_info_via_cli_passes_cookie_file_and_impersonation():
             "https://music.youtube.com/watch?v=abc123",
             cookie_file=r"C:\Users\alice\youtube_cookies.txt",
             impersonate="chrome",
+            visitor_data="visitor%3D%3D",
         )
 
     cmd = captured_cmd["cmd"]
     assert cmd[cmd.index("--cookies") + 1] == r"C:\Users\alice\youtube_cookies.txt"
     assert cmd[cmd.index("--impersonate") + 1] == "chrome"
     assert "--cookies-from-browser" not in cmd
+    assert ";visitor_data=visitor%3D%3D" in cmd[cmd.index("--extractor-args") + 1]
 
 
 def test_extract_ytdlp_info_via_cli_passes_player_client_override():

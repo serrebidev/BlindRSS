@@ -169,11 +169,15 @@ def youtube_player_client_list(clients=None) -> list[str]:
     return list(clients if clients is not None else YOUTUBE_PLAYER_CLIENTS)
 
 
-def youtube_player_client_arg(clients=None) -> str:
-    """yt-dlp CLI form: value for --extractor-args youtube:player_client=..."""
-    return "youtube:player_client=" + ",".join(
+def youtube_player_client_arg(clients=None, *, visitor_data: str | None = None) -> str:
+    """yt-dlp CLI extractor args for clients and optional browser visitor data."""
+    value = "youtube:player_client=" + ",".join(
         clients if clients is not None else YOUTUBE_PLAYER_CLIENTS
     )
+    visitor = str(visitor_data or "").strip()
+    if visitor and not any(char in visitor for char in (";", "\r", "\n")):
+        value += ";visitor_data=" + visitor
+    return value
 
 
 def normalize_ytdlp_single_item_url(url: str) -> str:

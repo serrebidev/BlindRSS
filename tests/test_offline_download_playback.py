@@ -474,6 +474,69 @@ def test_ytdlp_download_keeps_firefox_after_chromium_dpapi(tmp_path, monkeypatch
     assert messages and messages[-1][1] == "Download complete"
 
 
+def test_ytdlp_download_recovers_with_hidden_browser_visitor_session(
+    tmp_path,
+    monkeypatch,
+):
+    from core import youtube_browser_session
+
+    host = _host(tmp_path)
+    article = _article(title="YouTube Video")
+    article.url = "https://www.youtube.com/watch?v=A3TU_p5kLJI"
+    article.media_url = article.url
+    article.media_type = "video/youtube"
+    cookie_file = tmp_path / "browser-youtube-cookies.txt"
+    cookie_file.write_text("# Netscape HTTP Cookie File\n", encoding="utf-8")
+    commands = []
+    messages = []
+
+    monkeypatch.setattr(
+        mainframe,
+        "wx",
+        SimpleNamespace(
+            CallAfter=lambda fn, *args, **kwargs: fn(*args, **kwargs),
+            MessageBox=lambda *args, **kwargs: messages.append(args),
+            ICON_ERROR=1,
+        ),
+    )
+    monkeypatch.setattr(mainframe.core.discovery, "_resolve_ytdlp_cli_path", lambda: "/tmp/yt-dlp")
+    monkeypatch.setattr(mainframe.core.discovery, "get_ytdlp_cookie_sources", lambda _url: [])
+    monkeypatch.setattr(mainframe.dependency_check, "_find_executable_path", lambda _name: "/tmp/ffmpeg")
+    monkeypatch.setattr(
+        youtube_browser_session,
+        "bootstrap_youtube_session",
+        lambda *_args, **_kwargs: youtube_browser_session.YouTubeBrowserSession(
+            cookie_file=str(cookie_file),
+            visitor_data="visitor%3D%3D",
+            user_agent="Mozilla/5.0 Test Chrome",
+        ),
+    )
+
+    def fake_run(cmd, **_kwargs):
+        commands.append(list(cmd))
+        extractor_arg = cmd[cmd.index("--extractor-args") + 1]
+        if "visitor_data=visitor%3D%3D" in extractor_arg:
+            target_dir = host._download_dir_for_article(article)
+            with open(os.path.join(target_dir, "YouTube Video.mp4"), "wb") as f:
+                f.write(b"merged-video")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        return SimpleNamespace(returncode=1, stdout="", stderr="ERROR: Video unavailable")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    host._download_article_via_ytdlp(article, article.url)
+
+    browser_cmd = commands[-1]
+    assert browser_cmd[browser_cmd.index("--cookies") + 1] == str(cookie_file)
+    assert browser_cmd[browser_cmd.index("--user-agent") + 1] == "Mozilla/5.0 Test Chrome"
+    assert browser_cmd[browser_cmd.index("--impersonate") + 1] == "chrome"
+    assert "visitor_data=visitor%3D%3D" in browser_cmd[
+        browser_cmd.index("--extractor-args") + 1
+    ]
+    assert host._downloaded_media_path_for_article(article).endswith("YouTube Video.mp4")
+    assert messages and messages[-1][1] == "Download complete"
+
+
 def test_ytdlp_download_skips_fallback_pool_when_primary_succeeds(tmp_path, monkeypatch):
     """The wider client pool is a last resort: a working primary attempt
     must not pay for a second extraction."""

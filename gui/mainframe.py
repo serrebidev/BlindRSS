@@ -12506,14 +12506,33 @@ class MainFrame(wx.Frame):
         if cookiefile and os.path.isfile(cookiefile):
             fallback_attempts.append(("cookiefile", ["--cookies", cookiefile]))
         attempt_phases = [
-            (url, attempts, False, False),
-            (url, fallback_attempts, True, False),
+            (url, attempts, False, False, False),
+            (url, fallback_attempts, True, False, False),
         ]
         attempt_phases.extend(
-            (recovery_url, fallback_attempts, True, True)
+            (recovery_url, fallback_attempts, True, True, False)
             for recovery_url in core.discovery.youtube_single_item_recovery_urls(url)
         )
-        for target_url, phase_attempts, is_fallback, impersonate in attempt_phases:
+        if core.discovery.youtube_single_item_recovery_urls(url):
+            attempt_phases.append((url, [], True, True, True))
+        for target_url, phase_attempts, is_fallback, impersonate, browser_bootstrap in attempt_phases:
+            visitor_data = ""
+            browser_user_agent = ""
+            if browser_bootstrap:
+                self._post_activity_status(_("Preparing YouTube browser session: {title}").format(title=title))
+                try:
+                    from core.youtube_browser_session import bootstrap_youtube_session
+
+                    browser_session = bootstrap_youtube_session(target_url, timeout_s=45)
+                except Exception:
+                    browser_session = None
+                if browser_session is None:
+                    continue
+                phase_attempts = [
+                    ("cookiefile", ["--cookies", browser_session.cookie_file])
+                ]
+                visitor_data = browser_session.visitor_data
+                browser_user_agent = browser_session.user_agent
             if is_fallback:
                 log.info(
                     "yt-dlp download: retrying with the wider player-client "
@@ -12539,11 +12558,14 @@ class MainFrame(wx.Frame):
                     if is_fallback:
                         cmd[cmd.index("--extractor-args") + 1] = (
                             core.discovery.youtube_player_client_arg(
-                                core.discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK
+                                core.discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK,
+                                visitor_data=visitor_data,
                             )
                         )
                     if impersonate:
                         cmd.extend(["--impersonate", "chrome"])
+                    if browser_user_agent:
+                        cmd.extend(["--user-agent", browser_user_agent])
                     if not audio_only:
                         cmd[cmd.index("--merge-output-format") + 1] = merge_format
                     try:
