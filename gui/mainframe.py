@@ -14935,7 +14935,7 @@ class FilterRulesDialog(wx.Dialog):
                 )
                 return
             wx.MessageBox(
-                _("Scanned {scanned} articles; {changed} matched a rule.").format(
+                ngettext("Scanned {scanned} article; {changed} matched a rule.", "Scanned {scanned} articles; {changed} matched a rule.", result.get("scanned", 0)).format(
                     scanned=result.get("scanned", 0), changed=result.get("changed", 0)
                 ),
                 _("Filter Rules Applied"), wx.ICON_INFORMATION, self,
