@@ -12494,77 +12494,102 @@ class MainFrame(wx.Frame):
         base_err = ""
         dpapi_seen = False
         timed_out = False
-        for kind, extra in attempts:
-            # A browser-cookie source that cannot be decrypted (Chromium App-Bound
-            # Encryption, yt-dlp #10927) tells us nothing about the media, and every
-            # remaining browser source fails the same way. Stop, and keep reporting
-            # the anonymous attempt's real error instead of the DPAPI noise.
-            if kind == "cookies" and dpapi_seen:
-                continue
-            # Audio presets never mux video, so the MKV rescue below does not
-            # apply to them: one attempt per cookie source is the whole loop.
-            merge_formats = ("mp4",) if audio_only else ("mp4", "mkv")
-            for merge_format in merge_formats:
-                cmd = list(base_cmd)
-                if not audio_only:
-                    cmd[cmd.index("--merge-output-format") + 1] = merge_format
-                try:
-                    res = subprocess.run(
-                        cmd + extra + [url],
-                        stdout=subprocess.PIPE,
-                        stderr=subprocess.PIPE,
-                        stdin=subprocess.DEVNULL,
-                        creationflags=creationflags,
-                        startupinfo=startupinfo,
-                        timeout=1800,
-                        text=True,
-                        encoding="utf-8",
-                        errors="replace",
-                    )
-                except FileNotFoundError:
-                    wx.CallAfter(lambda: wx.MessageBox(
-                        _("yt-dlp is not installed. Install it via Settings to download YouTube items."),
-                        _("Download error"), wx.ICON_ERROR))
-                    self._post_activity_status(_("Download failed: {title}").format(title=title))
-                    return
-                except subprocess.TimeoutExpired:
-                    last_err = _("yt-dlp download timed out")
-                    timed_out = True
-                    break
-                except Exception as e:
-                    last_err = str(e)
-                    break
-
-                if int(getattr(res, "returncode", -1) or 0) == 0:
-                    produced = self._find_downloaded_file(target_dir, base_name)
-                    if produced:
-                        self._record_article_download(article, produced)
-                    self._apply_download_retention(target_dir)
-                    dest = produced or target_dir
-                    wx.CallAfter(
-                        lambda d=dest: wx.MessageBox(
-                            _("Downloaded to:\n{path}").format(path=d),
-                            _("Download complete"),
-                        )
-                    )
-                    self._post_activity_status(_("Download complete: {title}").format(title=title))
-                    return
-
-                attempt_err = (res.stderr or res.stdout or "").strip()
-                if kind == "cookies" and core.discovery.is_ytdlp_dpapi_cookie_error(attempt_err):
-                    dpapi_seen = True
-                    log.info(
-                        "yt-dlp download: browser cookies unusable (Windows DPAPI); "
-                        "skipping remaining browser cookie sources"
-                    )
-                    break
-                last_err = attempt_err or last_err
-                if kind == "base":
-                    base_err = attempt_err
-                if merge_format == "mp4" and "conversion failed" in last_err.lower():
-                    log.info("yt-dlp MP4-preferred merge failed; retrying download as MKV")
+        # Phase 1 uses the primary player-client pool with every cookie
+        # source. If all of that fails, phase 2 retries with the wider
+        # YOUTUBE_PLAYER_CLIENTS_FALLBACK pool (anonymous + cookies.txt only;
+        # browser cookies already failed and DPAPI churn tells us nothing),
+        # mirroring the player.py fallback: YouTube blocks individual clients,
+        # so the wider pool frequently resolves videos the primary set
+        # reports as "unavailable".
+        fallback_attempts = [("base", [])]
+        if cookiefile and os.path.isfile(cookiefile):
+            fallback_attempts.append(("cookiefile", ["--cookies", cookiefile]))
+        attempt_phases = ((attempts, False), (fallback_attempts, True))
+        for phase_attempts, is_fallback in attempt_phases:
+            if is_fallback:
+                log.info(
+                    "yt-dlp download: primary attempts failed; retrying with "
+                    "the wider player-client fallback pool"
+                )
+            for kind, extra in phase_attempts:
+                # A browser-cookie source that cannot be decrypted (Chromium App-Bound
+                # Encryption, yt-dlp #10927) tells us nothing about the media, and every
+                # remaining browser source fails the same way. Stop, and keep reporting
+                # the anonymous attempt's real error instead of the DPAPI noise.
+                if kind == "cookies" and dpapi_seen:
                     continue
-                break
+                # Audio presets never mux video, so the MKV rescue below does not
+                # apply to them: one attempt per cookie source is the whole loop.
+                merge_formats = ("mp4",) if audio_only else ("mp4", "mkv")
+                for merge_format in merge_formats:
+                    cmd = list(base_cmd)
+                    if is_fallback:
+                        cmd[cmd.index("--extractor-args") + 1] = (
+                            core.discovery.youtube_player_client_arg(
+                                core.discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK
+                            )
+                        )
+                    if not audio_only:
+                        cmd[cmd.index("--merge-output-format") + 1] = merge_format
+                    try:
+                        res = subprocess.run(
+                            cmd + extra + [url],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            stdin=subprocess.DEVNULL,
+                            creationflags=creationflags,
+                            startupinfo=startupinfo,
+                            timeout=1800,
+                            text=True,
+                            encoding="utf-8",
+                            errors="replace",
+                        )
+                    except FileNotFoundError:
+                        wx.CallAfter(lambda: wx.MessageBox(
+                            _("yt-dlp is not installed. Install it via Settings to download YouTube items."),
+                            _("Download error"), wx.ICON_ERROR))
+                        self._post_activity_status(_("Download failed: {title}").format(title=title))
+                        return
+                    except subprocess.TimeoutExpired:
+                        last_err = _("yt-dlp download timed out")
+                        timed_out = True
+                        break
+                    except Exception as e:
+                        last_err = str(e)
+                        break
+
+                    if int(getattr(res, "returncode", -1) or 0) == 0:
+                        produced = self._find_downloaded_file(target_dir, base_name)
+                        if produced:
+                            self._record_article_download(article, produced)
+                        self._apply_download_retention(target_dir)
+                        dest = produced or target_dir
+                        wx.CallAfter(
+                            lambda d=dest: wx.MessageBox(
+                                _("Downloaded to:\n{path}").format(path=d),
+                                _("Download complete"),
+                            )
+                        )
+                        self._post_activity_status(_("Download complete: {title}").format(title=title))
+                        return
+
+                    attempt_err = (res.stderr or res.stdout or "").strip()
+                    if kind == "cookies" and core.discovery.is_ytdlp_dpapi_cookie_error(attempt_err):
+                        dpapi_seen = True
+                        log.info(
+                            "yt-dlp download: browser cookies unusable (Windows DPAPI); "
+                            "skipping remaining browser cookie sources"
+                        )
+                        break
+                    last_err = attempt_err or last_err
+                    if kind == "base" and not is_fallback:
+                        base_err = attempt_err
+                    if merge_format == "mp4" and "conversion failed" in last_err.lower():
+                        log.info("yt-dlp MP4-preferred merge failed; retrying download as MKV")
+                        continue
+                    break
+                if timed_out:
+                    break
             if timed_out:
                 break
 

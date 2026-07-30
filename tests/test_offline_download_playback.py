@@ -308,3 +308,96 @@ def test_ytdlp_download_honors_an_mp3_format_preset(tmp_path, monkeypatch):
     assert len(commands) == 1
     assert host._downloaded_media_path_for_article(article).endswith("YouTube Video.mp3")
     assert messages and messages[-1][1] == "Download complete"
+
+
+def test_ytdlp_download_retries_with_wider_player_client_pool(tmp_path, monkeypatch):
+    """A 'Video unavailable' from the primary client pool must trigger the
+    wider YOUTUBE_PLAYER_CLIENTS_FALLBACK pool before giving up."""
+    host = _host(tmp_path)
+    article = _article(title="YouTube Video")
+    article.url = "https://www.youtube.com/watch?v=A3TU_p5kLJI&list=RDA3TU_p5kLJI&start_radio=1"
+    article.media_url = article.url
+    article.media_type = "video/youtube"
+    messages = []
+    client_args = []
+
+    monkeypatch.setattr(
+        mainframe,
+        "wx",
+        SimpleNamespace(
+            CallAfter=lambda fn, *args, **kwargs: fn(*args, **kwargs),
+            MessageBox=lambda *args, **kwargs: messages.append(args),
+            ICON_ERROR=1,
+        ),
+    )
+    monkeypatch.setattr(mainframe.core.discovery, "_resolve_ytdlp_cli_path", lambda: "/tmp/yt-dlp")
+    monkeypatch.setattr(mainframe.core.discovery, "get_ytdlp_cookie_sources", lambda _url: [])
+    monkeypatch.setattr(mainframe.dependency_check, "_find_executable_path", lambda _name: "/tmp/ffmpeg")
+
+    primary_arg = mainframe.core.discovery.youtube_player_client_arg()
+    fallback_arg = mainframe.core.discovery.youtube_player_client_arg(
+        mainframe.core.discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK
+    )
+
+    def fake_run(cmd, **_kwargs):
+        client_args.append(cmd[cmd.index("--extractor-args") + 1])
+        if len(client_args) == 1:
+            return SimpleNamespace(
+                returncode=1,
+                stdout="",
+                stderr="ERROR: [youtube] A3TU_p5kLJI: Video unavailable. This video is not available",
+            )
+        target_dir = host._download_dir_for_article(article)
+        with open(os.path.join(target_dir, "YouTube Video.mp4"), "wb") as f:
+            f.write(b"merged-video")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    host._download_article_via_ytdlp(article, article.url)
+
+    assert client_args == [primary_arg, fallback_arg]
+    assert host._downloaded_media_path_for_article(article).endswith("YouTube Video.mp4")
+    assert messages and messages[-1][1] == "Download complete"
+
+
+def test_ytdlp_download_skips_fallback_pool_when_primary_succeeds(tmp_path, monkeypatch):
+    """The wider client pool is a last resort: a working primary attempt
+    must not pay for a second extraction."""
+    host = _host(tmp_path)
+    article = _article(title="YouTube Video")
+    article.url = "https://www.youtube.com/watch?v=s-59p7kUAaE"
+    article.media_url = article.url
+    article.media_type = "video/youtube"
+    messages = []
+    commands = []
+
+    monkeypatch.setattr(
+        mainframe,
+        "wx",
+        SimpleNamespace(
+            CallAfter=lambda fn, *args, **kwargs: fn(*args, **kwargs),
+            MessageBox=lambda *args, **kwargs: messages.append(args),
+            ICON_ERROR=1,
+        ),
+    )
+    monkeypatch.setattr(mainframe.core.discovery, "_resolve_ytdlp_cli_path", lambda: "/tmp/yt-dlp")
+    monkeypatch.setattr(mainframe.core.discovery, "get_ytdlp_cookie_sources", lambda _url: [])
+    monkeypatch.setattr(mainframe.dependency_check, "_find_executable_path", lambda _name: "/tmp/ffmpeg")
+
+    def fake_run(cmd, **_kwargs):
+        commands.append(cmd)
+        target_dir = host._download_dir_for_article(article)
+        with open(os.path.join(target_dir, "YouTube Video.mp4"), "wb") as f:
+            f.write(b"merged-video")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    host._download_article_via_ytdlp(article, article.url)
+
+    assert len(commands) == 1
+    assert commands[0][commands[0].index("--extractor-args") + 1] == (
+        mainframe.core.discovery.youtube_player_client_arg()
+    )
+    assert messages and messages[-1][1] == "Download complete"
