@@ -4,6 +4,11 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.127.0 - 2026-07-30
+
+- Self-update the embedded yt_dlp module at runtime.
+- Retry yt-dlp downloads with the wider player-client fallback pool.
+
 ## v1.126.0 - 2026-07-29
 
 - Add opt-in paid CAPTCHA solver as last-resort challenge escalation.
