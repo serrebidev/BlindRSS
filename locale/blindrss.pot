@@ -778,201 +778,201 @@ msgstr ""
 msgid "starts with"
 msgstr ""
 
-#: core/updater.py:299
+#: core/updater.py:306
 msgid "Update available."
 msgstr ""
 
-#: core/updater.py:502
+#: core/updater.py:509
 msgid "Authenticode verification failed: PowerShell was not found."
 msgstr ""
 
-#: core/updater.py:764
+#: core/updater.py:805
 msgid "Verifying download…"
 msgstr ""
 
-#: core/updater.py:779
+#: core/updater.py:820
 msgid "Extracting update…"
 msgstr ""
 
-#: core/updater.py:805
-#: core/updater.py:859
-#: core/updater.py:937
+#: core/updater.py:858
+#: core/updater.py:912
+#: core/updater.py:990
 msgid "Verifying signature…"
 msgstr ""
 
-#: core/updater.py:810
-#: core/updater.py:864
-#: core/updater.py:942
-#: core/updater.py:962
+#: core/updater.py:863
+#: core/updater.py:917
+#: core/updater.py:995
+#: core/updater.py:1015
 msgid "Preparing restart…"
 msgstr ""
 
-#: core/updater.py:199
+#: core/updater.py:206
 msgid "No release data from GitHub."
 msgstr ""
 
-#: core/updater.py:224
+#: core/updater.py:231
 msgid "Update manifest is empty."
 msgstr ""
 
-#: core/updater.py:228
+#: core/updater.py:235
 msgid "Update manifest has invalid version."
 msgstr ""
 
-#: core/updater.py:230
+#: core/updater.py:237
 msgid "Update manifest version does not match the latest release."
 msgstr ""
 
-#: core/updater.py:234
+#: core/updater.py:241
 msgid "Update manifest is missing asset name."
 msgstr ""
 
-#: core/updater.py:244
+#: core/updater.py:251
 msgid "Update manifest is missing a download URL."
 msgstr ""
 
-#: core/updater.py:248
+#: core/updater.py:255
 msgid "Update manifest has an invalid SHA-256 hash."
 msgstr ""
 
-#: core/updater.py:719
+#: core/updater.py:760
 msgid "Auto-update is not available for this build."
 msgstr ""
 
-#: core/updater.py:767
+#: core/updater.py:808
 msgid "Downloaded update failed SHA-256 verification."
 msgstr ""
 
-#: core/updater.py:857
+#: core/updater.py:910
 msgid "Downloaded Windows installer is missing."
 msgstr ""
 
-#: core/updater.py:925
+#: core/updater.py:978
 msgid "Could not locate the running .app bundle to update."
 msgstr ""
 
-#: core/updater.py:933
+#: core/updater.py:986
 msgid "Update package does not contain a BlindRSS.app bundle."
 msgstr ""
 
-#: core/updater.py:935
+#: core/updater.py:988
 msgid "Update package .app is missing its executable."
 msgstr ""
 
-#: core/updater.py:960
+#: core/updater.py:1013
 msgid "Update package is missing the BlindRSS executable."
 msgstr ""
 
-#: core/updater.py:751
-#: core/updater.py:759
+#: core/updater.py:792
+#: core/updater.py:800
 msgid "Downloading update…"
 msgstr ""
 
-#: core/updater.py:792
-#: core/updater.py:211
+#: core/updater.py:833
+#: core/updater.py:218
 msgid "Auto-update is not supported on this platform ({platform})."
 msgstr ""
 
-#: core/updater.py:919
+#: core/updater.py:972
 msgid "Update signature verification failed: {error}"
 msgstr ""
 
-#: core/updater.py:161
+#: core/updater.py:168
 msgid "{msg} Reset time (epoch): {reset}"
 msgstr ""
 
-#: core/updater.py:165
+#: core/updater.py:172
 msgid "GitHub API error: HTTP {status}"
 msgstr ""
 
-#: core/updater.py:193
+#: core/updater.py:200
 msgid "Invalid current version: {version}"
 msgstr ""
 
-#: core/updater.py:204
+#: core/updater.py:211
 msgid "Latest release tag is not semver: {tag}"
 msgstr ""
 
-#: core/updater.py:207
+#: core/updater.py:214
 msgid "BlindRSS is up to date ({version})."
 msgstr ""
 
-#: core/updater.py:218
+#: core/updater.py:225
 msgid "Update manifest '{manifest}' not found in release assets."
 msgstr ""
 
-#: core/updater.py:236
+#: core/updater.py:243
 msgid "Update asset must be a {extension} file."
 msgstr ""
 
-#: core/updater.py:240
+#: core/updater.py:247
 msgid "Update asset '{name}' not found in release assets."
 msgstr ""
 
-#: core/updater.py:266
+#: core/updater.py:273
 msgid "Windows installer asset must be an .exe file."
 msgstr ""
 
-#: core/updater.py:275
+#: core/updater.py:282
 msgid "Update installer has an invalid SHA-256 hash."
 msgstr ""
 
-#: core/updater.py:282
+#: core/updater.py:289
 msgid "Update installer is missing a download URL."
 msgstr ""
 
-#: core/updater.py:501
+#: core/updater.py:508
 msgid "Authenticode verification failed: {error}"
 msgstr ""
 
-#: core/updater.py:798
-#: core/updater.py:855
-#: core/updater.py:956
-msgid "{name} is missing from the install directory."
-msgstr ""
-
-#: core/updater.py:803
+#: core/updater.py:840
 msgid "Update package is missing {name}."
 msgstr ""
 
-#: core/updater.py:929
+#: core/updater.py:854
+#: core/updater.py:908
+#: core/updater.py:1009
+msgid "{name} is missing from the install directory."
+msgstr ""
+
+#: core/updater.py:982
 msgid "{name} is missing from the app bundle."
 msgstr ""
 
-#: core/updater.py:155
+#: core/updater.py:162
 msgid "Network error while checking GitHub: {error}"
 msgstr ""
 
-#: core/updater.py:170
+#: core/updater.py:177
 msgid "Invalid GitHub response: {error}"
 msgstr ""
 
-#: core/updater.py:187
+#: core/updater.py:194
 msgid "Failed to download update metadata: {error}"
 msgstr ""
 
-#: core/updater.py:410
+#: core/updater.py:417
 msgid "Unsupported update archive type: {type}"
 msgstr ""
 
-#: core/updater.py:592
-#: core/updater.py:1020
+#: core/updater.py:599
+#: core/updater.py:1073
 msgid "Failed to start update helper: {error}"
 msgstr ""
 
-#: core/updater.py:762
+#: core/updater.py:803
 msgid "Failed to download update: {error}"
 msgstr ""
 
-#: core/updater.py:783
+#: core/updater.py:824
 msgid "Failed to extract update: {error}"
 msgstr ""
 
-#: core/updater.py:271
+#: core/updater.py:278
 msgid "Update installer '{name}' not found in release assets."
 msgstr ""
 
-#: core/updater.py:489
+#: core/updater.py:496
 msgid "Update is signed but not by a trusted certificate{suffix}"
 msgstr ""
 

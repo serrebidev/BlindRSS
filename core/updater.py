@@ -40,6 +40,13 @@ log = logging.getLogger(__name__)
 
 _SEMVER_RE = re.compile(r"^v?(\d+)\.(\d+)(?:\.(\d+))?$")
 
+# A restarted app can begin while the detached update helper is still writing
+# its log, showing a failure dialog, or cleaning its working directory.  Never
+# let startup cleanup race a fresh helper.  Successful helpers remove their own
+# artifacts; these windows apply only to abandoned/failed leftovers.
+_UPDATE_TEMP_STALE_SECONDS = 24 * 60 * 60
+_UPDATE_BACKUP_STALE_SECONDS = 30 * 24 * 60 * 60
+
 
 def _normalize_thumbprint(value: Optional[str]) -> str:
     if not value:
@@ -652,8 +659,28 @@ def _safe_remove_dir(path: str, install_dir: str, reason: str) -> None:
         log.debug("Failed to remove update artifact (%s): %s", reason, e)
 
 
+def _update_artifact_is_stale(path: str, minimum_age_seconds: float) -> bool:
+    """Return True only when an update artifact is safely old enough to reap.
+
+    Missing/unreadable timestamps fail closed.  The helper owns fresh artifacts,
+    and deleting one while its restarted app is starting can interrupt the batch
+    file itself or erase the only recovery backup from a failed update.
+    """
+    try:
+        modified_at = float(os.path.getmtime(path))
+        age = max(0.0, time.time() - modified_at)
+        return age >= max(0.0, float(minimum_age_seconds))
+    except Exception:
+        return False
+
+
 def cleanup_update_artifacts(install_dir: Optional[str] = None) -> None:
-    """Remove leftover update folders from previous runs."""
+    """Remove stale update folders without racing a detached update helper.
+
+    A successful helper removes its backup and temp root itself.  Startup only
+    reaps abandoned temp roots after a day and failed-update recovery backups
+    after 30 days, preserving both the running helper and a useful safety copy.
+    """
     if not getattr(sys, "frozen", False):
         return
 
@@ -663,7 +690,10 @@ def cleanup_update_artifacts(install_dir: Optional[str] = None) -> None:
 
     for path in glob.glob(f"{install_dir}_backup_*"):
         base = os.path.basename(path).lower()
-        if base.startswith(f"{install_base}_backup_"):
+        if (
+            base.startswith(f"{install_base}_backup_")
+            and _update_artifact_is_stale(path, _UPDATE_BACKUP_STALE_SECONDS)
+        ):
             _safe_remove_dir(path, install_dir, "backup")
 
     # Temp parents: next to the install dir, and (macOS) next to the .app
@@ -677,8 +707,14 @@ def cleanup_update_artifacts(install_dir: Optional[str] = None) -> None:
         try:
             if os.path.isdir(update_tmp_parent):
                 for entry in os.listdir(update_tmp_parent):
-                    if entry.startswith("BlindRSS_update_"):
-                        _safe_remove_dir(os.path.join(update_tmp_parent, entry), install_dir, "temp")
+                    candidate = os.path.join(update_tmp_parent, entry)
+                    if (
+                        entry.startswith("BlindRSS_update_")
+                        and _update_artifact_is_stale(
+                            candidate, _UPDATE_TEMP_STALE_SECONDS
+                        )
+                    ):
+                        _safe_remove_dir(candidate, install_dir, "temp")
                 if not os.listdir(update_tmp_parent):
                     _safe_remove_dir(update_tmp_parent, install_dir, "temp parent")
         except Exception as e:
@@ -687,8 +723,13 @@ def cleanup_update_artifacts(install_dir: Optional[str] = None) -> None:
     try:
         temp_dir = tempfile.gettempdir()
         for entry in os.listdir(temp_dir):
-            if entry.startswith("BlindRSS_update_"):
-                candidate = os.path.join(temp_dir, entry)
+            candidate = os.path.join(temp_dir, entry)
+            if (
+                entry.startswith("BlindRSS_update_")
+                and _update_artifact_is_stale(
+                    candidate, _UPDATE_TEMP_STALE_SECONDS
+                )
+            ):
                 _safe_remove_dir(candidate, install_dir, "temp")
     except Exception as e:
         log.debug("Failed to clean system temp updates: %s", e)
@@ -793,14 +834,26 @@ def download_and_apply_update(info: UpdateInfo, debug_mode: bool = False, progre
 
 
 def _apply_windows(info, install_dir, temp_root, extract_dir, debug_mode, report) -> Tuple[bool, str]:
-    helper_path = os.path.join(install_dir, WINDOWS_UPDATE_HELPER_NAME)
-    if not os.path.isfile(helper_path):
-        return False, _("{name} is missing from the install directory.").format(name=WINDOWS_UPDATE_HELPER_NAME)
-
     staging_root = _find_staging_root(extract_dir)
     exe_path = os.path.join(staging_root, EXE_NAME)
     if not os.path.isfile(exe_path):
         return False, _("Update package is missing {name}.").format(name=EXE_NAME)
+
+    # Prefer the helper delivered by the target release.  Otherwise a client
+    # always updates with its OLD helper, so a helper fix cannot repair the very
+    # update that delivers it (the v1.124.1 -> v1.127.7 yt-dlp lock failure).
+    # Keep the installed helper as a compatibility fallback for older archives.
+    staged_helper_path = os.path.join(staging_root, WINDOWS_UPDATE_HELPER_NAME)
+    installed_helper_path = os.path.join(install_dir, WINDOWS_UPDATE_HELPER_NAME)
+    helper_path = (
+        staged_helper_path
+        if os.path.isfile(staged_helper_path)
+        else installed_helper_path
+    )
+    if not os.path.isfile(helper_path):
+        return False, _("{name} is missing from the install directory.").format(
+            name=WINDOWS_UPDATE_HELPER_NAME
+        )
 
     report(_("Verifying signature…"), None)
     ok, msg = _verify_authenticode_signature(exe_path, info.signing_thumbprints)

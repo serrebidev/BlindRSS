@@ -7,6 +7,7 @@
 import os
 import sys
 import tarfile
+import time
 import types
 import zipfile
 
@@ -387,6 +388,112 @@ def test_apply_windows_installer_verifies_and_launches_helper(monkeypatch, tmp_p
     assert captured["install_dir"] == str(install)
     assert captured["staging_root"] == ""
     assert captured["kwargs"]["installer_path"] == str(installer)
+
+
+def test_apply_windows_prefers_helper_from_target_release(monkeypatch, tmp_path):
+    install = tmp_path / "install"
+    install.mkdir()
+    (install / "update_helper.bat").write_text("old helper", encoding="utf-8")
+
+    temp_root = tmp_path / "BlindRSS_update_x"
+    extract = temp_root / "extract"
+    stage = extract / "BlindRSS"
+    stage.mkdir(parents=True)
+    (stage / "BlindRSS.exe").write_bytes(b"signed app")
+    (stage / "update_helper.bat").write_text("fixed target helper", encoding="utf-8")
+
+    info = updater.UpdateInfo(
+        version=updater.Version("2.0.0"),
+        tag="v2.0.0",
+        published_at="",
+        notes_summary="",
+        asset_name="BlindRSS-v2.0.0.zip",
+        download_url="https://example.test/update.zip",
+        sha256="a" * 64,
+        signing_thumbprints=("AABBCC",),
+    )
+    monkeypatch.setattr(updater, "_verify_authenticode_signature", lambda *_args: (True, ""))
+
+    captured = {}
+
+    def fake_launch(helper, parent_pid, install_dir, staging_root, **kwargs):
+        captured["helper"] = helper
+        with open(helper, encoding="utf-8") as helper_file:
+            captured["helper_text"] = helper_file.read()
+        captured["staging_root"] = staging_root
+        return True, ""
+
+    monkeypatch.setattr(updater, "_launch_update_helper", fake_launch)
+    ok, message = updater._apply_windows(
+        info,
+        str(install),
+        str(temp_root),
+        str(extract),
+        False,
+        lambda *_args: True,
+    )
+
+    assert ok, message
+    assert captured["helper_text"] == "fixed target helper"
+    assert captured["staging_root"] == str(stage)
+
+
+def test_startup_cleanup_preserves_fresh_helper_artifacts(monkeypatch, tmp_path):
+    install = tmp_path / "BlindRSS"
+    install.mkdir()
+    backup = tmp_path / "BlindRSS_backup_20260730114426"
+    backup.mkdir()
+    (backup / "recovery.txt").write_text("keep", encoding="utf-8")
+
+    temp_parent = tmp_path / "_BlindRSS_update_tmp"
+    temp_root = temp_parent / "BlindRSS_update_active"
+    temp_root.mkdir(parents=True)
+    (temp_root / "update_helper.bat").write_text("running", encoding="utf-8")
+
+    system_temp = tmp_path / "system-temp"
+    system_temp.mkdir()
+    system_root = system_temp / "BlindRSS_update_active"
+    system_root.mkdir()
+
+    monkeypatch.setattr(updater.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(updater.tempfile, "gettempdir", lambda: str(system_temp))
+
+    updater.cleanup_update_artifacts(str(install))
+
+    assert backup.is_dir()
+    assert temp_root.is_dir()
+    assert system_root.is_dir()
+
+
+def test_startup_cleanup_reaps_only_stale_helper_artifacts(monkeypatch, tmp_path):
+    install = tmp_path / "BlindRSS"
+    install.mkdir()
+    backup = tmp_path / "BlindRSS_backup_20260601000000"
+    backup.mkdir()
+
+    temp_parent = tmp_path / "_BlindRSS_update_tmp"
+    temp_root = temp_parent / "BlindRSS_update_abandoned"
+    temp_root.mkdir(parents=True)
+
+    system_temp = tmp_path / "system-temp"
+    system_temp.mkdir()
+    system_root = system_temp / "BlindRSS_update_abandoned"
+    system_root.mkdir()
+
+    now = time.time()
+    os.utime(backup, (now - updater._UPDATE_BACKUP_STALE_SECONDS - 1,) * 2)
+    os.utime(temp_root, (now - updater._UPDATE_TEMP_STALE_SECONDS - 1,) * 2)
+    os.utime(system_root, (now - updater._UPDATE_TEMP_STALE_SECONDS - 1,) * 2)
+
+    monkeypatch.setattr(updater.sys, "frozen", True, raising=False)
+    monkeypatch.setattr(updater.tempfile, "gettempdir", lambda: str(system_temp))
+
+    updater.cleanup_update_artifacts(str(install))
+
+    assert not backup.exists()
+    assert not temp_root.exists()
+    assert not temp_parent.exists()
+    assert not system_root.exists()
 
 
 def test_extract_zip_preserves_symlinks_on_macos(tmp_path):
