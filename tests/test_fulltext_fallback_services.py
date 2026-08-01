@@ -136,6 +136,29 @@ def test_sky_gate_recovered_through_live_google_translate_route(monkeypatch):
     assert not any("r.jina.ai" in call or "archive.org" in call for call in calls)
 
 
+def test_sky_large_footer_shell_without_akamai_name_uses_translate_route(monkeypatch):
+    sky_url = "https://news.sky.com/story/example-world-report-13562675"
+    shell = (
+        "<html><head><script>" + ("window.blocked=true;" * 150) + "</script></head>"
+        "<body><footer>Powered and protected by <a>Privacy</a></footer></body></html>"
+    )
+    calls = []
+
+    def fake_get(url, **kwargs):
+        calls.append(url)
+        if "news-sky-com.translate.goog" in url:
+            return _resp(200, ARTICLE_HTML)
+        return _resp(200, shell)
+
+    monkeypatch.setattr(utils, "safe_requests_get", fake_get)
+
+    res = article_extractor._fetch_page(sky_url)
+
+    assert res.blocked is False
+    assert "university mail servers" in (res.html or "")
+    assert calls[1].startswith("https://news-sky-com.translate.goog/")
+
+
 def test_sky_translate_route_rejects_akamai_footer(monkeypatch):
     gate = "Powered and protected by Akamai Privacy"
     monkeypatch.setattr(

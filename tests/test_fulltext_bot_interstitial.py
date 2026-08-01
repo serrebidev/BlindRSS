@@ -55,6 +55,16 @@ def test_detects_sky_news_bare_akamai_gate():
     assert article_extractor._looks_like_bot_interstitial(body) is True
 
 
+def test_detects_sky_news_footer_without_akamai_name_inside_large_html_shell():
+    body = (
+        "<html><head><style>" + (".placeholder{display:none}" * 150) + "</style></head>"
+        "<body><footer><span>Powered and protected by</span><a>Privacy</a></footer></body></html>"
+    )
+
+    assert len(body) > 2000
+    assert article_extractor._looks_like_bot_interstitial(body) is True
+
+
 def test_detects_gate_with_curly_apostrophe():
     # Bloomberg renders the smart apostrophe in "you're"; detection must normalize it.
     body = "To continue, please click the box below to let us know you’re not a robot."

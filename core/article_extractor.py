@@ -239,8 +239,24 @@ def _looks_like_bot_interstitial(content: str) -> bool:
     # them is never misclassified.
     if "before you continue to google" in low and "we use cookies and data" in low:
         return True
-    if len(low) < 2000 and "powered and protected by" in low and "akamai" in low:
-        return True
+    if "powered and protected by" in low:
+        # Sky's current Akamai denial can omit the word ``Akamai`` from the
+        # accessible text and expose only "Powered and protected by / Privacy".
+        # It can also wrap those two visible lines in enough script/style markup
+        # to exceed the raw-body size guard.  Measure visible text when markup is
+        # present so that shell still enters the normal Sky recovery chain.
+        visible_low = low
+        if "<" in low and ">" in low:
+            try:
+                visible_low = BeautifulSoup(content, "html.parser").get_text(" ", strip=True).lower()
+            except Exception:
+                visible_low = low
+        visible_low = re.sub(r"\s+", " ", visible_low).strip()
+        if len(visible_low) < 2000 and (
+            "akamai" in visible_low
+            or re.search(r"\bpowered and protected by\s+privacy\b", visible_low)
+        ):
+            return True
     return any(marker in low for marker in _BOT_INTERSTITIAL_MARKERS)
 
 
