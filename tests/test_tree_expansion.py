@@ -39,6 +39,11 @@ def wx_app():
     except Exception as exc:  # pragma: no cover - depends on display availability
         pytest.skip(f"no display / wx.App() unavailable: {exc}")
     yield app
+    try:
+        wx.YieldIfNeeded()
+        app.Destroy()
+    except Exception:  # pragma: no cover - backend-specific shutdown
+        pass
 
 
 def test_untouched_category_follows_default():

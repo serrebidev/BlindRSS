@@ -88,6 +88,14 @@ def wx_app():
     except Exception as exc:  # pragma: no cover - depends on display availability
         pytest.skip(f"no display / wx.App() unavailable: {exc}")
     yield app
+    # Destroy() on the dialog/frame is deferred by wxWidgets. Flush those
+    # native window deletions before tearing down the app, or MSW reports
+    # ``UnregisterClass ... Class still has open windows`` at process exit.
+    try:
+        wx.YieldIfNeeded()
+        app.Destroy()
+    except Exception:  # pragma: no cover - backend-specific shutdown
+        pass
 
 
 def test_settings_dialog_article_open_controls(wx_app):

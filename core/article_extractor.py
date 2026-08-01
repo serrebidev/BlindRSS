@@ -19,7 +19,7 @@ import re
 import time
 import logging
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Callable, Optional, Tuple, List, Set
 from urllib.parse import quote, urljoin, urlsplit
 
@@ -3228,6 +3228,296 @@ def _response_text(r) -> str:
         return ""
 
 
+_SKY_FLOURISH_MAX_TABLES = 12
+_SKY_FLOURISH_MAX_EMBED_BYTES = 8_000_000
+_SKY_FLOURISH_ROWS_PER_TABLE = 100
+_FLOURISH_DATE_MS_KEY = "__blindrss_flourish_date_ms__"
+
+
+def _extract_balanced_js_value(source: str, variable: str) -> str:
+    """Return a JSON-like object/array assigned to a JavaScript variable.
+
+    Flourish publishes table data directly in its embed document.  The value is
+    JSON except for typed ``new Date(...)`` cells, but a non-greedy regex cannot
+    safely stop at the right nested closing brace.  This small scanner ignores
+    brackets inside quoted strings and returns only a complete object/array.
+    """
+    match = re.search(rf"\b{re.escape(variable)}\s*=\s*", source or "")
+    if not match:
+        return ""
+    start = match.end()
+    while start < len(source) and source[start].isspace():
+        start += 1
+    if start >= len(source) or source[start] not in "{[":
+        return ""
+
+    pairs = {"{": "}", "[": "]"}
+    stack: List[str] = []
+    quote_char = ""
+    escaped = False
+    for index in range(start, len(source)):
+        char = source[index]
+        if quote_char:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote_char:
+                quote_char = ""
+            continue
+        if char in ('"', "'"):
+            quote_char = char
+        elif char in pairs:
+            stack.append(pairs[char])
+        elif char in "}]":
+            if not stack or char != stack.pop():
+                return ""
+            if not stack:
+                return source[start:index + 1]
+    return ""
+
+
+def _flourish_json_value(source: str, variable: str):
+    """Parse one embedded Flourish data variable without executing JavaScript."""
+    raw = _extract_balanced_js_value(source, variable)
+    if not raw:
+        return None
+
+    # Published datasets are JSON apart from typed dates such as
+    # ``new Date(-2208922980000)``. Replace only tokens outside JSON strings so
+    # authored cell text containing those words remains untouched.
+    output: List[str] = []
+    index = 0
+    quoted = False
+    escaped = False
+    date_re = re.compile(r"new\s+Date\(\s*(-?\d+)\s*\)")
+    while index < len(raw):
+        char = raw[index]
+        if quoted:
+            output.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                quoted = False
+            index += 1
+            continue
+        if char == '"':
+            quoted = True
+            output.append(char)
+            index += 1
+            continue
+        date_match = date_re.match(raw, index)
+        if date_match:
+            output.append(
+                '{"' + _FLOURISH_DATE_MS_KEY + '":' + date_match.group(1) + "}"
+            )
+            index = date_match.end()
+            continue
+        output.append(char)
+        index += 1
+    try:
+        return json.loads("".join(output))
+    except (TypeError, ValueError):
+        return None
+
+
+def _format_flourish_datetime(milliseconds: int, metadata: dict) -> str:
+    """Format a Flourish typed date using its published d3-style format."""
+    try:
+        # ``datetime.fromtimestamp`` delegates to the platform C runtime and
+        # rejects Flourish's perfectly valid pre-1970 time-only values on
+        # Windows. Epoch arithmetic is portable across the supported OSes.
+        value = datetime(1970, 1, 1, tzinfo=timezone.utc) + timedelta(
+            milliseconds=int(milliseconds)
+        )
+    except (OverflowError, OSError, TypeError, ValueError):
+        return str(milliseconds)
+
+    format_id = str((metadata or {}).get("output_format_id") or "")
+    date_format = format_id.split("$", 1)[1] if "$" in format_id else ""
+    if not date_format:
+        return value.isoformat().replace("+00:00", "Z")
+
+    hour12 = value.hour % 12 or 12
+    values = {
+        "Y": f"{value.year:04d}",
+        "y": f"{value.year % 100:02d}",
+        "m": f"{value.month:02d}",
+        "d": f"{value.day:02d}",
+        "e": f"{value.day:2d}",
+        "H": f"{value.hour:02d}",
+        "I": f"{hour12:02d}",
+        "M": f"{value.minute:02d}",
+        "S": f"{value.second:02d}",
+        "L": f"{value.microsecond // 1000:03d}",
+        "p": "AM" if value.hour < 12 else "PM",
+        "a": value.strftime("%a"),
+        "A": value.strftime("%A"),
+        "b": value.strftime("%b"),
+        "B": value.strftime("%B"),
+        "%": "%",
+    }
+
+    def replace_token(match) -> str:
+        unpadded, token = match.groups()
+        rendered = values.get(token)
+        if rendered is None:
+            return match.group(0)
+        if unpadded and token in {"m", "d", "H", "I"}:
+            return rendered.lstrip("0") or "0"
+        return rendered
+
+    return re.sub(r"%(-?)([A-Za-z%])", replace_token, date_format)
+
+
+def _format_flourish_cell(value, metadata: dict) -> str:
+    if isinstance(value, dict) and set(value) == {_FLOURISH_DATE_MS_KEY}:
+        return _format_flourish_datetime(value[_FLOURISH_DATE_MS_KEY], metadata)
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (dict, list)):
+        return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+    return str(value)
+
+
+def _flourish_table_nodes(soup: BeautifulSoup, embed_html: str) -> List:
+    """Build semantic HTML tables from a published Flourish table embed."""
+    data = _flourish_json_value(embed_html, "_Flourish_data")
+    column_names = _flourish_json_value(embed_html, "_Flourish_data_column_names")
+    metadata = _flourish_json_value(embed_html, "_Flourish_data_metadata") or {}
+    if not isinstance(data, dict) or not isinstance(column_names, dict):
+        return []
+
+    tables: List = []
+    for dataset_name, raw_rows in data.items():
+        if not isinstance(raw_rows, list) or not raw_rows:
+            continue
+        names = column_names.get(dataset_name)
+        if not isinstance(names, dict):
+            continue
+
+        headers = names.get("columns")
+        row_values: List[List] = []
+        if isinstance(headers, list):
+            for row in raw_rows:
+                if isinstance(row, dict) and isinstance(row.get("columns"), list):
+                    row_values.append(row["columns"])
+        else:
+            # Some Flourish templates expose rows as ordinary objects and map
+            # binding keys to their human-readable column names.
+            keys = [key for key in names if isinstance(names.get(key), str)]
+            headers = [names[key] for key in keys]
+            for row in raw_rows:
+                if isinstance(row, dict):
+                    row_values.append([row.get(key) for key in keys])
+        if not isinstance(headers, list) or len(headers) < 2 or not row_values:
+            continue
+
+        max_columns = max([len(headers)] + [len(row) for row in row_values])
+        clean_headers = [str(value or "").strip() for value in headers]
+        clean_headers.extend(
+            f"Column {index}" for index in range(len(clean_headers) + 1, max_columns + 1)
+        )
+        dataset_metadata = metadata.get(dataset_name)
+        column_metadata = (
+            dataset_metadata.get("columns", []) if isinstance(dataset_metadata, dict) else []
+        )
+        part_count = (len(row_values) + _SKY_FLOURISH_ROWS_PER_TABLE - 1) // _SKY_FLOURISH_ROWS_PER_TABLE
+        for part_index in range(part_count):
+            table = soup.new_tag("table")
+            if part_count > 1:
+                caption = soup.new_tag("caption")
+                caption.string = f"Table, part {part_index + 1} of {part_count}"
+                table.append(caption)
+            thead = soup.new_tag("thead")
+            head_row = soup.new_tag("tr")
+            for heading in clean_headers:
+                th = soup.new_tag("th", scope="col")
+                th.string = heading
+                head_row.append(th)
+            thead.append(head_row)
+            table.append(thead)
+            tbody = soup.new_tag("tbody")
+            start = part_index * _SKY_FLOURISH_ROWS_PER_TABLE
+            for raw_row in row_values[start:start + _SKY_FLOURISH_ROWS_PER_TABLE]:
+                tr = soup.new_tag("tr")
+                for column_index in range(max_columns):
+                    td = soup.new_tag("td")
+                    cell_metadata = (
+                        column_metadata[column_index]
+                        if column_index < len(column_metadata)
+                        and isinstance(column_metadata[column_index], dict)
+                        else {}
+                    )
+                    cell = raw_row[column_index] if column_index < len(raw_row) else ""
+                    td.string = _format_flourish_cell(cell, cell_metadata)
+                    tr.append(td)
+                tbody.append(tr)
+            table.append(tbody)
+            tables.append(table)
+    return tables
+
+
+def _expand_sky_flourish_tables(html_text: str, url: str, timeout: int = 20) -> str:
+    """Replace Sky's script-hydrated Flourish tables with semantic HTML.
+
+    Sky's article response contains only a ``div[data-src]`` and a thumbnail;
+    the table is loaded later by JavaScript, so neither the classic extractor
+    nor the rich-view sanitizer can see its cells.  Fetch only strict numeric
+    public Flourish visualization IDs and fail closed on any format change.
+    """
+    if not html_text or (urlsplit(url).hostname or "").lower() != "news.sky.com":
+        return html_text
+    if "flourish-table" not in html_text.lower():
+        return html_text
+    parsed = _parse_html_soup(html_text, context="Sky Flourish table expansion")
+    if parsed is None:
+        return html_text
+
+    changed = False
+    widgets = parsed.select("div.flourish-embed.flourish-table[data-src]")
+    for widget in widgets[:_SKY_FLOURISH_MAX_TABLES]:
+        data_src = str(widget.get("data-src") or "")
+        match = re.fullmatch(r"/?visualisation/(\d+)(?:\?[^#]*)?", data_src)
+        if not match:
+            continue
+        embed_url = f"https://flo.uri.sh/visualisation/{match.group(1)}/embed"
+        try:
+            response = utils.safe_requests_get(
+                embed_url,
+                timeout=max(1, min(int(timeout or 20), 15)),
+                allow_redirects=True,
+                headers={"Referer": url},
+                site_cookies=False,
+            )
+            if not (200 <= int(getattr(response, "status_code", 0)) < 300):
+                continue
+            embed_html = _response_text(response)
+            if not embed_html or len(embed_html.encode("utf-8")) > _SKY_FLOURISH_MAX_EMBED_BYTES:
+                continue
+            tables = _flourish_table_nodes(parsed, embed_html)
+        except Exception:
+            LOG.debug("Could not expand Sky Flourish table %s", embed_url, exc_info=True)
+            continue
+        if not tables:
+            continue
+        container = parsed.new_tag("div")
+        for table in tables:
+            container.append(table)
+        # Sky wraps Flourish in a ``sdc-article-custom-markup`` block that
+        # trafilatura deliberately discards. Replace that wrapper too, or the
+        # semantic table would exist but classic extraction would still prune
+        # it before accessible table linearization.
+        target = widget.find_parent("div", class_="sdc-article-widget") or widget
+        target.replace_with(container)
+        changed = True
+    return str(parsed) if changed else html_text
+
+
 def _wayback_raw_url(snapshot_url: str) -> str:
     """Rewrite a Wayback snapshot URL to the raw (`id_`) form that skips the archive toolbar."""
     m = _WAYBACK_SNAPSHOT_RE.match((snapshot_url or "").strip())
@@ -4250,7 +4540,8 @@ def extract_full_article(
             if not author:
                 author = a
 
-        page_texts.append(_extract_text_any(html, current))
+        expanded_html = _expand_sky_flourish_tables(html, current, timeout)
+        page_texts.append(_extract_text_any(expanded_html, current))
 
         next_url = _find_next_page(html, current)
         if not next_url or next_url in visited:
