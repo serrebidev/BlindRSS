@@ -930,6 +930,19 @@ _FORUM_LAYOUTS = (
         "post_time": "",
         "junk": (),
     },
+    {   # BlindRSS semantic reconstruction of a GitHub pull request / issue /
+        # commit / release page (see core.github_source)
+        "name": "github",
+        "lead": "",
+        "lead_body": "",
+        "lead_header": (),
+        "post": "section.blindrss-github-post",
+        "post_body": ".blindrss-github-body",
+        "post_number": "h2",
+        "post_header": (),
+        "post_time": "",
+        "junk": (),
+    },
     {   # BlindRSS semantic reconstruction of a Reddit JSON/RSS thread
         "name": "reddit",
         "lead": "",
@@ -1059,6 +1072,15 @@ def _is_groups_io_thread_url(url: str) -> bool:
         return False
 
 
+def _is_github_page_url(url: str) -> bool:
+    try:
+        from core import github_source
+
+        return github_source.is_github_page_url(url)
+    except Exception:
+        return False
+
+
 def _is_web_forum_thread_url(url: str) -> bool:
     try:
         from core import forum_sources
@@ -1078,6 +1100,7 @@ def _is_forum_thread_host(url: str) -> bool:
         or _is_lemmy_thread_url(url)
         or _is_groups_io_thread_url(url)
         or _is_web_forum_thread_url(url)
+        or _is_github_page_url(url)
         or any(_host_matches(url, host) for host in _FORUM_THREAD_HOSTS)
     )
 
@@ -2586,7 +2609,12 @@ def _postprocess_extracted_text(text: str, url: str) -> str:
     # Generic (all hosts): a naive upstream tag-stripper can leave inline <script>/<style>
     # SOURCE behind as body "text", so the reader speaks the page's JavaScript after the last
     # paragraph. Runs last so it also covers the proxy/fallback renderings, not just JSON-LD.
-    t = _strip_embedded_script_code(t)
+    #
+    # Never on a GitHub page: it is rebuilt from the API (core.github_source), so its diff
+    # hunks and fenced code blocks ARE the content. A pull request touching JavaScript is a
+    # long run of code-shaped lines with several strong markers — exactly what this drops.
+    if not _is_github_page_url(url):
+        t = _strip_embedded_script_code(t)
 
     # Generic (all hosts): a bare recirculation heading ("You May Also Like", "SEE ALSO:")
     # left behind mid-body by the widget it labelled. It carries no content and interrupts
@@ -3762,6 +3790,21 @@ def _fetch_page(url: str, timeout: int = 20, encoding_override: str = "") -> _Fe
         if groups_html:
             return _FetchResult(html=groups_html)
 
+    # A GitHub pull request / issue / commit page renders its conversation
+    # client-side while server-rendering only the diff, so generic extraction
+    # returned the changed-lines table alone and dropped the description, every
+    # comment and every code review. Rebuild the whole page from the REST API.
+    if _is_github_page_url(url):
+        try:
+            from core import github_source
+
+            github_html = github_source.download_page_html(url, timeout=timeout)
+        except Exception:
+            LOG.debug("GitHub page reconstruction failed for %s", url, exc_info=True)
+            github_html = ""
+        if github_html:
+            return _FetchResult(html=github_html)
+
     # Reddit's normal HTML progressively hydrates/collapses comment branches,
     # so scraping that DOM can never satisfy the reader's "all comments"
     # contract.  Build a complete semantic page from its comments endpoint (and
@@ -4245,7 +4288,12 @@ _PAGINATION_LABEL_RE = re.compile(r"(?:next|older)(?:\s+(?:page|pages|entries))?
 #     at a DIFFERENT story — following it appended an unrelated article to every extraction, and
 #     the newest story's button points at a malformed firehose.pl URL whose fallback fetch
 #     returned the site's "YOUR PRIVACY CHOICES" OneTrust page as the final "page".
-_NO_PAGINATION_FOLLOW_HOSTS = ("wired.com", "ning.com", "neowin.net", "bloomberg.com", "slashdot.org")
+#   - github.com: the page is rebuilt whole from the API (core.github_source), so there is
+#     never a page 2 to follow, and a "next" link inside somebody's comment would append an
+#     unrelated page to the pull request.
+_NO_PAGINATION_FOLLOW_HOSTS = (
+    "wired.com", "ning.com", "neowin.net", "bloomberg.com", "slashdot.org", "github.com",
+)
 
 
 def _find_next_page(html: str, base_url: str) -> Optional[str]:
@@ -4565,7 +4613,11 @@ def extract_full_article(
     # Guard against pages with no article body (video-only/index pages): extraction "succeeds"
     # but yields only the page's navigation or related-story headlines, which would be shown
     # (and read aloud) as if they were the story. Raising lets callers fall back to feed content.
-    if merged and _looks_like_link_list(merged):
+    # Never for a rebuilt GitHub page (core.github_source): a small pull request is
+    # legitimately mostly short, punctuation-free lines — diff lines, changed-file rows,
+    # metadata bullets — which is the exact shape this guard rejects as a navigation
+    # stack, and rejecting it would hand the reader the feed excerpt instead.
+    if merged and not _is_github_page_url(extraction_url) and _looks_like_link_list(merged):
         raise ExtractionError(_link_list_only_message())
     # Guard against a hard-paywall stub (headline + byline + "Subscribe to unlock"): let the
     # caller fall back to feed content instead of presenting the subscribe nag as the article.
@@ -4708,6 +4760,14 @@ def _should_prefer_feed_content(url: str, html: str) -> bool:
 
     low = html.lower()
     if "unable to retrieve full-text content" in low:
+        return False
+
+    # A GitHub page is rebuilt whole from the API (core.github_source), and the feed item
+    # for it carries only the description or the commit message. Preferring the feed here
+    # would skip the fetch entirely and drop exactly the conversation the reconstruction
+    # exists to recover — a long pull-request description is enough to trip the generic
+    # "feed content is very long, it's probably full text" rule below.
+    if _is_github_page_url(url):
         return False
 
     # Ning activity feeds often contain the only useful human-readable description/excerpt

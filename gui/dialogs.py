@@ -2891,6 +2891,21 @@ class SettingsDialog(wx.Dialog):
             "Browser cookies are imported only from Groups.io domains."
         )), 0, wx.ALL, 8)
 
+    def _build_github_group(self, panel, sizer):
+        """Built on first view; see _register_lazy_page."""
+        sizer.Add(wx.StaticText(panel, label=_(
+            "GitHub personal access token (optional). Full text of pull requests, issues and "
+            "commits works without one, but GitHub allows only 60 page reads an hour per "
+            "connection; a token raises that limit and reaches private repositories. "
+            "Create one at github.com/settings/tokens."
+        )), 0, wx.ALL, 8)
+        self.github_token_ctrl = wx.TextCtrl(
+            panel, value=str(self.config.get("github_token", "") or ""), style=wx.TE_PASSWORD
+        )
+        self.github_token_ctrl.SetName(_("GitHub personal access token"))
+        self.github_token_ctrl.SetHint(_("Paste your GitHub token"))
+        sizer.Add(self.github_token_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 8)
+
     def _build_media_page(self, panel, sizer):
         """Built on first view; see _register_lazy_page."""
         config = self.config
@@ -3179,6 +3194,15 @@ class SettingsDialog(wx.Dialog):
         )
         self._build_groups_io_page(panel, groups_io_group)
         sizer.Add(groups_io_group, 0, wx.EXPAND | wx.ALL, 8)
+
+        # GitHub full text (pull requests, issues, commits) is read through the
+        # GitHub API, so its optional token is provider configuration too — in its
+        # own group, since a screen reader announces the group a field sits in.
+        github_group = wx.StaticBoxSizer(
+            wx.StaticBox(panel, label="GitHub"), wx.VERTICAL
+        )
+        self._build_github_group(panel, github_group)
+        sizer.Add(github_group, 0, wx.EXPAND | wx.ALL, 8)
 
     def _build_sounds_page(self, panel, sizer):
         """Built on first view; see _register_lazy_page."""
@@ -4029,6 +4053,7 @@ class SettingsDialog(wx.Dialog):
             "full_text_rich_view": self.rich_view_chk.GetValue(),
             "ytdlp_cookies_file": self.ytdlp_cookies_ctrl.GetValue().strip(),
             "groups_io_api_key": self.groups_io_api_key_ctrl.GetValue().strip(),
+            "github_token": self.github_token_ctrl.GetValue().strip(),
             "auto_import_browser_cookies": self.auto_import_cookies_chk.GetValue(),
             "youtube_play_via_download": self.youtube_play_via_download_chk.GetValue(),
             "youtube_play_cache_dir": self.youtube_play_cache_dir_ctrl.GetValue().strip(),

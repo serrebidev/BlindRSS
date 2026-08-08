@@ -1095,7 +1095,9 @@ def render_full_article_html(
     # Some publishers (e.g. fraservalleytoday.ca) serve a truncated web page but
     # syndicate the complete story in the feed. Prefer whichever body is fuller,
     # never downgrading below the feed content the user could already see.
-    if fallback_html and not structured_youtube:
+    # Never for a GitHub page: it is rebuilt whole from the API, so the feed item (the
+    # pull-request description alone) must not be able to replace the conversation.
+    if fallback_html and not structured_youtube and not ae._is_github_page_url(url):
         feed_body = clean_article_html(fallback_html, display_url, use_traf_prune=False)
         if feed_body:
             body_len = len(_norm(BeautifulSoup(body or "", "html.parser").get_text(" ", strip=True)))

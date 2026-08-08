@@ -169,6 +169,11 @@ DEFAULT_CONFIG = {
     # only in the user's local config.json.
     "groups_io_api_key": "",
     "groups_io_search_max_items": 100,
+    # GitHub pull request / issue / commit pages are rebuilt from the public
+    # REST API (core.github_source), which allows 60 requests an hour per IP
+    # anonymously. An optional personal access token raises that to 5000 and is
+    # what private repositories need; stored only in the local config.json.
+    "github_token": "",
     # Google Groups retired RSS. The current web conversation list exposes up
     # to 30 recent topics per response; keep the cap configurable for future
     # server-side expansion without treating the HTML page as an RSS document.
