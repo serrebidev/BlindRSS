@@ -65,6 +65,12 @@ _PULL_RE = re.compile(
 _ISSUE_RE = re.compile(rf"^/{_OWNER_REPO}/issues/(?P<number>\d+)/?$")
 _COMMIT_RE = re.compile(rf"^/{_OWNER_REPO}/commit/(?P<sha>[0-9a-fA-F]{{7,40}})(?:\.patch|\.diff)?/?$")
 _RELEASE_RE = re.compile(rf"^/{_OWNER_REPO}/releases/tag/(?P<tag>[^/]+)/?$")
+_DISCUSSION_RE = re.compile(rf"^/{_OWNER_REPO}/discussions/(?P<number>\d+)/?$")
+# Organization-level discussions ("github.com/orgs/community/discussions/1234")
+# live in the org's .github repository, which is what the API reads.
+_ORG_DISCUSSION_RE = re.compile(
+    r"^/orgs/(?P<owner>[A-Za-z0-9][A-Za-z0-9._-]{0,99})/discussions/(?P<number>\d+)/?$"
+)
 
 # Bounds. A busy pull request can carry thousands of review comments and a
 # refactor can touch hundreds of files; the reader must stay finite without
@@ -85,22 +91,25 @@ _MAX_HUNK_CONTEXT_LINES = 6
 class GitHubTarget:
     """A GitHub page shape this module can rebuild."""
 
-    kind: str  # "pull" | "issue" | "commit" | "release"
+    kind: str  # "pull" | "issue" | "commit" | "release" | "discussion" | "org_discussion"
     owner: str
     repo: str
-    ref: str  # issue/PR number, commit sha, or release tag
+    ref: str  # issue/PR/discussion number, commit sha, or release tag
 
     @property
     def slug(self) -> str:
-        return f"{self.owner}/{self.repo}"
+        return f"{self.owner}/{self.repo}" if self.repo else self.owner
 
     @property
     def canonical_url(self) -> str:
+        if self.kind == "org_discussion":
+            return f"https://github.com/orgs/{self.owner}/discussions/{self.ref}"
         path = {
             "pull": f"pull/{self.ref}",
             "issue": f"issues/{self.ref}",
             "commit": f"commit/{self.ref}",
             "release": f"releases/tag/{quote(self.ref, safe='')}",
+            "discussion": f"discussions/{self.ref}",
         }[self.kind]
         return f"https://github.com/{self.owner}/{self.repo}/{path}"
 
@@ -116,11 +125,21 @@ def parse_target(url: str) -> Optional[GitHubTarget]:
     if (parts.hostname or "").lower() not in _GITHUB_HOSTS:
         return None
     path = parts.path or ""
+    # Organization discussions (the GitHub Community forum) have no repository and
+    # no REST endpoint; they are rebuilt from the page, which GitHub does render
+    # server-side. Checked before the reserved-owner rule below, which exists to
+    # stop "/orgs/..." being read as owner/repo.
+    org = _ORG_DISCUSSION_RE.match(path)
+    if org:
+        return GitHubTarget(
+            kind="org_discussion", owner=org.group("owner"), repo="", ref=org.group("number")
+        )
     for kind, pattern, group in (
         ("pull", _PULL_RE, "number"),
         ("issue", _ISSUE_RE, "number"),
         ("commit", _COMMIT_RE, "sha"),
         ("release", _RELEASE_RE, "tag"),
+        ("discussion", _DISCUSSION_RE, "number"),
     ):
         match = pattern.match(path)
         if not match:
@@ -745,11 +764,165 @@ def _release_document(target: GitHubTarget, *, timeout: float) -> str:
     return _document(f"{title} ({target.slug})", target.canonical_url, author, sections)
 
 
+def _discussion_document(target: GitHubTarget, *, timeout: float) -> str:
+    """A discussion (GitHub's forum) — opening post, every comment, every reply.
+
+    Repository discussions come from the REST API, whose comment listing already
+    contains the threaded replies (flat, each carrying ``parent_id``). Anything
+    it cannot serve — an organization discussion, a rate-limited call — falls
+    through to the rendered page, which GitHub does serve server-side.
+    """
+    if target.kind == "discussion":
+        document = _discussion_from_api(target, timeout=timeout)
+        if document:
+            return document
+    return _discussion_from_html(target, timeout=timeout)
+
+
+def _discussion_from_api(target: GitHubTarget, *, timeout: float) -> str:
+    base = f"/repos/{quote(target.owner, safe='')}/{quote(target.repo, safe='')}"
+    discussion = _api_get(f"{base}/discussions/{target.ref}", timeout=timeout)
+    if not isinstance(discussion, dict) or not discussion.get("number"):
+        return ""
+
+    title = str(discussion.get("title") or "").strip() or f"Discussion #{target.ref}"
+    author = _login(discussion)
+    opened = _time_label(discussion.get("created_at"))
+    heading = f"Discussion opened by {author}"
+    if opened:
+        heading += f" — {opened}"
+
+    bullets = []
+    category = _sub_dict(discussion, "category")
+    if category.get("name"):
+        bullets.append(f"Category: {_escape(category.get('name'))}")
+    labels = _name_list(discussion.get("labels"))
+    if labels:
+        bullets.append(f"Labels: {_escape(labels)}")
+    answered = _time_label(discussion.get("answer_chosen_at"))
+    if answered:
+        chooser = _sub_dict(discussion, "answer_chosen_by").get("login") or ""
+        bullets.append(_escape(
+            f"Marked answered: {answered}" + (f" by {chooser}" if chooser else "")
+        ))
+    bullets.append(f"Repository: {_link(f'https://github.com/{target.slug}', target.slug)}")
+    sections = [_section(1, heading, _bullets(bullets) + _body_html(discussion))]
+
+    answer_url = str(discussion.get("answer_html_url") or "").strip()
+    comments = _api_list(f"{base}/discussions/{target.ref}/comments",
+                         timeout=timeout, max_items=_MAX_COMMENTS)
+    # Replies arrive in the same listing, so a reply's parent already has its
+    # number by the time the reply is rendered.
+    numbers = {}
+    index = 2
+    for comment in comments:
+        body = _body_html(comment)
+        if not body.strip():
+            continue
+        identity = comment.get("id")
+        numbers[identity] = index
+        label = "Comment"
+        if answer_url and str(comment.get("html_url") or "").strip() == answer_url:
+            label = "Answer"
+        heading = f"{label} by {_login(comment)}"
+        parent = numbers.get(comment.get("parent_id"))
+        if parent:
+            heading += f" — reply to #{parent}"
+        when = _time_label(comment.get("created_at"))
+        if when:
+            heading += f" — {when}"
+        sections.append(_section(index, heading, body))
+        index += 1
+    return _document(f"{title} ({target.slug}#{target.ref})", target.canonical_url, author, sections)
+
+
+def _html_comment_author(group) -> str:
+    """The account that wrote one rendered comment (its profile link)."""
+    for anchor in group.select("a[href]"):
+        href = str(anchor.get("href") or "")
+        if re.fullmatch(r"/[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})", href):
+            name = anchor.get_text(" ", strip=True)
+            if name:
+                return name
+    return "ghost"
+
+
+def _discussion_from_html(target: GitHubTarget, *, timeout: float) -> str:
+    """Rebuild a discussion from its rendered page (organization discussions).
+
+    GitHub renders discussion posts server-side, so the conversation is present
+    in the HTML — but as sibling comment blocks that generic extraction reduces
+    to one post. Each block becomes an attributed section, and a nested block is
+    a threaded reply.
+    """
+    from bs4 import BeautifulSoup  # local: keeps the API path import-light
+
+    url = target.canonical_url
+    try:
+        response = utils.safe_requests_get(
+            url, timeout=max(1.0, float(timeout or 20)),
+            headers={"Accept": "text/html,application/xhtml+xml"}, allow_redirects=True,
+        )
+    except Exception:
+        log.debug("GitHub discussion page fetch failed for %s", url, exc_info=True)
+        return ""
+    if int(getattr(response, "status_code", 0) or 0) != 200:
+        return ""
+    try:
+        soup = BeautifulSoup(getattr(response, "text", "") or "", "html.parser")
+    except Exception:
+        return ""
+
+    title = ""
+    meta = soup.find("meta", attrs={"property": "og:title"})
+    if meta is not None:
+        title = str(meta.get("content") or "").strip()
+    if not title and soup.title:
+        title = soup.title.get_text(" ", strip=True)
+    # "Some title · community · Discussion #16925" — keep the discussion's own title.
+    title = title.split(" · ")[0].strip() or f"Discussion #{target.ref}"
+
+    sections = []
+    author = ""
+    index = 1
+    for group in soup.select("div.timeline-comment-group"):
+        body = group.select_one(".comment-body") or group.select_one(".markdown-body")
+        if body is None or not body.get_text(strip=True):
+            continue
+        for junk in body.select("script, style, form, button, input, textarea, svg"):
+            junk.decompose()
+        for attr in ("class", "id"):
+            if body.has_attr(attr):
+                del body[attr]
+        who = _html_comment_author(group)
+        if not author:
+            author = who
+        when = ""
+        for stamp in group.select("relative-time[datetime]"):
+            value = str(stamp.get("datetime") or "")
+            if value[:1].isdigit():
+                when = _time_label(value)
+                break
+        label = "Discussion opened by" if index == 1 else "Comment by"
+        heading = f"{label} {who}"
+        if group.find_parent("div", class_="timeline-comment-group") is not None:
+            heading += " — reply"
+        if when:
+            heading += f" — {when}"
+        sections.append(_section(index, heading, str(body)))
+        index += 1
+    if len(sections) < 1:
+        return ""
+    return _document(f"{title} ({target.slug}#{target.ref})", url, author, sections)
+
+
 _RENDERERS = {
     "pull": _pull_document,
     "issue": _issue_document,
     "commit": _commit_document,
     "release": _release_document,
+    "discussion": _discussion_document,
+    "org_discussion": _discussion_document,
 }
 
 

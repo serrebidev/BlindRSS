@@ -130,6 +130,7 @@ def _install_api(monkeypatch, routes=None, status=200):
         ("https://github.com/serrebi/BlindRSS/issues/79", "issue", "79"),
         ("https://github.com/serrebi/BlindRSS/commit/d95c9c6", "commit", "d95c9c6"),
         ("https://github.com/serrebi/BlindRSS/releases/tag/v1.127.11", "release", "v1.127.11"),
+        ("https://github.com/serrebi/BlindRSS/discussions/9", "discussion", "9"),
     ],
 )
 def test_supported_github_pages_are_recognized(url, kind, ref):
@@ -140,11 +141,19 @@ def test_supported_github_pages_are_recognized(url, kind, ref):
     assert article_extractor._is_forum_thread_host(url) is True
 
 
+def test_organization_discussions_are_recognized():
+    target = github_source.parse_target("https://github.com/orgs/community/discussions/16925")
+    assert target is not None
+    assert (target.kind, target.owner, target.repo, target.ref) == (
+        "org_discussion", "community", "", "16925"
+    )
+    assert target.canonical_url == "https://github.com/orgs/community/discussions/16925"
+
+
 @pytest.mark.parametrize(
     "url",
     [
         "https://github.com/serrebi/BlindRSS",
-        "https://github.com/serrebi/BlindRSS/discussions/4",
         "https://github.com/orgs/serrebi/issues/4",
         "https://example.com/serrebi/BlindRSS/pull/42",
         "",
@@ -340,6 +349,104 @@ def test_issue_page_keeps_body_and_every_comment(monkeypatch):
     assert "Works now, thanks." in text          # plain body, no body_html
     assert "#1 Issue opened by reporter" in text
     assert "Closed" in text
+
+
+def test_discussion_keeps_every_comment_and_marks_replies_and_the_answer(monkeypatch):
+    url = "https://github.com/serrebi/BlindRSS/discussions/9"
+    routes = {
+        "/repos/serrebi/BlindRSS/discussions/9": {
+            "number": 9,
+            "title": "How do I follow a podcast?",
+            "user": {"login": "asker"},
+            "created_at": "2026-06-01T09:00:00Z",
+            "body_html": "<p>Where do I paste the feed?</p>",
+            "category": {"name": "Q&A"},
+            "answer_chosen_at": "2026-06-01T12:00:00Z",
+            "answer_chosen_by": {"login": "asker"},
+            "answer_html_url": "https://github.com/serrebi/BlindRSS/discussions/9#discussioncomment-2",
+        },
+        "/repos/serrebi/BlindRSS/discussions/9/comments": [
+            {
+                "id": 1,
+                "parent_id": None,
+                "user": {"login": "helper"},
+                "created_at": "2026-06-01T10:00:00Z",
+                "html_url": "https://github.com/serrebi/BlindRSS/discussions/9#discussioncomment-1",
+                "body_html": "<p>Use Add Feed.</p>",
+            },
+            {
+                "id": 2,
+                "parent_id": None,
+                "user": {"login": "maintainer"},
+                "created_at": "2026-06-01T11:00:00Z",
+                "html_url": "https://github.com/serrebi/BlindRSS/discussions/9#discussioncomment-2",
+                "body_html": "<p>Paste the show's RSS URL.</p>",
+            },
+            {
+                "id": 3,
+                "parent_id": 2,
+                "user": {"login": "asker"},
+                "created_at": "2026-06-01T11:30:00Z",
+                "html_url": "https://github.com/serrebi/BlindRSS/discussions/9#discussioncomment-3",
+                "body": "That worked.",
+            },
+        ],
+    }
+    _install_api(monkeypatch, routes=routes)
+    page = github_source.download_page_html(url, timeout=5)
+    text = article_extractor._extract_forum_thread_text(page, url)
+    assert "Where do I paste the feed?" in text
+    assert "Use Add Feed." in text
+    assert "Paste the show's RSS URL." in text
+    assert "That worked." in text
+    assert "#1 Discussion opened by asker" in text
+    assert "Category: Q&A" in text
+    # The accepted answer is named, and a threaded reply says what it answers.
+    assert "#3 Answer by maintainer" in text
+    assert "#4 Comment by asker — reply to #3" in text
+
+    rich = article_html.clean_article_html(page, url)
+    assert "Paste the show's RSS URL." in rich
+
+
+def test_organization_discussion_is_rebuilt_from_the_rendered_page(monkeypatch):
+    url = "https://github.com/orgs/community/discussions/16925"
+    page_html = """
+    <html><head><meta property="og:title" content="Alerts in Markdown · community · Discussion #16925">
+    </head><body>
+      <div class="timeline-comment-group">
+        <a href="/dipree">dipree</a>
+        <relative-time datetime="2022-05-19T14:22:54Z">May 19</relative-time>
+        <div class="comment-body"><p>Alerts emphasize critical information.</p><script>x()</script></div>
+        <div class="timeline-comment-group">
+          <a href="/jsoref">jsoref</a>
+          <relative-time datetime="2023-09-24T04:32:58Z">Sep 24</relative-time>
+          <div class="comment-body"><p>Nested reply text.</p></div>
+        </div>
+      </div>
+      <div class="timeline-comment-group">
+        <a href="/laymonage">laymonage</a>
+        <relative-time datetime="2022-05-19T23:22:00Z">May 19</relative-time>
+        <div class="comment-body"><p>Second top level comment.</p></div>
+      </div>
+    </body></html>
+    """
+
+    class _Page:
+        status_code = 200
+        text = page_html
+
+    monkeypatch.setattr(utils, "safe_requests_get", lambda u, **k: _Page())
+    monkeypatch.setattr(github_source, "_token", lambda: "")
+    page = github_source.download_page_html(url, timeout=5)
+    text = article_extractor._extract_forum_thread_text(page, url)
+    assert "#1 Discussion opened by dipree" in text
+    assert "Alerts emphasize critical information." in text
+    assert "Nested reply text." in text
+    assert "Second top level comment." in text
+    assert "— reply" in text
+    assert "x()" not in text  # scripts inside a rendered body are dropped
+    assert "Alerts in Markdown" in page  # title, without GitHub's suffix
 
 
 def test_commit_page_keeps_message_stats_and_diff(monkeypatch):
