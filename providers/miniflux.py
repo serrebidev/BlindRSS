@@ -7,13 +7,13 @@ from requests.adapters import HTTPAdapter
 import hashlib
 import re
 import logging
+import ssl
 import time
 import copy
 import concurrent.futures
 import threading
 from xml.etree import ElementTree as ET
 from typing import List, Dict, Any
-from bs4 import BeautifulSoup
 from datetime import datetime, timezone, timedelta
 from dateutil import parser as dateparser
 from .base import RSSProvider
@@ -22,6 +22,30 @@ from core.categories import UNCATEGORIZED
 from core import utils
 
 log = logging.getLogger(__name__)
+
+
+class _SystemTrustHTTPAdapter(HTTPAdapter):
+    """Requests adapter that starts with the operating system's trusted roots.
+
+    Requests normally replaces the platform defaults with its bundled CA file.
+    That makes a private CA trusted through Windows Certificate Manager invisible
+    to Miniflux connections.  Starting urllib3 with ``create_default_context``
+    loads Windows' CA/ROOT stores first; Requests may then add its public CA file
+    without discarding those locally trusted roots.
+    """
+
+    def __init__(self, *args, **kwargs):
+        self._system_ssl_context = ssl.create_default_context()
+        super().__init__(*args, **kwargs)
+
+    def init_poolmanager(self, connections, maxsize, block=False, **pool_kwargs):
+        pool_kwargs["ssl_context"] = self._system_ssl_context
+        return super().init_poolmanager(connections, maxsize, block=block, **pool_kwargs)
+
+    def proxy_manager_for(self, proxy, **proxy_kwargs):
+        proxy_kwargs.setdefault("ssl_context", self._system_ssl_context)
+        return super().proxy_manager_for(proxy, **proxy_kwargs)
+
 
 class MinifluxProvider(RSSProvider):
     # Short connect timeout so an unreachable address (e.g. a dead IPv6 AAAA whose
@@ -62,7 +86,7 @@ class MinifluxProvider(RSSProvider):
         # so back-to-back refreshes don't overflow the pool. Otherwise urllib3 discards
         # and re-handshakes the overflow connections ("Connection pool is full,
         # discarding connection"), re-paying a TLS handshake per overflow worker.
-        adapter = HTTPAdapter(pool_connections=4, pool_maxsize=48)
+        adapter = _SystemTrustHTTPAdapter(pool_connections=4, pool_maxsize=48)
         self._session.mount("https://", adapter)
         self._session.mount("http://", adapter)
         self._cached_get_responses: dict[str, Any] = {}
@@ -104,6 +128,7 @@ class MinifluxProvider(RSSProvider):
             "endpoint": "",
             "method": "",
             "error_body": None,
+            "error_message": None,
         }
 
     @property
@@ -540,11 +565,53 @@ class MinifluxProvider(RSSProvider):
         )
 
     def test_connection(self) -> bool:
-        try:
-            res = self._req("GET", "/v1/me")
-            return res is not None
-        except:
-            return False
+        res = self._req("GET", "/v1/me")
+        return res is not None
+
+    def get_connection_error(self) -> str | None:
+        """Return an actionable description of the latest failed API request."""
+        info = dict(self._last_request_info or {})
+        if info.get("ok"):
+            return None
+        message = str(info.get("error_message") or "").strip()
+        if message:
+            return message
+        status_code = info.get("status_code")
+        if status_code:
+            return f"Miniflux returned HTTP {status_code}."
+        return None
+
+    @staticmethod
+    def _format_request_error(error: Exception, url: str) -> str:
+        detail = " ".join(str(error or "").split())
+        if isinstance(error, requests.exceptions.SSLError):
+            message = (
+                f"TLS certificate verification failed for {url}. BlindRSS uses the "
+                "operating system certificate store for Miniflux; ensure the issuing "
+                "CA is trusted and the certificate hostname matches."
+            )
+        elif isinstance(error, requests.Timeout):
+            message = f"The Miniflux server at {url} timed out."
+        elif isinstance(error, requests.HTTPError):
+            status_code = int(
+                getattr(getattr(error, "response", None), "status_code", 0) or 0
+            )
+            if status_code in (401, 403):
+                message = (
+                    f"Miniflux rejected the connection with HTTP {status_code}. "
+                    "Check the Miniflux URL and API key."
+                )
+            elif status_code:
+                message = f"Miniflux returned HTTP {status_code} for {url}."
+            else:
+                message = f"Miniflux rejected the request to {url}."
+        elif isinstance(error, requests.ConnectionError):
+            message = f"Could not connect to the Miniflux server at {url}."
+        else:
+            message = f"The Miniflux request to {url} failed."
+        if detail and detail.casefold() not in message.casefold():
+            message = f"{message} Details: {detail}"
+        return message
 
     def _req(self, method, endpoint, json=None, params=None, data=None, extra_headers=None):
         if not self.base_url:
@@ -555,6 +622,7 @@ class MinifluxProvider(RSSProvider):
                 "endpoint": str(endpoint or ""),
                 "method": str(method or "").upper(),
                 "error_body": None,
+                "error_message": "The Miniflux URL is empty.",
             }
             return None
         url = f"{self.base_url}{endpoint}"
@@ -568,6 +636,7 @@ class MinifluxProvider(RSSProvider):
         is_targeted_refresh = self._is_targeted_refresh_endpoint(endpoint)
         last_error = None
         last_status_code = None
+        last_error_message = None
 
         for attempt in range(1, retries + 2):
             try:
@@ -620,6 +689,7 @@ class MinifluxProvider(RSSProvider):
                         "endpoint": str(endpoint or ""),
                         "method": method_upper,
                         "error_body": None,
+                        "error_message": None,
                     }
                     return None
 
@@ -634,6 +704,7 @@ class MinifluxProvider(RSSProvider):
                         "endpoint": str(endpoint or ""),
                         "method": method_upper,
                         "error_body": None,
+                        "error_message": f"Miniflux returned invalid JSON for {url}.",
                     }
                     return None
 
@@ -646,11 +717,13 @@ class MinifluxProvider(RSSProvider):
                     "endpoint": str(endpoint or ""),
                     "method": method_upper,
                     "error_body": None,
+                    "error_message": None,
                 }
                 return payload
 
             except requests.HTTPError as e:
                 last_error = e
+                last_error_message = self._format_request_error(e, url)
                 status_code = None
                 body_preview = ""
                 try:
@@ -715,6 +788,7 @@ class MinifluxProvider(RSSProvider):
                 break
             except requests.Timeout as e:
                 last_error = e
+                last_error_message = self._format_request_error(e, url)
                 last_status_code = None
                 if attempt <= retries:
                     delay = self._retry_backoff_seconds(attempt)
@@ -755,6 +829,7 @@ class MinifluxProvider(RSSProvider):
                 break
             except requests.RequestException as e:
                 last_error = e
+                last_error_message = self._format_request_error(e, url)
                 last_status_code = None
                 if attempt <= retries:
                     delay = self._retry_backoff_seconds(attempt)
@@ -792,6 +867,7 @@ class MinifluxProvider(RSSProvider):
                 break
             except Exception as e:
                 last_error = e
+                last_error_message = self._format_request_error(e, url)
                 last_status_code = None
                 log.error(f"Miniflux error for {url}: {e}")
                 self._last_request_info = {
@@ -815,6 +891,7 @@ class MinifluxProvider(RSSProvider):
                     "endpoint": str(endpoint or ""),
                     "method": method_upper,
                     "error_body": None,
+                    "error_message": last_error_message,
                 }
                 return cached
 
@@ -825,6 +902,7 @@ class MinifluxProvider(RSSProvider):
             "endpoint": str(endpoint or ""),
             "method": method_upper,
             "error_body": None if method_upper == "GET" else self._last_request_info.get("error_body"),
+            "error_message": last_error_message,
         }
         if last_error is not None:
             log.debug("Miniflux request failed with no fallback for %s %s", method_upper, url, exc_info=True)
@@ -1912,7 +1990,8 @@ class MinifluxProvider(RSSProvider):
 
     def get_feeds(self) -> List[Feed]:
         data = self._req("GET", "/v1/feeds")
-        if not data: return []
+        if not data:
+            return []
         
         counters_data = self._req("GET", "/v1/feeds/counters")
         counts = {}
@@ -2387,7 +2466,8 @@ class MinifluxProvider(RSSProvider):
 
     def get_categories(self) -> List[str]:
         data = self._req("GET", "/v1/categories")
-        if not data: return []
+        if not data:
+            return []
         return [c["title"] for c in data]
 
     def uncategorized_is_real_category(self) -> bool:
@@ -2402,7 +2482,8 @@ class MinifluxProvider(RSSProvider):
 
     def rename_category(self, old_title: str, new_title: str) -> bool:
         data = self._req("GET", "/v1/categories")
-        if not data: return False
+        if not data:
+            return False
         
         cat_id = None
         for c in data:
@@ -2416,7 +2497,8 @@ class MinifluxProvider(RSSProvider):
 
     def delete_category(self, title: str) -> bool:
         data = self._req("GET", "/v1/categories")
-        if not data: return False
+        if not data:
+            return False
 
         cat_id = None
         for c in data:

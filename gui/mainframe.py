@@ -4219,7 +4219,7 @@ class MainFrame(wx.Frame):
                 if not unlimited:
                     remaining = max(0, remaining - 1)
 
-            for _ in range(max(0, generic_count - sent)):
+            for _notification_index in range(max(0, generic_count - sent)):
                 body = feed_title if (include_feed and feed_title) else _("New article available.")
                 wx.CallAfter(self._show_windows_notification, _("New article"), body)
                 if not unlimited:
@@ -7640,6 +7640,16 @@ class MainFrame(wx.Frame):
             # Retention cleanup moved to _manual_refresh_thread to prevent
             # deletion of articles that were just marked as read.
             feeds = self.provider.get_feeds()
+            # Hosted providers historically converted transport failures to an
+            # empty list, making certificate/authentication errors visible only
+            # in the debug console.  Surface the provider's actionable error
+            # before treating that empty result as a valid empty account.
+            if not feeds:
+                get_connection_error = getattr(self.provider, "get_connection_error", None)
+                if callable(get_connection_error):
+                    connection_error = get_connection_error()
+                    if connection_error:
+                        raise RuntimeError(connection_error)
             all_cats = self.provider.get_categories()
             # Sync categories to local DB so hierarchy is available for all providers
             from core.db import sync_categories
@@ -9318,11 +9328,9 @@ class MainFrame(wx.Frame):
                     break
 
         # 2. Restore Focus
-        focused_idx = None
         if focused_id:
             for i, a in enumerate(self.current_articles):
                 if self._article_cache_id(a) == focused_id:
-                    focused_idx = i
                     self.list_ctrl.SetItemState(i, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                     # If we don't have a specific scroll target, ensure focused is visible
                     if not top_id:
@@ -9330,7 +9338,6 @@ class MainFrame(wx.Frame):
                     break
         elif selected_idx is not None:
             try:
-                focused_idx = selected_idx
                 self.list_ctrl.SetItemState(selected_idx, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
                 if not top_id:
                     self.list_ctrl.EnsureVisible(selected_idx)
@@ -11028,7 +11035,8 @@ class MainFrame(wx.Frame):
                 try:
                     provider_html = self._provider_fetch_full_content(req.get("article_id"), url)
                 except Exception as e:
-                    if not err: err = str(e) or _("Unknown error")
+                    if not err:
+                        err = str(e) or _("Unknown error")
                 if provider_html:
                     _metadata_sink(provider_html, url)
                     try:
@@ -11041,7 +11049,8 @@ class MainFrame(wx.Frame):
                         )
                         render_source = "provider"
                     except Exception as e:
-                        if not err: err = str(e) or _("Unknown error")
+                        if not err:
+                            err = str(e) or _("Unknown error")
                         rendered = None
             else:
                 if is_web_eligible:
@@ -11088,7 +11097,8 @@ class MainFrame(wx.Frame):
                     try:
                         provider_html = self._provider_fetch_full_content(req.get("article_id"), url)
                     except Exception as e:
-                        if not err: err = str(e) or _("Unknown error")
+                        if not err:
+                            err = str(e) or _("Unknown error")
                     if provider_html:
                         _metadata_sink(provider_html, url)
                         try:
@@ -11101,7 +11111,8 @@ class MainFrame(wx.Frame):
                             )
                             render_source = "provider"
                         except Exception as e:
-                            if not err: err = str(e) or _("Unknown error")
+                            if not err:
+                                err = str(e) or _("Unknown error")
                             rendered = None
 
             if not rendered:
@@ -12847,7 +12858,8 @@ class MainFrame(wx.Frame):
 
     def _show_add_feed_dialog(self, initial_url: str = ""):
         cats = self.provider.get_categories()
-        if not cats: cats = [UNCATEGORIZED]
+        if not cats:
+            cats = [UNCATEGORIZED]
 
         dlg = AddFeedDialog(self, cats, initial_url=initial_url)
         if dlg.ShowModal() == wx.ID_OK:

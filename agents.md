@@ -95,6 +95,14 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
     `test_*.py` modules: import-time execution can add tens of seconds and make
     ordinary regression runs depend on external services.
 
+- `providers/miniflux.py`
+  - Miniflux HTTPS sessions start from the operating system certificate trust
+    store before Requests adds its public roots, so private CAs trusted through
+    Windows Certificate Manager work without disabling TLS verification. Keep
+    connection failures in `_last_request_info` as user-safe diagnostics; an
+    empty feed-tree load must surface that diagnostic in the GUI rather than
+    looking like a valid empty account.
+
 - `core/`
   - `user_agents.py`: the browser identity every outbound request presents — installed-browser detection, built-in Chrome/Edge/Firefox presets, custom strings, and the `sec-ch-ua*` hints that must travel with each. Owns `utils.HEADERS["User-Agent"]`; see "Browser identity" under Full Text & Discovery.
   - `db.py`: SQLite schema setup/migrations, WAL/busy timeout pragmas, connection helpers, retention cleanup.
