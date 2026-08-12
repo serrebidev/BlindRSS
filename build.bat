@@ -360,6 +360,19 @@ if not "%PYI_RC%"=="0" (
     exit /b %PYI_RC%
 )
 
+rem Screen readers (NVDA's app-version report, the JAWS equivalent) read the
+rem name and version straight out of the exe's Win32 VERSIONINFO resource. It
+rem is stamped by main.spec and is invisible to the running app, so nothing
+rem else in this pipeline would notice if it went missing or stale -- verify it
+rem here instead of shipping an app that announces itself as "Application
+rem unknown, version not detected".
+echo [BlindRSS Build] Verifying version resource (screen-reader app version)...
+"%VENV_PYTHON%" "%SCRIPT_DIR%tools\verify_version_resource.py" "%SCRIPT_DIR%dist\BlindRSS\BlindRSS.exe" "%SCRIPT_DIR%dist\BlindRSS.exe"
+if errorlevel 1 (
+    call :restore_preserved_dist_data
+    exit /b 1
+)
+
 echo [BlindRSS Build] Refreshing VLC plugins cache...
 set "VLC_DIR=C:\Program Files\VideoLAN\VLC"
 if not exist "%VLC_DIR%\vlc-cache-gen.exe" set "VLC_DIR=C:\Program Files (x86)\VideoLAN\VLC"

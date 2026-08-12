@@ -152,6 +152,10 @@ An earlier attempt at a Windows CI job was reverted because the runner had no VL
 - Sets up/uses `.venv`.
 - Installs dependencies.
 - Runs PyInstaller using `main.spec`.
+- Verifies the built exe's VERSIONINFO resource (`tools\verify_version_resource.py`)
+  and fails the build if it is missing or does not match `core\version.py`. This is
+  what NVDA's app-version command and the JAWS equivalent read; an unstamped exe
+  makes them announce "Application unknown, version not detected".
 - Preserves `dist\BlindRSS` user data (`rss.db`, `rss.db-wal`, `rss.db-shm`, `podcasts\`) between iterative builds.
 - Signs when possible (or skip with `SKIP_SIGN=1`).
 - Produces:

@@ -5,8 +5,8 @@
 
 import glob
 import importlib.util
-import importlib.util
 import os
+import re
 import sys
 import warnings
 from pathlib import Path
@@ -32,6 +32,77 @@ os.environ["PYTHONWARNINGS"] = ",".join(_pythonwarnings)
 ROOT = Path(os.getcwd())
 BIN_DIR = ROOT / "bin"
 PLATFORM = sys.platform
+
+
+def _read_app_version():
+    """Read APP_VERSION from core/version.py without importing the app package.
+
+    Keep in sync with main.spec.
+    """
+    try:
+        text = (ROOT / "core" / "version.py").read_text(encoding="utf-8")
+        m = re.search(r'APP_VERSION\s*=\s*["\']([^"\']+)["\']', text)
+        if m:
+            return m.group(1)
+    except Exception:
+        pass
+    return os.environ.get("BLINDRSS_APP_VERSION", "0.0.0")
+
+
+_app_version = _read_app_version()
+
+# Windows screen readers (NVDA's app-version report, the JAWS equivalent) read
+# the application name and version out of the exe's VERSIONINFO resource; with
+# no resource they announce "Application unknown, version not detected". This
+# spec also builds on Windows, so it stamps the same resource main.spec does.
+# On macOS the equivalent lives in the BUNDLE Info.plist below; ELF binaries
+# have no such resource, so Linux gets nothing to stamp.
+_win_version_info = None
+if PLATFORM.startswith("win"):
+    from PyInstaller.utils.win32.versioninfo import (
+        VSVersionInfo,
+        FixedFileInfo,
+        StringFileInfo,
+        StringTable,
+        StringStruct,
+        VarFileInfo,
+        VarStruct,
+    )
+
+    _nums = [int(x) for x in re.findall(r"\d+", _app_version)[:4]]
+    while len(_nums) < 4:
+        _nums.append(0)
+    _vt = tuple(_nums[:4])
+    _win_version_info = VSVersionInfo(
+        ffi=FixedFileInfo(
+            filevers=_vt,
+            prodvers=_vt,
+            mask=0x3F,
+            flags=0x0,
+            OS=0x40004,
+            fileType=0x1,
+            subtype=0x0,
+            date=(0, 0),
+        ),
+        kids=[
+            StringFileInfo([
+                StringTable('040904B0', [
+                    StringStruct('CompanyName', 'Serrebi'),
+                    StringStruct('FileDescription', 'BlindRSS'),
+                    StringStruct('FileVersion', _app_version),
+                    StringStruct('InternalName', 'BlindRSS'),
+                    StringStruct('OriginalFilename', 'BlindRSS.exe'),
+                    StringStruct('ProductName', 'BlindRSS'),
+                    StringStruct('ProductVersion', _app_version),
+                    StringStruct(
+                        'LegalCopyright',
+                        'Copyright (c) 2024-2026 serrebidev and contributors',
+                    ),
+                ]),
+            ]),
+            VarFileInfo([VarStruct('Translation', [0x0409, 0x04B0])]),
+        ],
+    )
 
 # Keep in sync with main.spec (see the audit note there): direct imports plus
 # installed transitive deps whose data files collect_all protects. Dead
@@ -289,6 +360,7 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    version=_win_version_info,
 )
 
 coll = COLLECT(
@@ -307,7 +379,10 @@ if PLATFORM.startswith("darwin"):
         name="BlindRSS.app",
         icon=None,
         bundle_identifier="com.serrebi.BlindRSS",
-        version=os.environ.get("BLINDRSS_APP_VERSION"),
+        # VoiceOver/Finder read the version from the bundle. core/version.py is
+        # the source of truth; BLINDRSS_APP_VERSION (exported by build.sh) is
+        # only a fallback for builds run outside the repo.
+        version=_app_version,
         info_plist={
             "NSPrincipalClass": "NSApplication",
             "CFBundleName": "BlindRSS",

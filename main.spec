@@ -89,7 +89,10 @@ version_info = VSVersionInfo(
                 StringStruct('OriginalFilename', 'BlindRSS.exe'),
                 StringStruct('ProductName', 'BlindRSS'),
                 StringStruct('ProductVersion', _app_version),
-                StringStruct('LegalCopyright', ''),
+                StringStruct(
+                    'LegalCopyright',
+                    'Copyright (c) 2024-2026 serrebidev and contributors',
+                ),
             ]),
         ]),
         VarFileInfo([VarStruct('Translation', [0x0409, 0x04B0])]),

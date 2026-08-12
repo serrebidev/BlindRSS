@@ -2500,6 +2500,10 @@ class MainFrame(wx.Frame):
             help_menu, "tools.check_updates", _("Check for &Updates..."),
             _("Check for new versions"),
         )
+        announce_version_item = self._append_shortcut_menu_item(
+            help_menu, "tools.announce_version", _("Announce &Version"),
+            _("Speak the running BlindRSS version"),
+        )
         about_item = help_menu.Append(wx.ID_ABOUT, _("&About"), _("About BlindRSS"))
 
         menubar.Append(file_menu, _("&File"))
@@ -2556,6 +2560,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_manage_filter_rules, filter_rules_item)
         self.Bind(wx.EVT_MENU, self.on_import_site_cookies, import_site_cookies_item)
         self.Bind(wx.EVT_MENU, self.on_open_keyboard_shortcuts, keyboard_shortcuts_item)
+        self.Bind(wx.EVT_MENU, self._cmd_announce_version, announce_version_item)
         self.Bind(wx.EVT_MENU, self.on_about, about_item)
         self.Bind(wx.EVT_MENU_OPEN, self.on_menu_open)
         self._refresh_player_chapters_submenu()
@@ -3206,6 +3211,7 @@ class MainFrame(wx.Frame):
             "tools.keyboard_shortcuts": self.on_open_keyboard_shortcuts,
             "tools.settings": self.on_settings,
             "tools.check_updates": self.on_check_updates,
+            "tools.announce_version": self._cmd_announce_version,
         }
 
     # --- Registry command wrappers ------------------------------------
@@ -3224,6 +3230,19 @@ class MainFrame(wx.Frame):
             return
         self.on_stop_refresh()
         self._announce_event("stop_update", _("Stop Refresh"))
+
+    def _cmd_announce_version(self, event=None):
+        """Speak the running version, so "what am I running?" is one keypress.
+
+        A screen reader's own app-version command answers this from the exe's
+        VERSIONINFO resource (stamped and verified at build time). This is the
+        in-app answer: it needs no screen-reader command, and it is correct in
+        a source checkout too, where the process is python.exe.
+        """
+        self._announce_event(
+            "general",
+            _("BlindRSS version {version}").format(version=APP_VERSION),
+        )
 
     def _cmd_selected_article_index(self):
         try:

@@ -113,6 +113,12 @@ COMMANDS: List[Command] = [
     Command("tools.keyboard_shortcuts", "Tools", "Keyboard Shortcuts", ""),
     Command("tools.settings", "Tools", "Settings", "Ctrl+,"),
     Command("tools.check_updates", "Tools", "Check for Updates", ""),
+    # Speaks the running version outright. A screen reader's own app-version
+    # command (NVDA, JAWS) reads the exe's VERSIONINFO resource, which the
+    # build stamps and verifies; this is the in-app answer to the same
+    # question, and it works from a source checkout too, where the process is
+    # python.exe and the screen reader would report Python's version instead.
+    Command("tools.announce_version", "Tools", "Announce Version", "Ctrl+Shift+A"),
 ]
 
 _COMMANDS_BY_ID: "OrderedDict[str, Command]" = OrderedDict((c.id, c) for c in COMMANDS)
@@ -206,6 +212,7 @@ _POT_ANCHORS = (
     _("Keyboard Shortcuts"),
     _("Settings"),
     _("Check for Updates"),
+    _("Announce Version"),
 )
 
 
