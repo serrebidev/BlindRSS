@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.128.0 - 2026-08-12
+
+- Report the app version to screen readers and announce it in-app.
+
 ## v1.127.13 - 2026-08-11
 
 - Trust Windows certificates for Miniflux.
