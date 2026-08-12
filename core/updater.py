@@ -87,6 +87,9 @@ class UpdateInfo:
     sha256: str
     signing_thumbprints: Tuple[str, ...] = ()
     asset_kind: str = "archive"
+    # Alternate URLs for the same bytes (GitHub's REST asset endpoint), tried when
+    # the primary CDN URL fails with a transient error.
+    download_fallback_urls: Tuple[str, ...] = ()
 
 
 @dataclass
@@ -151,15 +154,144 @@ def _ps_single_quote(value: str) -> str:
     return "'" + str(value or "").replace("'", "''") + "'"
 
 
+# GitHub's release CDN and REST API both return these often enough that a single
+# attempt turns a routine update check into a hard failure for the user (reported
+# as "503 Service Unavailable" on BlindRSS-update.json).  Retrying, and trying the
+# REST asset endpoint as a second path to the same bytes, makes the check survive
+# a blip instead of telling every user the release is broken.
+_TRANSIENT_STATUS_CODES = frozenset({408, 425, 429, 500, 502, 503, 504})
+_HTTP_ATTEMPTS = 3
+_HTTP_RETRY_BACKOFF_SECONDS = (1.0, 3.0)
+_RETRY_AFTER_CAP_SECONDS = 10.0
+
+
+class _UpdateCanceled(Exception):
+    """Raised inside the download loop when the user cancels; never retried."""
+
+
+def _retry_delay(attempt_index: int, resp=None) -> float:
+    """Seconds to wait before the retry that follows ``attempt_index``."""
+    delay = _HTTP_RETRY_BACKOFF_SECONDS[
+        min(attempt_index, len(_HTTP_RETRY_BACKOFF_SECONDS) - 1)
+    ]
+    if resp is not None:
+        try:
+            retry_after = float(str(resp.headers.get("Retry-After") or "").strip())
+        except Exception:
+            retry_after = 0.0
+        if retry_after > 0:
+            delay = min(max(delay, retry_after), _RETRY_AFTER_CAP_SECONDS)
+    return delay
+
+
+def _asset_url_candidates(asset: Optional[dict], *fallback_urls: str) -> Tuple[Tuple[str, dict], ...]:
+    """Ordered ``(url, headers)`` pairs for fetching one release asset.
+
+    ``browser_download_url`` points at GitHub's object CDN; the REST asset URL
+    serves identical bytes through a different front end, so when one is having a
+    bad minute the other usually still answers.
+    """
+    urls = []
+    if isinstance(asset, dict):
+        urls.append(str(asset.get("browser_download_url") or "").strip())
+        urls.append(str(asset.get("url") or "").strip())
+    urls.extend(str(url or "").strip() for url in fallback_urls)
+
+    candidates = []
+    seen = set()
+    for url in urls:
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        candidates.append((url, _asset_url_headers(url)))
+    return tuple(candidates)
+
+
+def _fallback_urls(asset: Optional[dict], primary_url: str) -> Tuple[str, ...]:
+    """Alternate URLs for ``asset``, excluding the one already chosen."""
+    primary = str(primary_url or "").strip()
+    return tuple(
+        candidate[0]
+        for candidate in _asset_url_candidates(asset)
+        if candidate[0] and candidate[0] != primary
+    )
+
+
+def _asset_url_headers(url: str) -> dict:
+    # The REST asset endpoint returns the asset's JSON metadata unless the request
+    # explicitly asks for the bytes.
+    if url.startswith("https://api.github.com/"):
+        return {"Accept": "application/octet-stream"}
+    return {}
+
+
+def _get_with_retry(
+    candidates: Iterable[Tuple[str, dict]],
+    *,
+    timeout: int = 20,
+    stream: bool = False,
+    attempts: int = _HTTP_ATTEMPTS,
+    on_retry=None,
+):
+    """GET the first candidate URL that answers, retrying transient failures.
+
+    Returns ``(response, error_text)``.  Non-transient HTTP errors (404, 403 …)
+    are returned as-is on the first candidate that produces one, because retrying
+    them only delays the real message.
+    """
+    candidates = tuple(candidates)
+    if not candidates:
+        return None, _("No download URL available.")
+
+    last_error = ""
+    for attempt in range(max(1, attempts)):
+        transient = False
+        retry_resp = None
+        for url, headers in candidates:
+            try:
+                resp = safe_requests_get(
+                    url,
+                    headers=dict(headers),
+                    timeout=timeout,
+                    stream=stream,
+                    site_cookies=False,
+                )
+            except Exception as e:
+                last_error = str(e)
+                transient = True
+                continue
+            if resp.status_code in _TRANSIENT_STATUS_CODES:
+                last_error = _("HTTP {status} from {url}").format(
+                    status=resp.status_code, url=url
+                )
+                transient = True
+                retry_resp = resp
+                continue
+            return resp, None
+        if not transient or attempt >= attempts - 1:
+            break
+        delay = _retry_delay(attempt, retry_resp)
+        if on_retry is not None:
+            try:
+                on_retry(attempt + 1, delay, last_error)
+            except _UpdateCanceled:
+                raise
+            except Exception:
+                pass
+        log.info("Update fetch failed (%s); retrying in %.1fs", last_error, delay)
+        time.sleep(delay)
+
+    return None, last_error or _("Unknown network error.")
+
+
 def _fetch_latest_release() -> Tuple[Optional[dict], Optional[str]]:
     url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
     headers = {"Accept": "application/vnd.github+json"}
-    try:
-        # No imported browser cookies: this is our own release API call, and the
-        # user's github.com session has no business travelling with it.
-        resp = safe_requests_get(url, headers=headers, timeout=15, site_cookies=False)
-    except Exception as e:
-        return None, _("Network error while checking GitHub: {error}").format(error=e)
+    # No imported browser cookies: this is our own release API call, and the
+    # user's github.com session has no business travelling with it.
+    resp, err = _get_with_retry(((url, headers),), timeout=15)
+    if resp is None:
+        return None, _("Network error while checking GitHub: {error}").format(error=err)
 
     if resp.status_code == 403 and resp.headers.get("X-RateLimit-Remaining") == "0":
         reset = resp.headers.get("X-RateLimit-Reset", "")
@@ -185,13 +317,27 @@ def _find_release_asset(release: dict, name: str) -> Optional[dict]:
     return None
 
 
-def _download_json(url: str, timeout: int = 20) -> Tuple[Optional[dict], Optional[str]]:
+def _download_json(
+    url: str, timeout: int = 20, fallback_urls: Iterable[str] = ()
+) -> Tuple[Optional[dict], Optional[str]]:
+    candidates = _asset_url_candidates(None, url, *fallback_urls)
     try:
-        resp = safe_requests_get(url, timeout=timeout, site_cookies=False)
+        resp, err = _get_with_retry(candidates, timeout=timeout)
+        if resp is None:
+            raise RuntimeError(err or "")
         resp.raise_for_status()
         return resp.json(), None
     except Exception as e:
-        return None, _("Failed to download update metadata: {error}").format(error=e)
+        detail = str(e).strip()
+        if detail:
+            return None, _(
+                "Failed to download update metadata: {error}. GitHub may be "
+                "temporarily unavailable; please try again in a few minutes."
+            ).format(error=detail)
+        return None, _(
+            "Failed to download update metadata. GitHub may be temporarily "
+            "unavailable; please try again in a few minutes."
+        )
 
 
 def check_for_updates() -> UpdateCheckResult:
@@ -224,7 +370,10 @@ def check_for_updates() -> UpdateCheckResult:
     if not manifest_asset:
         return UpdateCheckResult("error", _("Update manifest '{manifest}' not found in release assets.").format(manifest=manifest_name))
 
-    manifest, err = _download_json(manifest_asset.get("browser_download_url", ""))
+    manifest, err = _download_json(
+        manifest_asset.get("browser_download_url", ""),
+        fallback_urls=(manifest_asset.get("url", ""),),
+    )
     if err:
         return UpdateCheckResult("error", err)
     if not manifest:
@@ -249,6 +398,7 @@ def check_for_updates() -> UpdateCheckResult:
     download_url = asset.get("browser_download_url") or manifest.get("download_url") or ""
     if not download_url:
         return UpdateCheckResult("error", _("Update manifest is missing a download URL."))
+    download_fallback_urls = _fallback_urls(asset, download_url)
 
     sha256 = str(manifest.get("sha256") or "").strip().lower()
     if not re.fullmatch(r"[0-9a-f]{64}", sha256):
@@ -291,6 +441,7 @@ def check_for_updates() -> UpdateCheckResult:
             download_url = installer_url
             sha256 = installer_sha256
             asset_kind = "installer"
+            download_fallback_urls = _fallback_urls(installer_asset, download_url)
 
     info = UpdateInfo(
         version=latest,
@@ -302,6 +453,7 @@ def check_for_updates() -> UpdateCheckResult:
         sha256=sha256,
         signing_thumbprints=allowed_thumbprints,
         asset_kind=asset_kind,
+        download_fallback_urls=download_fallback_urls,
     )
     return UpdateCheckResult("update_available", _("Update available."), info)
 
@@ -804,10 +956,23 @@ def download_and_apply_update(info: UpdateInfo, debug_mode: bool = False, progre
     os.makedirs(extract_dir, exist_ok=True)
 
     # --- Download (common to all platforms) -----------------------------------
+    # A transient GitHub 503 must not read as "the update is broken": retry, and
+    # fall back to the REST asset URL, before giving up.  The user hears each
+    # retry, so a slow attempt never looks like a frozen dialog.
+    def _announce_retry(attempt: int, delay: float, _error: str) -> None:
+        if not report(
+            _("Download failed; retrying (attempt {attempt})…").format(attempt=attempt + 1),
+            None,
+        ):
+            raise _UpdateCanceled()
+
+    candidates = _asset_url_candidates(None, info.download_url, *info.download_fallback_urls)
     try:
-        resp = safe_requests_get(
-            info.download_url, stream=True, timeout=30, site_cookies=False
+        resp, err = _get_with_retry(
+            candidates, timeout=30, stream=True, on_retry=_announce_retry
         )
+        if resp is None:
+            raise RuntimeError(err or "")
         resp.raise_for_status()
         try:
             total = int(resp.headers.get("Content-Length") or 0)
@@ -824,8 +989,19 @@ def download_and_apply_update(info: UpdateInfo, debug_mode: bool = False, progre
                     fraction = (downloaded / total) if total > 0 else None
                     if not report(_("Downloading update…"), fraction):
                         return False, UPDATE_CANCELED_MESSAGE
+    except _UpdateCanceled:
+        return False, UPDATE_CANCELED_MESSAGE
     except Exception as e:
-        return False, _("Failed to download update: {error}").format(error=e)
+        detail = str(e).strip()
+        if detail:
+            return False, _(
+                "Failed to download update: {error}. GitHub may be temporarily "
+                "unavailable; please try again in a few minutes."
+            ).format(error=detail)
+        return False, _(
+            "Failed to download update. GitHub may be temporarily unavailable; "
+            "please try again in a few minutes."
+        )
 
     report(_("Verifying download…"), None)
     digest = _sha256_file(archive_path)

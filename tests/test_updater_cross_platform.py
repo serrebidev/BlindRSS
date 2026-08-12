@@ -221,7 +221,7 @@ def test_check_for_updates_selects_linux_manifest(monkeypatch):
         "download_url": "http://x/a",
         "sha256": "a" * 64,
     }
-    monkeypatch.setattr(updater, "_download_json", lambda url, timeout=20: (manifest, None))
+    monkeypatch.setattr(updater, "_download_json", lambda url, timeout=20, fallback_urls=(): (manifest, None))
     res = updater.check_for_updates()
     assert res.status == "update_available"
     assert res.info is not None
@@ -237,7 +237,7 @@ def test_check_for_updates_rejects_wrong_extension(monkeypatch):
         "download_url": "http://x/a",
         "sha256": "a" * 64,
     }
-    monkeypatch.setattr(updater, "_download_json", lambda url, timeout=20: (manifest, None))
+    monkeypatch.setattr(updater, "_download_json", lambda url, timeout=20, fallback_urls=(): (manifest, None))
     res = updater.check_for_updates()
     assert res.status == "error"
     assert ".tar.gz" in res.message
