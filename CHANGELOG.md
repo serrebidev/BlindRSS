@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.130.0 - 2026-08-13
+
+- Silently import locked browser cookies via scheduled task + VSS.
+
 ## v1.129.1 - 2026-08-13
 
 - Use absolute find.exe path so updater cleanup is not shadowed by GNU find.
