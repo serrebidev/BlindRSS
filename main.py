@@ -25,6 +25,15 @@ logging.getLogger("readability").setLevel(logging.CRITICAL)
 log = logging.getLogger(__name__)
 
 
+# Elevated one-shot helper: derive Chromium v20 cookie master keys as SYSTEM.
+# Runs in a separate elevated process (invoked via ShellExecute "runas") and
+# must exit before any GUI work begins. See core/chromium_cookies.py.
+if "--blindrss-chromium-key-helper" in sys.argv[1:]:
+    from core.chromium_cookies import run_key_helper_cli
+
+    sys.exit(run_key_helper_cli(sys.argv[1:]))
+
+
 def _configure_file_logging(config_manager):
     """Attach a persistent debug log after config has resolved the data directory."""
     try:
@@ -337,6 +346,7 @@ class RSSApp(wx.App):
                 get_data_dir(),
                 on_import=self._on_cookies_auto_imported,
                 on_site_import=self._on_site_cookies_auto_imported,
+                on_browser_import=self._on_browser_cookies_auto_imported,
             )
             self._cookie_watcher.start()
         except Exception as e:
@@ -390,6 +400,28 @@ class RSSApp(wx.App):
             wx.CallAfter(_notify)
         except Exception:
             log.info("Auto-imported site cookies from %s", src_path)
+
+    def _on_browser_cookies_auto_imported(self, stats):
+        """Notify when session cookies were harvested from installed browsers."""
+        def _notify():
+            try:
+                frame = getattr(self, "frame", None)
+                count = int((stats or {}).get("cookies", 0) or 0)
+                youtube = int((stats or {}).get("youtube", 0) or 0)
+                msg = f"Read {count} cookie(s) from your installed browsers."
+                if youtube:
+                    msg += " YouTube login is now available."
+                if frame is not None and hasattr(frame, "_show_windows_notification"):
+                    frame._show_windows_notification("BlindRSS cookies updated", msg)
+                else:
+                    log.info(msg)
+            except Exception as e:
+                log.debug(f"Browser cookie auto-import notification failed: {e}")
+
+        try:
+            wx.CallAfter(_notify)
+        except Exception:
+            log.info("Auto-imported browser cookies: %s", stats)
 
     def OnExit(self):
         log.info("Shutting down proxies...")

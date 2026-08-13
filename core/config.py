@@ -200,6 +200,17 @@ DEFAULT_CONFIG = {
     # file, while all valid jars are merged into the per-site HTTP cookie jar.
     # See core/cookies_import.py and core/site_cookies.py.
     "auto_import_browser_cookies": True,
+    # When true, BlindRSS reads session cookies directly from every installed
+    # browser (Firefox family and Chromium family — Chrome, Edge, Brave, Opera,
+    # Vivaldi, Chromium and their beta/dev/nightly variants) and merges them
+    # into the site jar and the yt-dlp cookie file. Chromium App-Bound (v20)
+    # decryption needs one Windows permission prompt per key rotation; the
+    # resulting key is cached so later runs stay silent. See
+    # core/site_cookies.auto_import_installed_browser_cookies.
+    "auto_import_installed_browser_cookies": True,
+    # Internal: {profile dir/cookie db: mtime} for the full-browser cookie
+    # import, so unchanged profiles are not re-read every watcher tick.
+    "site_cookies_full_profile_mtimes": {},
     # Internal: mtime of the last cookie export we auto-imported, so the watcher
     # only imports newer exports and never loops on the same file.
     "ytdlp_cookies_last_import_mtime": 0,

@@ -277,14 +277,16 @@ class CookieImportWatcher:
     """
 
     def __init__(self, config_manager, data_dir: str, *, interval_s: float = 45.0,
-                 on_import=None, on_site_import=None):
+                 on_import=None, on_site_import=None, on_browser_import=None):
         self._config_manager = config_manager
         self._data_dir = data_dir
         self._interval_s = max(10.0, float(interval_s))
         self._on_import = on_import
         self._on_site_import = on_site_import
+        self._on_browser_import = on_browser_import
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._full_harvest_inflight = False
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -323,6 +325,10 @@ class CookieImportWatcher:
                 site_cookies.auto_import_browser_profiles(self._config_manager)
             except Exception:
                 log.exception("Browser-profile clearance import tick failed")
+            # Full session-cookie import from installed browsers (Firefox +
+            # Chromium incl. v20) runs on its own thread so a one-time UAC
+            # elevation never delays the Downloads/clearance scans above.
+            self._maybe_start_full_browser_harvest()
             if site_src and self._on_site_import:
                 try:
                     self._on_site_import(site_src)
@@ -330,3 +336,37 @@ class CookieImportWatcher:
                     log.exception("Cookie import on_site_import callback failed")
             if self._stop.wait(self._interval_s):
                 break
+
+    def _maybe_start_full_browser_harvest(self) -> None:
+        if self._full_harvest_inflight:
+            return
+        self._full_harvest_inflight = True
+        try:
+            threading.Thread(
+                target=self._full_browser_harvest_worker,
+                daemon=True,
+                name="BrowserCookieHarvest",
+            ).start()
+        except Exception:
+            self._full_harvest_inflight = False
+            log.exception("Could not start the full browser cookie harvest")
+
+    def _full_browser_harvest_worker(self) -> None:
+        stats = None
+        try:
+            from core import site_cookies
+
+            stats = site_cookies.auto_import_installed_browser_cookies(self._config_manager)
+        except Exception:
+            log.exception("Full browser cookie harvest tick failed")
+        finally:
+            self._full_harvest_inflight = False
+        if (
+            stats
+            and (stats.get("cookies") or stats.get("youtube"))
+            and self._on_browser_import
+        ):
+            try:
+                self._on_browser_import(stats)
+            except Exception:
+                log.exception("Cookie import on_browser_import callback failed")

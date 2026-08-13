@@ -467,6 +467,19 @@ def _merge_records_into_jar(new_records) -> None:
     _invalidate()
 
 
+def merge_records_into_jar(records) -> int:
+    """Merge raw Netscape 7-field records into the managed site jar.
+
+    Public counterpart to ``_merge_records_into_jar`` for importers outside this
+    module (e.g. ``core.chromium_cookies``). Existing entries for the same
+    (domain, path, name) are replaced; everything else is kept.
+    """
+    records = list(records or [])
+    if records:
+        _merge_records_into_jar(records)
+    return len(records)
+
+
 def merge_jar_file(src_path: str) -> int:
     """Merge a Netscape cookies.txt export into the managed jar.
 
@@ -1119,3 +1132,229 @@ def looks_like_challenge_response(status_code: int, body: str) -> bool:
         return False
     text = str(body or "")[:20000]
     return any(marker in text for marker in _CHALLENGE_MARKERS)
+
+
+# ---------------------------------------------------------------------------
+# Full-cookie import from every installed browser (issue: Chromium v20)
+# ---------------------------------------------------------------------------
+
+# Netscape cookie records whose domain is a YouTube/Google login, so the yt-dlp
+# cookie file gets what it needs without carrying every unrelated session.
+_YOUTUBE_DOMAINS = ("youtube.com", "google.com")
+
+
+def _is_youtube_record(domain_field: str) -> bool:
+    domain = str(domain_field or "").replace("#HttpOnly_", "", 1).lstrip(".").lower()
+    return any(domain == d or domain.endswith("." + d) for d in _YOUTUBE_DOMAINS)
+
+
+def merge_youtube_cookies(records, config_manager) -> int:
+    """Merge YouTube/Google records into the managed yt-dlp cookie file.
+
+    Returns the number of records in the resulting jar. Points yt-dlp's
+    ``ytdlp_cookies_file`` at the managed jar unless the user configured their
+    own file, so restricted YouTube playback works automatically.
+    """
+    from core.cookies_import import IMPORTED_COOKIE_FILENAME, _iter_cookie_records
+
+    data_dir = config_mod.get_data_dir()
+    dest = os.path.join(data_dir, IMPORTED_COOKIE_FILENAME)
+
+    merged = {}
+    try:
+        with open(dest, "r", encoding="utf-8", errors="replace") as fh:
+            text = fh.read()
+        for fields in _iter_cookie_records(text):
+            merged[_record_key(tuple(fields[:7]))] = tuple(fields[:7])
+    except OSError:
+        pass
+
+    for record in records or []:
+        merged[_record_key(tuple(record))] = tuple(record)
+
+    os.makedirs(data_dir, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(prefix="youtube-cookies-", suffix=".tmp", dir=data_dir)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write("# Netscape HTTP Cookie File\n")
+            fh.write("# Harvested from installed browsers by BlindRSS\n\n")
+            for record in merged.values():
+                fh.write("\t".join(str(f) for f in record) + "\n")
+        os.replace(tmp, dest)
+        tmp = ""
+    finally:
+        if tmp:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+    current = str(config_manager.get("ytdlp_cookies_file", "") or "").strip()
+    if not current or os.path.abspath(current) == os.path.abspath(dest):
+        try:
+            config_manager.set("ytdlp_cookies_file", dest)
+        except Exception:
+            log.exception("Failed to persist the harvested yt-dlp cookie path")
+    return len(merged)
+
+
+def auto_import_installed_browser_cookies(
+    config_manager, *, profiles=None, chromium_profiles=None
+) -> dict:
+    """Full-cookie import from every installed browser (Firefox + Chromium).
+
+    Gated by the ``auto_import_installed_browser_cookies`` consent (default on).
+    Unlike the clearance-only watcher this copies the user's *session* cookies
+    — the whole point of the feature: YouTube login and any other site. Firefox
+    profiles are read directly (plain SQLite); Chromium cookies are decrypted
+    (v10 via user DPAPI, v20 via a one-time UAC elevation whose master key is
+    then cached, so later runs are silent).
+
+    Unchanged profiles are skipped via the persisted ``site_cookies_full_profile_mtimes``
+    markers, so the watcher does not re-read every cookie DB every tick.
+
+    Runs on the CookieImportWatcher thread. Returns a stats dict.
+    """
+    stats = {"firefox": 0, "chromium": 0, "cookies": 0, "youtube": 0, "elevated": 0}
+    try:
+        if not bool(config_manager.get("auto_import_installed_browser_cookies", True)):
+            return stats
+    except Exception:
+        return stats
+
+    try:
+        seen = dict(config_manager.get("site_cookies_full_profile_mtimes", {}) or {})
+    except Exception:
+        seen = {}
+    if not isinstance(seen, dict):
+        seen = {}
+
+    changed = False
+    youtube_records = []
+
+    # --- Firefox family: full jar (plain SQLite, no encryption) --------------
+    try:
+        ff_profiles = profiles if profiles is not None else list_browser_profiles()
+    except Exception:
+        ff_profiles = []
+    for profile in ff_profiles or []:
+        profile_dir = str(profile.get("path", "") or "")
+        if not profile_dir:
+            continue
+        key = os.path.abspath(profile_dir).lower()
+        try:
+            mtime = float(profile.get("mtime", 0) or 0)
+        except (TypeError, ValueError):
+            mtime = 0.0
+        try:
+            if mtime and mtime <= float(seen.get(key, 0) or 0):
+                continue
+        except (TypeError, ValueError):
+            pass
+        try:
+            rows = _read_firefox_cookies(profile_dir)
+        except Exception:
+            log.debug("Could not read Firefox cookies from %s", profile_dir, exc_info=True)
+            continue
+        seen[key] = mtime
+        changed = True
+        records = []
+        # A clearance cookie is only valid for the exact browser identity that
+        # earned it; pin the profile's Firefox UA for any host whose clearance
+        # we import (mirrors the matched-triple rule the clearance-only import
+        # already follows).
+        clearance_ua = ""
+        clearance_hosts = set()
+        now = int(time.time())
+        for host, path, secure, http_only, expiry, name, value in rows:
+            try:
+                expiry_i = int(expiry or 0)
+            except (TypeError, ValueError):
+                expiry_i = 0
+            # Firefox ``expiry`` is already Unix seconds; drop expired cookies.
+            if expiry_i and expiry_i < now:
+                continue
+            domain_field = ("#HttpOnly_" + host) if http_only else host
+            record = (
+                domain_field,
+                "TRUE" if host.startswith(".") else "FALSE",
+                path or "/",
+                "TRUE" if secure else "FALSE",
+                str(expiry_i),
+                name,
+                value,
+            )
+            records.append(record)
+            if _is_youtube_record(domain_field):
+                youtube_records.append(record)
+            if _is_harvestable(str(name or "")):
+                clearance_hosts.add(str(host or "").strip().lstrip(".").lower())
+        if records:
+            _merge_records_into_jar(records)
+            stats["cookies"] += len(records)
+        if clearance_hosts:
+            if not clearance_ua:
+                try:
+                    clearance_ua = firefox_profile_user_agent(profile_dir)
+                except Exception:
+                    clearance_ua = ""
+            if clearance_ua:
+                for host in clearance_hosts:
+                    try:
+                        set_host_user_agent(host, clearance_ua)
+                    except Exception:
+                        log.debug("Could not pin UA for %s", host, exc_info=True)
+    stats["firefox"] = len([p for p in (ff_profiles or []) if p.get("path")])
+
+    # --- Chromium family: v10 + v20 (one-time elevation for v20) ------------
+    try:
+        from core import chromium_cookies
+
+        if chromium_profiles is not None:
+            cprofiles = chromium_profiles
+        else:
+            cprofiles = chromium_cookies.list_chromium_profiles()
+        # Skip unchanged cookie DBs via the same marker set.
+        filtered = []
+        for profile in cprofiles or []:
+            db = str(profile.get("cookie_db", "") or "")
+            if not db:
+                continue
+            key = os.path.abspath(db).lower()
+            try:
+                mtime = float(profile.get("mtime", 0) or 0)
+            except (TypeError, ValueError):
+                mtime = 0.0
+            try:
+                if mtime and mtime <= float(seen.get(key, 0) or 0):
+                    continue
+            except (TypeError, ValueError):
+                pass
+            filtered.append(profile)
+            seen[key] = mtime
+            changed = True
+        cstats = chromium_cookies.import_chromium_cookies(
+            config_manager, profiles=filtered, elevate=True
+        )
+    except Exception:
+        log.exception("Chromium cookie import failed")
+        cstats = {}
+    stats["chromium"] = int(cstats.get("profiles", 0) or 0)
+    stats["cookies"] += int(cstats.get("cookies", 0) or 0)
+    stats["elevated"] = int(cstats.get("elevated", 0) or 0)
+    stats["youtube"] = int(cstats.get("youtube", 0) or 0)
+
+    # --- Firefox YouTube cookies -> yt-dlp jar -------------------------------
+    if youtube_records:
+        try:
+            stats["youtube"] += merge_youtube_cookies(youtube_records, config_manager)
+        except Exception:
+            log.exception("Failed to persist harvested Firefox YouTube cookies")
+
+    if changed:
+        try:
+            config_manager.set("site_cookies_full_profile_mtimes", seen)
+        except Exception:
+            log.exception("Failed to persist full-browser cookie import state")
+    return stats
+

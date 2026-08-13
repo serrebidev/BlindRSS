@@ -129,6 +129,10 @@ packages_to_collect = [
     "ifaddr",
     "certifi",
     "curl_cffi",
+    # Chromium v20 cookie decryption (core/chromium_cookies.py). cryptography is
+    # imported lazily inside the AES-GCM/ChaCha20 helpers, so collect it
+    # explicitly (its hook also bundles the C extension backends).
+    "cryptography",
     # Last-resort real-browser feed retrieval. Browser/driver binaries remain
     # runtime-managed in the writable per-user data directory.
     "seleniumbase",

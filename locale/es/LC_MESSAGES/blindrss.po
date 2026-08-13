@@ -60,8 +60,7 @@ msgstr "Cambio de velocidad de reproducción"
 #: core/announcements.py:150
 msgid "Announce the current playback speed when it is changed by keyboard."
 msgstr ""
-"Anunciar la velocidad de reproducción actual cuando se cambia con el "
-"teclado."
+"Anunciar la velocidad de reproducción actual cuando se cambia con el teclado."
 
 #: core/announcements.py:151
 msgid "Media and chapter navigation"
@@ -95,8 +94,8 @@ msgstr "Solo Braille"
 msgid "Speech and Braille"
 msgstr "Voz y Braille"
 
-#: core/article_columns.py:68 gui/dialogs.py:5038 gui/dialogs.py:5995
-#: gui/dialogs.py:6019
+#: core/article_columns.py:68 gui/dialogs.py:5051 gui/dialogs.py:6008
+#: gui/dialogs.py:6032
 msgid "Title"
 msgstr "Título"
 
@@ -112,7 +111,7 @@ msgstr "Multimedia"
 msgid "Date"
 msgstr "Fecha"
 
-#: core/article_columns.py:72 gui/dialogs.py:4667
+#: core/article_columns.py:72 gui/dialogs.py:4680
 msgid "Feed"
 msgstr "Fuente"
 
@@ -130,8 +129,8 @@ msgid ""
 "or a \"you're not a robot\" page), so the full text can't be fetched "
 "automatically. Open the original link in your browser to read it."
 msgstr ""
-"Esta página está detrás de una verificación anti-bot / de humanidad (p. ej.,"
-" Cloudflare o una página de \"no soy un robot\"), por lo que el texto "
+"Esta página está detrás de una verificación anti-bot / de humanidad (p. ej., "
+"Cloudflare o una página de \"no soy un robot\"), por lo que el texto "
 "completo no se puede obtener automáticamente. Abra el enlace original en su "
 "navegador para leerla."
 
@@ -141,8 +140,8 @@ msgid ""
 "links were found (common for video-only pages). Open the original link in "
 "your browser to view it."
 msgstr ""
-"La página no tiene texto de artículo legible: solo se encontraron enlaces de"
-" navegación o de noticias relacionadas (habitual en páginas de solo vídeo). "
+"La página no tiene texto de artículo legible: solo se encontraron enlaces de "
+"navegación o de noticias relacionadas (habitual en páginas de solo vídeo). "
 "Abra el enlace original en su navegador para verla."
 
 #: core/article_extractor.py:335
@@ -152,8 +151,8 @@ msgid ""
 "read it."
 msgstr ""
 "Este artículo está detrás de un muro de pago (se requiere suscripción), por "
-"lo que el texto completo no se puede obtener automáticamente. Abra el enlace"
-" original en su navegador para leerlo."
+"lo que el texto completo no se puede obtener automáticamente. Abra el enlace "
+"original en su navegador para leerlo."
 
 #: core/article_extractor.py:370
 msgid ""
@@ -161,26 +160,26 @@ msgid ""
 "requires a subscription. Open the original link in your browser to read it."
 msgstr ""
 "En la página solo se publica la vista previa gratuita de este artículo; el "
-"resto requiere una suscripción. Abra el enlace original en su navegador para"
-" leerlo."
+"resto requiere una suscripción. Abra el enlace original en su navegador para "
+"leerlo."
 
 #: core/article_extractor.py:2891
 msgid ""
-"Google News could not resolve the original publisher link. Open the original"
-" link in your browser to read it."
+"Google News could not resolve the original publisher link. Open the original "
+"link in your browser to read it."
 msgstr ""
 "Google News no pudo resolver el enlace original del editor. Abra el enlace "
 "original en su navegador para leerlo."
 
-#: core/article_extractor.py:4713 gui/dialogs.py:4777
+#: core/article_extractor.py:4713 gui/dialogs.py:4790
 msgid "(unknown)"
 msgstr "(desconocido)"
 
 #: core/article_extractor.py:4785
 msgid "Could not extract full text from the webpage or from feed content."
 msgstr ""
-"No se pudo extraer el texto completo de la página web ni del contenido de la"
-" fuente."
+"No se pudo extraer el texto completo de la página web ni del contenido de la "
+"fuente."
 
 #: core/article_extractor.py:4541
 msgid ""
@@ -212,7 +211,7 @@ msgstr ""
 "comprobaciones solo son válidas poco tiempo. Abra la página en {browser} y "
 "BlindRSS recuperará el acceso automáticamente en un minuto."
 
-#: core/article_extractor.py:4714 gui/dialogs.py:4146
+#: core/article_extractor.py:4714 gui/dialogs.py:4159
 msgid "Title:"
 msgstr "Título:"
 
@@ -233,21 +232,21 @@ msgstr "Error de extracción desconocido"
 msgid "Uncategorized"
 msgstr "Sin categoría"
 
-#: core/config.py:779
+#: core/config.py:790
 msgid "Installed Windows builds store data in the User Data Folder."
 msgstr ""
-"Las compilaciones instaladas de Windows almacenan los datos en la carpeta de"
-" datos del usuario."
+"Las compilaciones instaladas de Windows almacenan los datos en la carpeta de "
+"datos del usuario."
 
-#: core/config.py:781
+#: core/config.py:792
 msgid "No change."
 msgstr "Sin cambios."
 
-#: core/config.py:807
+#: core/config.py:818
 msgid "Config moved to {path}."
 msgstr "La configuración se movió a {path}."
 
-#: core/config.py:794
+#: core/config.py:805
 msgid "Could not write config at new location: {error}"
 msgstr "No se pudo escribir la configuración en la nueva ubicación: {error}"
 
@@ -317,8 +316,8 @@ msgid ""
 "Import Site Cookies, then refresh the feed."
 msgstr ""
 "Este grupo de Google requiere iniciar sesión. Importe sus cookies del "
-"navegador con Herramientas > Importar cookies del sitio y luego actualice la"
-" fuente."
+"navegador con Herramientas > Importar cookies del sitio y luego actualice la "
+"fuente."
 
 #: core/macos_integration.py:75
 msgid "Startup registration is only available on macOS."
@@ -433,7 +432,7 @@ msgstr "Ordenación"
 msgid "Player"
 msgstr "Reproductor"
 
-#: core/shortcuts.py:148 gui/dialogs.py:7580
+#: core/shortcuts.py:148 gui/dialogs.py:7593
 msgid "Play Queue"
 msgstr "Cola de reproducción"
 
@@ -508,11 +507,11 @@ msgstr "Importar YouTube Takeout"
 msgid "Export OPML"
 msgstr "Exportar OPML"
 
-#: core/shortcuts.py:167 gui/dialogs.py:5000
+#: core/shortcuts.py:167 gui/dialogs.py:5013
 msgid "Find a Podcast or RSS Feed"
 msgstr "Buscar un podcast o fuente RSS"
 
-#: core/shortcuts.py:168 gui/dialogs.py:3919 gui/dialogs.py:5916
+#: core/shortcuts.py:168 gui/dialogs.py:3931 gui/dialogs.py:5929
 msgid "Video Search"
 msgstr "Búsqueda de video"
 
@@ -688,11 +687,11 @@ msgstr "Reglas de filtro"
 msgid "Import Site Cookies"
 msgstr "Importar cookies del sitio"
 
-#: core/shortcuts.py:211 gui/dialogs.py:7453
+#: core/shortcuts.py:211 gui/dialogs.py:7466
 msgid "Configure Persistent Search"
 msgstr "Configurar búsqueda persistente"
 
-#: core/shortcuts.py:212 gui/dialogs.py:7884
+#: core/shortcuts.py:212 gui/dialogs.py:7897
 msgid "Keyboard Shortcuts"
 msgstr "Atajos de teclado"
 
@@ -700,7 +699,7 @@ msgstr "Atajos de teclado"
 msgid "Settings"
 msgstr "Configuración"
 
-#: core/shortcuts.py:214 gui/dialogs.py:1863
+#: core/shortcuts.py:214 gui/dialogs.py:1875
 msgid "Check for Updates"
 msgstr "Buscar actualizaciones"
 
@@ -820,8 +819,7 @@ msgstr "El manifiesto de actualización tiene una versión no válida."
 #: core/updater.py:386
 msgid "Update manifest version does not match the latest release."
 msgstr ""
-"La versión del manifiesto de actualización no coincide con la última "
-"versión."
+"La versión del manifiesto de actualización no coincide con la última versión."
 
 #: core/updater.py:390
 msgid "Update manifest is missing asset name."
@@ -878,8 +876,8 @@ msgstr "Descargando la actualización…"
 
 #: core/updater.py:1001
 msgid ""
-"Failed to download update. GitHub may be temporarily unavailable; please try"
-" again in a few minutes."
+"Failed to download update. GitHub may be temporarily unavailable; please try "
+"again in a few minutes."
 msgstr ""
 "No se pudo descargar la actualización. Es posible que GitHub no esté "
 "disponible temporalmente; inténtelo de nuevo en unos minutos."
@@ -999,8 +997,8 @@ msgstr ""
 #: core/updater.py:428
 msgid "Update installer '{name}' not found in release assets."
 msgstr ""
-"No se encontró el instalador de actualización «{name}» en los recursos de la"
-" versión."
+"No se encontró el instalador de actualización «{name}» en los recursos de la "
+"versión."
 
 #: core/updater.py:648
 msgid "Update is signed but not by a trusted certificate{suffix}"
@@ -1414,8 +1412,8 @@ msgstr "Vistas"
 
 #: gui/accessibility.py:503
 msgid ""
-"Categories can be expanded or collapsed. Use the buttons, or use Right Arrow"
-" to expand and Left Arrow to collapse."
+"Categories can be expanded or collapsed. Use the buttons, or use Right Arrow "
+"to expand and Left Arrow to collapse."
 msgstr ""
 "Las categorías se pueden expandir o contraer. Use los botones, o la flecha "
 "derecha para expandir y la flecha izquierda para contraer."
@@ -1558,13 +1556,13 @@ msgstr "¿Quitar esta categoría? Las fuentes se moverán a \"Sin categoría\"."
 msgid "Could not remove category."
 msgstr "No se pudo quitar la categoría."
 
-#: gui/accessibility.py:1047 gui/dialogs.py:4670 gui/mainframe.py:13457
+#: gui/accessibility.py:1047 gui/dialogs.py:4683 gui/mainframe.py:13457
 #: gui/mainframe.py:13508
 msgid "Error"
 msgstr "Error"
 
 #: gui/accessibility.py:1318 gui/accessibility.py:297 gui/dialogs.py:236
-#: gui/dialogs.py:4164
+#: gui/dialogs.py:4177
 msgid "Category:"
 msgstr "Categoría:"
 
@@ -1647,21 +1645,22 @@ msgid ""
 "Taskbar pinning may be limited by your Windows version/policies."
 msgstr ""
 "Elija dónde agregar los accesos directos de BlindRSS.\n"
-"El anclaje a la barra de tareas puede estar limitado por su versión o directivas de Windows."
+"El anclaje a la barra de tareas puede estar limitado por su versión o "
+"directivas de Windows."
 
-#: gui/dialogs.py:1099 gui/dialogs.py:1083 gui/dialogs.py:4181
+#: gui/dialogs.py:1099 gui/dialogs.py:1083 gui/dialogs.py:4194
 msgid "5 minutes"
 msgstr "5 minutos"
 
-#: gui/dialogs.py:2113
+#: gui/dialogs.py:2125
 msgid "BlindRSS notification test"
 msgstr "Prueba de notificación de BlindRSS"
 
-#: gui/dialogs.py:2114
+#: gui/dialogs.py:2126
 msgid "If you can read this, notifications are working."
 msgstr "Si puede leer esto, las notificaciones funcionan correctamente."
 
-#: gui/dialogs.py:3249
+#: gui/dialogs.py:3261
 msgid ""
 "Windows toast notifications for new articles.\n"
 "Disabled by default."
@@ -1669,7 +1668,7 @@ msgstr ""
 "Notificaciones emergentes de Windows para artículos nuevos.\n"
 "Desactivadas de forma predeterminada."
 
-#: gui/dialogs.py:3328
+#: gui/dialogs.py:3340
 msgid ""
 "Screen-reader announcements for key keyboard actions.\n"
 "Each event can announce via speech, Braille, both, or neither.\n"
@@ -1679,7 +1678,7 @@ msgstr ""
 "Cada evento puede anunciarse por voz, braille, ambos o ninguno.\n"
 "La salida braille es más fiable en Windows con NVDA o JAWS."
 
-#: gui/dialogs.py:3380
+#: gui/dialogs.py:3392
 msgid ""
 "Configure automatic article translation.\n"
 "Your API key is stored locally in config.json."
@@ -1687,7 +1686,7 @@ msgstr ""
 "Configure la traducción automática de artículos.\n"
 "Su clave de API se almacena localmente en config.json."
 
-#: gui/dialogs.py:3732
+#: gui/dialogs.py:3744
 msgid ""
 "Optional paid CAPTCHA-solving service for sites whose Cloudflare\n"
 "challenge defeats every automated browser attempt. BlindRSS then\n"
@@ -1695,13 +1694,15 @@ msgid ""
 "solved token. The service sees which blocked URL is being solved.\n"
 "Your API key is stored locally in config.json."
 msgstr ""
-"Servicio opcional de pago para resolver CAPTCHA en sitios cuyo desafío de Cloudflare\n"
-"supera todos los intentos automatizados del navegador. BlindRSS envía entonces\n"
+"Servicio opcional de pago para resolver CAPTCHA en sitios cuyo desafío de "
+"Cloudflare\n"
+"supera todos los intentos automatizados del navegador. BlindRSS envía "
+"entonces\n"
 "solo los parámetros del desafío al servicio e inyecta el token\n"
 "resuelto. El servicio ve qué URL bloqueada se está resolviendo.\n"
 "La clave de API se guarda localmente en config.json."
 
-#: gui/dialogs.py:3811 gui/dialogs.py:3799
+#: gui/dialogs.py:3823 gui/dialogs.py:3811
 msgid "App Install Folder"
 msgstr "Carpeta de instalación de la aplicación"
 
@@ -1717,8 +1718,8 @@ msgstr "URL del canal o del medio"
 msgid "https://example.com/feed or a YouTube/podcast URL"
 msgstr "https://example.com/feed o una URL de YouTube/podcast"
 
-#: gui/dialogs.py:238 gui/dialogs.py:4166 gui/dialogs.py:7902
-#: gui/dialogs.py:4603
+#: gui/dialogs.py:238 gui/dialogs.py:4179 gui/dialogs.py:7915
+#: gui/dialogs.py:4616
 msgid "Category"
 msgstr "Categoría"
 
@@ -1770,55 +1771,55 @@ msgstr "Agente de usuario del navegador"
 msgid "Choose the exported cookies.txt"
 msgstr "Elegir el archivo cookies.txt exportado"
 
-#: gui/dialogs.py:1077 gui/dialogs.py:4248
+#: gui/dialogs.py:1077 gui/dialogs.py:4261
 msgid "Never"
 msgstr "Nunca"
 
-#: gui/dialogs.py:1078 gui/dialogs.py:4176
+#: gui/dialogs.py:1078 gui/dialogs.py:4189
 msgid "30 seconds"
 msgstr "30 segundos"
 
-#: gui/dialogs.py:1079 gui/dialogs.py:4177
+#: gui/dialogs.py:1079 gui/dialogs.py:4190
 msgid "1 minute"
 msgstr "1 minuto"
 
-#: gui/dialogs.py:1080 gui/dialogs.py:4178
+#: gui/dialogs.py:1080 gui/dialogs.py:4191
 msgid "2 minutes"
 msgstr "2 minutos"
 
-#: gui/dialogs.py:1081 gui/dialogs.py:4179
+#: gui/dialogs.py:1081 gui/dialogs.py:4192
 msgid "3 minutes"
 msgstr "3 minutos"
 
-#: gui/dialogs.py:1082 gui/dialogs.py:4180
+#: gui/dialogs.py:1082 gui/dialogs.py:4193
 msgid "4 minutes"
 msgstr "4 minutos"
 
-#: gui/dialogs.py:1084 gui/dialogs.py:4182
+#: gui/dialogs.py:1084 gui/dialogs.py:4195
 msgid "10 minutes"
 msgstr "10 minutos"
 
-#: gui/dialogs.py:1085 gui/dialogs.py:4183
+#: gui/dialogs.py:1085 gui/dialogs.py:4196
 msgid "15 minutes"
 msgstr "15 minutos"
 
-#: gui/dialogs.py:1086 gui/dialogs.py:4184
+#: gui/dialogs.py:1086 gui/dialogs.py:4197
 msgid "30 minutes"
 msgstr "30 minutos"
 
-#: gui/dialogs.py:1087 gui/dialogs.py:4185
+#: gui/dialogs.py:1087 gui/dialogs.py:4198
 msgid "60 minutes"
 msgstr "60 minutos"
 
-#: gui/dialogs.py:1088 gui/dialogs.py:4186
+#: gui/dialogs.py:1088 gui/dialogs.py:4199
 msgid "2 hours"
 msgstr "2 horas"
 
-#: gui/dialogs.py:1089 gui/dialogs.py:4187
+#: gui/dialogs.py:1089 gui/dialogs.py:4200
 msgid "3 hours"
 msgstr "3 horas"
 
-#: gui/dialogs.py:1090 gui/dialogs.py:4188
+#: gui/dialogs.py:1090 gui/dialogs.py:4201
 msgid "4 hours"
 msgstr "4 horas"
 
@@ -1834,11 +1835,11 @@ msgstr "Títulos y texto del artículo"
 msgid "Delete behavior"
 msgstr "Comportamiento al eliminar"
 
-#: gui/dialogs.py:1203 gui/dialogs.py:4325
+#: gui/dialogs.py:1203 gui/dialogs.py:4338
 msgid "Delete target category (full path)"
 msgstr "Categoría de destino al eliminar (ruta completa)"
 
-#: gui/dialogs.py:1204 gui/dialogs.py:4326
+#: gui/dialogs.py:1204 gui/dialogs.py:4339
 msgid "Category / Path"
 msgstr "Categoría / Ruta"
 
@@ -1870,214 +1871,222 @@ msgstr "Actualizar siempre completamente las fuentes"
 msgid "Local RSS automatic feed refresh workload"
 msgstr "Modo de actualización automática de fuentes de RSS local"
 
-#: gui/dialogs.py:1434
+#: gui/dialogs.py:1432
 msgid "yt-dlp cookies file path"
 msgstr "Ruta del archivo de cookies de yt-dlp"
 
-#: gui/dialogs.py:1435
+#: gui/dialogs.py:1433
 msgid "Path to a cookies.txt file"
 msgstr "Ruta a un archivo cookies.txt"
 
-#: gui/dialogs.py:1438
+#: gui/dialogs.py:1436
 msgid "Browse for cookies file"
 msgstr "Buscar archivo de cookies"
 
-#: gui/dialogs.py:1469
+#: gui/dialogs.py:1459
+msgid "Read cookies from installed browsers"
+msgstr "Leer cookies desde los navegadores instalados"
+
+#: gui/dialogs.py:1481
 msgid "YouTube playback cache folder"
 msgstr "Carpeta de caché de reproducción de YouTube"
 
-#: gui/dialogs.py:1470
+#: gui/dialogs.py:1482
 msgid "Leave blank for the default location"
 msgstr "Deje en blanco para usar la ubicación predeterminada"
 
-#: gui/dialogs.py:1473
+#: gui/dialogs.py:1485
 msgid "Browse for playback cache folder"
 msgstr "Buscar carpeta de caché de reproducción"
 
-#: gui/dialogs.py:1539
+#: gui/dialogs.py:1551
 msgid "Automatic (system language)"
 msgstr "Automático (idioma del sistema)"
 
-#: gui/dialogs.py:1576
+#: gui/dialogs.py:1588
 msgid "Interface language"
 msgstr "Idioma de la interfaz"
 
-#: gui/dialogs.py:1603 gui/dialogs.py:1611
+#: gui/dialogs.py:1615 gui/dialogs.py:1623
 msgid "All items expanded"
 msgstr "Todos los elementos expandidos"
 
-#: gui/dialogs.py:1604 gui/dialogs.py:1611
+#: gui/dialogs.py:1616 gui/dialogs.py:1623
 msgid "All items collapsed"
 msgstr "Todos los elementos contraídos"
 
-#: gui/dialogs.py:1608
+#: gui/dialogs.py:1620
 msgid "Feed category tree default state on startup"
 msgstr "Estado inicial del árbol de categorías de canales"
 
-#: gui/dialogs.py:1623 gui/dialogs.py:1631
+#: gui/dialogs.py:1635 gui/dialogs.py:1643
 msgid "Default browser"
 msgstr "Navegador predeterminado"
 
-#: gui/dialogs.py:1624 gui/dialogs.py:2821 gui/dialogs.py:1631
+#: gui/dialogs.py:1636 gui/dialogs.py:2833 gui/dialogs.py:1643
 msgid "Custom command"
 msgstr "Comando personalizado"
 
-#: gui/dialogs.py:1628
+#: gui/dialogs.py:1640
 msgid "Article opening method"
 msgstr "Método para abrir artículos"
 
-#: gui/dialogs.py:1644
+#: gui/dialogs.py:1656
 msgid "Custom article open command"
 msgstr "Comando personalizado para abrir artículos"
 
-#: gui/dialogs.py:1647
+#: gui/dialogs.py:1659
 msgid "Test custom article open command"
 msgstr "Probar el comando personalizado de apertura"
 
-#: gui/dialogs.py:1678 gui/dialogs.py:4346
+#: gui/dialogs.py:1690 gui/dialogs.py:4359
 msgid "General"
 msgstr "General"
 
-#: gui/dialogs.py:1680
+#: gui/dialogs.py:1692
 msgid "Feeds && Articles"
 msgstr "Canales y artículos"
 
-#: gui/dialogs.py:1682
+#: gui/dialogs.py:1694
 msgid "YouTube"
 msgstr "YouTube"
 
-#: gui/dialogs.py:1691
+#: gui/dialogs.py:1703
 msgid "Media Player"
 msgstr "Reproductor multimedia"
 
-#: gui/dialogs.py:1694 gui/dialogs.py:5039
+#: gui/dialogs.py:1706 gui/dialogs.py:5052
 msgid "Provider"
 msgstr "Proveedor"
 
-#: gui/dialogs.py:1699 gui/dialogs.py:2110 gui/dialogs.py:2147
+#: gui/dialogs.py:1711 gui/dialogs.py:2122 gui/dialogs.py:2159
 #: gui/mainframe.py:14103
 msgid "Notifications"
 msgstr "Notificaciones"
 
-#: gui/dialogs.py:1704
+#: gui/dialogs.py:1716
 msgid "Translate"
 msgstr "Traducir"
 
-#: gui/dialogs.py:1714 gui/dialogs.py:4354
+#: gui/dialogs.py:1726 gui/dialogs.py:4367
 msgid "List Headers"
 msgstr "Encabezados de lista"
 
-#: gui/dialogs.py:1717
+#: gui/dialogs.py:1729
 msgid "Advanced"
 msgstr "Avanzado"
 
-#: gui/dialogs.py:1723
+#: gui/dialogs.py:1735
 msgid "CAPTCHA Solving"
 msgstr "Resolución de CAPTCHA"
 
-#: gui/dialogs.py:1853 gui/dialogs.py:1845
+#: gui/dialogs.py:1865 gui/dialogs.py:1857
 msgid "Check for updates:"
 msgstr "Buscar actualizaciones:"
 
-#: gui/dialogs.py:1921 gui/dialogs.py:1832
+#: gui/dialogs.py:1933 gui/dialogs.py:1844
 msgid "Translation Updates"
 msgstr "Actualizaciones de traducciones"
 
-#: gui/dialogs.py:2084 gui/dialogs.py:576
+#: gui/dialogs.py:2096 gui/dialogs.py:576
 msgid "No feeds available."
 msgstr "No hay fuentes disponibles."
 
-#: gui/dialogs.py:2184
+#: gui/dialogs.py:2196
 msgid ""
 "The announcement could not be delivered.\n"
 "\n"
-"No screen reader output was available. Check that your screen reader is running, and that the accessible-output2 library is installed for full speech and Braille support."
+"No screen reader output was available. Check that your screen reader is "
+"running, and that the accessible-output2 library is installed for full "
+"speech and Braille support."
 msgstr ""
 "No se pudo entregar el anuncio.\n"
 "\n"
-"No había salida de lector de pantalla disponible. Compruebe que su lector de pantalla esté en ejecución y que la biblioteca accessible-output2 esté instalada para una compatibilidad completa con voz y braille."
+"No había salida de lector de pantalla disponible. Compruebe que su lector de "
+"pantalla esté en ejecución y que la biblioteca accessible-output2 esté "
+"instalada para una compatibilidad completa con voz y braille."
 
-#: gui/dialogs.py:2190 gui/dialogs.py:3316
+#: gui/dialogs.py:2202 gui/dialogs.py:3328
 msgid "Announcements"
 msgstr "Anuncios"
 
-#: gui/dialogs.py:2273
+#: gui/dialogs.py:2285
 msgid "Waiting for authorization..."
 msgstr "Esperando la autorización..."
 
-#: gui/dialogs.py:2416
+#: gui/dialogs.py:2428
 msgid "Authorization failed"
 msgstr "Error de autorización"
 
-#: gui/dialogs.py:2435 gui/dialogs.py:3165
+#: gui/dialogs.py:2447 gui/dialogs.py:3177
 msgid "Not authorized"
 msgstr "No autorizado"
 
-#: gui/dialogs.py:2578
+#: gui/dialogs.py:2590
 msgid "Choose download directory"
 msgstr "Elegir directorio de descargas"
 
-#: gui/dialogs.py:2586
+#: gui/dialogs.py:2598
 msgid "Choose yt-dlp cookies.txt"
 msgstr "Elegir cookies.txt de yt-dlp"
 
-#: gui/dialogs.py:2604
+#: gui/dialogs.py:2616
 msgid "Choose YouTube playback cache folder"
 msgstr "Elegir carpeta de caché de reproducción de YouTube"
 
-#: gui/dialogs.py:2627
+#: gui/dialogs.py:2639
 msgid "Clear playback cache"
 msgstr "Borrar caché de reproducción"
 
-#: gui/dialogs.py:2635
+#: gui/dialogs.py:2647
 msgid "Playback cache cleared"
 msgstr "Caché de reproducción borrada"
 
-#: gui/dialogs.py:2664
+#: gui/dialogs.py:2676
 msgid "Import cookies from browser"
 msgstr "Importar cookies del navegador"
 
-#: gui/dialogs.py:2667
+#: gui/dialogs.py:2679
 msgid "Find my export"
 msgstr "Buscar mi exportación"
 
-#: gui/dialogs.py:2667
+#: gui/dialogs.py:2679
 msgid "Open extension page"
 msgstr "Abrir la página de la extensión"
 
-#: gui/dialogs.py:2667 gui/dialogs.py:2700 gui/player.py:451
+#: gui/dialogs.py:2679 gui/dialogs.py:2712 gui/player.py:451
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: gui/dialogs.py:2741
+#: gui/dialogs.py:2753
 msgid "Cookies imported"
 msgstr "Cookies importadas"
 
-#: gui/dialogs.py:2886
+#: gui/dialogs.py:2898
 msgid "Groups.io API key"
 msgstr "Clave de API de Groups.io"
 
-#: gui/dialogs.py:2887
+#: gui/dialogs.py:2899
 msgid "Paste your Groups.io API key"
 msgstr "Pegue su clave de API de Groups.io"
 
-#: gui/dialogs.py:2905
+#: gui/dialogs.py:2917
 msgid "GitHub personal access token"
 msgstr "Token de acceso personal de GitHub"
 
-#: gui/dialogs.py:2906
+#: gui/dialogs.py:2918
 msgid "Paste your GitHub token"
 msgstr "Pegue su token de GitHub"
 
-#: gui/dialogs.py:2920
+#: gui/dialogs.py:2932
 msgid "Loading soundcards..."
 msgstr "Cargando tarjetas de sonido..."
 
-#: gui/dialogs.py:2975
+#: gui/dialogs.py:2987
 msgid "Media tools (ffmpeg, ffprobe, yt-dlp)"
 msgstr "Herramientas multimedia (ffmpeg, ffprobe, yt-dlp)"
 
-#: gui/dialogs.py:3172
+#: gui/dialogs.py:3184
 msgid ""
 "Local provider uses the feeds you add inside the app (Add Feed / Import "
 "OPML)."
@@ -2085,338 +2094,338 @@ msgstr ""
 "El proveedor local usa las fuentes que agregas dentro de la aplicación "
 "(Agregar fuente / Importar OPML)."
 
-#: gui/dialogs.py:3239
+#: gui/dialogs.py:3251
 msgid "Refresh Complete Sound:"
 msgstr "Sonido de actualización completa:"
 
-#: gui/dialogs.py:3240
+#: gui/dialogs.py:3252
 msgid "Refresh Error Sound:"
 msgstr "Sonido de error de actualización:"
 
-#: gui/dialogs.py:3367 gui/dialogs.py:3366
+#: gui/dialogs.py:3379 gui/dialogs.py:3378
 msgid "Test Announcement"
 msgstr "Anuncio de prueba"
 
-#: gui/dialogs.py:3369
+#: gui/dialogs.py:3381
 msgid "Send a test announcement to your screen reader via speech and Braille."
 msgstr ""
 "Enviar un anuncio de prueba a su lector de pantalla mediante voz y braille."
 
-#: gui/dialogs.py:3440
+#: gui/dialogs.py:3452
 msgid "Target language"
 msgstr "Idioma de destino"
 
-#: gui/dialogs.py:3475
+#: gui/dialogs.py:3487
 msgid "Grok (xAI) model"
 msgstr "Modelo de Grok (xAI)"
 
-#: gui/dialogs.py:3497
+#: gui/dialogs.py:3509
 msgid "Grok (xAI) API key"
 msgstr "Clave de API de Grok (xAI)"
 
-#: gui/dialogs.py:3518
+#: gui/dialogs.py:3530
 msgid "Groq model"
 msgstr "Modelo de Groq"
 
-#: gui/dialogs.py:3535
+#: gui/dialogs.py:3547
 msgid "Groq API key"
 msgstr "Clave de API de Groq"
 
-#: gui/dialogs.py:3566
+#: gui/dialogs.py:3578
 msgid "OpenAI model"
 msgstr "Modelo de OpenAI"
 
-#: gui/dialogs.py:3583
+#: gui/dialogs.py:3595
 msgid "OpenAI API key"
 msgstr "Clave de API de OpenAI"
 
-#: gui/dialogs.py:3604
+#: gui/dialogs.py:3616
 msgid "OpenRouter model"
 msgstr "Modelo de OpenRouter"
 
-#: gui/dialogs.py:3621
+#: gui/dialogs.py:3633
 msgid "OpenRouter API key"
 msgstr "Clave de API de OpenRouter"
 
-#: gui/dialogs.py:3652
+#: gui/dialogs.py:3664
 msgid "Gemini model"
 msgstr "Modelo de Gemini"
 
-#: gui/dialogs.py:3669
+#: gui/dialogs.py:3681
 msgid "Gemini API key"
 msgstr "Clave de API de Gemini"
 
-#: gui/dialogs.py:3690
+#: gui/dialogs.py:3702
 msgid "Qwen model"
 msgstr "Modelo de Qwen"
 
-#: gui/dialogs.py:3707
+#: gui/dialogs.py:3719
 msgid "Qwen API key"
 msgstr "Clave de API de Qwen"
 
-#: gui/dialogs.py:3774
+#: gui/dialogs.py:3786
 msgid "CAPTCHA solving service API key"
 msgstr "Clave de API del servicio de resolución de CAPTCHA"
 
-#: gui/dialogs.py:3798
+#: gui/dialogs.py:3810
 msgid "User Data Folder"
 msgstr "Carpeta de datos del usuario"
 
-#: gui/dialogs.py:3882
+#: gui/dialogs.py:3894
 msgid "Identify as"
 msgstr "Identificarse como"
 
-#: gui/dialogs.py:3904
+#: gui/dialogs.py:3916
 msgid "Custom User-Agent"
 msgstr "Agente de usuario personalizado"
 
-#: gui/dialogs.py:3912
+#: gui/dialogs.py:3924
 msgid "Current User-Agent"
 msgstr "Agente de usuario actual"
 
-#: gui/dialogs.py:3926 gui/dialogs.py:3923
+#: gui/dialogs.py:3938 gui/dialogs.py:3935
 msgid "Enable adult sites in Video Search"
 msgstr "Habilitar sitios para adultos en la búsqueda de vídeos"
 
-#: gui/dialogs.py:4148
+#: gui/dialogs.py:4161
 msgid "Feed title"
 msgstr "Título del canal"
 
-#: gui/dialogs.py:4155
+#: gui/dialogs.py:4168
 msgid "Feed URL"
 msgstr "URL del canal"
 
-#: gui/dialogs.py:4191
+#: gui/dialogs.py:4204
 msgid "Refresh interval for this feed"
 msgstr "Intervalo de actualización para esta fuente"
 
-#: gui/dialogs.py:4227
+#: gui/dialogs.py:4240
 msgid "Custom request headers"
 msgstr "Cabeceras de solicitud personalizadas"
 
-#: gui/dialogs.py:4243
+#: gui/dialogs.py:4256
 msgid "Request timeout seconds"
 msgstr "Tiempo de espera de la solicitud en segundos"
 
-#: gui/dialogs.py:4249
+#: gui/dialogs.py:4262
 msgid "Browser impersonation"
 msgstr "Suplantación de navegador"
 
-#: gui/dialogs.py:4269
+#: gui/dialogs.py:4282
 msgid "Proxy URL"
 msgstr "URL del proxy"
 
-#: gui/dialogs.py:4286
+#: gui/dialogs.py:4299
 msgid "Feed encoding"
 msgstr "Codificación del canal"
 
-#: gui/dialogs.py:4301
+#: gui/dialogs.py:4314
 msgid "Full text extraction encoding"
 msgstr "Codificación para la extracción de texto completo"
 
-#: gui/dialogs.py:4322
+#: gui/dialogs.py:4335
 msgid "Delete behavior for this feed"
 msgstr "Comportamiento al eliminar para este canal"
 
-#: gui/dialogs.py:4583 gui/mainframe.py:7532
+#: gui/dialogs.py:4596 gui/mainframe.py:7532
 msgid "Category name"
 msgstr "Nombre de la categoría"
 
-#: gui/dialogs.py:4666
+#: gui/dialogs.py:4679
 msgid "Feeds with errors"
 msgstr "Canales con errores"
 
-#: gui/dialogs.py:4668
+#: gui/dialogs.py:4681
 msgid "Last attempt"
 msgstr "Último intento"
 
-#: gui/dialogs.py:4669
+#: gui/dialogs.py:4682
 msgid "Failures"
 msgstr "Errores"
 
-#: gui/dialogs.py:4680
+#: gui/dialogs.py:4693
 msgid "Error details"
 msgstr "Detalles del error"
 
-#: gui/dialogs.py:4715
+#: gui/dialogs.py:4728
 msgid "No feeds reported errors during their most recent update."
 msgstr "Ningún feed informó errores durante su última actualización."
 
-#: gui/dialogs.py:4724 gui/dialogs.py:4728
+#: gui/dialogs.py:4737 gui/dialogs.py:4741
 msgid "Unknown"
 msgstr "Desconocido"
 
-#: gui/dialogs.py:4769
+#: gui/dialogs.py:4782
 msgid "1 failed attempt so far (this may be a one-off glitch)."
 msgstr "Hasta ahora 1 intento fallido (puede ser un fallo puntual)."
 
-#: gui/dialogs.py:4776 gui/dialogs.py:4740
+#: gui/dialogs.py:4789 gui/dialogs.py:4753
 msgid "Untitled feed"
 msgstr "Fuente sin título"
 
-#: gui/dialogs.py:4780
+#: gui/dialogs.py:4793
 msgid "No successful update recorded."
 msgstr "No se ha registrado ninguna actualización correcta."
 
-#: gui/dialogs.py:4782 gui/dialogs.py:1968 gui/mainframe.py:635
+#: gui/dialogs.py:4795 gui/dialogs.py:1980 gui/mainframe.py:635
 #: gui/mainframe.py:11788
 msgid "Unknown error"
 msgstr "Error desconocido"
 
-#: gui/dialogs.py:4921
+#: gui/dialogs.py:4934
 msgid "this feed"
 msgstr "este canal"
 
-#: gui/dialogs.py:5014
+#: gui/dialogs.py:5027
 msgid "Search for a podcast or RSS feed"
 msgstr "Buscar un pódcast o canal RSS"
 
-#: gui/dialogs.py:5015
+#: gui/dialogs.py:5028
 msgid "Podcast name, topic, or site URL"
 msgstr "Nombre del podcast, tema o URL del sitio"
 
-#: gui/dialogs.py:5022
+#: gui/dialogs.py:5035
 msgid "Search source"
 msgstr "Fuente de búsqueda"
 
-#: gui/dialogs.py:5037 gui/dialogs.py:6016
+#: gui/dialogs.py:5050 gui/dialogs.py:6029
 msgid "Search results"
 msgstr "Resultados de la búsqueda"
 
-#: gui/dialogs.py:5040 gui/dialogs.py:6023
+#: gui/dialogs.py:5053 gui/dialogs.py:6036
 msgid "Details"
 msgstr "Detalles"
 
-#: gui/dialogs.py:5041 gui/dialogs.py:6024
+#: gui/dialogs.py:5054 gui/dialogs.py:6037
 msgid "URL"
 msgstr "URL"
 
-#: gui/dialogs.py:5970
+#: gui/dialogs.py:5983
 msgid "Video search"
 msgstr "Búsqueda de vídeos"
 
-#: gui/dialogs.py:5971
+#: gui/dialogs.py:5984
 msgid "Search videos across sites"
 msgstr "Buscar videos en varios sitios"
 
-#: gui/dialogs.py:5983
+#: gui/dialogs.py:5996
 msgid "Search sites"
 msgstr "Sitios de búsqueda"
 
-#: gui/dialogs.py:5987
+#: gui/dialogs.py:6000
 msgid "Filter results by site"
 msgstr "Filtrar resultados por sitio"
 
-#: gui/dialogs.py:5994
+#: gui/dialogs.py:6007
 msgid "Sort results"
 msgstr "Ordenar resultados"
 
-#: gui/dialogs.py:5995
+#: gui/dialogs.py:6008
 msgid "Relevance"
 msgstr "Relevancia"
 
-#: gui/dialogs.py:5995 gui/dialogs.py:6020
+#: gui/dialogs.py:6008 gui/dialogs.py:6033
 msgid "Site"
 msgstr "Sitio"
 
-#: gui/dialogs.py:5995 gui/dialogs.py:6022
+#: gui/dialogs.py:6008 gui/dialogs.py:6035
 msgid "Plays"
 msgstr "Reproducciones"
 
-#: gui/dialogs.py:6021
+#: gui/dialogs.py:6034
 msgid "Kind"
 msgstr "Tipo"
 
-#: gui/dialogs.py:6028 gui/dialogs.py:7548 gui/mainframe.py:6522
+#: gui/dialogs.py:6041 gui/dialogs.py:7561 gui/mainframe.py:6522
 #: gui/mainframe.py:5437
 msgid "Close"
 msgstr "Cerrar"
 
-#: gui/dialogs.py:6999
+#: gui/dialogs.py:7012
 msgid "Searching"
 msgstr "Buscando en"
 
-#: gui/dialogs.py:6999
+#: gui/dialogs.py:7012
 msgid "Loading more"
 msgstr "Cargando más de"
 
-#: gui/dialogs.py:7222 gui/player.py:2108 gui/player.py:5948
+#: gui/dialogs.py:7235 gui/player.py:2108 gui/player.py:5948
 msgid "Play"
 msgstr "Reproducir"
 
-#: gui/dialogs.py:7223 gui/dialogs.py:7400
+#: gui/dialogs.py:7236 gui/dialogs.py:7413
 msgid "Subscribe"
 msgstr "Suscribirse"
 
-#: gui/dialogs.py:7224
+#: gui/dialogs.py:7237
 msgid "Copy URL"
 msgstr "Copiar URL"
 
-#: gui/dialogs.py:7429
+#: gui/dialogs.py:7442
 msgid "Subscribed (native)"
 msgstr "Suscrito (nativo)"
 
-#: gui/dialogs.py:7432
+#: gui/dialogs.py:7445
 msgid "Subscribed (source)"
 msgstr "Suscrito (fuente)"
 
-#: gui/dialogs.py:7462
+#: gui/dialogs.py:7475
 msgid "Saved searches"
 msgstr "Búsquedas guardadas"
 
-#: gui/dialogs.py:7494
+#: gui/dialogs.py:7507
 msgid "Search query:"
 msgstr "Consulta de búsqueda:"
 
-#: gui/dialogs.py:7494
+#: gui/dialogs.py:7507
 msgid "Add Search"
 msgstr "Agregar búsqueda"
 
-#: gui/dialogs.py:7591
+#: gui/dialogs.py:7604
 msgid "Queued media"
 msgstr "Multimedia en cola"
 
-#: gui/dialogs.py:7719
+#: gui/dialogs.py:7732
 msgid "&Pause"
 msgstr "&Pausa"
 
-#: gui/dialogs.py:7719 gui/dialogs.py:7602
+#: gui/dialogs.py:7732 gui/dialogs.py:7615
 msgid "&Play"
 msgstr "&Reproducir"
 
-#: gui/dialogs.py:7824
+#: gui/dialogs.py:7837
 msgid "Captured keyboard shortcut"
 msgstr "Atajo de teclado capturado"
 
-#: gui/dialogs.py:7901
+#: gui/dialogs.py:7914
 msgid "Keyboard shortcuts"
 msgstr "Atajos de teclado"
 
-#: gui/dialogs.py:7903
+#: gui/dialogs.py:7916
 msgid "Command"
 msgstr "Comando"
 
-#: gui/dialogs.py:7904
+#: gui/dialogs.py:7917
 msgid "Shortcut"
 msgstr "Atajo"
 
-#: gui/dialogs.py:8149
+#: gui/dialogs.py:8162
 msgid "Preset"
 msgstr "Preajuste"
 
-#: gui/dialogs.py:8158
+#: gui/dialogs.py:8171
 msgid "Preamp"
 msgstr "Preamplificador"
 
-#: gui/dialogs.py:8241
+#: gui/dialogs.py:8254
 msgid "Custom"
 msgstr "Personalizado"
 
-#: gui/dialogs.py:8328
+#: gui/dialogs.py:8341
 msgid "Name for this equalizer preset:"
 msgstr "Nombre para este preajuste del ecualizador:"
 
-#: gui/dialogs.py:8328 gui/dialogs.py:8354 gui/dialogs.py:8340
+#: gui/dialogs.py:8341 gui/dialogs.py:8367 gui/dialogs.py:8353
 msgid "Save Preset"
 msgstr "Guardar preajuste"
 
@@ -2424,15 +2433,15 @@ msgstr "Guardar preajuste"
 msgid "Use the global column layout"
 msgstr "Usar la disposición global de columnas"
 
-#: gui/dialogs.py:129 gui/dialogs.py:7606 gui/mainframe.py:14998
+#: gui/dialogs.py:129 gui/dialogs.py:7619 gui/mainframe.py:14998
 msgid "Move &Up"
 msgstr "Mover hacia &arriba"
 
-#: gui/dialogs.py:130 gui/dialogs.py:7610 gui/mainframe.py:14999
+#: gui/dialogs.py:130 gui/dialogs.py:7623 gui/mainframe.py:14999
 msgid "Move &Down"
 msgstr "Mover hacia a&bajo"
 
-#: gui/dialogs.py:131 gui/dialogs.py:7919
+#: gui/dialogs.py:131 gui/dialogs.py:7932
 msgid "Reset All to &Defaults"
 msgstr "Restablecer todo a los valores &predeterminados"
 
@@ -2492,17 +2501,22 @@ msgstr "No se seleccionó ninguna fuente."
 
 #: gui/dialogs.py:664
 msgid ""
-"Some websites show a browser verification page (for example a Cloudflare challenge) before their feeds. To read them in BlindRSS:\n"
+"Some websites show a browser verification page (for example a Cloudflare "
+"challenge) before their feeds. To read them in BlindRSS:\n"
 "1. Open the website in your web browser and wait for it to load.\n"
 "2. Export its cookies with a \"cookies.txt\" browser extension.\n"
 "3. Choose the exported file below.\n"
-"Also paste your browser's User-Agent string (search the web for \"what is my user agent\" to see it) so the site accepts the cookies."
+"Also paste your browser's User-Agent string (search the web for \"what is my "
+"user agent\" to see it) so the site accepts the cookies."
 msgstr ""
-"Algunos sitios muestran una página de verificación del navegador (por ejemplo, un desafío de Cloudflare) antes de sus fuentes. Para leerlos en BlindRSS:\n"
+"Algunos sitios muestran una página de verificación del navegador (por "
+"ejemplo, un desafío de Cloudflare) antes de sus fuentes. Para leerlos en "
+"BlindRSS:\n"
 "1. Abra el sitio web en su navegador y espere a que cargue.\n"
 "2. Exporte sus cookies con una extensión \"cookies.txt\".\n"
 "3. Elija el archivo exportado a continuación.\n"
-"Pegue también la cadena User-Agent de su navegador (busque \"what is my user agent\" en la web para verla) para que el sitio acepte las cookies."
+"Pegue también la cadena User-Agent de su navegador (busque \"what is my user "
+"agent\" en la web para verla) para que el sitio acepte las cookies."
 
 #: gui/dialogs.py:682
 msgid "Import from &Browser..."
@@ -2511,8 +2525,8 @@ msgstr "Importar desde el &navegador..."
 #: gui/dialogs.py:688
 msgid "Get the \"Get cookies.txt LOCALLY\" extension for Chrome-based browsers"
 msgstr ""
-"Obtener la extensión \"Get cookies.txt LOCALLY\" para navegadores basados en"
-" Chrome"
+"Obtener la extensión \"Get cookies.txt LOCALLY\" para navegadores basados en "
+"Chrome"
 
 #: gui/dialogs.py:705
 msgid "&Browse..."
@@ -2522,11 +2536,17 @@ msgstr "Examinar..."
 msgid ""
 "No supported browser profiles were found.\n"
 "\n"
-"Cookies can be read directly from Firefox-based browsers (Firefox, LibreWolf, Waterfox, Floorp, Zen). Chrome-based browsers encrypt their cookies; use the \"Get cookies.txt LOCALLY\" extension linked above and import the exported file instead."
+"Cookies can be read directly from Firefox-based browsers (Firefox, "
+"LibreWolf, Waterfox, Floorp, Zen). Chrome-based browsers encrypt their "
+"cookies; use the \"Get cookies.txt LOCALLY\" extension linked above and "
+"import the exported file instead."
 msgstr ""
 "No se encontraron perfiles de navegador compatibles.\n"
 "\n"
-"Las cookies pueden leerse directamente de navegadores basados en Firefox (Firefox, LibreWolf, Waterfox, Floorp, Zen). Los navegadores basados en Chrome cifran sus cookies; use la extensión \"Get cookies.txt LOCALLY\" enlazada arriba e importe el archivo exportado."
+"Las cookies pueden leerse directamente de navegadores basados en Firefox "
+"(Firefox, LibreWolf, Waterfox, Floorp, Zen). Los navegadores basados en "
+"Chrome cifran sus cookies; use la extensión \"Get cookies.txt LOCALLY\" "
+"enlazada arriba e importe el archivo exportado."
 
 #: gui/dialogs.py:786
 msgid "Choose the browser profile to import cookies from:"
@@ -2710,7 +2730,7 @@ msgstr "Neerlandés"
 msgid "Dzongkha"
 msgstr "Dzongkha"
 
-#: gui/dialogs.py:894 gui/dialogs.py:2454
+#: gui/dialogs.py:894 gui/dialogs.py:2466
 msgid "English"
 msgstr "Inglés"
 
@@ -3310,16 +3330,16 @@ msgstr "Confirmar antes de eliminar artículos"
 msgid "Move it to Deleted Articles (restorable)"
 msgstr "Moverlo a Artículos eliminados (recuperable)"
 
-#: gui/dialogs.py:1194 gui/dialogs.py:4318
+#: gui/dialogs.py:1194 gui/dialogs.py:4331
 msgid "Remove it permanently"
 msgstr "Eliminarlo permanentemente"
 
-#: gui/dialogs.py:1195 gui/dialogs.py:4319
+#: gui/dialogs.py:1195 gui/dialogs.py:4332
 msgid "Move it to a category"
 msgstr "Moverlo a una categoría"
 
-#: gui/dialogs.py:1225 gui/dialogs.py:1437 gui/dialogs.py:1472
-#: gui/dialogs.py:3000
+#: gui/dialogs.py:1225 gui/dialogs.py:1435 gui/dialogs.py:1484
+#: gui/dialogs.py:3012
 msgid "Browse..."
 msgstr "Examinar..."
 
@@ -3353,12 +3373,12 @@ msgstr "Actualizar fuentes automáticamente al iniciar"
 
 #: gui/dialogs.py:1367
 msgid ""
-"Article formatting: preserve structure from the original page as spoken text"
-" markers. Applies to newly loaded articles and full text."
+"Article formatting: preserve structure from the original page as spoken text "
+"markers. Applies to newly loaded articles and full text."
 msgstr ""
 "Formato del artículo: conservar la estructura de la página original como "
-"marcadores de texto hablados. Se aplica a los artículos recién cargados y al"
-" texto completo."
+"marcadores de texto hablados. Se aplica a los artículos recién cargados y al "
+"texto completo."
 
 #: gui/dialogs.py:1375
 msgid "Describe tables (\"Table with 3 rows...\" and one line per row)"
@@ -3401,88 +3421,84 @@ msgstr ""
 
 #: gui/dialogs.py:1422
 msgid ""
-"yt-dlp cookies file (cookies.txt) — only needed for age-restricted, private,"
-" or members-only YouTube content. Installed browsers are detected "
-"automatically; Firefox is recommended. Chrome, Edge, and Brave may fail on "
-"Windows because their cookies can be encrypted in a way yt-dlp cannot read, "
-"so a cookies.txt is the reliable fallback. LibreWolf uses Firefox-compatible"
-" cookies. Chrome \"Nightly\" means Chrome Canary; Edge \"Nightly\" means "
-"Edge Canary."
-msgstr ""
-"Archivo de cookies para yt-dlp (cookies.txt); solo es necesario para "
-"contenido de YouTube restringido por edad, privado o exclusivo para "
-"miembros. Los navegadores instalados se detectan automáticamente; se "
-"recomienda Firefox. Chrome, Edge y Brave pueden fallar en Windows porque sus"
-" cookies pueden cifrarse de una forma que yt-dlp no puede leer, por lo que "
-"un cookies.txt es la alternativa confiable. LibreWolf usa cookies "
-"compatibles con Firefox. \"Nightly\" en Chrome significa Chrome Canary; "
-"\"Nightly\" en Edge significa Edge Canary."
+"Cookies are only needed for age-restricted, private, or members-only "
+"content. BlindRSS reads them automatically from your installed browsers "
+"(Firefox, Chrome, Edge, Brave, Opera, Vivaldi, Chromium and their beta/"
+"nightly variants). A cookies.txt export remains a manual fallback."
+msgstr "Las cookies solo se necesitan para contenido con restricción de edad, privado o exclusivo para miembros. BlindRSS las lee automáticamente desde los navegadores instalados (Firefox, Chrome, Edge, Brave, Opera, Vivaldi, Chromium y sus variantes beta/nightly). La exportación de cookies.txt sigue disponible como alternativa manual."
 
-#: gui/dialogs.py:1441
+#: gui/dialogs.py:1439
 msgid "Import from browser..."
 msgstr "Importar desde el navegador..."
 
-#: gui/dialogs.py:1448
+#: gui/dialogs.py:1446
 msgid "Automatically import browser cookies.txt exports from Downloads"
 msgstr ""
 "Importar automáticamente las exportaciones cookies.txt del navegador desde "
 "Descargas"
 
-#: gui/dialogs.py:1455
+#: gui/dialogs.py:1453
+msgid ""
+"Read cookies directly from installed browsers (Firefox, Chrome, Edge, Brave, "
+"Opera, Vivaldi, Chromium and their beta/nightly variants). Chrome/Edge/Brave "
+"need a one-time Windows permission prompt."
+msgstr "Leer cookies directamente desde los navegadores instalados (Firefox, Chrome, Edge, Brave, Opera, Vivaldi, Chromium y sus variantes beta/nightly). Chrome/Edge/Brave necesitan un único aviso de permisos de Windows."
+
+#: gui/dialogs.py:1467
 msgid "Play YouTube by downloading first (most reliable; slower to start)"
 msgstr ""
 "Reproducir YouTube descargando primero (más confiable; inicio más lento)"
 
-#: gui/dialogs.py:1462
+#: gui/dialogs.py:1474
 msgid "YouTube playback cache folder (blank = default, next to your data):"
 msgstr ""
 "Carpeta de caché de reproducción de YouTube (en blanco = predeterminada, "
 "junto a sus datos):"
 
-#: gui/dialogs.py:1476
+#: gui/dialogs.py:1488
 msgid "Clear cache now"
 msgstr "Borrar caché ahora"
 
-#: gui/dialogs.py:1495
+#: gui/dialogs.py:1507
 msgid "Ask to install missing media dependencies on startup"
 msgstr ""
 "Preguntar si se instalan las dependencias multimedia faltantes al iniciar"
 
-#: gui/dialogs.py:1508
+#: gui/dialogs.py:1520
 msgid "Remember last selected feed/folder on startup"
 msgstr "Recordar la última fuente o carpeta seleccionada al iniciar"
 
-#: gui/dialogs.py:1646
+#: gui/dialogs.py:1658
 msgid "Test"
 msgstr "Probar"
 
-#: gui/dialogs.py:1653
+#: gui/dialogs.py:1665
 msgid "Use %1 for the article URL. Example: chrome --incognito %1"
 msgstr "Use %1 para la URL del artículo. Ejemplo: chrome --incognito %1"
 
-#: gui/dialogs.py:1836
+#: gui/dialogs.py:1848
 msgid "Update translations automatically"
 msgstr "Actualizar las traducciones automáticamente"
 
-#: gui/dialogs.py:1916
+#: gui/dialogs.py:1928
 msgid "Could not check for translation updates."
 msgstr "No se pudo buscar actualizaciones de traducciones."
 
-#: gui/dialogs.py:1948
+#: gui/dialogs.py:1960
 msgid "Loading OpenRouter models..."
 msgstr "Cargando modelos de OpenRouter..."
 
-#: gui/dialogs.py:2110
+#: gui/dialogs.py:2122
 msgid "Notifications are not supported on this platform."
 msgstr "Las notificaciones no son compatibles con esta plataforma."
 
-#: gui/dialogs.py:2138
+#: gui/dialogs.py:2150
 msgid "Check Windows notification permissions and Focus Assist."
 msgstr ""
 "Compruebe los permisos de notificación de Windows y el Asistente de "
 "concentración."
 
-#: gui/dialogs.py:2140
+#: gui/dialogs.py:2152
 msgid ""
 "Check the app's notification permission in System Settings > Notifications "
 "and that Do Not Disturb is off."
@@ -3490,244 +3506,250 @@ msgstr ""
 "Compruebe el permiso de notificaciones de la aplicación en Preferencias del "
 "Sistema > Notificaciones y que No molestar esté desactivado."
 
-#: gui/dialogs.py:2265
+#: gui/dialogs.py:2277
 msgid "Enter your Inoreader App ID and App Key first."
 msgstr "Primero ingrese su ID de app y clave de app de Inoreader."
 
-#: gui/dialogs.py:2293
+#: gui/dialogs.py:2305
 msgid "Redirected URL"
 msgstr "URL redirigida"
 
-#: gui/dialogs.py:2294
+#: gui/dialogs.py:2306
 msgid "Paste the full URL from your browser address bar"
 msgstr "Pegue la URL completa desde la barra de direcciones del navegador"
 
-#: gui/dialogs.py:2509 gui/dialogs.py:2919
+#: gui/dialogs.py:2521 gui/dialogs.py:2931
 msgid "System Default"
 msgstr "Predeterminado del sistema"
 
-#: gui/dialogs.py:2620
+#: gui/dialogs.py:2632
 msgid "Playback cache"
 msgstr "Caché de reproducción"
 
-#: gui/dialogs.py:2693
+#: gui/dialogs.py:2705
 msgid ""
 "No recent YouTube cookies.txt export was found in your Downloads.\n"
 "\n"
 "Export one with the extension first, or choose the file manually."
 msgstr ""
-"No se encontró ninguna exportación reciente de cookies.txt de YouTube en su carpeta de descargas.\n"
+"No se encontró ninguna exportación reciente de cookies.txt de YouTube en su "
+"carpeta de descargas.\n"
 "\n"
 "Exporte una primero con la extensión o elija el archivo manualmente."
 
-#: gui/dialogs.py:2697
+#: gui/dialogs.py:2709
 msgid "No export found"
 msgstr "No se encontró ninguna exportación"
 
-#: gui/dialogs.py:2700
+#: gui/dialogs.py:2712
 msgid "Choose file..."
 msgstr "Elegir archivo..."
 
-#: gui/dialogs.py:2707
+#: gui/dialogs.py:2719
 msgid "Choose exported cookies.txt"
 msgstr "Elegir cookies.txt exportado"
 
-#: gui/dialogs.py:2830
+#: gui/dialogs.py:2842
 msgid "Enter a command to test. Use %1 where the article URL should go."
 msgstr ""
 "Ingrese un comando para probar. Use %1 donde debería ir la URL del artículo."
 
-#: gui/dialogs.py:2831
+#: gui/dialogs.py:2843
 msgid "Nothing to test"
 msgstr "Nada que probar"
 
-#: gui/dialogs.py:2852
+#: gui/dialogs.py:2864
 msgid "Test launched"
 msgstr "Prueba iniciada"
 
-#: gui/dialogs.py:2857
+#: gui/dialogs.py:2869
 msgid "Test failed"
 msgstr "La prueba falló"
 
-#: gui/dialogs.py:2927
+#: gui/dialogs.py:2939
 msgid "Skip Silence (Experimental)"
 msgstr "Omitir silencios (experimental)"
 
-#: gui/dialogs.py:2956
+#: gui/dialogs.py:2968
 msgid "Show player window when starting playback"
 msgstr "Mostrar la ventana del reproductor al iniciar la reproducción"
 
-#: gui/dialogs.py:2967
+#: gui/dialogs.py:2979
 msgid "Verbose range-cache proxy debug logs"
 msgstr "Registros de depuración detallados del proxy de caché por rangos"
 
-#: gui/dialogs.py:3068
+#: gui/dialogs.py:3080
 msgid "Provider information"
 msgstr "Información del proveedor"
 
-#: gui/dialogs.py:3104
+#: gui/dialogs.py:3116
 msgid "Inoreader App ID"
 msgstr "ID de aplicación de Inoreader"
 
-#: gui/dialogs.py:3111
+#: gui/dialogs.py:3123
 msgid "Inoreader App Key"
 msgstr "Clave de aplicación de Inoreader"
 
-#: gui/dialogs.py:3118
+#: gui/dialogs.py:3130
 msgid "Redirect URI"
 msgstr "URI de redirección"
 
-#: gui/dialogs.py:3213
+#: gui/dialogs.py:3225
 msgid "Enable Sound Notifications"
 msgstr "Habilitar notificaciones sonoras"
 
-#: gui/dialogs.py:3257
+#: gui/dialogs.py:3269
 msgid "Enable notifications for new articles"
 msgstr "Habilitar notificaciones para artículos nuevos"
 
-#: gui/dialogs.py:3266
+#: gui/dialogs.py:3278
 msgid "Include feed name in notification text"
 msgstr "Incluir el nombre de la fuente en el texto de la notificación"
 
-#: gui/dialogs.py:3291
+#: gui/dialogs.py:3303
 msgid "Show a summary notification when notification cap is reached"
 msgstr ""
 "Mostrar una notificación de resumen al alcanzar el límite de notificaciones"
 
-#: gui/dialogs.py:3298
+#: gui/dialogs.py:3310
 msgid "Test Notification"
 msgstr "Notificación de prueba"
 
-#: gui/dialogs.py:3302
+#: gui/dialogs.py:3314
 msgid "Exclude Feeds..."
 msgstr "Excluir fuentes..."
 
-#: gui/dialogs.py:3388
+#: gui/dialogs.py:3400
 msgid "Enable automatic translation for article content"
 msgstr "Habilitar la traducción automática del contenido de los artículos"
 
-#: gui/dialogs.py:3481
+#: gui/dialogs.py:3493
 msgid ""
 "Grok is by xAI. Get a key at console.x.ai. For Groq (LLaMA/Mistral), select "
 "'Groq (LLaMA, Mistral)' instead."
 msgstr ""
-"Grok es de xAI. Obtenga una clave en console.x.ai. Para Groq "
-"(LLaMA/Mistral), seleccione en su lugar 'Groq (LLaMA, Mistral)'."
+"Grok es de xAI. Obtenga una clave en console.x.ai. Para Groq (LLaMA/"
+"Mistral), seleccione en su lugar 'Groq (LLaMA, Mistral)'."
 
-#: gui/dialogs.py:3540
+#: gui/dialogs.py:3552
 msgid ""
 "Groq is NOT Grok. Get a free Groq key at console.groq.com/keys (runs LLaMA "
 "and Mistral models)."
 msgstr ""
-"Groq NO es Grok. Obtenga una clave gratuita de Groq en console.groq.com/keys"
-" (ejecuta modelos LLaMA y Mistral)."
+"Groq NO es Grok. Obtenga una clave gratuita de Groq en console.groq.com/keys "
+"(ejecuta modelos LLaMA y Mistral)."
 
-#: gui/dialogs.py:3626
+#: gui/dialogs.py:3638
 msgid "Load OpenRouter Models"
 msgstr "Cargar modelos de OpenRouter"
 
-#: gui/dialogs.py:3630
+#: gui/dialogs.py:3642
 msgid "Loads all available model IDs from OpenRouter."
 msgstr ""
 "Carga todos los identificadores de modelos disponibles desde OpenRouter."
 
-#: gui/dialogs.py:3743
+#: gui/dialogs.py:3755
 msgid "Enable CAPTCHA solving service (last resort, per-solve fees apply)"
 msgstr ""
 "Activar el servicio de resolución de CAPTCHA (último recurso; se cobra por "
 "resolución)"
 
-#: gui/dialogs.py:3784
+#: gui/dialogs.py:3796
 msgid "Data Storage Location"
 msgstr "Ubicación de almacenamiento de datos"
 
-#: gui/dialogs.py:3789
+#: gui/dialogs.py:3801
 msgid ""
 "Where BlindRSS stores config.json and rss.db.\n"
 "User Data Folder keeps your settings and feeds across app upgrades,\n"
 "especially on macOS where the installed app bundle is replaced."
 msgstr ""
 "Dónde guarda BlindRSS los archivos config.json y rss.db.\n"
-"La carpeta de datos de usuario conserva su configuración y fuentes entre actualizaciones de la aplicación,\n"
-"especialmente en macOS, donde se reemplaza el paquete de la aplicación instalada."
+"La carpeta de datos de usuario conserva su configuración y fuentes entre "
+"actualizaciones de la aplicación,\n"
+"especialmente en macOS, donde se reemplaza el paquete de la aplicación "
+"instalada."
 
-#: gui/dialogs.py:3836 gui/mainframe.py:14335 gui/mainframe.py:14303
+#: gui/dialogs.py:3848 gui/mainframe.py:14335 gui/mainframe.py:14303
 msgid "Updates"
 msgstr "Actualizaciones"
 
-#: gui/dialogs.py:3840
+#: gui/dialogs.py:3852
 msgid "Automatically install updates without confirmation"
 msgstr "Instalar actualizaciones automáticamente sin confirmación"
 
-#: gui/dialogs.py:3852
+#: gui/dialogs.py:3864
 msgid "Browser Identification"
 msgstr "Identificación del navegador"
 
-#: gui/dialogs.py:3870
+#: gui/dialogs.py:3882
 msgid "Custom (type it below)"
 msgstr "Personalizado (escríbalo abajo)"
 
-#: gui/dialogs.py:4121 gui/dialogs.py:4418
+#: gui/dialogs.py:4134 gui/dialogs.py:4431
 msgid "Feed Properties"
 msgstr "Propiedades de la fuente"
 
-#: gui/dialogs.py:4174 gui/dialogs.py:4316
+#: gui/dialogs.py:4187 gui/dialogs.py:4329
 msgid "Use global setting"
 msgstr "Usar la configuración global"
 
-#: gui/dialogs.py:4175
+#: gui/dialogs.py:4188
 msgid "Never (manual refresh only)"
 msgstr "Nunca (solo actualización manual)"
 
-#: gui/dialogs.py:4317
+#: gui/dialogs.py:4330
 msgid "Move it to Deleted Articles"
 msgstr "Moverlo a Artículos eliminados"
 
-#: gui/dialogs.py:4570
+#: gui/dialogs.py:4583
 msgid "Category Properties"
 msgstr "Propiedades de la categoría"
 
-#: gui/dialogs.py:4649
+#: gui/dialogs.py:4662
 msgid "Feeds with Errors"
 msgstr "Fuentes con errores"
 
-#: gui/dialogs.py:4673
+#: gui/dialogs.py:4686
 msgid "Error &details:"
 msgstr "&Detalles del error:"
 
-#: gui/dialogs.py:4684
+#: gui/dialogs.py:4697
 msgid "&Refresh Selected"
 msgstr "&Actualizar selección"
 
-#: gui/dialogs.py:4685
+#: gui/dialogs.py:4698
 msgid "&Copy Details"
 msgstr "&Copiar detalles"
 
-#: gui/dialogs.py:4686
+#: gui/dialogs.py:4699
 msgid "Feed &Properties..."
 msgstr "&Propiedades de la fuente..."
 
-#: gui/dialogs.py:4687
+#: gui/dialogs.py:4700
 msgid "Re&move Feed"
 msgstr "&Quitar fuente"
 
-#: gui/dialogs.py:4716
+#: gui/dialogs.py:4729
 msgid "{n} feed failed to update during its most recent attempt:"
 msgid_plural "{n} feeds failed to update during their most recent attempt:"
 msgstr[0] "{n} fuente no se pudo actualizar en su último intento:"
 msgstr[1] "{n} fuentes no se pudieron actualizar en su último intento:"
 
-#: gui/dialogs.py:4750
+#: gui/dialogs.py:4763
 msgid ""
 "No feeds reported errors during their most recent update attempt.\n"
 "\n"
-"Feeds appear here automatically when an update fails (for example a dead URL, an HTTP error, a timeout, or an invalid feed format)."
+"Feeds appear here automatically when an update fails (for example a dead "
+"URL, an HTTP error, a timeout, or an invalid feed format)."
 msgstr ""
 "Ningún feed informó errores durante su último intento de actualización.\n"
 "\n"
-"Los feeds aparecen aquí automáticamente cuando una actualización falla (por ejemplo, una URL muerta, un error HTTP, un tiempo de espera agotado o un formato de feed no válido)."
+"Los feeds aparecen aquí automáticamente cuando una actualización falla (por "
+"ejemplo, una URL muerta, un error HTTP, un tiempo de espera agotado o un "
+"formato de feed no válido)."
 
-#: gui/dialogs.py:4783
+#: gui/dialogs.py:4796
 msgid ""
 "Feed: {title}\n"
 "URL: {url}\n"
@@ -3749,269 +3771,269 @@ msgstr ""
 "Error:\n"
 "{error}"
 
-#: gui/dialogs.py:4899
+#: gui/dialogs.py:4912
 msgid "Editing feed properties is not available here."
 msgstr "La edición de las propiedades de la fuente no está disponible aquí."
 
-#: gui/dialogs.py:4900
+#: gui/dialogs.py:4913
 msgid "Not available"
 msgstr "No disponible"
 
-#: gui/dialogs.py:4926
+#: gui/dialogs.py:4939
 msgid "Confirm Remove"
 msgstr "Confirmar eliminación"
 
-#: gui/dialogs.py:5026 gui/dialogs.py:5973
+#: gui/dialogs.py:5039 gui/dialogs.py:5986
 msgid "Search"
 msgstr "Buscar"
 
-#: gui/dialogs.py:5032 gui/dialogs.py:6003 gui/dialogs.py:7328
+#: gui/dialogs.py:5045 gui/dialogs.py:6016 gui/dialogs.py:7341
 msgid "Ready."
 msgstr "Listo."
 
-#: gui/dialogs.py:5192
+#: gui/dialogs.py:5205
 msgid "Searching all sources..."
 msgstr "Buscando en todas las fuentes..."
 
-#: gui/dialogs.py:5975
+#: gui/dialogs.py:5988
 msgid "Load More Results (+80/site)"
 msgstr "Cargar más resultados (+80/sitio)"
 
-#: gui/dialogs.py:6630
+#: gui/dialogs.py:6643
 msgid "All searchable sites"
 msgstr "Todos los sitios que se pueden buscar"
 
-#: gui/dialogs.py:6633
+#: gui/dialogs.py:6646
 msgid "Adult sites (all)"
 msgstr "Sitios para adultos (todos)"
 
-#: gui/dialogs.py:6643
+#: gui/dialogs.py:6656
 msgid "All sites"
 msgstr "Todos los sitios"
 
-#: gui/dialogs.py:6935
+#: gui/dialogs.py:6948
 msgid "No searchable sites."
 msgstr "No hay sitios en los que se pueda buscar."
 
-#: gui/dialogs.py:7132
+#: gui/dialogs.py:7145
 msgid "{completed}/{total} site"
 msgid_plural "{completed}/{total} sites"
 msgstr[0] "{completed}/{total} sitio"
 msgstr[1] "{completed}/{total} sitios"
 
-#: gui/dialogs.py:7135
+#: gui/dialogs.py:7148
 msgid "{count} result"
 msgid_plural "{count} results"
 msgstr[0] "{count} resultado"
 msgstr[1] "{count} resultados"
 
-#: gui/dialogs.py:7400
+#: gui/dialogs.py:7413
 msgid "Parent window does not support subscribing from this dialog."
 msgstr ""
 "La ventana principal no admite la suscripción desde este cuadro de diálogo."
 
-#: gui/dialogs.py:7466
+#: gui/dialogs.py:7479
 msgid "Add..."
 msgstr "Agregar..."
 
-#: gui/dialogs.py:7467
+#: gui/dialogs.py:7480
 msgid "Remove"
 msgstr "Quitar"
 
-#: gui/dialogs.py:7521 gui/mainframe.py:2521
+#: gui/dialogs.py:7534 gui/mainframe.py:2521
 msgid "About BlindRSS"
 msgstr "Acerca de BlindRSS"
 
-#: gui/dialogs.py:7532
+#: gui/dialogs.py:7545
 msgid "Copyright (c) 2024-2026 serrebidev and contributors"
 msgstr "Copyright (c) 2024-2026 serrebidev y colaboradores"
 
-#: gui/dialogs.py:7538
+#: gui/dialogs.py:7551
 msgid "Follow me on GitHub (@serrebidev)"
 msgstr "Sígame en GitHub (@serrebidev)"
 
-#: gui/dialogs.py:7539
+#: gui/dialogs.py:7552
 msgid "Visit Repository"
 msgstr "Visitar repositorio"
 
-#: gui/dialogs.py:7540
+#: gui/dialogs.py:7553
 msgid "View Changelog"
 msgstr "Ver registro de cambios"
 
-#: gui/dialogs.py:7614
+#: gui/dialogs.py:7627
 msgid "&Remove"
 msgstr "&Quitar"
 
-#: gui/dialogs.py:7618
+#: gui/dialogs.py:7631
 msgid "&Clear All"
 msgstr "&Borrar todo"
 
-#: gui/dialogs.py:7685
+#: gui/dialogs.py:7698
 msgid "Untitled"
 msgstr "Sin título"
 
-#: gui/dialogs.py:7706
+#: gui/dialogs.py:7719
 msgid "The play queue is empty."
 msgstr "La cola de reproducción está vacía."
 
-#: gui/dialogs.py:7767
+#: gui/dialogs.py:7780
 msgid "Remove all items from the play queue?"
 msgstr "¿Quitar todos los elementos de la cola de reproducción?"
 
-#: gui/dialogs.py:7768
+#: gui/dialogs.py:7781
 msgid "Clear Play Queue"
 msgstr "Vaciar cola de reproducción"
 
-#: gui/dialogs.py:7810
+#: gui/dialogs.py:7823
 msgid "Press Shortcut"
 msgstr "Pulsar atajo"
 
-#: gui/dialogs.py:7823
+#: gui/dialogs.py:7836
 msgid "Waiting for a key…"
 msgstr "Esperando una tecla…"
 
-#: gui/dialogs.py:7896
+#: gui/dialogs.py:7909
 msgid "Select a command and choose Change to set its shortcut."
 msgstr "Seleccione un comando y elija Cambiar para establecer su atajo."
 
-#: gui/dialogs.py:7911
+#: gui/dialogs.py:7924
 msgid "&Change Shortcut..."
 msgstr "&Cambiar atajo..."
 
-#: gui/dialogs.py:7915
+#: gui/dialogs.py:7928
 msgid "&Remove Shortcut"
 msgstr "Quitar ata&jo"
 
-#: gui/dialogs.py:7944
+#: gui/dialogs.py:7957
 msgid "Enter"
 msgstr "Intro"
 
-#: gui/dialogs.py:7944
+#: gui/dialogs.py:7957
 msgid "Open or play the selected article"
 msgstr "Abrir o reproducir el artículo seleccionado"
 
-#: gui/dialogs.py:7945
+#: gui/dialogs.py:7958
 msgid "Del"
 msgstr "Supr"
 
-#: gui/dialogs.py:7945
+#: gui/dialogs.py:7958
 msgid "Delete the selected article"
 msgstr "Eliminar el artículo seleccionado"
 
-#: gui/dialogs.py:7946
+#: gui/dialogs.py:7959
 msgid "Shift+Del"
 msgstr "Mayús+Supr"
 
-#: gui/dialogs.py:7946
+#: gui/dialogs.py:7959
 msgid "Delete the selected article without confirmation"
 msgstr "Eliminar el artículo seleccionado sin confirmación"
 
-#: gui/dialogs.py:7947
+#: gui/dialogs.py:7960
 msgid "Backspace"
 msgstr "Retroceso"
 
-#: gui/dialogs.py:7947
+#: gui/dialogs.py:7960
 msgid "Toggle read/unread in the article list"
 msgstr "Alternar leído/no leído en la lista de artículos"
 
-#: gui/dialogs.py:7948
+#: gui/dialogs.py:7961
 msgid "Refresh feeds (fixed alias)"
 msgstr "Actualizar fuentes (alias fijo)"
 
-#: gui/dialogs.py:7949
+#: gui/dialogs.py:7962
 msgid "Ctrl+Left / Ctrl+Right"
 msgstr "Ctrl+Izquierda / Ctrl+Derecha"
 
-#: gui/dialogs.py:7949
+#: gui/dialogs.py:7962
 msgid "Rewind / fast forward playback"
 msgstr "Retroceder / avanzar la reproducción"
 
-#: gui/dialogs.py:7950
+#: gui/dialogs.py:7963
 msgid "Ctrl+Up / Ctrl+Down"
 msgstr "Ctrl+Arriba / Ctrl+Abajo"
 
-#: gui/dialogs.py:7950
+#: gui/dialogs.py:7963
 msgid "Volume up / volume down"
 msgstr "Subir / bajar volumen"
 
-#: gui/dialogs.py:7951
+#: gui/dialogs.py:7964
 msgid "Ctrl+Shift+Left / Ctrl+Shift+Right"
 msgstr "Ctrl+Mayús+Izquierda / Ctrl+Mayús+Derecha"
 
-#: gui/dialogs.py:7951
+#: gui/dialogs.py:7964
 msgid "Previous / next chapter"
 msgstr "Capítulo anterior / siguiente"
 
-#: gui/dialogs.py:7952
+#: gui/dialogs.py:7965
 msgid "Ctrl+F"
 msgstr "Ctrl+F"
 
-#: gui/dialogs.py:7952
+#: gui/dialogs.py:7965
 msgid "Find in the article reader"
 msgstr "Buscar en el artículo"
 
-#: gui/dialogs.py:7953
+#: gui/dialogs.py:7966
 msgid "F3 / Shift+F3"
 msgstr "F3 / Mayús+F3"
 
-#: gui/dialogs.py:7953
+#: gui/dialogs.py:7966
 msgid "Next / previous match in the article reader"
 msgstr "Coincidencia siguiente / anterior en el artículo"
 
-#: gui/dialogs.py:7954
+#: gui/dialogs.py:7967
 msgid "F6 / Shift+F6"
 msgstr "F6 / Mayús+F6"
 
-#: gui/dialogs.py:7954
+#: gui/dialogs.py:7967
 msgid "Move between panes in the rich view"
 msgstr "Moverse entre paneles en la vista enriquecida"
 
-#: gui/dialogs.py:7955
+#: gui/dialogs.py:7968
 msgid "Ctrl+X / Ctrl+C / Ctrl+V / Ctrl+A"
 msgstr "Ctrl+X / Ctrl+C / Ctrl+V / Ctrl+A"
 
-#: gui/dialogs.py:7955
+#: gui/dialogs.py:7968
 msgid "Cut / Copy / Paste / Select All in text fields"
 msgstr "Cortar / copiar / pegar / seleccionar todo en campos de texto"
 
-#: gui/dialogs.py:7969
+#: gui/dialogs.py:7982
 msgid "Fixed keys"
 msgstr "Teclas fijas"
 
-#: gui/dialogs.py:8061
+#: gui/dialogs.py:8074
 msgid "Reset all keyboard shortcuts to their defaults?"
 msgstr ""
 "¿Restablecer todos los atajos de teclado a sus valores predeterminados?"
 
-#: gui/dialogs.py:8062
+#: gui/dialogs.py:8075
 msgid "Reset Shortcuts"
 msgstr "Restablecer atajos"
 
-#: gui/dialogs.py:8115
+#: gui/dialogs.py:8128
 msgid "Equalizer"
 msgstr "Ecualizador"
 
-#: gui/dialogs.py:8140
+#: gui/dialogs.py:8153
 msgid "&Enable equalizer"
 msgstr "&Habilitar ecualizador"
 
-#: gui/dialogs.py:8177
+#: gui/dialogs.py:8190
 msgid "&Save as Preset..."
 msgstr "&Guardar como preajuste..."
 
-#: gui/dialogs.py:8180
+#: gui/dialogs.py:8193
 msgid "&Delete Preset"
 msgstr "&Eliminar preajuste"
 
-#: gui/dialogs.py:8183
+#: gui/dialogs.py:8196
 msgid "&Reset (Flat)"
 msgstr "&Restablecer (plano)"
 
-#: gui/dialogs.py:8354
+#: gui/dialogs.py:8367
 msgid "Could not save the preset."
 msgstr "No se pudo guardar el preajuste."
 
-#: gui/dialogs.py:8366
+#: gui/dialogs.py:8379
 msgid "Delete Preset"
 msgstr "Eliminar preajuste"
 
@@ -4021,8 +4043,8 @@ msgstr "&Usar la disposición global de columnas"
 
 #: gui/dialogs.py:113
 msgid ""
-"Columns (checked = shown). Press Space to show or hide a column; use Move up"
-" / Move down to reorder:"
+"Columns (checked = shown). Press Space to show or hide a column; use Move "
+"up / Move down to reorder:"
 msgstr ""
 "Columnas (marcada = mostrada). Pulse Espacio para mostrar u ocultar una "
 "columna; use Subir / Bajar para reordenar:"
@@ -4044,8 +4066,10 @@ msgid ""
 "Paste a link to a video, podcast episode, or other media file.\n"
 "YouTube and other yt-dlp sites are supported, as are direct media links."
 msgstr ""
-"Pegue un enlace a un video, un episodio de pódcast u otro archivo multimedia.\n"
-"Se admiten YouTube y otros sitios compatibles con yt-dlp, así como los enlaces multimedia directos."
+"Pegue un enlace a un video, un episodio de pódcast u otro archivo "
+"multimedia.\n"
+"Se admiten YouTube y otros sitios compatibles con yt-dlp, así como los "
+"enlaces multimedia directos."
 
 #: gui/dialogs.py:330
 msgid "Media URL:"
@@ -4154,85 +4178,87 @@ msgstr ""
 "Usar la caché de fuentes reduce el uso de CPU y de red. La actualización "
 "manual de todas las fuentes siempre comprueba cada fuente."
 
-#: gui/dialogs.py:1483
+#: gui/dialogs.py:1495
 msgid "Max cache size (MB, 0 = unlimited):"
 msgstr "Tamaño máximo de caché (MB, 0 = ilimitado):"
 
-#: gui/dialogs.py:1517
+#: gui/dialogs.py:1529
 msgid "Interface language (requires restart):"
 msgstr "Idioma de la interfaz (requiere reiniciar):"
 
-#: gui/dialogs.py:1599
+#: gui/dialogs.py:1611
 msgid "Feed category tree on startup:"
 msgstr "Árbol de categorías de fuentes al iniciar:"
 
-#: gui/dialogs.py:1619
+#: gui/dialogs.py:1631
 msgid "Article opening method:"
 msgstr "Método de apertura de artículos:"
 
-#: gui/dialogs.py:1638
+#: gui/dialogs.py:1650
 msgid "Custom command:"
 msgstr "Comando personalizado:"
 
-#: gui/dialogs.py:1672
+#: gui/dialogs.py:1684
 msgid "Startup && Tray"
 msgstr "Inicio && bandeja"
 
-#: gui/dialogs.py:1851
+#: gui/dialogs.py:1863
 msgid "Daily"
 msgstr "Diariamente"
 
-#: gui/dialogs.py:1851
+#: gui/dialogs.py:1863
 msgid "Weekly"
 msgstr "Semanalmente"
 
-#: gui/dialogs.py:1851
+#: gui/dialogs.py:1863
 msgid "Monthly"
 msgstr "Mensualmente"
 
-#: gui/dialogs.py:1918
+#: gui/dialogs.py:1930
 msgid "Translations updated. Restart to apply."
 msgstr "Traducciones actualizadas. Reinicie para aplicarlas."
 
-#: gui/dialogs.py:1920
+#: gui/dialogs.py:1932
 msgid "Translations are up to date."
 msgstr "Las traducciones están actualizadas."
 
-#: gui/dialogs.py:2086
+#: gui/dialogs.py:2098
 msgid "Excluded feeds: {excluded} of {total}"
 msgstr "Feeds excluidos: {excluded} de {total}"
 
-#: gui/dialogs.py:2283
+#: gui/dialogs.py:2295
 msgid "Inoreader Authorization"
 msgstr "Autorización de Inoreader"
 
-#: gui/dialogs.py:2285
+#: gui/dialogs.py:2297
 msgid ""
 "After authorizing in your browser, it will redirect to your Redirect URI.\n"
-"If the redirected page fails to load (common for HTTPS localhost), copy the full URL from the\n"
+"If the redirected page fails to load (common for HTTPS localhost), copy the "
+"full URL from the\n"
 "browser address bar and paste it below.\n"
 "\n"
 "Redirect URI:\n"
 "{redirect_uri}"
 msgstr ""
 "Tras autorizar en su navegador, este le redirigirá a su URI de redirección.\n"
-"Si la página redirigida no carga (algo habitual con HTTPS en localhost), copie la URL completa de la\n"
+"Si la página redirigida no carga (algo habitual con HTTPS en localhost), "
+"copie la URL completa de la\n"
 "barra de direcciones del navegador y péguela abajo.\n"
 "\n"
 "URI de redirección:\n"
 "{redirect_uri}"
 
-#: gui/dialogs.py:2345
+#: gui/dialogs.py:2357
 msgid ""
 "Complete authorization in your browser, then paste the redirected URL..."
 msgstr ""
 "Complete la autorización en su navegador y luego pegue la URL redirigida..."
 
-#: gui/dialogs.py:2374
+#: gui/dialogs.py:2386
 msgid "No access token returned from Inoreader."
 msgstr "Inoreader no devolvió ningún token de acceso."
 
-#: gui/dialogs.py:2424
+#: gui/dialogs.py:2436
 msgid ""
 "Inoreader authorization failed:\n"
 "{message}"
@@ -4240,21 +4266,21 @@ msgstr ""
 "Error al autorizar Inoreader:\n"
 "{message}"
 
-#: gui/dialogs.py:2522
+#: gui/dialogs.py:2534
 msgid "Unnamed Device"
 msgstr "Dispositivo sin nombre"
 
-#: gui/dialogs.py:2634
+#: gui/dialogs.py:2646
 msgid "Removed {n} file, freed {size}."
 msgid_plural "Removed {n} files, freed {size}."
 msgstr[0] "Se eliminó {n} archivo, se liberó {size}."
 msgstr[1] "Se eliminaron {n} archivos, se liberó {size}."
 
-#: gui/dialogs.py:2722 gui/dialogs.py:2729
+#: gui/dialogs.py:2734 gui/dialogs.py:2741
 msgid "Import failed"
 msgstr "Error al importar"
 
-#: gui/dialogs.py:2736
+#: gui/dialogs.py:2748
 msgid ""
 "Imported YouTube cookies from:\n"
 "{source}\n"
@@ -4272,24 +4298,24 @@ msgstr ""
 "\n"
 "Guarde la configuración para empezar a usarlas."
 
-#: gui/dialogs.py:2747
+#: gui/dialogs.py:2759
 msgid "Executables"
 msgstr "Ejecutables"
 
-#: gui/dialogs.py:2747 gui/dialogs.py:2749 gui/dialogs.py:750
-#: gui/dialogs.py:2588
+#: gui/dialogs.py:2759 gui/dialogs.py:2761 gui/dialogs.py:750
+#: gui/dialogs.py:2600
 msgid "All files"
 msgstr "Todos los archivos"
 
-#: gui/dialogs.py:2814
+#: gui/dialogs.py:2826
 msgid "Current User-Agent: {ua}"
 msgstr "User-Agent actual: {ua}"
 
-#: gui/dialogs.py:2841
+#: gui/dialogs.py:2853
 msgid "Invalid command"
 msgstr "Comando no válido"
 
-#: gui/dialogs.py:2878
+#: gui/dialogs.py:2890
 msgid ""
 "Groups.io API key (optional). Public groups and RSS work without a key; the "
 "key enables complete paginated topics and member-only archives. Create one "
@@ -4299,7 +4325,7 @@ msgstr ""
 "sin clave; la clave habilita los temas paginados completos y los archivos "
 "solo para miembros. Cree una en groups.io/settings/apikeys."
 
-#: gui/dialogs.py:2889
+#: gui/dialogs.py:2901
 msgid ""
 "Search subscriptions keep the search URL and refresh results in the "
 "background. Browser cookies are imported only from Groups.io domains."
@@ -4308,7 +4334,7 @@ msgstr ""
 "resultados en segundo plano. Las cookies del navegador solo se importan de "
 "dominios de Groups.io."
 
-#: gui/dialogs.py:2896
+#: gui/dialogs.py:2908
 msgid ""
 "GitHub personal access token (optional). Full text of pull requests, issues "
 "and commits works without one, but GitHub allows only 60 page reads an hour "
@@ -4316,159 +4342,163 @@ msgid ""
 "Create one at github.com/settings/tokens."
 msgstr ""
 "Token de acceso personal de GitHub (opcional). El texto completo de pull "
-"requests, incidencias y commits funciona sin él, pero GitHub solo permite 60"
-" lecturas de página por hora y conexión; un token aumenta ese límite y da "
+"requests, incidencias y commits funciona sin él, pero GitHub solo permite 60 "
+"lecturas de página por hora y conexión; un token aumenta ese límite y da "
 "acceso a repositorios privados. Cree uno en github.com/settings/tokens."
 
-#: gui/dialogs.py:2917
+#: gui/dialogs.py:2929
 msgid "Preferred Soundcard:"
 msgstr "Tarjeta de sonido preferida:"
 
-#: gui/dialogs.py:2933
+#: gui/dialogs.py:2945
 msgid "Default Playback Speed:"
 msgstr "Velocidad de reproducción predeterminada:"
 
-#: gui/dialogs.py:2962
+#: gui/dialogs.py:2974
 msgid "Network Cache (ms):"
 msgstr "Caché de red (ms):"
 
-#: gui/dialogs.py:2980
+#: gui/dialogs.py:2992
 msgid "Leave a path blank to auto-detect. A set path overrides detection."
 msgstr ""
 "Deje una ruta en blanco para detectarla automáticamente. Una ruta "
 "establecida anula la detección."
 
-#: gui/dialogs.py:3030
+#: gui/dialogs.py:3042
 msgid "Sounds"
 msgstr "Sonidos"
 
-#: gui/dialogs.py:3040
+#: gui/dialogs.py:3052
 msgid "Active Provider:"
 msgstr "Proveedor activo:"
 
-#: gui/dialogs.py:3128
+#: gui/dialogs.py:3140
 msgid ""
-"Note: If your Redirect URI uses HTTPS (common/required), your browser may fail to load\n"
-"localhost after authorization. Copy the full redirected URL from the address bar and paste it\n"
+"Note: If your Redirect URI uses HTTPS (common/required), your browser may "
+"fail to load\n"
+"localhost after authorization. Copy the full redirected URL from the address "
+"bar and paste it\n"
 "when prompted."
 msgstr ""
-"Nota: si su URI de redirección usa HTTPS (común/obligatorio), es posible que su navegador no pueda cargar\n"
-"localhost después de la autorización. Copie la URL completa redirigida desde la barra de direcciones y péguela\n"
+"Nota: si su URI de redirección usa HTTPS (común/obligatorio), es posible que "
+"su navegador no pueda cargar\n"
+"localhost después de la autorización. Copie la URL completa redirigida desde "
+"la barra de direcciones y péguela\n"
 "cuando se le solicite."
 
-#: gui/dialogs.py:3140
+#: gui/dialogs.py:3152
 msgid "Authorize Inoreader"
 msgstr "Autorizar Inoreader"
 
-#: gui/dialogs.py:3141
+#: gui/dialogs.py:3153
 msgid "Clear Authorization"
 msgstr "Borrar autorización"
 
-#: gui/dialogs.py:3165
+#: gui/dialogs.py:3177
 msgid "Authorized"
 msgstr "Autorizado"
 
-#: gui/dialogs.py:3174
+#: gui/dialogs.py:3186
 msgid "Miniflux URL:"
 msgstr "URL de Miniflux:"
 
-#: gui/dialogs.py:3175
+#: gui/dialogs.py:3187
 msgid "Miniflux API Key:"
 msgstr "Clave de API de Miniflux:"
 
-#: gui/dialogs.py:3178
+#: gui/dialogs.py:3190
 msgid "The Old Reader Email:"
 msgstr "Correo electrónico de The Old Reader:"
 
-#: gui/dialogs.py:3179
+#: gui/dialogs.py:3191
 msgid "The Old Reader Password:"
 msgstr "Contraseña de The Old Reader:"
 
-#: gui/dialogs.py:3183
+#: gui/dialogs.py:3195
 msgid "BazQux Email:"
 msgstr "Correo electrónico de BazQux:"
 
-#: gui/dialogs.py:3184
+#: gui/dialogs.py:3196
 msgid "BazQux Password:"
 msgstr "Contraseña de BazQux:"
 
-#: gui/dialogs.py:3275
+#: gui/dialogs.py:3287
 msgid "Max notifications per refresh (0 = no limit):"
 msgstr "Notificaciones máximas por actualización (0 = sin límite):"
 
-#: gui/dialogs.py:3408
+#: gui/dialogs.py:3420
 msgid "Provider:"
 msgstr "Proveedor:"
 
-#: gui/dialogs.py:3428
+#: gui/dialogs.py:3440
 msgid "Target language:"
 msgstr "Idioma de destino:"
 
-#: gui/dialogs.py:3451
+#: gui/dialogs.py:3463
 msgid "Choose a language or type a code (e.g. en, es, fr, pt-BR)."
 msgstr "Elija un idioma o escriba un código (por ejemplo, en, es, fr, pt-BR)."
 
-#: gui/dialogs.py:3460
+#: gui/dialogs.py:3472
 msgid "Grok (xAI) model (optional):"
 msgstr "Modelo de Grok (xAI) (opcional):"
 
-#: gui/dialogs.py:3491
+#: gui/dialogs.py:3503
 msgid "Grok (xAI) API key (starts with xai-):"
 msgstr "Clave de API de Grok (xAI) (empieza con xai-):"
 
-#: gui/dialogs.py:3503
+#: gui/dialogs.py:3515
 msgid "Groq model (optional) - hosts LLaMA and Mistral:"
 msgstr "Modelo de Groq (opcional): aloja LLaMA y Mistral:"
 
-#: gui/dialogs.py:3525
+#: gui/dialogs.py:3537
 msgid "Groq API key (starts with gsk_):"
 msgstr "Clave de API de Groq (empieza con gsk_):"
 
-#: gui/dialogs.py:3551
+#: gui/dialogs.py:3563
 msgid "OpenAI model (optional):"
 msgstr "Modelo de OpenAI (opcional):"
 
-#: gui/dialogs.py:3573
+#: gui/dialogs.py:3585
 msgid "OpenAI API key:"
 msgstr "Clave de API de OpenAI:"
 
-#: gui/dialogs.py:3589
+#: gui/dialogs.py:3601
 msgid "OpenRouter model (optional):"
 msgstr "Modelo de OpenRouter (opcional):"
 
-#: gui/dialogs.py:3611
+#: gui/dialogs.py:3623
 msgid "OpenRouter API key:"
 msgstr "Clave de API de OpenRouter:"
 
-#: gui/dialogs.py:3637
+#: gui/dialogs.py:3649
 msgid "Gemini model (optional):"
 msgstr "Modelo de Gemini (opcional):"
 
-#: gui/dialogs.py:3659
+#: gui/dialogs.py:3671
 msgid "Gemini API key:"
 msgstr "Clave de API de Gemini:"
 
-#: gui/dialogs.py:3675
+#: gui/dialogs.py:3687
 msgid "Qwen model (optional):"
 msgstr "Modelo de Qwen (opcional):"
 
-#: gui/dialogs.py:3697
+#: gui/dialogs.py:3709
 msgid "Qwen API key:"
 msgstr "Clave de API de Qwen:"
 
-#: gui/dialogs.py:3749
+#: gui/dialogs.py:3761
 msgid "Service:"
 msgstr "Servicio:"
 
-#: gui/dialogs.py:3768
+#: gui/dialogs.py:3780
 msgid "API key:"
 msgstr "Clave de API:"
 
-#: gui/dialogs.py:3804
+#: gui/dialogs.py:3816
 msgid "Storage Location:"
 msgstr "Ubicación de almacenamiento:"
 
-#: gui/dialogs.py:3857
+#: gui/dialogs.py:3869
 msgid ""
 "The browser BlindRSS reports itself as when fetching feeds and articles.\n"
 "Automatic uses a browser installed on this computer, at its real version,\n"
@@ -4478,83 +4508,86 @@ msgstr ""
 "Automático usa un navegador instalado en este equipo, con su versión real,\n"
 "que es lo que más probablemente acepten los sitios con protección antibots."
 
-#: gui/dialogs.py:3874
+#: gui/dialogs.py:3886
 msgid "Identify as:"
 msgstr "Identificarse como:"
 
-#: gui/dialogs.py:3896
+#: gui/dialogs.py:3908
 msgid "Custom User-Agent:"
 msgstr "User-Agent personalizado:"
 
-#: gui/dialogs.py:3931
+#: gui/dialogs.py:3943
 msgid ""
 "When off, adult sites never appear in the Video Search site list.\n"
-"When on, adult sites are added and must still be selected explicitly to search them."
+"When on, adult sites are added and must still be selected explicitly to "
+"search them."
 msgstr ""
-"Cuando está desactivado, los sitios para adultos nunca aparecen en la lista de sitios de la búsqueda de vídeos.\n"
-"Cuando está activado, los sitios para adultos se agregan y aun así deben seleccionarse explícitamente para buscarlos."
+"Cuando está desactivado, los sitios para adultos nunca aparecen en la lista "
+"de sitios de la búsqueda de vídeos.\n"
+"Cuando está activado, los sitios para adultos se agregan y aun así deben "
+"seleccionarse explícitamente para buscarlos."
 
-#: gui/dialogs.py:4153
+#: gui/dialogs.py:4166
 msgid "URL:"
 msgstr "URL:"
 
-#: gui/dialogs.py:4172
+#: gui/dialogs.py:4185
 msgid "Refresh interval for this feed:"
 msgstr "Intervalo de actualización para este feed:"
 
-#: gui/dialogs.py:4216
+#: gui/dialogs.py:4229
 msgid "Custom request headers (one per line, Name: Value):"
 msgstr ""
 "Encabezados de solicitud personalizados (uno por línea, Nombre: Valor):"
 
-#: gui/dialogs.py:4232
+#: gui/dialogs.py:4245
 msgid "Request timeout in seconds (blank = default):"
 msgstr ""
 "Tiempo de espera de la solicitud en segundos (en blanco = predeterminado):"
 
-#: gui/dialogs.py:4247
+#: gui/dialogs.py:4260
 msgid "Browser impersonation:"
 msgstr "Suplantación de navegador:"
 
-#: gui/dialogs.py:4248
+#: gui/dialogs.py:4261
 msgid "Auto"
 msgstr "Automático"
 
-#: gui/dialogs.py:4248
+#: gui/dialogs.py:4261
 msgid "Always"
 msgstr "Siempre"
 
-#: gui/dialogs.py:4260
+#: gui/dialogs.py:4273
 msgid "Proxy URL (optional, e.g. http://host:port):"
 msgstr "URL del proxy (opcional, p. ej. http://host:port):"
 
-#: gui/dialogs.py:4277
+#: gui/dialogs.py:4290
 msgid "Feed encoding (blank = automatic, e.g. utf-8, windows-1251):"
 msgstr ""
 "Codificación de la fuente (vacío = automática, p. ej. utf-8, windows-1251):"
 
-#: gui/dialogs.py:4292
+#: gui/dialogs.py:4305
 msgid "Full text extraction encoding (blank = automatic):"
 msgstr "Codificación de la extracción de texto completo (vacío = automática):"
 
-#: gui/dialogs.py:4313
+#: gui/dialogs.py:4326
 msgid "When I delete an article from this feed:"
 msgstr "Al eliminar un artículo de esta fuente:"
 
-#: gui/dialogs.py:4417
+#: gui/dialogs.py:4430
 msgid ""
 "Unknown text encoding: %s. Use a Python codec name such as utf-8, "
 "windows-1251 or koi8-r, or leave the field blank for automatic detection."
 msgstr ""
-"Codificación de texto desconocida: %s. Use un nombre de códec de Python como"
-" utf-8, windows-1251 o koi8-r, o deje el campo vacío para la detección "
+"Codificación de texto desconocida: %s. Use un nombre de códec de Python como "
+"utf-8, windows-1251 o koi8-r, o deje el campo vacío para la detección "
 "automática."
 
-#: gui/dialogs.py:4581
+#: gui/dialogs.py:4594
 msgid "Name:"
 msgstr "Nombre:"
 
-#: gui/dialogs.py:4593
+#: gui/dialogs.py:4606
 msgid ""
 "This provider keeps categories in one flat list, so this category cannot be "
 "moved."
@@ -4562,11 +4595,11 @@ msgstr ""
 "Este proveedor mantiene las categorías en una lista plana, por lo que esta "
 "categoría no se puede mover."
 
-#: gui/dialogs.py:4599 gui/mainframe.py:7539
+#: gui/dialogs.py:4612 gui/mainframe.py:7539
 msgid "(None - Top Level)"
 msgstr "(Ninguna - Nivel superior)"
 
-#: gui/dialogs.py:4771
+#: gui/dialogs.py:4784
 msgid "{n} consecutive failed attempt (likely a persistent problem)."
 msgid_plural "{n} consecutive failed attempts (likely a persistent problem)."
 msgstr[0] ""
@@ -4574,95 +4607,94 @@ msgstr[0] ""
 msgstr[1] ""
 "{n} intentos fallidos consecutivos (probablemente un problema persistente)."
 
-#: gui/dialogs.py:4858
+#: gui/dialogs.py:4871
 msgid "Refreshing '{title}'..."
 msgstr "Actualizando «{title}»..."
 
-#: gui/dialogs.py:5010 gui/dialogs.py:5967
+#: gui/dialogs.py:5023 gui/dialogs.py:5980
 msgid "Search:"
 msgstr "Buscar:"
 
-#: gui/dialogs.py:5019
+#: gui/dialogs.py:5032
 msgid "Source:"
 msgstr "Fuente:"
 
-#: gui/dialogs.py:5047
+#: gui/dialogs.py:5060
 msgid ""
 "Sources: NewsBlur, iTunes, gPodder, fyyd, Podverse, YouTube, Feedspot, "
-"Google News, Bing News, Feedsearch, Website scan, Reddit, Fediverse "
-"(Lemmy/Kbin/Mastodon/Bluesky/PieFed). Feedly is available as an explicit "
-"source."
+"Google News, Bing News, Feedsearch, Website scan, Reddit, Fediverse (Lemmy/"
+"Kbin/Mastodon/Bluesky/PieFed). Feedly is available as an explicit source."
 msgstr ""
 "Fuentes: NewsBlur, iTunes, gPodder, fyyd, Podverse, YouTube, Feedspot, "
 "Google News, Bing News, Feedsearch, análisis de sitios web, Reddit, "
 "Fediverso (Lemmy/Kbin/Mastodon/Bluesky/PieFed). Feedly está disponible como "
 "fuente explícita."
 
-#: gui/dialogs.py:5453 gui/dialogs.py:5478
+#: gui/dialogs.py:5466 gui/dialogs.py:5491
 msgid "News search feed"
 msgstr "Feed de búsqueda de noticias"
 
-#: gui/dialogs.py:5981
+#: gui/dialogs.py:5994
 msgid "Search Sites:"
 msgstr "Sitios de búsqueda:"
 
-#: gui/dialogs.py:5985
+#: gui/dialogs.py:5998
 msgid "Filter Results:"
 msgstr "Filtrar resultados:"
 
-#: gui/dialogs.py:5989
+#: gui/dialogs.py:6002
 msgid "Sort by:"
 msgstr "Ordenar por:"
 
-#: gui/dialogs.py:7000
+#: gui/dialogs.py:7013
 msgid "{action} {n} site..."
 msgid_plural "{action} {n} sites..."
 msgstr[0] "{action} {n} sitio..."
 msgstr[1] "{action} {n} sitios..."
 
-#: gui/dialogs.py:7147
+#: gui/dialogs.py:7160
 msgid "{sites}, {results}. {label} +{added}"
 msgstr "{sites}, {results}. {label} +{added}"
 
-#: gui/dialogs.py:7408
+#: gui/dialogs.py:7421
 msgid "Subscribe Error"
 msgstr "Error al suscribirse"
 
-#: gui/dialogs.py:7446
+#: gui/dialogs.py:7459
 msgid "Copied URL."
 msgstr "URL copiada."
 
-#: gui/dialogs.py:7459
+#: gui/dialogs.py:7472
 msgid "Saved searches:"
 msgstr "Búsquedas guardadas:"
 
-#: gui/dialogs.py:7966
+#: gui/dialogs.py:7979
 msgid "(none)"
 msgstr "(ninguno)"
 
-#: gui/dialogs.py:8101
+#: gui/dialogs.py:8114
 msgid "{sign}{v} dB"
 msgstr "{sign}{v} dB"
 
-#: gui/dialogs.py:8147
+#: gui/dialogs.py:8160
 msgid "&Preset:"
 msgstr "&Preajuste:"
 
-#: gui/dialogs.py:750 gui/dialogs.py:2588 gui/dialogs.py:2708
+#: gui/dialogs.py:750 gui/dialogs.py:2600 gui/dialogs.py:2720
 msgid "Cookies"
 msgstr "Cookies"
 
-#: gui/dialogs.py:2020
+#: gui/dialogs.py:2032
 msgid "Loaded {n} OpenRouter model."
 msgid_plural "Loaded {n} OpenRouter models."
 msgstr[0] "{n} modelo de OpenRouter cargado."
 msgstr[1] "{n} modelos de OpenRouter cargados."
 
-#: gui/dialogs.py:2146
+#: gui/dialogs.py:2158
 msgid "Notification APIs were unavailable. {hint}"
 msgstr "Las API de notificación no estaban disponibles. {hint}"
 
-#: gui/dialogs.py:2170
+#: gui/dialogs.py:2182
 msgid ""
 "BlindRSS announcement test. If you can hear or read this, announcements are "
 "working."
@@ -4670,47 +4702,47 @@ msgstr ""
 "Prueba de anuncios de BlindRSS. Si puede oír o leer esto, los anuncios "
 "funcionan."
 
-#: gui/dialogs.py:2355
+#: gui/dialogs.py:2367
 msgid "Authorization cancelled."
 msgstr "Autorización cancelada."
 
-#: gui/dialogs.py:2361
+#: gui/dialogs.py:2373
 msgid "No authorization code found in the pasted URL."
 msgstr "No se encontró ningún código de autorización en la URL pegada."
 
-#: gui/dialogs.py:2364
+#: gui/dialogs.py:2376
 msgid ""
 "Missing state parameter; paste the full redirected URL from your browser "
 "address bar."
 msgstr ""
-"Falta el parámetro state; pegue la URL redirigida completa desde la barra de"
-" direcciones de su navegador."
+"Falta el parámetro state; pegue la URL redirigida completa desde la barra de "
+"direcciones de su navegador."
 
-#: gui/dialogs.py:2368
+#: gui/dialogs.py:2380
 msgid "Invalid state (redirect does not match this authorization attempt)."
 msgstr ""
 "Estado no válido (la redirección no coincide con este intento de "
 "autorización)."
 
-#: gui/dialogs.py:2619
+#: gui/dialogs.py:2631
 msgid "The playback cache is already empty."
 msgstr "La caché de reproducción ya está vacía."
 
-#: gui/dialogs.py:2625
+#: gui/dialogs.py:2637
 msgid "Delete {n} cached file ({size})?"
 msgid_plural "Delete {n} cached files ({size})?"
 msgstr[0] "¿Eliminar {n} archivo en caché ({size})?"
 msgstr[1] "¿Eliminar {n} archivos en caché ({size})?"
 
-#: gui/dialogs.py:2782
+#: gui/dialogs.py:2794
 msgid "Detected {nm}: not found"
 msgstr "{nm} detectado: no encontrado"
 
-#: gui/dialogs.py:2814
+#: gui/dialogs.py:2826
 msgid "(not set)"
 msgstr "(sin definir)"
 
-#: gui/dialogs.py:2847
+#: gui/dialogs.py:2859
 msgid ""
 "Launched the test command with a sample URL:\n"
 "\n"
@@ -4724,7 +4756,7 @@ msgstr ""
 "\n"
 "Compruebe que su navegador abrió https://example.com/ como se esperaba."
 
-#: gui/dialogs.py:2856
+#: gui/dialogs.py:2868
 msgid ""
 "The command could not be run:\n"
 "\n"
@@ -4734,39 +4766,39 @@ msgstr ""
 "\n"
 "{error}"
 
-#: gui/dialogs.py:2998
+#: gui/dialogs.py:3010
 msgid "{label} executable path override"
 msgstr "Ruta personalizada del ejecutable de {label}"
 
-#: gui/dialogs.py:3008
+#: gui/dialogs.py:3020
 msgid "Detected {label}"
 msgstr "{label} detectado"
 
-#: gui/dialogs.py:3023
+#: gui/dialogs.py:3035
 msgid "Downloads"
 msgstr "Descargas"
 
-#: gui/dialogs.py:3102
+#: gui/dialogs.py:3114
 msgid "Inoreader App ID:"
 msgstr "ID de app de Inoreader:"
 
-#: gui/dialogs.py:3109
+#: gui/dialogs.py:3121
 msgid "Inoreader App Key:"
 msgstr "Clave de app de Inoreader:"
 
-#: gui/dialogs.py:3120
+#: gui/dialogs.py:3132
 msgid "Redirect URI:"
 msgstr "URI de redirección:"
 
-#: gui/dialogs.py:3226
+#: gui/dialogs.py:3238
 msgid "Browse for {name}"
 msgstr "Examinar para {name}"
 
-#: gui/dialogs.py:4858
+#: gui/dialogs.py:4871
 msgid "feed"
 msgstr "fuente"
 
-#: gui/dialogs.py:4923
+#: gui/dialogs.py:4936
 msgid ""
 "Remove the feed “{title}”?\n"
 "\n"
@@ -4776,61 +4808,61 @@ msgstr ""
 "\n"
 "Esto elimina el canal y todos sus artículos."
 
-#: gui/dialogs.py:5194
+#: gui/dialogs.py:5207
 msgid "Searching {label}..."
 msgstr "Buscando en {label}..."
 
-#: gui/dialogs.py:5461
+#: gui/dialogs.py:5474
 msgid "News topic feed"
 msgstr "Feed de temas de noticias"
 
-#: gui/dialogs.py:5828
+#: gui/dialogs.py:5841
 msgid "Website scan"
 msgstr "Escaneo de sitio web"
 
-#: gui/dialogs.py:5848
+#: gui/dialogs.py:5861
 msgid "Found {n} result."
 msgid_plural "Found {n} results."
 msgstr[0] "{n} resultado encontrado."
 msgstr[1] "{n} resultados encontrados."
 
-#: gui/dialogs.py:6007
+#: gui/dialogs.py:6020
 msgid "yt-dlp global search (max {count} concurrent)"
 msgstr "Búsqueda global de yt-dlp (máx. {count} simultáneas)"
 
-#: gui/dialogs.py:7140
+#: gui/dialogs.py:7153
 msgid "{sites}, {results}. {label}: error"
 msgstr "{sites}, {results}. {label}: error"
 
-#: gui/dialogs.py:7180
+#: gui/dialogs.py:7193
 msgid "Stopped. {n} result."
 msgid_plural "Stopped. {n} results."
 msgstr[0] "Detenido. {n} resultado."
 msgstr[1] "Detenido. {n} resultados."
 
-#: gui/dialogs.py:7382
+#: gui/dialogs.py:7395
 msgid "Playback Error"
 msgstr "Error de reproducción"
 
-#: gui/dialogs.py:7386 gui/dialogs.py:7324
+#: gui/dialogs.py:7399 gui/dialogs.py:7337
 msgid "Playing: {title}"
 msgstr "Reproduciendo: {title}"
 
-#: gui/dialogs.py:7688
+#: gui/dialogs.py:7701
 msgid "{index}. {title}, from {source}"
 msgstr "{index}. {title}, de {source}"
 
-#: gui/dialogs.py:7692
+#: gui/dialogs.py:7705
 msgid "{index}. {title}"
 msgstr "{index}. {title}"
 
-#: gui/dialogs.py:7699
+#: gui/dialogs.py:7712
 msgid "{n} item in queue."
 msgid_plural "{n} items in queue."
 msgstr[0] "{n} elemento en la cola."
 msgstr[1] "{n} elementos en la cola."
 
-#: gui/dialogs.py:7816
+#: gui/dialogs.py:7829
 msgid ""
 "Press the new shortcut for “{command}”.\n"
 "It must include Ctrl, Alt or Shift. Press Escape to cancel."
@@ -4838,15 +4870,15 @@ msgstr ""
 "Pulse el nuevo atajo para «{command}».\n"
 "Debe incluir Ctrl, Alt o Mayús. Pulse Escape para cancelar."
 
-#: gui/dialogs.py:8033
+#: gui/dialogs.py:8046
 msgid "Shortcut Conflict"
 msgstr "Conflicto de atajos"
 
-#: gui/dialogs.py:8247
+#: gui/dialogs.py:8260
 msgid "{name} (my preset)"
 msgstr "{name} (mi preajuste)"
 
-#: gui/dialogs.py:8365
+#: gui/dialogs.py:8378
 msgid "Delete the preset \"{name}\"?"
 msgstr "¿Eliminar el preajuste \"{name}\"?"
 
@@ -4854,19 +4886,19 @@ msgstr "¿Eliminar el preajuste \"{name}\"?"
 msgid "Could not read cookies from {browser}."
 msgstr "No se pudieron leer las cookies de {browser}."
 
-#: gui/dialogs.py:1983
+#: gui/dialogs.py:1995
 msgid "OpenRouter model load failed: {error}"
 msgstr "Error al cargar los modelos de OpenRouter: {error}"
 
-#: gui/dialogs.py:2353
+#: gui/dialogs.py:2365
 msgid "Timed out waiting for the redirected URL."
 msgstr "Se agotó el tiempo de espera de la URL redirigida."
 
-#: gui/dialogs.py:2540
+#: gui/dialogs.py:2552
 msgid "Saved device (currently unavailable): {device}"
 msgstr "Dispositivo guardado (no disponible actualmente): {device}"
 
-#: gui/dialogs.py:2721
+#: gui/dialogs.py:2733
 msgid ""
 "That file is not a usable YouTube cookie export:\n"
 "\n"
@@ -4876,7 +4908,7 @@ msgstr ""
 "\n"
 "{error}"
 
-#: gui/dialogs.py:2728
+#: gui/dialogs.py:2740
 msgid ""
 "Could not import the cookies file:\n"
 "\n"
@@ -4886,15 +4918,15 @@ msgstr ""
 "\n"
 "{error}"
 
-#: gui/dialogs.py:2784
+#: gui/dialogs.py:2796
 msgid "Detected {nm}: {path} (failed version check)"
 msgstr "{nm} detectado: {path} (falló la comprobación de versión)"
 
-#: gui/dialogs.py:2786
+#: gui/dialogs.py:2798
 msgid "Detected {nm}: {path}"
 msgstr "{nm} detectado: {path}"
 
-#: gui/dialogs.py:2840
+#: gui/dialogs.py:2852
 msgid ""
 "The command could not be parsed:\n"
 "\n"
@@ -4904,15 +4936,15 @@ msgstr ""
 "\n"
 "{error}"
 
-#: gui/dialogs.py:3007
+#: gui/dialogs.py:3019
 msgid "Detected {label}: checking…"
 msgstr "{label} detectado: comprobando…"
 
-#: gui/dialogs.py:3229
+#: gui/dialogs.py:3241
 msgid "Choose {label}"
 msgstr "Elegir {label}"
 
-#: gui/dialogs.py:3827
+#: gui/dialogs.py:3839
 msgid ""
 "User Data Folder path:\n"
 "  {path}\n"
@@ -4920,7 +4952,7 @@ msgstr ""
 "Ruta de la carpeta de datos del usuario:\n"
 "  {path}\n"
 
-#: gui/dialogs.py:3828
+#: gui/dialogs.py:3840
 msgid ""
 "App Install Folder path:\n"
 "  {path}"
@@ -4928,60 +4960,60 @@ msgstr ""
 "Ruta de la carpeta de instalación de la aplicación:\n"
 "  {path}"
 
-#: gui/dialogs.py:5452
+#: gui/dialogs.py:5465
 msgid "Google News: {term}"
 msgstr "Google News: {term}"
 
-#: gui/dialogs.py:6637
+#: gui/dialogs.py:6650
 msgid "Adult: {site}"
 msgstr "Adultos: {site}"
 
-#: gui/dialogs.py:7183
+#: gui/dialogs.py:7196
 msgid "Loaded more. {n} result."
 msgid_plural "Loaded more. {n} results."
 msgstr[0] "Se cargaron más. {n} resultado."
 msgstr[1] "Se cargaron más. {n} resultados."
 
-#: gui/dialogs.py:7185
+#: gui/dialogs.py:7198
 msgid "{n} result."
 msgid_plural "{n} results."
 msgstr[0] "{n} resultado."
 msgstr[1] "{n} resultados."
 
-#: gui/dialogs.py:7407
+#: gui/dialogs.py:7420
 msgid "Could not subscribe: {error}"
 msgstr "No se pudo suscribir: {error}"
 
-#: gui/dialogs.py:8339
+#: gui/dialogs.py:8352
 msgid "A preset named \"{name}\" already exists. Overwrite it?"
 msgstr "Ya existe un preajuste llamado \"{name}\". ¿Sobrescribirlo?"
 
-#: gui/dialogs.py:2359
+#: gui/dialogs.py:2371
 msgid "Inoreader authorization failed: {error}"
 msgstr "Error en la autorización de Inoreader: {error}"
 
-#: gui/dialogs.py:2994
+#: gui/dialogs.py:3006
 msgid "{tool} path:"
 msgstr "Ruta de {tool}:"
 
-#: gui/dialogs.py:3229
+#: gui/dialogs.py:3241
 msgid "WAV files"
 msgstr "Archivos WAV"
 
-#: gui/dialogs.py:5460
+#: gui/dialogs.py:5473
 msgid "Google News: {topic} headlines"
 msgstr "Google News: titulares sobre {topic}"
 
-#: gui/dialogs.py:7324 gui/mainframe.py:1877 gui/player.py:4305
+#: gui/dialogs.py:7337 gui/mainframe.py:1877 gui/player.py:4305
 #: gui/player.py:6913
 msgid "Playing"
 msgstr "Reproduciendo"
 
-#: gui/dialogs.py:7381
+#: gui/dialogs.py:7394
 msgid "Could not start playback: {error}"
 msgstr "No se pudo iniciar la reproducción: {error}"
 
-#: gui/dialogs.py:8029
+#: gui/dialogs.py:8042
 msgid ""
 "{accel} is already assigned to “{other}”.\n"
 "Reassign it to “{this}”?"
@@ -4989,32 +5021,32 @@ msgstr ""
 "{accel} ya está asignado a «{other}».\n"
 "¿Reasignarlo a «{this}»?"
 
-#: gui/dialogs.py:5477
+#: gui/dialogs.py:5490
 msgid "Bing News: {term}"
 msgstr "Bing News: {term}"
 
-#: gui/dialogs.py:7326 gui/mainframe.py:1877 gui/player.py:6969
+#: gui/dialogs.py:7339 gui/mainframe.py:1877 gui/player.py:6969
 #: gui/player.py:6986
 msgid "Paused"
 msgstr "En pausa"
 
-#: gui/dialogs.py:7326
+#: gui/dialogs.py:7339
 msgid "Paused: {title}"
 msgstr "En pausa: {title}"
 
-#: gui/dialogs.py:7330 gui/player.py:4366 gui/player.py:4913
+#: gui/dialogs.py:7343 gui/player.py:4366 gui/player.py:4913
 msgid "Buffering..."
 msgstr "Almacenando en búfer..."
 
-#: gui/dialogs.py:7332 gui/player.py:4508
+#: gui/dialogs.py:7345 gui/player.py:4508
 msgid "Connecting..."
 msgstr "Conectando..."
 
-#: gui/dialogs.py:7330
+#: gui/dialogs.py:7343
 msgid "Buffering: {title}"
 msgstr "Almacenando en búfer: {title}"
 
-#: gui/dialogs.py:7332
+#: gui/dialogs.py:7345
 msgid "Connecting: {title}"
 msgstr "Conectando: {title}"
 
@@ -5204,8 +5236,7 @@ msgstr "Importar fuentes desde OPML"
 
 #: gui/mainframe.py:2291
 msgid ""
-"Import YouTube subscriptions, playlists, channels, and watch-history "
-"channels"
+"Import YouTube subscriptions, playlists, channels, and watch-history channels"
 msgstr ""
 "Importar suscripciones, listas de reproducción, canales y canales del "
 "historial de reproducción de YouTube"
@@ -5897,8 +5928,8 @@ msgstr[1] "{n} artículos"
 
 #: gui/mainframe.py:7146
 msgid ""
-"Delete {subject}? Deleted articles can be restored from the Deleted Articles"
-" view."
+"Delete {subject}? Deleted articles can be restored from the Deleted Articles "
+"view."
 msgstr ""
 "¿Eliminar {subject}? Los artículos eliminados se pueden recuperar desde la "
 "vista Artículos eliminados."
@@ -5977,7 +6008,8 @@ msgid ""
 "The title and category will be updated, but the URL will stay the same."
 msgstr ""
 "Este proveedor no admite el cambio de la URL de la fuente.\n"
-"Se actualizarán el título y la categoría, pero la URL seguirá siendo la misma."
+"Se actualizarán el título y la categoría, pero la URL seguirá siendo la "
+"misma."
 
 #: gui/mainframe.py:13424
 msgid "Feed URL not supported"
@@ -6046,7 +6078,8 @@ msgid ""
 "Auto-update is only available in the packaged app build.\n"
 "Download the latest release from GitHub."
 msgstr ""
-"La actualización automática solo está disponible en la compilación empaquetada de la aplicación.\n"
+"La actualización automática solo está disponible en la compilación "
+"empaquetada de la aplicación.\n"
 "Descargue la última versión desde GitHub."
 
 #: gui/mainframe.py:14400
@@ -6098,8 +6131,8 @@ msgstr "Regla &habilitada"
 
 #: gui/mainframe.py:14954
 msgid ""
-"Choose at least one action for this rule (move, label, mark, delete, or skip"
-" notification)."
+"Choose at least one action for this rule (move, label, mark, delete, or skip "
+"notification)."
 msgstr ""
 "Elija al menos una acción para esta regla (mover, etiquetar, marcar, "
 "eliminar u omitir notificación)."
@@ -6278,8 +6311,8 @@ msgstr ""
 #: gui/mainframe.py:10763 gui/mainframe.py:11289
 msgid "No webpage URL for this item. Showing feed content."
 msgstr ""
-"No hay una URL de página web para este elemento. Se muestra el contenido del"
-" canal."
+"No hay una URL de página web para este elemento. Se muestra el contenido del "
+"canal."
 
 #: gui/mainframe.py:11449
 msgid "Chapters ({count}):"
@@ -6301,11 +6334,16 @@ msgstr "El comando personalizado falló"
 msgid ""
 "{error}\n"
 "\n"
-"Browser cookies could not be read on this Windows session (Chromium App-Bound Encryption). If this item needs a login, export a cookies.txt from your browser and set it in Settings."
+"Browser cookies could not be read on this Windows session (Chromium App-"
+"Bound Encryption). If this item needs a login, export a cookies.txt from "
+"your browser and set it in Settings."
 msgstr ""
 "{error}\n"
 "\n"
-"No se pudieron leer las cookies del navegador en esta sesión de Windows (cifrado vinculado a aplicaciones de Chromium). Si este elemento requiere iniciar sesión, exporte un archivo cookies.txt desde el navegador y configúrelo en Ajustes."
+"No se pudieron leer las cookies del navegador en esta sesión de Windows "
+"(cifrado vinculado a aplicaciones de Chromium). Si este elemento requiere "
+"iniciar sesión, exporte un archivo cookies.txt desde el navegador y "
+"configúrelo en Ajustes."
 
 #: gui/mainframe.py:12864 gui/mainframe.py:12933 gui/mainframe.py:12804
 msgid "Download error"
@@ -6355,7 +6393,8 @@ msgstr ""
 "Canales propios: {owned}\n"
 "Listas de reproducción: {playlists}\n"
 "\n"
-"Las fuentes importadas se actualizarán durante las actualizaciones normales en segundo plano."
+"Las fuentes importadas se actualizarán durante las actualizaciones normales "
+"en segundo plano."
 
 #: gui/mainframe.py:13733
 msgid "Refreshing category: {title}..."
@@ -6445,11 +6484,13 @@ msgstr ""
 
 #: gui/mainframe.py:525
 msgid ""
-"Would you like to install them automatically (via winget/Ninite) and add them to PATH?\n"
+"Would you like to install them automatically (via winget/Ninite) and add "
+"them to PATH?\n"
 "\n"
 "Tip: You can disable this prompt in Settings > YouTube."
 msgstr ""
-"¿Desea instalarlas automáticamente (mediante winget/Ninite) y añadirlas a PATH?\n"
+"¿Desea instalarlas automáticamente (mediante winget/Ninite) y añadirlas a "
+"PATH?\n"
 "\n"
 "Consejo: puede desactivar este aviso en Configuración > YouTube."
 
@@ -6629,13 +6670,17 @@ msgstr "Descarga completa: {title}"
 
 #: gui/mainframe.py:13069
 msgid ""
-"BlindRSS could not complete this site's browser verification page automatically.\n"
+"BlindRSS could not complete this site's browser verification page "
+"automatically.\n"
 "\n"
-"You can still open the site in your web browser, export its cookies with a cookies.txt extension, then use Tools > Import Site Cookies."
+"You can still open the site in your web browser, export its cookies with a "
+"cookies.txt extension, then use Tools > Import Site Cookies."
 msgstr ""
-"BlindRSS no pudo completar automáticamente la página de verificación del navegador de este sitio.\n"
+"BlindRSS no pudo completar automáticamente la página de verificación del "
+"navegador de este sitio.\n"
 "\n"
-"Aún puede abrir el sitio en su navegador web, exportar sus cookies con una extensión cookies.txt y luego usar Herramientas > Importar cookies del sitio."
+"Aún puede abrir el sitio en su navegador web, exportar sus cookies con una "
+"extensión cookies.txt y luego usar Herramientas > Importar cookies del sitio."
 
 #: gui/mainframe.py:13076
 msgid "Unable to retrieve the page."
@@ -6702,7 +6747,8 @@ msgid "Condition {n} value"
 msgstr "Valor de la condición {n}"
 
 #: gui/mainframe.py:15108
-msgid "Delete filter rule \"{name}\"? Articles it already filed are not changed."
+msgid ""
+"Delete filter rule \"{name}\"? Articles it already filed are not changed."
 msgstr ""
 "¿Eliminar la regla de filtro \"{name}\"? Los artículos que ya archivó no se "
 "modifican."
@@ -6710,8 +6756,7 @@ msgstr ""
 #: gui/mainframe.py:15178
 msgid "Scanned {scanned} article; {changed} matched a rule."
 msgid_plural "Scanned {scanned} articles; {changed} matched a rule."
-msgstr[0] ""
-"Se analizó {scanned} artículo; coincidencias con reglas: {changed}."
+msgstr[0] "Se analizó {scanned} artículo; coincidencias con reglas: {changed}."
 msgstr[1] ""
 "Se analizaron {scanned} artículos; coincidencias con reglas: {changed}."
 
@@ -6870,13 +6915,15 @@ msgid ""
 "\n"
 "{err}\n"
 "\n"
-"Opening in the default browser instead. You can change this in Settings > General > Article opening method."
+"Opening in the default browser instead. You can change this in Settings > "
+"General > Article opening method."
 msgstr ""
 "No se pudo abrir el artículo con su comando personalizado:\n"
 "\n"
 "{err}\n"
 "\n"
-"Se abrirá en el navegador predeterminado. Puede cambiar esto en Configuración > General > Método de apertura de artículos."
+"Se abrirá en el navegador predeterminado. Puede cambiar esto en "
+"Configuración > General > Método de apertura de artículos."
 
 #: gui/mainframe.py:12714
 msgid "Trying pytubefix: {title}"
@@ -6934,7 +6981,8 @@ msgstr "Capítulo actual, {label}"
 
 #: gui/mainframe.py:4783
 msgid "Mark all items in category \"{category}\" as read?"
-msgstr "¿Marcar como leídos todos los elementos de la categoría \"{category}\"?"
+msgstr ""
+"¿Marcar como leídos todos los elementos de la categoría \"{category}\"?"
 
 #: gui/mainframe.py:5177
 msgid "Add {count} to Play Queue"
@@ -6981,19 +7029,23 @@ msgstr "Error de traducción: {error}"
 
 #: gui/mainframe.py:556
 msgid ""
-"Install Homebrew (https://brew.sh) to let BlindRSS install these automatically, or install them yourself with:\n"
+"Install Homebrew (https://brew.sh) to let BlindRSS install these "
+"automatically, or install them yourself with:\n"
 "    brew install --cask vlc\n"
 "    brew install ffmpeg yt-dlp\n"
 "\n"
-"If this is a packaged build that should bundle them, see the log: {log_path}\n"
+"If this is a packaged build that should bundle them, see the log: "
+"{log_path}\n"
 "\n"
 "Tip: You can disable this prompt in Settings > YouTube."
 msgstr ""
-"Instale Homebrew (https://brew.sh) para que BlindRSS pueda instalarlos automáticamente, o instálelos usted mismo con:\n"
+"Instale Homebrew (https://brew.sh) para que BlindRSS pueda instalarlos "
+"automáticamente, o instálelos usted mismo con:\n"
 "    brew install --cask vlc\n"
 "    brew install ffmpeg yt-dlp\n"
 "\n"
-"Si esta es una compilación empaquetada que debería incluirlos, consulte el registro: {log_path}\n"
+"Si esta es una compilación empaquetada que debería incluirlos, consulte el "
+"registro: {log_path}\n"
 "\n"
 "Consejo: puede desactivar este aviso en Configuración > YouTube."
 
@@ -7164,13 +7216,13 @@ msgstr ""
 #: gui/player.py:3179
 msgid ""
 "This link opens a web page, not audio or video. The server returned "
-"{content_type} instead of a media file, which often means the item needs you"
-" to sign in, or the feed has no downloadable enclosure."
+"{content_type} instead of a media file, which often means the item needs you "
+"to sign in, or the feed has no downloadable enclosure."
 msgstr ""
 "Este enlace abre una página web, no audio ni vídeo. El servidor devolvió "
 "{content_type} en lugar de un archivo multimedia, lo que suele indicar que "
-"el elemento requiere iniciar sesión o que el canal no incluye ningún archivo"
-" descargable."
+"el elemento requiere iniciar sesión o que el canal no incluye ningún archivo "
+"descargable."
 
 #: gui/player.py:3567 gui/player.py:4220
 msgid "Failed to load media"
@@ -7298,7 +7350,8 @@ msgid ""
 msgstr ""
 "No se pudo inicializar VLC: {error}\n"
 "\n"
-"Asegúrese de que VLC media player esté instalado (se recomienda la versión de 64 bits)."
+"Asegúrese de que VLC media player esté instalado (se recomienda la versión "
+"de 64 bits)."
 
 #: gui/player.py:2314
 msgid "Chapters, {count} available, current chapter {current}"
@@ -7322,8 +7375,7 @@ msgid ""
 "invalid playback ID for this post."
 msgstr ""
 "La publicación de Rokfin está listada pero no se puede reproducir ahora "
-"mismo: Rokfin devolvió un ID de reproducción no válido para esta "
-"publicación."
+"mismo: Rokfin devolvió un ID de reproducción no válido para esta publicación."
 
 #: gui/player.py:5965
 msgid "Volume: {percent}%"
@@ -7343,8 +7395,8 @@ msgstr "Error al resolver con yt-dlp: {error}"
 
 #: gui/player.py:4138
 msgid ""
-"Rokfin post is not anonymously streamable right now. Rokfin requires a "
-"login/cookies to play this post."
+"Rokfin post is not anonymously streamable right now. Rokfin requires a login/"
+"cookies to play this post."
 msgstr ""
 "La publicación de Rokfin no se puede reproducir de forma anónima ahora "
 "mismo. Rokfin requiere iniciar sesión o usar cookies para reproducirla."
@@ -7352,8 +7404,8 @@ msgstr ""
 #: gui/player.py:4143
 msgid ""
 "yt-dlp resolve failed: this media may require a login, but browser cookies "
-"could not be loaded on this Windows session (DPAPI). Try running BlindRSS as"
-" your normal Windows user and restart the app."
+"could not be loaded on this Windows session (DPAPI). Try running BlindRSS as "
+"your normal Windows user and restart the app."
 msgstr ""
 "Error al resolver con yt-dlp: es posible que este medio requiera iniciar "
 "sesión, pero no se pudieron cargar las cookies del navegador en esta sesión "
@@ -7384,9 +7436,27 @@ msgstr "Salir"
 msgid "Unread: {count}"
 msgstr "No leídos: {count}"
 
-#: main.py:282
+#: main.py:291
 msgid "BlindRSS is already running."
 msgstr "BlindRSS ya se está ejecutando."
+
+#~ msgid ""
+#~ "yt-dlp cookies file (cookies.txt) — only needed for age-restricted, "
+#~ "private, or members-only YouTube content. Installed browsers are detected "
+#~ "automatically; Firefox is recommended. Chrome, Edge, and Brave may fail "
+#~ "on Windows because their cookies can be encrypted in a way yt-dlp cannot "
+#~ "read, so a cookies.txt is the reliable fallback. LibreWolf uses Firefox-"
+#~ "compatible cookies. Chrome \"Nightly\" means Chrome Canary; Edge "
+#~ "\"Nightly\" means Edge Canary."
+#~ msgstr ""
+#~ "Archivo de cookies para yt-dlp (cookies.txt); solo es necesario para "
+#~ "contenido de YouTube restringido por edad, privado o exclusivo para "
+#~ "miembros. Los navegadores instalados se detectan automáticamente; se "
+#~ "recomienda Firefox. Chrome, Edge y Brave pueden fallar en Windows porque "
+#~ "sus cookies pueden cifrarse de una forma que yt-dlp no puede leer, por lo "
+#~ "que un cookies.txt es la alternativa confiable. LibreWolf usa cookies "
+#~ "compatibles con Firefox. \"Nightly\" en Chrome significa Chrome Canary; "
+#~ "\"Nightly\" en Edge significa Edge Canary."
 
 #~ msgid "Failed to download update metadata: {error}"
 #~ msgstr "No se pudieron descargar los metadatos de la actualización: {error}"
@@ -7419,7 +7489,8 @@ msgstr "BlindRSS ya se está ejecutando."
 #~ "Tip: You can disable this prompt in Settings > YouTube."
 #~ msgstr ""
 #~ "Esta compilación para macOS/Linux ya debería incluir estas herramientas.\n"
-#~ "Si siguen apareciendo como no encontradas, consulte el registro: {log_path}\n"
+#~ "Si siguen apareciendo como no encontradas, consulte el registro: "
+#~ "{log_path}\n"
 #~ "\n"
 #~ "Consejo: puede desactivar este aviso en Configuración > YouTube."
 

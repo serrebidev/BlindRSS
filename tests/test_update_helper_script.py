@@ -152,7 +152,10 @@ def test_update_helper_terminates_orphaned_bundled_executable(tmp_path):
         assert locker.poll() is None
         completed = subprocess.run(
             [
-                str(cmd_exe), "/d", "/q", "/c", helper_copy.name,
+                # Full path, not the bare name: with the machine-wide
+                # NoDefaultCurrentDirectoryInExePath=1 hardening, cmd /c will
+                # not search the cwd and "x.bat" is reported as unrecognized.
+                str(cmd_exe), "/d", "/q", "/c", str(helper_copy),
                 "0", str(install), str(staging), "BlindRSS.exe", str(temp_root), "0",
             ],
             cwd=tmp_path,

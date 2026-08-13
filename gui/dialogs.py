@@ -1420,12 +1420,10 @@ class SettingsDialog(wx.Dialog):
         cookies_label = wx.StaticText(
             youtube_panel,
             label=_(
-                "yt-dlp cookies file (cookies.txt) — only needed for age-restricted, private, or "
-                "members-only YouTube content. Installed browsers are detected automatically; Firefox "
-                "is recommended. Chrome, Edge, and Brave may fail on Windows because their cookies can "
-                "be encrypted in a way yt-dlp cannot read, so a cookies.txt is the reliable fallback. "
-                "LibreWolf uses Firefox-compatible cookies. Chrome \"Nightly\" means Chrome Canary; "
-                "Edge \"Nightly\" means Edge Canary."
+                "Cookies are only needed for age-restricted, private, or members-only content. "
+                "BlindRSS reads them automatically from your installed browsers (Firefox, Chrome, "
+                "Edge, Brave, Opera, Vivaldi, Chromium and their beta/nightly variants). "
+                "A cookies.txt export remains a manual fallback."
             ),
         )
         youtube_sizer.Add(cookies_label, 0, wx.LEFT | wx.TOP, 5)
@@ -1449,6 +1447,20 @@ class SettingsDialog(wx.Dialog):
         )
         self.auto_import_cookies_chk.SetValue(bool(config.get("auto_import_browser_cookies", True)))
         youtube_sizer.Add(self.auto_import_cookies_chk, 0, wx.ALL, 5)
+
+        self.auto_import_installed_cookies_chk = wx.CheckBox(
+            youtube_panel,
+            label=_(
+                "Read cookies directly from installed browsers (Firefox, Chrome, Edge, "
+                "Brave, Opera, Vivaldi, Chromium and their beta/nightly variants). "
+                "Chrome/Edge/Brave need a one-time Windows permission prompt."
+            ),
+        )
+        self.auto_import_installed_cookies_chk.SetName(_("Read cookies from installed browsers"))
+        self.auto_import_installed_cookies_chk.SetValue(
+            bool(config.get("auto_import_installed_browser_cookies", True))
+        )
+        youtube_sizer.Add(self.auto_import_installed_cookies_chk, 0, wx.ALL, 5)
 
         self.youtube_play_via_download_chk = wx.CheckBox(
             youtube_panel,
@@ -4055,6 +4067,7 @@ class SettingsDialog(wx.Dialog):
             "groups_io_api_key": self.groups_io_api_key_ctrl.GetValue().strip(),
             "github_token": self.github_token_ctrl.GetValue().strip(),
             "auto_import_browser_cookies": self.auto_import_cookies_chk.GetValue(),
+            "auto_import_installed_browser_cookies": self.auto_import_installed_cookies_chk.GetValue(),
             "youtube_play_via_download": self.youtube_play_via_download_chk.GetValue(),
             "youtube_play_cache_dir": self.youtube_play_cache_dir_ctrl.GetValue().strip(),
             "youtube_play_cache_max_mb": int(self.youtube_play_cache_max_mb_ctrl.GetValue()),

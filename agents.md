@@ -490,6 +490,7 @@ sync-claude-memory.py after writing one:
 - [yt-dlp noplaylist & lazy entries](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\ytdlp-noplaylist-and-lazy-entries.md) — &list=RD… radio mixes hang extraction without noplaylist; never list() a lazy entries sequence
 - [DPAPI error masks real cause](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\dpapi-error-masks-real-cause.md) — label yt-dlp attempts base/cookiefile/cookies; report the anonymous error, stop on the first DPAPI hit
 - [yt-dlp must stay current](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\ytdlp-must-stay-current.md) — user rule; embedded module + runtime CLI both went stale; build must force-upgrade both
+- [Chromium v20 cookie decryption](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\chromium-v20-cookie-decryption.md) — core/chromium_cookies.py decrypts App-Bound v20 from Chrome/Edge/Brave/Opera/Vivaldi; one-time UAC elevation via --blindrss-chromium-key-helper; auto_import_installed_browser_cookies; full jar → site_cookies.txt + youtube_cookies.txt
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\MEMORY.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\aa-heading-loss-not-reproducible.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\accessible-checklist-and-mnemonics.md
@@ -503,6 +504,7 @@ sync-claude-memory.py after writing one:
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\avoid-running-test-suites.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\browser-feed-fallback-gating.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\category-identity-model.md
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\chromium-v20-cookie-decryption.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\curl-cffi-impersonation-transport.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\delete-restore-refresh-unguarded.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\deleted-purge-design.md

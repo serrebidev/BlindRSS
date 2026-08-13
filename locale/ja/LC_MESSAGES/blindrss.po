@@ -92,8 +92,8 @@ msgstr "点字のみ"
 msgid "Speech and Braille"
 msgstr "音声と点字"
 
-#: core/article_columns.py:68 gui/dialogs.py:5038 gui/dialogs.py:5995
-#: gui/dialogs.py:6019
+#: core/article_columns.py:68 gui/dialogs.py:5051 gui/dialogs.py:6008
+#: gui/dialogs.py:6032
 msgid "Title"
 msgstr "タイトル"
 
@@ -109,7 +109,7 @@ msgstr "メディア"
 msgid "Date"
 msgstr "日付"
 
-#: core/article_columns.py:72 gui/dialogs.py:4667
+#: core/article_columns.py:72 gui/dialogs.py:4680
 msgid "Feed"
 msgstr "フィード"
 
@@ -127,8 +127,9 @@ msgid ""
 "or a \"you're not a robot\" page), so the full text can't be fetched "
 "automatically. Open the original link in your browser to read it."
 msgstr ""
-"このページはボット対策／人間確認チェック（Cloudflare "
-"や「私はロボットではありません」ページなど）で保護されているため、全文を自動的に取得できません。元のリンクをブラウザーで開いてお読みください。"
+"このページはボット対策／人間確認チェック（Cloudflare や「私はロボットではあり"
+"ません」ページなど）で保護されているため、全文を自動的に取得できません。元の"
+"リンクをブラウザーで開いてお読みください。"
 
 #: core/article_extractor.py:243
 msgid ""
@@ -136,29 +137,36 @@ msgid ""
 "links were found (common for video-only pages). Open the original link in "
 "your browser to view it."
 msgstr ""
-"このページには読み取れる記事本文がありません — "
-"ナビゲーションや関連記事のリンクのみが見つかりました（動画のみのページでよくあります）。元のリンクをブラウザーで開いてご覧ください。"
+"このページには読み取れる記事本文がありません — ナビゲーションや関連記事のリン"
+"クのみが見つかりました（動画のみのページでよくあります）。元のリンクをブラウ"
+"ザーで開いてご覧ください。"
 
 #: core/article_extractor.py:335
 msgid ""
 "This article is behind a paywall (subscription required), so the full text "
 "can't be fetched automatically. Open the original link in your browser to "
 "read it."
-msgstr "この記事はペイウォール（購読が必要）の内側にあるため、全文を自動的に取得できません。元のリンクをブラウザーで開いてお読みください。"
+msgstr ""
+"この記事はペイウォール（購読が必要）の内側にあるため、全文を自動的に取得でき"
+"ません。元のリンクをブラウザーで開いてお読みください。"
 
 #: core/article_extractor.py:370
 msgid ""
 "Only the free preview of this article is published on the page — the rest "
 "requires a subscription. Open the original link in your browser to read it."
-msgstr "このページには記事の無料プレビューのみが公開されており、残りの部分は購読が必要です。元のリンクをブラウザーで開いてお読みください。"
+msgstr ""
+"このページには記事の無料プレビューのみが公開されており、残りの部分は購読が必"
+"要です。元のリンクをブラウザーで開いてお読みください。"
 
 #: core/article_extractor.py:2891
 msgid ""
-"Google News could not resolve the original publisher link. Open the original"
-" link in your browser to read it."
-msgstr "Google ニュースは元の発行元リンクを解決できませんでした。元のリンクをブラウザーで開いてお読みください。"
+"Google News could not resolve the original publisher link. Open the original "
+"link in your browser to read it."
+msgstr ""
+"Google ニュースは元の発行元リンクを解決できませんでした。元のリンクをブラウ"
+"ザーで開いてお読みください。"
 
-#: core/article_extractor.py:4713 gui/dialogs.py:4777
+#: core/article_extractor.py:4713 gui/dialogs.py:4790
 msgid "(unknown)"
 msgstr "(不明)"
 
@@ -169,15 +177,21 @@ msgstr "ウェブページまたはフィードの内容から全文を抽出で
 #: core/article_extractor.py:4541
 msgid ""
 "trafilatura is not installed or failed to import. Reinstall requirements."
-msgstr "trafilatura がインストールされていないか、インポートに失敗しました。必要なコンポーネントを再インストールしてください。"
+msgstr ""
+"trafilatura がインストールされていないか、インポートに失敗しました。必要なコ"
+"ンポーネントを再インストールしてください。"
 
 #: core/article_extractor.py:4635
 msgid "Download failed (site blocked, offline, or connection problem)."
-msgstr "ダウンロードに失敗しました（サイトのブロック、オフライン、または接続の問題）。"
+msgstr ""
+"ダウンロードに失敗しました（サイトのブロック、オフライン、または接続の問"
+"題）。"
 
 #: core/article_extractor.py:4659
 msgid "Downloaded page, but could not extract readable text (empty result)."
-msgstr "ページをダウンロードしましたが、読み取れるテキストを抽出できませんでした（空の結果）。"
+msgstr ""
+"ページをダウンロードしましたが、読み取れるテキストを抽出できませんでした（空"
+"の結果）。"
 
 #: core/article_extractor.py:210
 msgid ""
@@ -186,11 +200,12 @@ msgid ""
 "short time. Open the page in {browser} and BlindRSS will pick the access "
 "back up automatically within a minute."
 msgstr ""
-"このページはボット対策・人間確認のチェックで保護されており、BlindRSS "
-"がこのサイトに対して持っていたアクセス権は期限切れです（この種のチェックは短時間しか有効ではありません）。{browser} "
-"でページを開くと、BlindRSS が 1 分以内に自動でアクセス権を取得し直します。"
+"このページはボット対策・人間確認のチェックで保護されており、BlindRSS がこのサ"
+"イトに対して持っていたアクセス権は期限切れです（この種のチェックは短時間しか"
+"有効ではありません）。{browser} でページを開くと、BlindRSS が 1 分以内に自動"
+"でアクセス権を取得し直します。"
 
-#: core/article_extractor.py:4714 gui/dialogs.py:4146
+#: core/article_extractor.py:4714 gui/dialogs.py:4159
 msgid "Title:"
 msgstr "タイトル:"
 
@@ -211,19 +226,21 @@ msgstr "不明な抽出エラー"
 msgid "Uncategorized"
 msgstr "未分類"
 
-#: core/config.py:779
+#: core/config.py:790
 msgid "Installed Windows builds store data in the User Data Folder."
-msgstr "インストール版の Windows ビルドは、ユーザーデータフォルダーにデータを保存します。"
+msgstr ""
+"インストール版の Windows ビルドは、ユーザーデータフォルダーにデータを保存しま"
+"す。"
 
-#: core/config.py:781
+#: core/config.py:792
 msgid "No change."
 msgstr "変更はありません。"
 
-#: core/config.py:807
+#: core/config.py:818
 msgid "Config moved to {path}."
 msgstr "設定を {path} に移動しました。"
 
-#: core/config.py:794
+#: core/config.py:805
 msgid "Could not write config at new location: {error}"
 msgstr "新しい場所に設定を書き込めませんでした: {error}"
 
@@ -292,8 +309,9 @@ msgid ""
 "This Google Group requires sign-in. Import its browser cookies with Tools > "
 "Import Site Cookies, then refresh the feed."
 msgstr ""
-"この Google グループにはサインインが必要です。ツール > サイトの Cookie をインポート でブラウザーの Cookie "
-"をインポートしてから、フィードを更新してください。"
+"この Google グループにはサインインが必要です。ツール > サイトの Cookie をイン"
+"ポート でブラウザーの Cookie をインポートしてから、フィードを更新してくださ"
+"い。"
 
 #: core/macos_integration.py:75
 msgid "Startup registration is only available on macOS."
@@ -324,8 +342,8 @@ msgid ""
 "Could not register BlindRSS to start at login: {error} (the failed plist "
 "could not be removed: {cleanup_error})"
 msgstr ""
-"ログイン時に起動するよう BlindRSS を登録できませんでした: {error}(失敗した plist を削除できませんでした: "
-"{cleanup_error})"
+"ログイン時に起動するよう BlindRSS を登録できませんでした: {error}(失敗した "
+"plist を削除できませんでした: {cleanup_error})"
 
 #: core/retention.py:94
 msgid "1 day"
@@ -407,7 +425,7 @@ msgstr "並べ替え"
 msgid "Player"
 msgstr "プレーヤー"
 
-#: core/shortcuts.py:148 gui/dialogs.py:7580
+#: core/shortcuts.py:148 gui/dialogs.py:7593
 msgid "Play Queue"
 msgstr "再生キュー"
 
@@ -482,11 +500,11 @@ msgstr "YouTube Takeout をインポート"
 msgid "Export OPML"
 msgstr "OPML をエクスポート"
 
-#: core/shortcuts.py:167 gui/dialogs.py:5000
+#: core/shortcuts.py:167 gui/dialogs.py:5013
 msgid "Find a Podcast or RSS Feed"
 msgstr "ポッドキャストまたは RSS フィードを検索"
 
-#: core/shortcuts.py:168 gui/dialogs.py:3919 gui/dialogs.py:5916
+#: core/shortcuts.py:168 gui/dialogs.py:3931 gui/dialogs.py:5929
 msgid "Video Search"
 msgstr "動画検索"
 
@@ -662,11 +680,11 @@ msgstr "フィルタールール"
 msgid "Import Site Cookies"
 msgstr "サイトの Cookie をインポート"
 
-#: core/shortcuts.py:211 gui/dialogs.py:7453
+#: core/shortcuts.py:211 gui/dialogs.py:7466
 msgid "Configure Persistent Search"
 msgstr "保存済み検索の設定"
 
-#: core/shortcuts.py:212 gui/dialogs.py:7884
+#: core/shortcuts.py:212 gui/dialogs.py:7897
 msgid "Keyboard Shortcuts"
 msgstr "キーボードショートカット"
 
@@ -674,7 +692,7 @@ msgstr "キーボードショートカット"
 msgid "Settings"
 msgstr "設定"
 
-#: core/shortcuts.py:214 gui/dialogs.py:1863
+#: core/shortcuts.py:214 gui/dialogs.py:1875
 msgid "Check for Updates"
 msgstr "アップデートを確認"
 
@@ -839,7 +857,9 @@ msgstr "アップデートパッケージに BlindRSS の実行ファイルが�
 msgid ""
 "Failed to download update metadata. GitHub may be temporarily unavailable; "
 "please try again in a few minutes."
-msgstr "更新メタデータをダウンロードできませんでした。GitHub が一時的に利用できない可能性があります。数分後にもう一度お試しください。"
+msgstr ""
+"更新メタデータをダウンロードできませんでした。GitHub が一時的に利用できない可"
+"能性があります。数分後にもう一度お試しください。"
 
 #: core/updater.py:982 core/updater.py:990
 msgid "Downloading update…"
@@ -847,13 +867,17 @@ msgstr "アップデートをダウンロードしています…"
 
 #: core/updater.py:1001
 msgid ""
-"Failed to download update. GitHub may be temporarily unavailable; please try"
-" again in a few minutes."
-msgstr "アップデートをダウンロードできませんでした。GitHub が一時的に利用できない可能性があります。数分後にもう一度お試しください。"
+"Failed to download update. GitHub may be temporarily unavailable; please try "
+"again in a few minutes."
+msgstr ""
+"アップデートをダウンロードできませんでした。GitHub が一時的に利用できない可能"
+"性があります。数分後にもう一度お試しください。"
 
 #: core/updater.py:1034 core/updater.py:364
 msgid "Auto-update is not supported on this platform ({platform})."
-msgstr "このプラットフォームでは自動アップデートはサポートされていません({platform})。"
+msgstr ""
+"このプラットフォームでは自動アップデートはサポートされていません"
+"({platform})。"
 
 #: core/updater.py:1175
 msgid "Update signature verification failed: {error}"
@@ -885,7 +909,8 @@ msgstr "BlindRSS は最新の状態です({version})。"
 
 #: core/updater.py:371
 msgid "Update manifest '{manifest}' not found in release assets."
-msgstr "アップデートマニフェスト「{manifest}」がリリースアセット内に見つかりません。"
+msgstr ""
+"アップデートマニフェスト「{manifest}」がリリースアセット内に見つかりません。"
 
 #: core/updater.py:392
 msgid "Update asset must be a {extension} file."
@@ -953,22 +978,27 @@ msgid ""
 "Failed to download update metadata: {error}. GitHub may be temporarily "
 "unavailable; please try again in a few minutes."
 msgstr ""
-"更新メタデータをダウンロードできませんでした: {error}。GitHub が一時的に利用できない可能性があります。数分後にもう一度お試しください。"
+"更新メタデータをダウンロードできませんでした: {error}。GitHub が一時的に利用"
+"できない可能性があります。数分後にもう一度お試しください。"
 
 #: core/updater.py:428
 msgid "Update installer '{name}' not found in release assets."
-msgstr "アップデートインストーラー「{name}」がリリースアセット内に見つかりません。"
+msgstr ""
+"アップデートインストーラー「{name}」がリリースアセット内に見つかりません。"
 
 #: core/updater.py:648
 msgid "Update is signed but not by a trusted certificate{suffix}"
-msgstr "アップデートは署名されていますが、信頼された証明書によるものではありません{suffix}"
+msgstr ""
+"アップデートは署名されていますが、信頼された証明書によるものではありません"
+"{suffix}"
 
 #: core/updater.py:997
 msgid ""
 "Failed to download update: {error}. GitHub may be temporarily unavailable; "
 "please try again in a few minutes."
 msgstr ""
-"アップデートをダウンロードできませんでした: {error}。GitHub が一時的に利用できない可能性があります。数分後にもう一度お試しください。"
+"アップデートをダウンロードできませんでした: {error}。GitHub が一時的に利用で"
+"きない可能性があります。数分後にもう一度お試しください。"
 
 #: core/user_agents.py:486
 msgid "Automatic"
@@ -1348,7 +1378,9 @@ msgstr "BlindRSS アクセシブルブラウザー"
 msgid ""
 "VoiceOver-friendly browser for feeds, articles, and content. Use the lists "
 "below to choose a view and article."
-msgstr "フィード、記事、コンテンツ用の VoiceOver 対応ブラウザーです。下のリストからビューと記事を選択してください。"
+msgstr ""
+"フィード、記事、コンテンツ用の VoiceOver 対応ブラウザーです。下のリストから"
+"ビューと記事を選択してください。"
 
 #: gui/accessibility.py:468
 msgid "Rich View"
@@ -1364,9 +1396,11 @@ msgstr "ビュー"
 
 #: gui/accessibility.py:503
 msgid ""
-"Categories can be expanded or collapsed. Use the buttons, or use Right Arrow"
-" to expand and Left Arrow to collapse."
-msgstr "カテゴリは展開または折りたたむことができます。ボタンを使うか、右矢印キーで展開、左矢印キーで折りたたんでください。"
+"Categories can be expanded or collapsed. Use the buttons, or use Right Arrow "
+"to expand and Left Arrow to collapse."
+msgstr ""
+"カテゴリは展開または折りたたむことができます。ボタンを使うか、右矢印キーで展"
+"開、左矢印キーで折りたたんでください。"
 
 #: gui/accessibility.py:522
 msgid "Choose a view to load articles."
@@ -1506,13 +1540,13 @@ msgstr "このカテゴリを削除しますか? フィードは「未分類」�
 msgid "Could not remove category."
 msgstr "カテゴリを削除できませんでした。"
 
-#: gui/accessibility.py:1047 gui/dialogs.py:4670 gui/mainframe.py:13457
+#: gui/accessibility.py:1047 gui/dialogs.py:4683 gui/mainframe.py:13457
 #: gui/mainframe.py:13508
 msgid "Error"
 msgstr "エラー"
 
 #: gui/accessibility.py:1318 gui/accessibility.py:297 gui/dialogs.py:236
-#: gui/dialogs.py:4164
+#: gui/dialogs.py:4177
 msgid "Category:"
 msgstr "カテゴリ:"
 
@@ -1595,21 +1629,22 @@ msgid ""
 "Taskbar pinning may be limited by your Windows version/policies."
 msgstr ""
 "BlindRSS のショートカットを追加する場所を選択してください。\n"
-"タスクバーへのピン留めは、Windows のバージョンやポリシーによって制限される場合があります。"
+"タスクバーへのピン留めは、Windows のバージョンやポリシーによって制限される場"
+"合があります。"
 
-#: gui/dialogs.py:1099 gui/dialogs.py:1083 gui/dialogs.py:4181
+#: gui/dialogs.py:1099 gui/dialogs.py:1083 gui/dialogs.py:4194
 msgid "5 minutes"
 msgstr "5 分"
 
-#: gui/dialogs.py:2113
+#: gui/dialogs.py:2125
 msgid "BlindRSS notification test"
 msgstr "BlindRSS 通知テスト"
 
-#: gui/dialogs.py:2114
+#: gui/dialogs.py:2126
 msgid "If you can read this, notifications are working."
 msgstr "これが読めれば、通知は正常に機能しています。"
 
-#: gui/dialogs.py:3249
+#: gui/dialogs.py:3261
 msgid ""
 "Windows toast notifications for new articles.\n"
 "Disabled by default."
@@ -1617,7 +1652,7 @@ msgstr ""
 "新着記事の Windows トースト通知。\n"
 "既定では無効です。"
 
-#: gui/dialogs.py:3328
+#: gui/dialogs.py:3340
 msgid ""
 "Screen-reader announcements for key keyboard actions.\n"
 "Each event can announce via speech, Braille, both, or neither.\n"
@@ -1627,7 +1662,7 @@ msgstr ""
 "各イベントは音声、点字、両方、またはなしで通知できます。\n"
 "点字出力は Windows の NVDA または JAWS で最も確実に動作します。"
 
-#: gui/dialogs.py:3380
+#: gui/dialogs.py:3392
 msgid ""
 "Configure automatic article translation.\n"
 "Your API key is stored locally in config.json."
@@ -1635,7 +1670,7 @@ msgstr ""
 "記事の自動翻訳を設定します。\n"
 "API キーは config.json にローカル保存されます。"
 
-#: gui/dialogs.py:3732
+#: gui/dialogs.py:3744
 msgid ""
 "Optional paid CAPTCHA-solving service for sites whose Cloudflare\n"
 "challenge defeats every automated browser attempt. BlindRSS then\n"
@@ -1643,13 +1678,14 @@ msgid ""
 "solved token. The service sees which blocked URL is being solved.\n"
 "Your API key is stored locally in config.json."
 msgstr ""
-"Cloudflare のチャレンジを自動ブラウザーで突破できないサイト向けの、任意の有料 CAPTCHA 解決サービスです。\n"
+"Cloudflare のチャレンジを自動ブラウザーで突破できないサイト向けの、任意の有"
+"料 CAPTCHA 解決サービスです。\n"
 "BlindRSS はチャレンジのパラメーターだけをサービスに送信し、\n"
 "解決済みトークンを挿入します。サービスには、解決対象の\n"
 "ブロックされた URL が表示されます。\n"
 "API キーは config.json にローカル保存されます。"
 
-#: gui/dialogs.py:3811 gui/dialogs.py:3799
+#: gui/dialogs.py:3823 gui/dialogs.py:3811
 msgid "App Install Folder"
 msgstr "アプリのインストールフォルダー"
 
@@ -1665,8 +1701,8 @@ msgstr "フィードまたはメディアの URL"
 msgid "https://example.com/feed or a YouTube/podcast URL"
 msgstr "https://example.com/feed または YouTube/ポッドキャストの URL"
 
-#: gui/dialogs.py:238 gui/dialogs.py:4166 gui/dialogs.py:7902
-#: gui/dialogs.py:4603
+#: gui/dialogs.py:238 gui/dialogs.py:4179 gui/dialogs.py:7915
+#: gui/dialogs.py:4616
 msgid "Category"
 msgstr "カテゴリ"
 
@@ -1718,55 +1754,55 @@ msgstr "ブラウザーのユーザーエージェント"
 msgid "Choose the exported cookies.txt"
 msgstr "エクスポートした cookies.txt を選択"
 
-#: gui/dialogs.py:1077 gui/dialogs.py:4248
+#: gui/dialogs.py:1077 gui/dialogs.py:4261
 msgid "Never"
 msgstr "しない"
 
-#: gui/dialogs.py:1078 gui/dialogs.py:4176
+#: gui/dialogs.py:1078 gui/dialogs.py:4189
 msgid "30 seconds"
 msgstr "30 秒"
 
-#: gui/dialogs.py:1079 gui/dialogs.py:4177
+#: gui/dialogs.py:1079 gui/dialogs.py:4190
 msgid "1 minute"
 msgstr "1 分"
 
-#: gui/dialogs.py:1080 gui/dialogs.py:4178
+#: gui/dialogs.py:1080 gui/dialogs.py:4191
 msgid "2 minutes"
 msgstr "2 分"
 
-#: gui/dialogs.py:1081 gui/dialogs.py:4179
+#: gui/dialogs.py:1081 gui/dialogs.py:4192
 msgid "3 minutes"
 msgstr "3 分"
 
-#: gui/dialogs.py:1082 gui/dialogs.py:4180
+#: gui/dialogs.py:1082 gui/dialogs.py:4193
 msgid "4 minutes"
 msgstr "4 分"
 
-#: gui/dialogs.py:1084 gui/dialogs.py:4182
+#: gui/dialogs.py:1084 gui/dialogs.py:4195
 msgid "10 minutes"
 msgstr "10 分"
 
-#: gui/dialogs.py:1085 gui/dialogs.py:4183
+#: gui/dialogs.py:1085 gui/dialogs.py:4196
 msgid "15 minutes"
 msgstr "15 分"
 
-#: gui/dialogs.py:1086 gui/dialogs.py:4184
+#: gui/dialogs.py:1086 gui/dialogs.py:4197
 msgid "30 minutes"
 msgstr "30 分"
 
-#: gui/dialogs.py:1087 gui/dialogs.py:4185
+#: gui/dialogs.py:1087 gui/dialogs.py:4198
 msgid "60 minutes"
 msgstr "60 分"
 
-#: gui/dialogs.py:1088 gui/dialogs.py:4186
+#: gui/dialogs.py:1088 gui/dialogs.py:4199
 msgid "2 hours"
 msgstr "2 時間"
 
-#: gui/dialogs.py:1089 gui/dialogs.py:4187
+#: gui/dialogs.py:1089 gui/dialogs.py:4200
 msgid "3 hours"
 msgstr "3 時間"
 
-#: gui/dialogs.py:1090 gui/dialogs.py:4188
+#: gui/dialogs.py:1090 gui/dialogs.py:4201
 msgid "4 hours"
 msgstr "4 時間"
 
@@ -1782,11 +1818,11 @@ msgstr "タイトルと本文"
 msgid "Delete behavior"
 msgstr "削除時の動作"
 
-#: gui/dialogs.py:1203 gui/dialogs.py:4325
+#: gui/dialogs.py:1203 gui/dialogs.py:4338
 msgid "Delete target category (full path)"
 msgstr "削除時の移動先カテゴリ (フルパス)"
 
-#: gui/dialogs.py:1204 gui/dialogs.py:4326
+#: gui/dialogs.py:1204 gui/dialogs.py:4339
 msgid "Category / Path"
 msgstr "カテゴリ / パス"
 
@@ -1818,550 +1854,560 @@ msgstr "常にフィードを完全に更新"
 msgid "Local RSS automatic feed refresh workload"
 msgstr "ローカル RSS の自動フィード更新の動作"
 
-#: gui/dialogs.py:1434
+#: gui/dialogs.py:1432
 msgid "yt-dlp cookies file path"
 msgstr "yt-dlp の Cookie ファイルのパス"
 
-#: gui/dialogs.py:1435
+#: gui/dialogs.py:1433
 msgid "Path to a cookies.txt file"
 msgstr "cookies.txt ファイルへのパス"
 
-#: gui/dialogs.py:1438
+#: gui/dialogs.py:1436
 msgid "Browse for cookies file"
 msgstr "Cookie ファイルを参照"
 
-#: gui/dialogs.py:1469
+#: gui/dialogs.py:1459
+msgid "Read cookies from installed browsers"
+msgstr "インストール済みのブラウザーから Cookie を読み取る"
+
+#: gui/dialogs.py:1481
 msgid "YouTube playback cache folder"
 msgstr "YouTube 再生キャッシュフォルダー"
 
-#: gui/dialogs.py:1470
+#: gui/dialogs.py:1482
 msgid "Leave blank for the default location"
 msgstr "既定の場所を使用する場合は空欄にしてください"
 
-#: gui/dialogs.py:1473
+#: gui/dialogs.py:1485
 msgid "Browse for playback cache folder"
 msgstr "再生キャッシュフォルダーを参照"
 
-#: gui/dialogs.py:1539
+#: gui/dialogs.py:1551
 msgid "Automatic (system language)"
 msgstr "自動(システム言語)"
 
-#: gui/dialogs.py:1576
+#: gui/dialogs.py:1588
 msgid "Interface language"
 msgstr "インターフェイスの言語"
 
-#: gui/dialogs.py:1603 gui/dialogs.py:1611
+#: gui/dialogs.py:1615 gui/dialogs.py:1623
 msgid "All items expanded"
 msgstr "すべての項目が展開されました"
 
-#: gui/dialogs.py:1604 gui/dialogs.py:1611
+#: gui/dialogs.py:1616 gui/dialogs.py:1623
 msgid "All items collapsed"
 msgstr "すべての項目が折りたたまれました"
 
-#: gui/dialogs.py:1608
+#: gui/dialogs.py:1620
 msgid "Feed category tree default state on startup"
 msgstr "起動時のフィードカテゴリツリーの既定の状態"
 
-#: gui/dialogs.py:1623 gui/dialogs.py:1631
+#: gui/dialogs.py:1635 gui/dialogs.py:1643
 msgid "Default browser"
 msgstr "既定のブラウザー"
 
-#: gui/dialogs.py:1624 gui/dialogs.py:2821 gui/dialogs.py:1631
+#: gui/dialogs.py:1636 gui/dialogs.py:2833 gui/dialogs.py:1643
 msgid "Custom command"
 msgstr "カスタムコマンド"
 
-#: gui/dialogs.py:1628
+#: gui/dialogs.py:1640
 msgid "Article opening method"
 msgstr "記事を開く方法"
 
-#: gui/dialogs.py:1644
+#: gui/dialogs.py:1656
 msgid "Custom article open command"
 msgstr "記事を開くカスタムコマンド"
 
-#: gui/dialogs.py:1647
+#: gui/dialogs.py:1659
 msgid "Test custom article open command"
 msgstr "カスタムの記事オープンコマンドをテスト"
 
-#: gui/dialogs.py:1678 gui/dialogs.py:4346
+#: gui/dialogs.py:1690 gui/dialogs.py:4359
 msgid "General"
 msgstr "全般"
 
-#: gui/dialogs.py:1680
+#: gui/dialogs.py:1692
 msgid "Feeds && Articles"
 msgstr "フィードと記事"
 
-#: gui/dialogs.py:1682
+#: gui/dialogs.py:1694
 msgid "YouTube"
 msgstr "YouTube"
 
-#: gui/dialogs.py:1691
+#: gui/dialogs.py:1703
 msgid "Media Player"
 msgstr "メディアプレーヤー"
 
-#: gui/dialogs.py:1694 gui/dialogs.py:5039
+#: gui/dialogs.py:1706 gui/dialogs.py:5052
 msgid "Provider"
 msgstr "プロバイダー"
 
-#: gui/dialogs.py:1699 gui/dialogs.py:2110 gui/dialogs.py:2147
+#: gui/dialogs.py:1711 gui/dialogs.py:2122 gui/dialogs.py:2159
 #: gui/mainframe.py:14103
 msgid "Notifications"
 msgstr "通知"
 
-#: gui/dialogs.py:1704
+#: gui/dialogs.py:1716
 msgid "Translate"
 msgstr "翻訳"
 
-#: gui/dialogs.py:1714 gui/dialogs.py:4354
+#: gui/dialogs.py:1726 gui/dialogs.py:4367
 msgid "List Headers"
 msgstr "リストのヘッダー"
 
-#: gui/dialogs.py:1717
+#: gui/dialogs.py:1729
 msgid "Advanced"
 msgstr "詳細設定"
 
-#: gui/dialogs.py:1723
+#: gui/dialogs.py:1735
 msgid "CAPTCHA Solving"
 msgstr "CAPTCHA の解決"
 
-#: gui/dialogs.py:1853 gui/dialogs.py:1845
+#: gui/dialogs.py:1865 gui/dialogs.py:1857
 msgid "Check for updates:"
 msgstr "更新の確認:"
 
-#: gui/dialogs.py:1921 gui/dialogs.py:1832
+#: gui/dialogs.py:1933 gui/dialogs.py:1844
 msgid "Translation Updates"
 msgstr "翻訳の更新"
 
-#: gui/dialogs.py:2084 gui/dialogs.py:576
+#: gui/dialogs.py:2096 gui/dialogs.py:576
 msgid "No feeds available."
 msgstr "利用可能なフィードがありません。"
 
-#: gui/dialogs.py:2184
+#: gui/dialogs.py:2196
 msgid ""
 "The announcement could not be delivered.\n"
 "\n"
-"No screen reader output was available. Check that your screen reader is running, and that the accessible-output2 library is installed for full speech and Braille support."
+"No screen reader output was available. Check that your screen reader is "
+"running, and that the accessible-output2 library is installed for full "
+"speech and Braille support."
 msgstr ""
 "アナウンスを届けられませんでした。\n"
 "\n"
-"スクリーンリーダーの出力が利用できませんでした。スクリーンリーダーが起動していること、および完全な音声・点字サポートのために accessible-output2 ライブラリがインストールされていることを確認してください。"
+"スクリーンリーダーの出力が利用できませんでした。スクリーンリーダーが起動して"
+"いること、および完全な音声・点字サポートのために accessible-output2 ライブラ"
+"リがインストールされていることを確認してください。"
 
-#: gui/dialogs.py:2190 gui/dialogs.py:3316
+#: gui/dialogs.py:2202 gui/dialogs.py:3328
 msgid "Announcements"
 msgstr "アナウンス"
 
-#: gui/dialogs.py:2273
+#: gui/dialogs.py:2285
 msgid "Waiting for authorization..."
 msgstr "承認を待機しています..."
 
-#: gui/dialogs.py:2416
+#: gui/dialogs.py:2428
 msgid "Authorization failed"
 msgstr "承認に失敗しました"
 
-#: gui/dialogs.py:2435 gui/dialogs.py:3165
+#: gui/dialogs.py:2447 gui/dialogs.py:3177
 msgid "Not authorized"
 msgstr "未承認"
 
-#: gui/dialogs.py:2578
+#: gui/dialogs.py:2590
 msgid "Choose download directory"
 msgstr "ダウンロード先ディレクトリを選択"
 
-#: gui/dialogs.py:2586
+#: gui/dialogs.py:2598
 msgid "Choose yt-dlp cookies.txt"
 msgstr "yt-dlp の cookies.txt を選択"
 
-#: gui/dialogs.py:2604
+#: gui/dialogs.py:2616
 msgid "Choose YouTube playback cache folder"
 msgstr "YouTube 再生キャッシュフォルダーを選択"
 
-#: gui/dialogs.py:2627
+#: gui/dialogs.py:2639
 msgid "Clear playback cache"
 msgstr "再生キャッシュを消去"
 
-#: gui/dialogs.py:2635
+#: gui/dialogs.py:2647
 msgid "Playback cache cleared"
 msgstr "再生キャッシュを消去しました"
 
-#: gui/dialogs.py:2664
+#: gui/dialogs.py:2676
 msgid "Import cookies from browser"
 msgstr "ブラウザーから Cookie をインポート"
 
-#: gui/dialogs.py:2667
+#: gui/dialogs.py:2679
 msgid "Find my export"
 msgstr "エクスポートしたファイルを探す"
 
-#: gui/dialogs.py:2667
+#: gui/dialogs.py:2679
 msgid "Open extension page"
 msgstr "拡張機能ページを開く"
 
-#: gui/dialogs.py:2667 gui/dialogs.py:2700 gui/player.py:451
+#: gui/dialogs.py:2679 gui/dialogs.py:2712 gui/player.py:451
 msgid "Cancel"
 msgstr "キャンセル"
 
-#: gui/dialogs.py:2741
+#: gui/dialogs.py:2753
 msgid "Cookies imported"
 msgstr "Cookie をインポートしました"
 
-#: gui/dialogs.py:2886
+#: gui/dialogs.py:2898
 msgid "Groups.io API key"
 msgstr "Groups.io の API キー"
 
-#: gui/dialogs.py:2887
+#: gui/dialogs.py:2899
 msgid "Paste your Groups.io API key"
 msgstr "Groups.io の API キーを貼り付けてください"
 
-#: gui/dialogs.py:2905
+#: gui/dialogs.py:2917
 msgid "GitHub personal access token"
 msgstr "GitHub パーソナルアクセストークン"
 
-#: gui/dialogs.py:2906
+#: gui/dialogs.py:2918
 msgid "Paste your GitHub token"
 msgstr "GitHub トークンを貼り付けてください"
 
-#: gui/dialogs.py:2920
+#: gui/dialogs.py:2932
 msgid "Loading soundcards..."
 msgstr "サウンドカードを読み込んでいます..."
 
-#: gui/dialogs.py:2975
+#: gui/dialogs.py:2987
 msgid "Media tools (ffmpeg, ffprobe, yt-dlp)"
 msgstr "メディアツール(ffmpeg、ffprobe、yt-dlp)"
 
-#: gui/dialogs.py:3172
+#: gui/dialogs.py:3184
 msgid ""
 "Local provider uses the feeds you add inside the app (Add Feed / Import "
 "OPML)."
-msgstr "ローカルプロバイダーは、アプリ内で追加したフィードを使用します(フィードを追加 / OPML をインポート)。"
+msgstr ""
+"ローカルプロバイダーは、アプリ内で追加したフィードを使用します(フィードを追"
+"加 / OPML をインポート)。"
 
-#: gui/dialogs.py:3239
+#: gui/dialogs.py:3251
 msgid "Refresh Complete Sound:"
 msgstr "更新完了時のサウンド:"
 
-#: gui/dialogs.py:3240
+#: gui/dialogs.py:3252
 msgid "Refresh Error Sound:"
 msgstr "更新エラー時のサウンド:"
 
-#: gui/dialogs.py:3367 gui/dialogs.py:3366
+#: gui/dialogs.py:3379 gui/dialogs.py:3378
 msgid "Test Announcement"
 msgstr "テストアナウンス"
 
-#: gui/dialogs.py:3369
+#: gui/dialogs.py:3381
 msgid "Send a test announcement to your screen reader via speech and Braille."
 msgstr "音声と点字でスクリーンリーダーにテストアナウンスを送信します。"
 
-#: gui/dialogs.py:3440
+#: gui/dialogs.py:3452
 msgid "Target language"
 msgstr "翻訳先の言語"
 
-#: gui/dialogs.py:3475
+#: gui/dialogs.py:3487
 msgid "Grok (xAI) model"
 msgstr "Grok (xAI) のモデル"
 
-#: gui/dialogs.py:3497
+#: gui/dialogs.py:3509
 msgid "Grok (xAI) API key"
 msgstr "Grok (xAI) の API キー"
 
-#: gui/dialogs.py:3518
+#: gui/dialogs.py:3530
 msgid "Groq model"
 msgstr "Groq のモデル"
 
-#: gui/dialogs.py:3535
+#: gui/dialogs.py:3547
 msgid "Groq API key"
 msgstr "Groq の API キー"
 
-#: gui/dialogs.py:3566
+#: gui/dialogs.py:3578
 msgid "OpenAI model"
 msgstr "OpenAI のモデル"
 
-#: gui/dialogs.py:3583
+#: gui/dialogs.py:3595
 msgid "OpenAI API key"
 msgstr "OpenAI の API キー"
 
-#: gui/dialogs.py:3604
+#: gui/dialogs.py:3616
 msgid "OpenRouter model"
 msgstr "OpenRouter のモデル"
 
-#: gui/dialogs.py:3621
+#: gui/dialogs.py:3633
 msgid "OpenRouter API key"
 msgstr "OpenRouter の API キー"
 
-#: gui/dialogs.py:3652
+#: gui/dialogs.py:3664
 msgid "Gemini model"
 msgstr "Gemini のモデル"
 
-#: gui/dialogs.py:3669
+#: gui/dialogs.py:3681
 msgid "Gemini API key"
 msgstr "Gemini の API キー"
 
-#: gui/dialogs.py:3690
+#: gui/dialogs.py:3702
 msgid "Qwen model"
 msgstr "Qwen のモデル"
 
-#: gui/dialogs.py:3707
+#: gui/dialogs.py:3719
 msgid "Qwen API key"
 msgstr "Qwen の API キー"
 
-#: gui/dialogs.py:3774
+#: gui/dialogs.py:3786
 msgid "CAPTCHA solving service API key"
 msgstr "CAPTCHA 解決サービスの API キー"
 
-#: gui/dialogs.py:3798
+#: gui/dialogs.py:3810
 msgid "User Data Folder"
 msgstr "ユーザーデータフォルダー"
 
-#: gui/dialogs.py:3882
+#: gui/dialogs.py:3894
 msgid "Identify as"
 msgstr "名乗る種別"
 
-#: gui/dialogs.py:3904
+#: gui/dialogs.py:3916
 msgid "Custom User-Agent"
 msgstr "カスタムユーザーエージェント"
 
-#: gui/dialogs.py:3912
+#: gui/dialogs.py:3924
 msgid "Current User-Agent"
 msgstr "現在のユーザーエージェント"
 
-#: gui/dialogs.py:3926 gui/dialogs.py:3923
+#: gui/dialogs.py:3938 gui/dialogs.py:3935
 msgid "Enable adult sites in Video Search"
 msgstr "動画検索でアダルトサイトを有効にする"
 
-#: gui/dialogs.py:4148
+#: gui/dialogs.py:4161
 msgid "Feed title"
 msgstr "フィードのタイトル"
 
-#: gui/dialogs.py:4155
+#: gui/dialogs.py:4168
 msgid "Feed URL"
 msgstr "フィードの URL"
 
-#: gui/dialogs.py:4191
+#: gui/dialogs.py:4204
 msgid "Refresh interval for this feed"
 msgstr "このフィードの更新間隔"
 
-#: gui/dialogs.py:4227
+#: gui/dialogs.py:4240
 msgid "Custom request headers"
 msgstr "カスタムリクエストヘッダー"
 
-#: gui/dialogs.py:4243
+#: gui/dialogs.py:4256
 msgid "Request timeout seconds"
 msgstr "リクエストのタイムアウト秒数"
 
-#: gui/dialogs.py:4249
+#: gui/dialogs.py:4262
 msgid "Browser impersonation"
 msgstr "ブラウザーの偽装"
 
-#: gui/dialogs.py:4269
+#: gui/dialogs.py:4282
 msgid "Proxy URL"
 msgstr "プロキシの URL"
 
-#: gui/dialogs.py:4286
+#: gui/dialogs.py:4299
 msgid "Feed encoding"
 msgstr "フィードの文字エンコーディング"
 
-#: gui/dialogs.py:4301
+#: gui/dialogs.py:4314
 msgid "Full text extraction encoding"
 msgstr "全文抽出の文字エンコーディング"
 
-#: gui/dialogs.py:4322
+#: gui/dialogs.py:4335
 msgid "Delete behavior for this feed"
 msgstr "このフィードの削除時の動作"
 
-#: gui/dialogs.py:4583 gui/mainframe.py:7532
+#: gui/dialogs.py:4596 gui/mainframe.py:7532
 msgid "Category name"
 msgstr "カテゴリ名"
 
-#: gui/dialogs.py:4666
+#: gui/dialogs.py:4679
 msgid "Feeds with errors"
 msgstr "エラーのあるフィード"
 
-#: gui/dialogs.py:4668
+#: gui/dialogs.py:4681
 msgid "Last attempt"
 msgstr "前回の試行"
 
-#: gui/dialogs.py:4669
+#: gui/dialogs.py:4682
 msgid "Failures"
 msgstr "失敗回数"
 
-#: gui/dialogs.py:4680
+#: gui/dialogs.py:4693
 msgid "Error details"
 msgstr "エラーの詳細"
 
-#: gui/dialogs.py:4715
+#: gui/dialogs.py:4728
 msgid "No feeds reported errors during their most recent update."
 msgstr "直近の更新でエラーを報告したフィードはありません。"
 
-#: gui/dialogs.py:4724 gui/dialogs.py:4728
+#: gui/dialogs.py:4737 gui/dialogs.py:4741
 msgid "Unknown"
 msgstr "不明"
 
-#: gui/dialogs.py:4769
+#: gui/dialogs.py:4782
 msgid "1 failed attempt so far (this may be a one-off glitch)."
 msgstr "これまでに 1 回の失敗 (一時的な不具合の可能性があります)。"
 
-#: gui/dialogs.py:4776 gui/dialogs.py:4740
+#: gui/dialogs.py:4789 gui/dialogs.py:4753
 msgid "Untitled feed"
 msgstr "無題のフィード"
 
-#: gui/dialogs.py:4780
+#: gui/dialogs.py:4793
 msgid "No successful update recorded."
 msgstr "成功した更新は記録されていません。"
 
-#: gui/dialogs.py:4782 gui/dialogs.py:1968 gui/mainframe.py:635
+#: gui/dialogs.py:4795 gui/dialogs.py:1980 gui/mainframe.py:635
 #: gui/mainframe.py:11788
 msgid "Unknown error"
 msgstr "不明なエラー"
 
-#: gui/dialogs.py:4921
+#: gui/dialogs.py:4934
 msgid "this feed"
 msgstr "このフィード"
 
-#: gui/dialogs.py:5014
+#: gui/dialogs.py:5027
 msgid "Search for a podcast or RSS feed"
 msgstr "ポッドキャストまたは RSS フィードを検索"
 
-#: gui/dialogs.py:5015
+#: gui/dialogs.py:5028
 msgid "Podcast name, topic, or site URL"
 msgstr "ポッドキャスト名、トピック、またはサイトの URL"
 
-#: gui/dialogs.py:5022
+#: gui/dialogs.py:5035
 msgid "Search source"
 msgstr "検索ソース"
 
-#: gui/dialogs.py:5037 gui/dialogs.py:6016
+#: gui/dialogs.py:5050 gui/dialogs.py:6029
 msgid "Search results"
 msgstr "検索結果"
 
-#: gui/dialogs.py:5040 gui/dialogs.py:6023
+#: gui/dialogs.py:5053 gui/dialogs.py:6036
 msgid "Details"
 msgstr "詳細"
 
-#: gui/dialogs.py:5041 gui/dialogs.py:6024
+#: gui/dialogs.py:5054 gui/dialogs.py:6037
 msgid "URL"
 msgstr "URL"
 
-#: gui/dialogs.py:5970
+#: gui/dialogs.py:5983
 msgid "Video search"
 msgstr "動画検索"
 
-#: gui/dialogs.py:5971
+#: gui/dialogs.py:5984
 msgid "Search videos across sites"
 msgstr "サイト横断で動画を検索"
 
-#: gui/dialogs.py:5983
+#: gui/dialogs.py:5996
 msgid "Search sites"
 msgstr "検索サイト"
 
-#: gui/dialogs.py:5987
+#: gui/dialogs.py:6000
 msgid "Filter results by site"
 msgstr "サイトで結果を絞り込む"
 
-#: gui/dialogs.py:5994
+#: gui/dialogs.py:6007
 msgid "Sort results"
 msgstr "結果の並べ替え"
 
-#: gui/dialogs.py:5995
+#: gui/dialogs.py:6008
 msgid "Relevance"
 msgstr "関連度"
 
-#: gui/dialogs.py:5995 gui/dialogs.py:6020
+#: gui/dialogs.py:6008 gui/dialogs.py:6033
 msgid "Site"
 msgstr "サイト"
 
-#: gui/dialogs.py:5995 gui/dialogs.py:6022
+#: gui/dialogs.py:6008 gui/dialogs.py:6035
 msgid "Plays"
 msgstr "再生数"
 
-#: gui/dialogs.py:6021
+#: gui/dialogs.py:6034
 msgid "Kind"
 msgstr "種類"
 
-#: gui/dialogs.py:6028 gui/dialogs.py:7548 gui/mainframe.py:6522
+#: gui/dialogs.py:6041 gui/dialogs.py:7561 gui/mainframe.py:6522
 #: gui/mainframe.py:5437
 msgid "Close"
 msgstr "閉じる"
 
-#: gui/dialogs.py:6999
+#: gui/dialogs.py:7012
 msgid "Searching"
 msgstr "検索しています"
 
-#: gui/dialogs.py:6999
+#: gui/dialogs.py:7012
 msgid "Loading more"
 msgstr "追加で読み込んでいます"
 
-#: gui/dialogs.py:7222 gui/player.py:2108 gui/player.py:5948
+#: gui/dialogs.py:7235 gui/player.py:2108 gui/player.py:5948
 msgid "Play"
 msgstr "再生"
 
-#: gui/dialogs.py:7223 gui/dialogs.py:7400
+#: gui/dialogs.py:7236 gui/dialogs.py:7413
 msgid "Subscribe"
 msgstr "登録"
 
-#: gui/dialogs.py:7224
+#: gui/dialogs.py:7237
 msgid "Copy URL"
 msgstr "URL をコピー"
 
-#: gui/dialogs.py:7429
+#: gui/dialogs.py:7442
 msgid "Subscribed (native)"
 msgstr "購読済み (ネイティブ)"
 
-#: gui/dialogs.py:7432
+#: gui/dialogs.py:7445
 msgid "Subscribed (source)"
 msgstr "購読済み (ソース)"
 
-#: gui/dialogs.py:7462
+#: gui/dialogs.py:7475
 msgid "Saved searches"
 msgstr "保存した検索"
 
-#: gui/dialogs.py:7494
+#: gui/dialogs.py:7507
 msgid "Search query:"
 msgstr "検索クエリ:"
 
-#: gui/dialogs.py:7494
+#: gui/dialogs.py:7507
 msgid "Add Search"
 msgstr "検索を追加"
 
-#: gui/dialogs.py:7591
+#: gui/dialogs.py:7604
 msgid "Queued media"
 msgstr "キュー内のメディア"
 
-#: gui/dialogs.py:7719
+#: gui/dialogs.py:7732
 msgid "&Pause"
 msgstr "一時停止(&P)"
 
-#: gui/dialogs.py:7719 gui/dialogs.py:7602
+#: gui/dialogs.py:7732 gui/dialogs.py:7615
 msgid "&Play"
 msgstr "再生(&P)"
 
-#: gui/dialogs.py:7824
+#: gui/dialogs.py:7837
 msgid "Captured keyboard shortcut"
 msgstr "取得したショートカット"
 
-#: gui/dialogs.py:7901
+#: gui/dialogs.py:7914
 msgid "Keyboard shortcuts"
 msgstr "キーボードショートカット"
 
-#: gui/dialogs.py:7903
+#: gui/dialogs.py:7916
 msgid "Command"
 msgstr "コマンド"
 
-#: gui/dialogs.py:7904
+#: gui/dialogs.py:7917
 msgid "Shortcut"
 msgstr "ショートカット"
 
-#: gui/dialogs.py:8149
+#: gui/dialogs.py:8162
 msgid "Preset"
 msgstr "プリセット"
 
-#: gui/dialogs.py:8158
+#: gui/dialogs.py:8171
 msgid "Preamp"
 msgstr "プリアンプ"
 
-#: gui/dialogs.py:8241
+#: gui/dialogs.py:8254
 msgid "Custom"
 msgstr "カスタム"
 
-#: gui/dialogs.py:8328
+#: gui/dialogs.py:8341
 msgid "Name for this equalizer preset:"
 msgstr "このイコライザープリセットの名前:"
 
-#: gui/dialogs.py:8328 gui/dialogs.py:8354 gui/dialogs.py:8340
+#: gui/dialogs.py:8341 gui/dialogs.py:8367 gui/dialogs.py:8353
 msgid "Save Preset"
 msgstr "プリセットを保存"
 
@@ -2369,15 +2415,15 @@ msgstr "プリセットを保存"
 msgid "Use the global column layout"
 msgstr "全体の列レイアウトを使用する"
 
-#: gui/dialogs.py:129 gui/dialogs.py:7606 gui/mainframe.py:14998
+#: gui/dialogs.py:129 gui/dialogs.py:7619 gui/mainframe.py:14998
 msgid "Move &Up"
 msgstr "上へ移動(&U)"
 
-#: gui/dialogs.py:130 gui/dialogs.py:7610 gui/mainframe.py:14999
+#: gui/dialogs.py:130 gui/dialogs.py:7623 gui/mainframe.py:14999
 msgid "Move &Down"
 msgstr "下へ移動(&D)"
 
-#: gui/dialogs.py:131 gui/dialogs.py:7919
+#: gui/dialogs.py:131 gui/dialogs.py:7932
 msgid "Reset All to &Defaults"
 msgstr "すべて既定値にリセット(&D)"
 
@@ -2392,7 +2438,8 @@ msgstr "OK: yt-dlp で対応しています"
 #: gui/dialogs.py:386 gui/mainframe.py:12483 gui/mainframe.py:12502
 #: gui/mainframe.py:14553
 msgid "Downloads are disabled. Enable them in Settings > Downloads."
-msgstr "ダウンロードは無効になっています。設定 > ダウンロードで有効にしてください。"
+msgstr ""
+"ダウンロードは無効になっています。設定 > ダウンロードで有効にしてください。"
 
 #: gui/dialogs.py:417
 msgid "Add BlindRSS Shortcuts"
@@ -2415,7 +2462,8 @@ msgid ""
 "Select what to import from this YouTube Takeout file. Press Space to check "
 "or uncheck an item:"
 msgstr ""
-"この YouTube Takeout ファイルからインポートする項目を選択してください。スペースキーを押すと項目のチェックを切り替えられます:"
+"この YouTube Takeout ファイルからインポートする項目を選択してください。スペー"
+"スキーを押すと項目のチェックを切り替えられます:"
 
 #: gui/dialogs.py:507
 msgid "Exclude Feeds from Notifications"
@@ -2435,17 +2483,21 @@ msgstr "フィードが選択されていません。"
 
 #: gui/dialogs.py:664
 msgid ""
-"Some websites show a browser verification page (for example a Cloudflare challenge) before their feeds. To read them in BlindRSS:\n"
+"Some websites show a browser verification page (for example a Cloudflare "
+"challenge) before their feeds. To read them in BlindRSS:\n"
 "1. Open the website in your web browser and wait for it to load.\n"
 "2. Export its cookies with a \"cookies.txt\" browser extension.\n"
 "3. Choose the exported file below.\n"
-"Also paste your browser's User-Agent string (search the web for \"what is my user agent\" to see it) so the site accepts the cookies."
+"Also paste your browser's User-Agent string (search the web for \"what is my "
+"user agent\" to see it) so the site accepts the cookies."
 msgstr ""
-"一部のウェブサイトは、フィードの前にブラウザー検証ページ(例: Cloudflare チャレンジ)を表示します。BlindRSS で読むには:\n"
+"一部のウェブサイトは、フィードの前にブラウザー検証ページ(例: Cloudflare チャ"
+"レンジ)を表示します。BlindRSS で読むには:\n"
 "1. ウェブブラウザーでサイトを開き、読み込まれるまで待ちます。\n"
 "2. 「cookies.txt」ブラウザー拡張機能で Cookie をエクスポートします。\n"
 "3. 下でエクスポートしたファイルを選択します。\n"
-"また、サイトが Cookie を受け入れるように、ブラウザーの User-Agent 文字列も貼り付けてください(「what is my user agent」でウェブ検索すると確認できます)。"
+"また、サイトが Cookie を受け入れるように、ブラウザーの User-Agent 文字列も貼"
+"り付けてください(「what is my user agent」でウェブ検索すると確認できます)。"
 
 #: gui/dialogs.py:682
 msgid "Import from &Browser..."
@@ -2463,11 +2515,17 @@ msgstr "参照..."
 msgid ""
 "No supported browser profiles were found.\n"
 "\n"
-"Cookies can be read directly from Firefox-based browsers (Firefox, LibreWolf, Waterfox, Floorp, Zen). Chrome-based browsers encrypt their cookies; use the \"Get cookies.txt LOCALLY\" extension linked above and import the exported file instead."
+"Cookies can be read directly from Firefox-based browsers (Firefox, "
+"LibreWolf, Waterfox, Floorp, Zen). Chrome-based browsers encrypt their "
+"cookies; use the \"Get cookies.txt LOCALLY\" extension linked above and "
+"import the exported file instead."
 msgstr ""
 "対応するブラウザープロファイルが見つかりませんでした。\n"
 "\n"
-"Cookie は Firefox 系ブラウザー(Firefox、LibreWolf、Waterfox、Floorp、Zen)から直接読み取れます。Chrome 系ブラウザーは Cookie を暗号化しているため、上のリンクの「Get cookies.txt LOCALLY」拡張機能を使ってエクスポートしたファイルをインポートしてください。"
+"Cookie は Firefox 系ブラウザー(Firefox、LibreWolf、Waterfox、Floorp、Zen)から"
+"直接読み取れます。Chrome 系ブラウザーは Cookie を暗号化しているため、上のリン"
+"クの「Get cookies.txt LOCALLY」拡張機能を使ってエクスポートしたファイルをイン"
+"ポートしてください。"
 
 #: gui/dialogs.py:786
 msgid "Choose the browser profile to import cookies from:"
@@ -2650,7 +2708,7 @@ msgstr "オランダ語"
 msgid "Dzongkha"
 msgstr "ゾンカ語"
 
-#: gui/dialogs.py:894 gui/dialogs.py:2454
+#: gui/dialogs.py:894 gui/dialogs.py:2466
 msgid "English"
 msgstr "英語"
 
@@ -3250,16 +3308,16 @@ msgstr "記事削除前に確認する"
 msgid "Move it to Deleted Articles (restorable)"
 msgstr "削除済みの記事に移動する(復元可能)"
 
-#: gui/dialogs.py:1194 gui/dialogs.py:4318
+#: gui/dialogs.py:1194 gui/dialogs.py:4331
 msgid "Remove it permanently"
 msgstr "完全に削除する"
 
-#: gui/dialogs.py:1195 gui/dialogs.py:4319
+#: gui/dialogs.py:1195 gui/dialogs.py:4332
 msgid "Move it to a category"
 msgstr "カテゴリへ移動する"
 
-#: gui/dialogs.py:1225 gui/dialogs.py:1437 gui/dialogs.py:1472
-#: gui/dialogs.py:3000
+#: gui/dialogs.py:1225 gui/dialogs.py:1435 gui/dialogs.py:1484
+#: gui/dialogs.py:3012
 msgid "Browse..."
 msgstr "参照..."
 
@@ -3293,9 +3351,11 @@ msgstr "起動時にフィードを自動更新する"
 
 #: gui/dialogs.py:1367
 msgid ""
-"Article formatting: preserve structure from the original page as spoken text"
-" markers. Applies to newly loaded articles and full text."
-msgstr "記事の書式: 元のページの構造を読み上げ用テキストマーカーとして保持します。新しく読み込まれた記事と全文に適用されます。"
+"Article formatting: preserve structure from the original page as spoken text "
+"markers. Applies to newly loaded articles and full text."
+msgstr ""
+"記事の書式: 元のページの構造を読み上げ用テキストマーカーとして保持します。新"
+"しく読み込まれた記事と全文に適用されます。"
 
 #: gui/dialogs.py:1375
 msgid "Describe tables (\"Table with 3 rows...\" and one line per row)"
@@ -3316,246 +3376,259 @@ msgstr "引用をマークする（前に \"Quote:\"、後に \"End of quote.\"�
 #: gui/dialogs.py:1399
 msgid ""
 "Show links as \"text (address)\" and open the link at the cursor with Enter"
-msgstr "リンクを「テキスト (アドレス)」として表示し、カーソル位置のリンクを Enter で開く"
+msgstr ""
+"リンクを「テキスト (アドレス)」として表示し、カーソル位置のリンクを Enter で"
+"開く"
 
 #: gui/dialogs.py:1405
 msgid ""
 "Rich full-text view: show links, embedded videos, and tweets in a web view "
 "(instead of plain text). Falls back to plain text if unavailable."
 msgstr ""
-"リッチ全文表示: リンク、埋め込み動画、ツイートを（プレーンテキストではなく）Web "
-"ビューで表示します。利用できない場合はプレーンテキストに切り替わります。"
+"リッチ全文表示: リンク、埋め込み動画、ツイートを（プレーンテキストではなく）"
+"Web ビューで表示します。利用できない場合はプレーンテキストに切り替わります。"
 
 #: gui/dialogs.py:1415
 msgid ""
 "Include image alt text in articles (announces images, can override per feed)"
-msgstr "記事内の画像に代替テキストを含める(画像を読み上げます。フィードごとに上書き可能)"
+msgstr ""
+"記事内の画像に代替テキストを含める(画像を読み上げます。フィードごとに上書き可"
+"能)"
 
 #: gui/dialogs.py:1422
 msgid ""
-"yt-dlp cookies file (cookies.txt) — only needed for age-restricted, private,"
-" or members-only YouTube content. Installed browsers are detected "
-"automatically; Firefox is recommended. Chrome, Edge, and Brave may fail on "
-"Windows because their cookies can be encrypted in a way yt-dlp cannot read, "
-"so a cookies.txt is the reliable fallback. LibreWolf uses Firefox-compatible"
-" cookies. Chrome \"Nightly\" means Chrome Canary; Edge \"Nightly\" means "
-"Edge Canary."
-msgstr ""
-"yt-dlp 用 Cookie ファイル(cookies.txt)— 年齢制限付き、非公開、またはメンバー限定の YouTube "
-"コンテンツにのみ必要です。インストール済みのブラウザーは自動的に検出されます。Firefox を推奨します。Chrome、Edge、Brave "
-"は、Cookie が yt-dlp で読み取れない形式で暗号化されている場合があるため、Windows では失敗することがあります。その場合は "
-"cookies.txt を使う方法が確実です。LibreWolf は Firefox 互換の Cookie を使用します。Chrome "
-"の「Nightly」は Chrome Canary、Edge の「Nightly」は Edge Canary を意味します。"
+"Cookies are only needed for age-restricted, private, or members-only "
+"content. BlindRSS reads them automatically from your installed browsers "
+"(Firefox, Chrome, Edge, Brave, Opera, Vivaldi, Chromium and their beta/"
+"nightly variants). A cookies.txt export remains a manual fallback."
+msgstr "Cookie は、年齢制限、限定公開、メンバー限定のコンテンツにのみ必要です。BlindRSS はインストール済みのブラウザー (Firefox、Chrome、Edge、Brave、Opera、Vivaldi、Chromium とそのベータ版/ナイトリー版) から自動的に読み取ります。cookies.txt のエクスポートも手動の代替手段として利用できます。"
 
-#: gui/dialogs.py:1441
+#: gui/dialogs.py:1439
 msgid "Import from browser..."
 msgstr "ブラウザーからインポート..."
 
-#: gui/dialogs.py:1448
+#: gui/dialogs.py:1446
 msgid "Automatically import browser cookies.txt exports from Downloads"
-msgstr "ダウンロードにあるブラウザーの cookies.txt エクスポートを自動的にインポートする"
+msgstr ""
+"ダウンロードにあるブラウザーの cookies.txt エクスポートを自動的にインポートす"
+"る"
 
-#: gui/dialogs.py:1455
+#: gui/dialogs.py:1453
+msgid ""
+"Read cookies directly from installed browsers (Firefox, Chrome, Edge, Brave, "
+"Opera, Vivaldi, Chromium and their beta/nightly variants). Chrome/Edge/Brave "
+"need a one-time Windows permission prompt."
+msgstr "インストール済みのブラウザー (Firefox、Chrome、Edge、Brave、Opera、Vivaldi、Chromium とそのベータ版/ナイトリー版) から直接 Cookie を読み取ります。Chrome/Edge/Brave では、Windows のアクセス許可の確認が 1 回だけ必要です。"
+
+#: gui/dialogs.py:1467
 msgid "Play YouTube by downloading first (most reliable; slower to start)"
-msgstr "YouTube を先にダウンロードしてから再生する(最も確実ですが再生開始が遅くなります)"
+msgstr ""
+"YouTube を先にダウンロードしてから再生する(最も確実ですが再生開始が遅くなりま"
+"す)"
 
-#: gui/dialogs.py:1462
+#: gui/dialogs.py:1474
 msgid "YouTube playback cache folder (blank = default, next to your data):"
 msgstr "YouTube 再生キャッシュフォルダー(空欄 = 既定、データフォルダーの隣):"
 
-#: gui/dialogs.py:1476
+#: gui/dialogs.py:1488
 msgid "Clear cache now"
 msgstr "今すぐキャッシュを消去"
 
-#: gui/dialogs.py:1495
+#: gui/dialogs.py:1507
 msgid "Ask to install missing media dependencies on startup"
 msgstr "起動時に不足しているメディア関連の依存関係のインストールを確認する"
 
-#: gui/dialogs.py:1508
+#: gui/dialogs.py:1520
 msgid "Remember last selected feed/folder on startup"
 msgstr "起動時に最後に選択したフィード/フォルダーを記憶する"
 
-#: gui/dialogs.py:1646
+#: gui/dialogs.py:1658
 msgid "Test"
 msgstr "テスト"
 
-#: gui/dialogs.py:1653
+#: gui/dialogs.py:1665
 msgid "Use %1 for the article URL. Example: chrome --incognito %1"
 msgstr "記事の URL には %1 を使用してください。例: chrome --incognito %1"
 
-#: gui/dialogs.py:1836
+#: gui/dialogs.py:1848
 msgid "Update translations automatically"
 msgstr "翻訳を自動的に更新する"
 
-#: gui/dialogs.py:1916
+#: gui/dialogs.py:1928
 msgid "Could not check for translation updates."
 msgstr "翻訳の更新を確認できませんでした。"
 
-#: gui/dialogs.py:1948
+#: gui/dialogs.py:1960
 msgid "Loading OpenRouter models..."
 msgstr "OpenRouter のモデルを読み込んでいます..."
 
-#: gui/dialogs.py:2110
+#: gui/dialogs.py:2122
 msgid "Notifications are not supported on this platform."
 msgstr "このプラットフォームでは通知はサポートされていません。"
 
-#: gui/dialogs.py:2138
+#: gui/dialogs.py:2150
 msgid "Check Windows notification permissions and Focus Assist."
 msgstr "Windows の通知の許可と集中モードを確認してください。"
 
-#: gui/dialogs.py:2140
+#: gui/dialogs.py:2152
 msgid ""
 "Check the app's notification permission in System Settings > Notifications "
 "and that Do Not Disturb is off."
-msgstr "システム設定 > 通知でアプリの通知許可を確認し、「おやすみモード」がオフになっていることを確認してください。"
+msgstr ""
+"システム設定 > 通知でアプリの通知許可を確認し、「おやすみモード」がオフになっ"
+"ていることを確認してください。"
 
-#: gui/dialogs.py:2265
+#: gui/dialogs.py:2277
 msgid "Enter your Inoreader App ID and App Key first."
 msgstr "先に Inoreader のアプリ ID とアプリキーを入力してください。"
 
-#: gui/dialogs.py:2293
+#: gui/dialogs.py:2305
 msgid "Redirected URL"
 msgstr "リダイレクト先の URL"
 
-#: gui/dialogs.py:2294
+#: gui/dialogs.py:2306
 msgid "Paste the full URL from your browser address bar"
 msgstr "ブラウザーのアドレスバーから完全な URL を貼り付けてください"
 
-#: gui/dialogs.py:2509 gui/dialogs.py:2919
+#: gui/dialogs.py:2521 gui/dialogs.py:2931
 msgid "System Default"
 msgstr "システム既定値"
 
-#: gui/dialogs.py:2620
+#: gui/dialogs.py:2632
 msgid "Playback cache"
 msgstr "再生キャッシュ"
 
-#: gui/dialogs.py:2693
+#: gui/dialogs.py:2705
 msgid ""
 "No recent YouTube cookies.txt export was found in your Downloads.\n"
 "\n"
 "Export one with the extension first, or choose the file manually."
 msgstr ""
-"最近の YouTube cookies.txt のエクスポートがダウンロードフォルダーに見つかりませんでした。\n"
+"最近の YouTube cookies.txt のエクスポートがダウンロードフォルダーに見つかりま"
+"せんでした。\n"
 "\n"
 "先に拡張機能でエクスポートするか、ファイルを手動で選択してください。"
 
-#: gui/dialogs.py:2697
+#: gui/dialogs.py:2709
 msgid "No export found"
 msgstr "エクスポートが見つかりません"
 
-#: gui/dialogs.py:2700
+#: gui/dialogs.py:2712
 msgid "Choose file..."
 msgstr "ファイルを選択..."
 
-#: gui/dialogs.py:2707
+#: gui/dialogs.py:2719
 msgid "Choose exported cookies.txt"
 msgstr "エクスポートした cookies.txt を選択"
 
-#: gui/dialogs.py:2830
+#: gui/dialogs.py:2842
 msgid "Enter a command to test. Use %1 where the article URL should go."
-msgstr "テストするコマンドを入力してください。記事の URL を入れる位置には %1 を使用してください。"
+msgstr ""
+"テストするコマンドを入力してください。記事の URL を入れる位置には %1 を使用し"
+"てください。"
 
-#: gui/dialogs.py:2831
+#: gui/dialogs.py:2843
 msgid "Nothing to test"
 msgstr "テストする内容がありません"
 
-#: gui/dialogs.py:2852
+#: gui/dialogs.py:2864
 msgid "Test launched"
 msgstr "テストを開始しました"
 
-#: gui/dialogs.py:2857
+#: gui/dialogs.py:2869
 msgid "Test failed"
 msgstr "テストに失敗しました"
 
-#: gui/dialogs.py:2927
+#: gui/dialogs.py:2939
 msgid "Skip Silence (Experimental)"
 msgstr "無音をスキップ(実験的機能)"
 
-#: gui/dialogs.py:2956
+#: gui/dialogs.py:2968
 msgid "Show player window when starting playback"
 msgstr "再生開始時にプレーヤーウィンドウを表示する"
 
-#: gui/dialogs.py:2967
+#: gui/dialogs.py:2979
 msgid "Verbose range-cache proxy debug logs"
 msgstr "レンジキャッシュプロキシの詳細デバッグログ"
 
-#: gui/dialogs.py:3068
+#: gui/dialogs.py:3080
 msgid "Provider information"
 msgstr "プロバイダー情報"
 
-#: gui/dialogs.py:3104
+#: gui/dialogs.py:3116
 msgid "Inoreader App ID"
 msgstr "Inoreader のアプリ ID"
 
-#: gui/dialogs.py:3111
+#: gui/dialogs.py:3123
 msgid "Inoreader App Key"
 msgstr "Inoreader のアプリキー"
 
-#: gui/dialogs.py:3118
+#: gui/dialogs.py:3130
 msgid "Redirect URI"
 msgstr "リダイレクト URI"
 
-#: gui/dialogs.py:3213
+#: gui/dialogs.py:3225
 msgid "Enable Sound Notifications"
 msgstr "サウンド通知を有効にする"
 
-#: gui/dialogs.py:3257
+#: gui/dialogs.py:3269
 msgid "Enable notifications for new articles"
 msgstr "新着記事の通知を有効にする"
 
-#: gui/dialogs.py:3266
+#: gui/dialogs.py:3278
 msgid "Include feed name in notification text"
 msgstr "通知テキストにフィード名を含める"
 
-#: gui/dialogs.py:3291
+#: gui/dialogs.py:3303
 msgid "Show a summary notification when notification cap is reached"
 msgstr "通知の上限に達したときに、まとめの通知を表示する"
 
-#: gui/dialogs.py:3298
+#: gui/dialogs.py:3310
 msgid "Test Notification"
 msgstr "通知のテスト"
 
-#: gui/dialogs.py:3302
+#: gui/dialogs.py:3314
 msgid "Exclude Feeds..."
 msgstr "フィードを除外..."
 
-#: gui/dialogs.py:3388
+#: gui/dialogs.py:3400
 msgid "Enable automatic translation for article content"
 msgstr "記事内容の自動翻訳を有効にする"
 
-#: gui/dialogs.py:3481
+#: gui/dialogs.py:3493
 msgid ""
 "Grok is by xAI. Get a key at console.x.ai. For Groq (LLaMA/Mistral), select "
 "'Groq (LLaMA, Mistral)' instead."
 msgstr ""
-"Grok は xAI が提供しています。console.x.ai "
-"でキーを取得してください。Groq(LLaMA/Mistral)を使う場合は、代わりに「Groq (LLaMA, Mistral)」を選択してください。"
+"Grok は xAI が提供しています。console.x.ai でキーを取得してください。"
+"Groq(LLaMA/Mistral)を使う場合は、代わりに「Groq (LLaMA, Mistral)」を選択して"
+"ください。"
 
-#: gui/dialogs.py:3540
+#: gui/dialogs.py:3552
 msgid ""
 "Groq is NOT Grok. Get a free Groq key at console.groq.com/keys (runs LLaMA "
 "and Mistral models)."
 msgstr ""
-"Groq は Grok とは異なります。console.groq.com/keys で無料の Groq キーを取得してください(LLaMA と "
-"Mistral モデルを実行します)。"
+"Groq は Grok とは異なります。console.groq.com/keys で無料の Groq キーを取得し"
+"てください(LLaMA と Mistral モデルを実行します)。"
 
-#: gui/dialogs.py:3626
+#: gui/dialogs.py:3638
 msgid "Load OpenRouter Models"
 msgstr "OpenRouter のモデルを読み込む"
 
-#: gui/dialogs.py:3630
+#: gui/dialogs.py:3642
 msgid "Loads all available model IDs from OpenRouter."
 msgstr "OpenRouter から利用可能なすべてのモデル ID を読み込みます。"
 
-#: gui/dialogs.py:3743
+#: gui/dialogs.py:3755
 msgid "Enable CAPTCHA solving service (last resort, per-solve fees apply)"
 msgstr "CAPTCHA 解決サービスを有効にする（最終手段、解決ごとに料金が発生）"
 
-#: gui/dialogs.py:3784
+#: gui/dialogs.py:3796
 msgid "Data Storage Location"
 msgstr "データの保存場所"
 
-#: gui/dialogs.py:3789
+#: gui/dialogs.py:3801
 msgid ""
 "Where BlindRSS stores config.json and rss.db.\n"
 "User Data Folder keeps your settings and feeds across app upgrades,\n"
@@ -3563,84 +3636,87 @@ msgid ""
 msgstr ""
 "BlindRSS が config.json と rss.db を保存する場所です。\n"
 "ユーザーデータフォルダーは、アプリの更新後も設定とフィードを保持します。\n"
-"これは特に、インストール済みのアプリバンドルが置き換えられる macOS で重要です。"
+"これは特に、インストール済みのアプリバンドルが置き換えられる macOS で重要で"
+"す。"
 
-#: gui/dialogs.py:3836 gui/mainframe.py:14335 gui/mainframe.py:14303
+#: gui/dialogs.py:3848 gui/mainframe.py:14335 gui/mainframe.py:14303
 msgid "Updates"
 msgstr "アップデート"
 
-#: gui/dialogs.py:3840
+#: gui/dialogs.py:3852
 msgid "Automatically install updates without confirmation"
 msgstr "確認せずに更新を自動的にインストール"
 
-#: gui/dialogs.py:3852
+#: gui/dialogs.py:3864
 msgid "Browser Identification"
 msgstr "ブラウザーの識別"
 
-#: gui/dialogs.py:3870
+#: gui/dialogs.py:3882
 msgid "Custom (type it below)"
 msgstr "カスタム (下に入力)"
 
-#: gui/dialogs.py:4121 gui/dialogs.py:4418
+#: gui/dialogs.py:4134 gui/dialogs.py:4431
 msgid "Feed Properties"
 msgstr "フィードのプロパティ"
 
-#: gui/dialogs.py:4174 gui/dialogs.py:4316
+#: gui/dialogs.py:4187 gui/dialogs.py:4329
 msgid "Use global setting"
 msgstr "全体設定を使用"
 
-#: gui/dialogs.py:4175
+#: gui/dialogs.py:4188
 msgid "Never (manual refresh only)"
 msgstr "しない(手動更新のみ)"
 
-#: gui/dialogs.py:4317
+#: gui/dialogs.py:4330
 msgid "Move it to Deleted Articles"
 msgstr "削除済みの記事に移動する"
 
-#: gui/dialogs.py:4570
+#: gui/dialogs.py:4583
 msgid "Category Properties"
 msgstr "カテゴリのプロパティ"
 
-#: gui/dialogs.py:4649
+#: gui/dialogs.py:4662
 msgid "Feeds with Errors"
 msgstr "エラーのあるフィード"
 
-#: gui/dialogs.py:4673
+#: gui/dialogs.py:4686
 msgid "Error &details:"
 msgstr "エラーの詳細(&D):"
 
-#: gui/dialogs.py:4684
+#: gui/dialogs.py:4697
 msgid "&Refresh Selected"
 msgstr "選択項目を更新(&R)"
 
-#: gui/dialogs.py:4685
+#: gui/dialogs.py:4698
 msgid "&Copy Details"
 msgstr "詳細をコピー(&C)"
 
-#: gui/dialogs.py:4686
+#: gui/dialogs.py:4699
 msgid "Feed &Properties..."
 msgstr "フィードのプロパティ(&P)..."
 
-#: gui/dialogs.py:4687
+#: gui/dialogs.py:4700
 msgid "Re&move Feed"
 msgstr "フィードを削除(&M)"
 
-#: gui/dialogs.py:4716
+#: gui/dialogs.py:4729
 msgid "{n} feed failed to update during its most recent attempt:"
 msgid_plural "{n} feeds failed to update during their most recent attempt:"
 msgstr[0] "直近の試行で {n} 件のフィードの更新に失敗しました:"
 
-#: gui/dialogs.py:4750
+#: gui/dialogs.py:4763
 msgid ""
 "No feeds reported errors during their most recent update attempt.\n"
 "\n"
-"Feeds appear here automatically when an update fails (for example a dead URL, an HTTP error, a timeout, or an invalid feed format)."
+"Feeds appear here automatically when an update fails (for example a dead "
+"URL, an HTTP error, a timeout, or an invalid feed format)."
 msgstr ""
 "直近の更新試行でエラーを報告したフィードはありません。\n"
 "\n"
-"更新に失敗したフィード(たとえば無効な URL、HTTP エラー、タイムアウト、不正なフィード形式など)は、ここに自動的に表示されます。"
+"更新に失敗したフィード(たとえば無効な URL、HTTP エラー、タイムアウト、不正な"
+"フィード形式など)は、ここに自動的に表示されます。"
 
-#: gui/dialogs.py:4783
+#: gui/dialogs.py:4796
 msgid ""
 "Feed: {title}\n"
 "URL: {url}\n"
@@ -3662,265 +3738,265 @@ msgstr ""
 "エラー:\n"
 "{error}"
 
-#: gui/dialogs.py:4899
+#: gui/dialogs.py:4912
 msgid "Editing feed properties is not available here."
 msgstr "ここではフィードのプロパティを編集できません。"
 
-#: gui/dialogs.py:4900
+#: gui/dialogs.py:4913
 msgid "Not available"
 msgstr "利用できません"
 
-#: gui/dialogs.py:4926
+#: gui/dialogs.py:4939
 msgid "Confirm Remove"
 msgstr "削除の確認"
 
-#: gui/dialogs.py:5026 gui/dialogs.py:5973
+#: gui/dialogs.py:5039 gui/dialogs.py:5986
 msgid "Search"
 msgstr "検索"
 
-#: gui/dialogs.py:5032 gui/dialogs.py:6003 gui/dialogs.py:7328
+#: gui/dialogs.py:5045 gui/dialogs.py:6016 gui/dialogs.py:7341
 msgid "Ready."
 msgstr "準備完了。"
 
-#: gui/dialogs.py:5192
+#: gui/dialogs.py:5205
 msgid "Searching all sources..."
 msgstr "すべてのソースを検索しています..."
 
-#: gui/dialogs.py:5975
+#: gui/dialogs.py:5988
 msgid "Load More Results (+80/site)"
 msgstr "さらに結果を読み込む(サイトごとに+80件)"
 
-#: gui/dialogs.py:6630
+#: gui/dialogs.py:6643
 msgid "All searchable sites"
 msgstr "検索可能なすべてのサイト"
 
-#: gui/dialogs.py:6633
+#: gui/dialogs.py:6646
 msgid "Adult sites (all)"
 msgstr "アダルトサイト (すべて)"
 
-#: gui/dialogs.py:6643
+#: gui/dialogs.py:6656
 msgid "All sites"
 msgstr "すべてのサイト"
 
-#: gui/dialogs.py:6935
+#: gui/dialogs.py:6948
 msgid "No searchable sites."
 msgstr "検索可能なサイトがありません。"
 
-#: gui/dialogs.py:7132
+#: gui/dialogs.py:7145
 msgid "{completed}/{total} site"
 msgid_plural "{completed}/{total} sites"
 msgstr[0] "{completed}/{total} サイト"
 
-#: gui/dialogs.py:7135
+#: gui/dialogs.py:7148
 msgid "{count} result"
 msgid_plural "{count} results"
 msgstr[0] "{count} 件の結果"
 
-#: gui/dialogs.py:7400
+#: gui/dialogs.py:7413
 msgid "Parent window does not support subscribing from this dialog."
 msgstr "親ウィンドウは、このダイアログからの登録をサポートしていません。"
 
-#: gui/dialogs.py:7466
+#: gui/dialogs.py:7479
 msgid "Add..."
 msgstr "追加..."
 
-#: gui/dialogs.py:7467
+#: gui/dialogs.py:7480
 msgid "Remove"
 msgstr "削除"
 
-#: gui/dialogs.py:7521 gui/mainframe.py:2521
+#: gui/dialogs.py:7534 gui/mainframe.py:2521
 msgid "About BlindRSS"
 msgstr "BlindRSS について"
 
-#: gui/dialogs.py:7532
+#: gui/dialogs.py:7545
 msgid "Copyright (c) 2024-2026 serrebidev and contributors"
 msgstr "Copyright (c) 2024-2026 serrebidev and contributors"
 
-#: gui/dialogs.py:7538
+#: gui/dialogs.py:7551
 msgid "Follow me on GitHub (@serrebidev)"
 msgstr "GitHub でフォローする (@serrebidev)"
 
-#: gui/dialogs.py:7539
+#: gui/dialogs.py:7552
 msgid "Visit Repository"
 msgstr "リポジトリを表示"
 
-#: gui/dialogs.py:7540
+#: gui/dialogs.py:7553
 msgid "View Changelog"
 msgstr "変更履歴を表示"
 
-#: gui/dialogs.py:7614
+#: gui/dialogs.py:7627
 msgid "&Remove"
 msgstr "削除(&R)"
 
-#: gui/dialogs.py:7618
+#: gui/dialogs.py:7631
 msgid "&Clear All"
 msgstr "すべてクリア(&C)"
 
-#: gui/dialogs.py:7685
+#: gui/dialogs.py:7698
 msgid "Untitled"
 msgstr "無題"
 
-#: gui/dialogs.py:7706
+#: gui/dialogs.py:7719
 msgid "The play queue is empty."
 msgstr "再生キューは空です。"
 
-#: gui/dialogs.py:7767
+#: gui/dialogs.py:7780
 msgid "Remove all items from the play queue?"
 msgstr "再生キューからすべての項目を削除しますか?"
 
-#: gui/dialogs.py:7768
+#: gui/dialogs.py:7781
 msgid "Clear Play Queue"
 msgstr "再生キューをクリア"
 
-#: gui/dialogs.py:7810
+#: gui/dialogs.py:7823
 msgid "Press Shortcut"
 msgstr "ショートカットを押す"
 
-#: gui/dialogs.py:7823
+#: gui/dialogs.py:7836
 msgid "Waiting for a key…"
 msgstr "キー入力を待っています…"
 
-#: gui/dialogs.py:7896
+#: gui/dialogs.py:7909
 msgid "Select a command and choose Change to set its shortcut."
 msgstr "コマンドを選択し、「変更」を選んでショートカットを設定してください。"
 
-#: gui/dialogs.py:7911
+#: gui/dialogs.py:7924
 msgid "&Change Shortcut..."
 msgstr "ショートカットを変更(&C)..."
 
-#: gui/dialogs.py:7915
+#: gui/dialogs.py:7928
 msgid "&Remove Shortcut"
 msgstr "ショートカットを削除(&R)"
 
-#: gui/dialogs.py:7944
+#: gui/dialogs.py:7957
 msgid "Enter"
 msgstr "Enter"
 
-#: gui/dialogs.py:7944
+#: gui/dialogs.py:7957
 msgid "Open or play the selected article"
 msgstr "選択した記事を開くか再生"
 
-#: gui/dialogs.py:7945
+#: gui/dialogs.py:7958
 msgid "Del"
 msgstr "Del"
 
-#: gui/dialogs.py:7945
+#: gui/dialogs.py:7958
 msgid "Delete the selected article"
 msgstr "選択した記事を削除"
 
-#: gui/dialogs.py:7946
+#: gui/dialogs.py:7959
 msgid "Shift+Del"
 msgstr "Shift+Del"
 
-#: gui/dialogs.py:7946
+#: gui/dialogs.py:7959
 msgid "Delete the selected article without confirmation"
 msgstr "選択した記事を確認なしで削除"
 
-#: gui/dialogs.py:7947
+#: gui/dialogs.py:7960
 msgid "Backspace"
 msgstr "Backspace"
 
-#: gui/dialogs.py:7947
+#: gui/dialogs.py:7960
 msgid "Toggle read/unread in the article list"
 msgstr "記事リストで既読/未読を切り替え"
 
-#: gui/dialogs.py:7948
+#: gui/dialogs.py:7961
 msgid "Refresh feeds (fixed alias)"
 msgstr "フィードを更新(固定の別名)"
 
-#: gui/dialogs.py:7949
+#: gui/dialogs.py:7962
 msgid "Ctrl+Left / Ctrl+Right"
 msgstr "Ctrl+左 / Ctrl+右"
 
-#: gui/dialogs.py:7949
+#: gui/dialogs.py:7962
 msgid "Rewind / fast forward playback"
 msgstr "巻き戻し / 早送り"
 
-#: gui/dialogs.py:7950
+#: gui/dialogs.py:7963
 msgid "Ctrl+Up / Ctrl+Down"
 msgstr "Ctrl+上 / Ctrl+下"
 
-#: gui/dialogs.py:7950
+#: gui/dialogs.py:7963
 msgid "Volume up / volume down"
 msgstr "音量を上げる / 下げる"
 
-#: gui/dialogs.py:7951
+#: gui/dialogs.py:7964
 msgid "Ctrl+Shift+Left / Ctrl+Shift+Right"
 msgstr "Ctrl+Shift+左 / Ctrl+Shift+右"
 
-#: gui/dialogs.py:7951
+#: gui/dialogs.py:7964
 msgid "Previous / next chapter"
 msgstr "前 / 次のチャプター"
 
-#: gui/dialogs.py:7952
+#: gui/dialogs.py:7965
 msgid "Ctrl+F"
 msgstr "Ctrl+F"
 
-#: gui/dialogs.py:7952
+#: gui/dialogs.py:7965
 msgid "Find in the article reader"
 msgstr "記事内を検索"
 
-#: gui/dialogs.py:7953
+#: gui/dialogs.py:7966
 msgid "F3 / Shift+F3"
 msgstr "F3 / Shift+F3"
 
-#: gui/dialogs.py:7953
+#: gui/dialogs.py:7966
 msgid "Next / previous match in the article reader"
 msgstr "記事内の次 / 前の一致"
 
-#: gui/dialogs.py:7954
+#: gui/dialogs.py:7967
 msgid "F6 / Shift+F6"
 msgstr "F6 / Shift+F6"
 
-#: gui/dialogs.py:7954
+#: gui/dialogs.py:7967
 msgid "Move between panes in the rich view"
 msgstr "リッチ表示でペイン間を移動"
 
-#: gui/dialogs.py:7955
+#: gui/dialogs.py:7968
 msgid "Ctrl+X / Ctrl+C / Ctrl+V / Ctrl+A"
 msgstr "Ctrl+X / Ctrl+C / Ctrl+V / Ctrl+A"
 
-#: gui/dialogs.py:7955
+#: gui/dialogs.py:7968
 msgid "Cut / Copy / Paste / Select All in text fields"
 msgstr "テキスト欄で切り取り / コピー / 貼り付け / すべて選択"
 
-#: gui/dialogs.py:7969
+#: gui/dialogs.py:7982
 msgid "Fixed keys"
 msgstr "固定キー"
 
-#: gui/dialogs.py:8061
+#: gui/dialogs.py:8074
 msgid "Reset all keyboard shortcuts to their defaults?"
 msgstr "すべてのキーボードショートカットを既定値にリセットしますか?"
 
-#: gui/dialogs.py:8062
+#: gui/dialogs.py:8075
 msgid "Reset Shortcuts"
 msgstr "ショートカットをリセット"
 
-#: gui/dialogs.py:8115
+#: gui/dialogs.py:8128
 msgid "Equalizer"
 msgstr "イコライザー"
 
-#: gui/dialogs.py:8140
+#: gui/dialogs.py:8153
 msgid "&Enable equalizer"
 msgstr "イコライザーを有効にする(&E)"
 
-#: gui/dialogs.py:8177
+#: gui/dialogs.py:8190
 msgid "&Save as Preset..."
 msgstr "プリセットとして保存(&S)..."
 
-#: gui/dialogs.py:8180
+#: gui/dialogs.py:8193
 msgid "&Delete Preset"
 msgstr "プリセットを削除(&D)"
 
-#: gui/dialogs.py:8183
+#: gui/dialogs.py:8196
 msgid "&Reset (Flat)"
 msgstr "リセット(フラット)(&R)"
 
-#: gui/dialogs.py:8354
+#: gui/dialogs.py:8367
 msgid "Could not save the preset."
 msgstr "プリセットを保存できませんでした。"
 
-#: gui/dialogs.py:8366
+#: gui/dialogs.py:8379
 msgid "Delete Preset"
 msgstr "プリセットを削除"
 
@@ -3930,9 +4006,11 @@ msgstr "全体の列レイアウトを使用する(&U)"
 
 #: gui/dialogs.py:113
 msgid ""
-"Columns (checked = shown). Press Space to show or hide a column; use Move up"
-" / Move down to reorder:"
-msgstr "列(チェック = 表示)。Space キーで列の表示/非表示を切り替え、「上へ移動」/「下へ移動」で並べ替えます:"
+"Columns (checked = shown). Press Space to show or hide a column; use Move "
+"up / Move down to reorder:"
+msgstr ""
+"列(チェック = 表示)。Space キーで列の表示/非表示を切り替え、「上へ移動」/「下"
+"へ移動」で並べ替えます:"
 
 #: gui/dialogs.py:141
 msgid "Title is always the first column and cannot be hidden."
@@ -3951,8 +4029,10 @@ msgid ""
 "Paste a link to a video, podcast episode, or other media file.\n"
 "YouTube and other yt-dlp sites are supported, as are direct media links."
 msgstr ""
-"動画、ポッドキャストのエピソード、その他のメディアファイルへのリンクを貼り付けてください。\n"
-"YouTube などの yt-dlp 対応サイトのほか、直接のメディアリンクにも対応しています。"
+"動画、ポッドキャストのエピソード、その他のメディアファイルへのリンクを貼り付"
+"けてください。\n"
+"YouTube などの yt-dlp 対応サイトのほか、直接のメディアリンクにも対応していま"
+"す。"
 
 #: gui/dialogs.py:330
 msgid "Media URL:"
@@ -4054,86 +4134,90 @@ msgstr "ローカル RSS の自動更新:"
 msgid ""
 "Using the Local RSS feed cache lowers CPU and network use. Manual Refresh "
 "All always checks every feed."
-msgstr "フィードキャッシュを使用すると CPU とネットワークの負荷が下がります。手動の「すべて更新」は常にすべてのフィードを確認します。"
+msgstr ""
+"フィードキャッシュを使用すると CPU とネットワークの負荷が下がります。手動の"
+"「すべて更新」は常にすべてのフィードを確認します。"
 
-#: gui/dialogs.py:1483
+#: gui/dialogs.py:1495
 msgid "Max cache size (MB, 0 = unlimited):"
 msgstr "キャッシュの最大サイズ(MB、0 = 無制限):"
 
-#: gui/dialogs.py:1517
+#: gui/dialogs.py:1529
 msgid "Interface language (requires restart):"
 msgstr "インターフェース言語(再起動が必要):"
 
-#: gui/dialogs.py:1599
+#: gui/dialogs.py:1611
 msgid "Feed category tree on startup:"
 msgstr "起動時のフィードカテゴリツリー:"
 
-#: gui/dialogs.py:1619
+#: gui/dialogs.py:1631
 msgid "Article opening method:"
 msgstr "記事を開く方法:"
 
-#: gui/dialogs.py:1638
+#: gui/dialogs.py:1650
 msgid "Custom command:"
 msgstr "カスタムコマンド:"
 
-#: gui/dialogs.py:1672
+#: gui/dialogs.py:1684
 msgid "Startup && Tray"
 msgstr "起動 && トレイ"
 
-#: gui/dialogs.py:1851
+#: gui/dialogs.py:1863
 msgid "Daily"
 msgstr "毎日"
 
-#: gui/dialogs.py:1851
+#: gui/dialogs.py:1863
 msgid "Weekly"
 msgstr "毎週"
 
-#: gui/dialogs.py:1851
+#: gui/dialogs.py:1863
 msgid "Monthly"
 msgstr "毎月"
 
-#: gui/dialogs.py:1918
+#: gui/dialogs.py:1930
 msgid "Translations updated. Restart to apply."
 msgstr "翻訳を更新しました。適用するには再起動してください。"
 
-#: gui/dialogs.py:1920
+#: gui/dialogs.py:1932
 msgid "Translations are up to date."
 msgstr "翻訳は最新です。"
 
-#: gui/dialogs.py:2086
+#: gui/dialogs.py:2098
 msgid "Excluded feeds: {excluded} of {total}"
 msgstr "除外されたフィード: {total} 件中 {excluded} 件"
 
-#: gui/dialogs.py:2283
+#: gui/dialogs.py:2295
 msgid "Inoreader Authorization"
 msgstr "Inoreader の承認"
 
-#: gui/dialogs.py:2285
+#: gui/dialogs.py:2297
 msgid ""
 "After authorizing in your browser, it will redirect to your Redirect URI.\n"
-"If the redirected page fails to load (common for HTTPS localhost), copy the full URL from the\n"
+"If the redirected page fails to load (common for HTTPS localhost), copy the "
+"full URL from the\n"
 "browser address bar and paste it below.\n"
 "\n"
 "Redirect URI:\n"
 "{redirect_uri}"
 msgstr ""
 "ブラウザーで承認すると、リダイレクト URI に転送されます。\n"
-"リダイレクト先のページが読み込めない場合 (HTTPS の localhost では一般的です)、ブラウザーの\n"
+"リダイレクト先のページが読み込めない場合 (HTTPS の localhost では一般的で"
+"す)、ブラウザーの\n"
 "アドレスバーから URL 全体をコピーし、下に貼り付けてください。\n"
 "\n"
 "リダイレクト URI:\n"
 "{redirect_uri}"
 
-#: gui/dialogs.py:2345
+#: gui/dialogs.py:2357
 msgid ""
 "Complete authorization in your browser, then paste the redirected URL..."
 msgstr "ブラウザーで承認を完了し、リダイレクト先の URL を貼り付けてください..."
 
-#: gui/dialogs.py:2374
+#: gui/dialogs.py:2386
 msgid "No access token returned from Inoreader."
 msgstr "Inoreader からアクセストークンが返されませんでした。"
 
-#: gui/dialogs.py:2424
+#: gui/dialogs.py:2436
 msgid ""
 "Inoreader authorization failed:\n"
 "{message}"
@@ -4141,20 +4225,20 @@ msgstr ""
 "Inoreader の承認に失敗しました:\n"
 "{message}"
 
-#: gui/dialogs.py:2522
+#: gui/dialogs.py:2534
 msgid "Unnamed Device"
 msgstr "名前のないデバイス"
 
-#: gui/dialogs.py:2634
+#: gui/dialogs.py:2646
 msgid "Removed {n} file, freed {size}."
 msgid_plural "Removed {n} files, freed {size}."
 msgstr[0] "{n} 個のファイルを削除し、{size} を解放しました。"
 
-#: gui/dialogs.py:2722 gui/dialogs.py:2729
+#: gui/dialogs.py:2734 gui/dialogs.py:2741
 msgid "Import failed"
 msgstr "インポートに失敗しました"
 
-#: gui/dialogs.py:2736
+#: gui/dialogs.py:2748
 msgid ""
 "Imported YouTube cookies from:\n"
 "{source}\n"
@@ -4172,423 +4256,438 @@ msgstr ""
 "\n"
 "設定を保存すると使用を開始できます。"
 
-#: gui/dialogs.py:2747
+#: gui/dialogs.py:2759
 msgid "Executables"
 msgstr "実行可能ファイル"
 
-#: gui/dialogs.py:2747 gui/dialogs.py:2749 gui/dialogs.py:750
-#: gui/dialogs.py:2588
+#: gui/dialogs.py:2759 gui/dialogs.py:2761 gui/dialogs.py:750
+#: gui/dialogs.py:2600
 msgid "All files"
 msgstr "すべてのファイル"
 
-#: gui/dialogs.py:2814
+#: gui/dialogs.py:2826
 msgid "Current User-Agent: {ua}"
 msgstr "現在の User-Agent: {ua}"
 
-#: gui/dialogs.py:2841
+#: gui/dialogs.py:2853
 msgid "Invalid command"
 msgstr "無効なコマンドです"
 
-#: gui/dialogs.py:2878
+#: gui/dialogs.py:2890
 msgid ""
 "Groups.io API key (optional). Public groups and RSS work without a key; the "
 "key enables complete paginated topics and member-only archives. Create one "
 "at groups.io/settings/apikeys."
 msgstr ""
-"Groups.io API キー(省略可)。公開グループと RSS "
-"はキーなしで動作します。キーを設定すると、ページ分割されたトピック全体とメンバー限定アーカイブを取得できます。groups.io/settings/apikeys"
-" で作成してください。"
+"Groups.io API キー(省略可)。公開グループと RSS はキーなしで動作します。キーを"
+"設定すると、ページ分割されたトピック全体とメンバー限定アーカイブを取得できま"
+"す。groups.io/settings/apikeys で作成してください。"
 
-#: gui/dialogs.py:2889
+#: gui/dialogs.py:2901
 msgid ""
 "Search subscriptions keep the search URL and refresh results in the "
 "background. Browser cookies are imported only from Groups.io domains."
 msgstr ""
-"検索の購読は検索 URL を保存し、バックグラウンドで結果を更新します。ブラウザーの Cookie は Groups.io "
-"のドメインからのみインポートされます。"
+"検索の購読は検索 URL を保存し、バックグラウンドで結果を更新します。ブラウザー"
+"の Cookie は Groups.io のドメインからのみインポートされます。"
 
-#: gui/dialogs.py:2896
+#: gui/dialogs.py:2908
 msgid ""
 "GitHub personal access token (optional). Full text of pull requests, issues "
 "and commits works without one, but GitHub allows only 60 page reads an hour "
 "per connection; a token raises that limit and reaches private repositories. "
 "Create one at github.com/settings/tokens."
 msgstr ""
-"GitHub パーソナルアクセストークン (省略可)。プルリクエスト、Issue、コミットの全文はトークンなしでも取得できますが、GitHub は 1 "
-"接続あたり 1 時間に 60 "
-"ページしか読み取れません。トークンを設定するとこの上限が上がり、プライベートリポジトリにもアクセスできます。github.com/settings/tokens"
-" で作成してください。"
+"GitHub パーソナルアクセストークン (省略可)。プルリクエスト、Issue、コミットの"
+"全文はトークンなしでも取得できますが、GitHub は 1 接続あたり 1 時間に 60 ペー"
+"ジしか読み取れません。トークンを設定するとこの上限が上がり、プライベートリポ"
+"ジトリにもアクセスできます。github.com/settings/tokens で作成してください。"
 
-#: gui/dialogs.py:2917
+#: gui/dialogs.py:2929
 msgid "Preferred Soundcard:"
 msgstr "使用するサウンドカード:"
 
-#: gui/dialogs.py:2933
+#: gui/dialogs.py:2945
 msgid "Default Playback Speed:"
 msgstr "既定の再生速度:"
 
-#: gui/dialogs.py:2962
+#: gui/dialogs.py:2974
 msgid "Network Cache (ms):"
 msgstr "ネットワークキャッシュ(ミリ秒):"
 
-#: gui/dialogs.py:2980
+#: gui/dialogs.py:2992
 msgid "Leave a path blank to auto-detect. A set path overrides detection."
-msgstr "自動検出するにはパスを空欄にしてください。パスを設定すると自動検出より優先されます。"
+msgstr ""
+"自動検出するにはパスを空欄にしてください。パスを設定すると自動検出より優先さ"
+"れます。"
 
-#: gui/dialogs.py:3030
+#: gui/dialogs.py:3042
 msgid "Sounds"
 msgstr "サウンド"
 
-#: gui/dialogs.py:3040
+#: gui/dialogs.py:3052
 msgid "Active Provider:"
 msgstr "有効なプロバイダー:"
 
-#: gui/dialogs.py:3128
+#: gui/dialogs.py:3140
 msgid ""
-"Note: If your Redirect URI uses HTTPS (common/required), your browser may fail to load\n"
-"localhost after authorization. Copy the full redirected URL from the address bar and paste it\n"
+"Note: If your Redirect URI uses HTTPS (common/required), your browser may "
+"fail to load\n"
+"localhost after authorization. Copy the full redirected URL from the address "
+"bar and paste it\n"
 "when prompted."
 msgstr ""
-"注意: リダイレクト URI が HTTPS を使用している場合(一般的、または必須)、認証後にブラウザーが\n"
-"localhost の読み込みに失敗することがあります。アドレスバーからリダイレクト後の完全な URL をコピーし、\n"
+"注意: リダイレクト URI が HTTPS を使用している場合(一般的、または必須)、認証"
+"後にブラウザーが\n"
+"localhost の読み込みに失敗することがあります。アドレスバーからリダイレクト後"
+"の完全な URL をコピーし、\n"
 "表示されたら貼り付けてください。"
 
-#: gui/dialogs.py:3140
+#: gui/dialogs.py:3152
 msgid "Authorize Inoreader"
 msgstr "Inoreader を承認"
 
-#: gui/dialogs.py:3141
+#: gui/dialogs.py:3153
 msgid "Clear Authorization"
 msgstr "承認情報を消去"
 
-#: gui/dialogs.py:3165
+#: gui/dialogs.py:3177
 msgid "Authorized"
 msgstr "承認済み"
 
-#: gui/dialogs.py:3174
+#: gui/dialogs.py:3186
 msgid "Miniflux URL:"
 msgstr "Miniflux の URL:"
 
-#: gui/dialogs.py:3175
+#: gui/dialogs.py:3187
 msgid "Miniflux API Key:"
 msgstr "Miniflux の API キー:"
 
-#: gui/dialogs.py:3178
+#: gui/dialogs.py:3190
 msgid "The Old Reader Email:"
 msgstr "The Old Reader のメールアドレス:"
 
-#: gui/dialogs.py:3179
+#: gui/dialogs.py:3191
 msgid "The Old Reader Password:"
 msgstr "The Old Reader のパスワード:"
 
-#: gui/dialogs.py:3183
+#: gui/dialogs.py:3195
 msgid "BazQux Email:"
 msgstr "BazQux のメールアドレス:"
 
-#: gui/dialogs.py:3184
+#: gui/dialogs.py:3196
 msgid "BazQux Password:"
 msgstr "BazQux のパスワード:"
 
-#: gui/dialogs.py:3275
+#: gui/dialogs.py:3287
 msgid "Max notifications per refresh (0 = no limit):"
 msgstr "更新ごとの通知の最大数(0 = 無制限):"
 
-#: gui/dialogs.py:3408
+#: gui/dialogs.py:3420
 msgid "Provider:"
 msgstr "プロバイダー:"
 
-#: gui/dialogs.py:3428
+#: gui/dialogs.py:3440
 msgid "Target language:"
 msgstr "翻訳先の言語:"
 
-#: gui/dialogs.py:3451
+#: gui/dialogs.py:3463
 msgid "Choose a language or type a code (e.g. en, es, fr, pt-BR)."
 msgstr "言語を選択するか、コードを入力してください(例: en, es, fr, pt-BR)。"
 
-#: gui/dialogs.py:3460
+#: gui/dialogs.py:3472
 msgid "Grok (xAI) model (optional):"
 msgstr "Grok (xAI) モデル(任意):"
 
-#: gui/dialogs.py:3491
+#: gui/dialogs.py:3503
 msgid "Grok (xAI) API key (starts with xai-):"
 msgstr "Grok (xAI) API キー(xai- で始まります):"
 
-#: gui/dialogs.py:3503
+#: gui/dialogs.py:3515
 msgid "Groq model (optional) - hosts LLaMA and Mistral:"
 msgstr "Groq モデル(任意)- LLaMA と Mistral を提供:"
 
-#: gui/dialogs.py:3525
+#: gui/dialogs.py:3537
 msgid "Groq API key (starts with gsk_):"
 msgstr "Groq API キー(gsk_ で始まります):"
 
-#: gui/dialogs.py:3551
+#: gui/dialogs.py:3563
 msgid "OpenAI model (optional):"
 msgstr "OpenAI モデル(任意):"
 
-#: gui/dialogs.py:3573
+#: gui/dialogs.py:3585
 msgid "OpenAI API key:"
 msgstr "OpenAI API キー:"
 
-#: gui/dialogs.py:3589
+#: gui/dialogs.py:3601
 msgid "OpenRouter model (optional):"
 msgstr "OpenRouter モデル(任意):"
 
-#: gui/dialogs.py:3611
+#: gui/dialogs.py:3623
 msgid "OpenRouter API key:"
 msgstr "OpenRouter API キー:"
 
-#: gui/dialogs.py:3637
+#: gui/dialogs.py:3649
 msgid "Gemini model (optional):"
 msgstr "Gemini モデル(任意):"
 
-#: gui/dialogs.py:3659
+#: gui/dialogs.py:3671
 msgid "Gemini API key:"
 msgstr "Gemini API キー:"
 
-#: gui/dialogs.py:3675
+#: gui/dialogs.py:3687
 msgid "Qwen model (optional):"
 msgstr "Qwen モデル(任意):"
 
-#: gui/dialogs.py:3697
+#: gui/dialogs.py:3709
 msgid "Qwen API key:"
 msgstr "Qwen API キー:"
 
-#: gui/dialogs.py:3749
+#: gui/dialogs.py:3761
 msgid "Service:"
 msgstr "サービス:"
 
-#: gui/dialogs.py:3768
+#: gui/dialogs.py:3780
 msgid "API key:"
 msgstr "API キー:"
 
-#: gui/dialogs.py:3804
+#: gui/dialogs.py:3816
 msgid "Storage Location:"
 msgstr "保存場所:"
 
-#: gui/dialogs.py:3857
+#: gui/dialogs.py:3869
 msgid ""
 "The browser BlindRSS reports itself as when fetching feeds and articles.\n"
 "Automatic uses a browser installed on this computer, at its real version,\n"
 "which is what sites with bot protection are most likely to accept."
 msgstr ""
 "フィードや記事の取得時に BlindRSS が名乗るブラウザーです。\n"
-"自動では、このコンピューターにインストールされたブラウザーを実際のバージョンで使用します。\n"
+"自動では、このコンピューターにインストールされたブラウザーを実際のバージョン"
+"で使用します。\n"
 "ボット対策のあるサイトが最も受け入れやすい設定です。"
 
-#: gui/dialogs.py:3874
+#: gui/dialogs.py:3886
 msgid "Identify as:"
 msgstr "名乗るブラウザー:"
 
-#: gui/dialogs.py:3896
+#: gui/dialogs.py:3908
 msgid "Custom User-Agent:"
 msgstr "カスタム User-Agent:"
 
-#: gui/dialogs.py:3931
+#: gui/dialogs.py:3943
 msgid ""
 "When off, adult sites never appear in the Video Search site list.\n"
-"When on, adult sites are added and must still be selected explicitly to search them."
+"When on, adult sites are added and must still be selected explicitly to "
+"search them."
 msgstr ""
 "オフの場合、アダルトサイトは動画検索のサイト一覧に一切表示されません。\n"
-"オンの場合、アダルトサイトが追加されますが、検索するには明示的に選択する必要があります。"
+"オンの場合、アダルトサイトが追加されますが、検索するには明示的に選択する必要"
+"があります。"
 
-#: gui/dialogs.py:4153
+#: gui/dialogs.py:4166
 msgid "URL:"
 msgstr "URL:"
 
-#: gui/dialogs.py:4172
+#: gui/dialogs.py:4185
 msgid "Refresh interval for this feed:"
 msgstr "このフィードの更新間隔:"
 
-#: gui/dialogs.py:4216
+#: gui/dialogs.py:4229
 msgid "Custom request headers (one per line, Name: Value):"
 msgstr "カスタムリクエストヘッダー(1行に1つ、名前: 値):"
 
-#: gui/dialogs.py:4232
+#: gui/dialogs.py:4245
 msgid "Request timeout in seconds (blank = default):"
 msgstr "リクエストのタイムアウト(秒、空欄 = 既定):"
 
-#: gui/dialogs.py:4247
+#: gui/dialogs.py:4260
 msgid "Browser impersonation:"
 msgstr "ブラウザーのなりすまし:"
 
-#: gui/dialogs.py:4248
+#: gui/dialogs.py:4261
 msgid "Auto"
 msgstr "自動"
 
-#: gui/dialogs.py:4248
+#: gui/dialogs.py:4261
 msgid "Always"
 msgstr "常に"
 
-#: gui/dialogs.py:4260
+#: gui/dialogs.py:4273
 msgid "Proxy URL (optional, e.g. http://host:port):"
 msgstr "プロキシ URL(任意、例: http://host:port):"
 
-#: gui/dialogs.py:4277
+#: gui/dialogs.py:4290
 msgid "Feed encoding (blank = automatic, e.g. utf-8, windows-1251):"
 msgstr "フィードのエンコーディング(空欄 = 自動、例: utf-8, windows-1251):"
 
-#: gui/dialogs.py:4292
+#: gui/dialogs.py:4305
 msgid "Full text extraction encoding (blank = automatic):"
 msgstr "全文抽出のエンコーディング(空欄 = 自動):"
 
-#: gui/dialogs.py:4313
+#: gui/dialogs.py:4326
 msgid "When I delete an article from this feed:"
 msgstr "このフィードの記事を削除するとき:"
 
-#: gui/dialogs.py:4417
+#: gui/dialogs.py:4430
 msgid ""
 "Unknown text encoding: %s. Use a Python codec name such as utf-8, "
 "windows-1251 or koi8-r, or leave the field blank for automatic detection."
 msgstr ""
-"不明なテキストエンコーディングです: %s。utf-8、windows-1251、koi8-r などの Python "
-"コーデック名を使用するか、自動検出のために空欄のままにしてください。"
+"不明なテキストエンコーディングです: %s。utf-8、windows-1251、koi8-r などの "
+"Python コーデック名を使用するか、自動検出のために空欄のままにしてください。"
 
-#: gui/dialogs.py:4581
+#: gui/dialogs.py:4594
 msgid "Name:"
 msgstr "名前:"
 
-#: gui/dialogs.py:4593
+#: gui/dialogs.py:4606
 msgid ""
 "This provider keeps categories in one flat list, so this category cannot be "
 "moved."
-msgstr "このプロバイダーはカテゴリをフラットな一覧で管理するため、このカテゴリは移動できません。"
+msgstr ""
+"このプロバイダーはカテゴリをフラットな一覧で管理するため、このカテゴリは移動"
+"できません。"
 
-#: gui/dialogs.py:4599 gui/mainframe.py:7539
+#: gui/dialogs.py:4612 gui/mainframe.py:7539
 msgid "(None - Top Level)"
 msgstr "(なし - 最上位)"
 
-#: gui/dialogs.py:4771
+#: gui/dialogs.py:4784
 msgid "{n} consecutive failed attempt (likely a persistent problem)."
 msgid_plural "{n} consecutive failed attempts (likely a persistent problem)."
 msgstr[0] "{n} 回連続で失敗 (継続的な問題の可能性が高いです)。"
 
-#: gui/dialogs.py:4858
+#: gui/dialogs.py:4871
 msgid "Refreshing '{title}'..."
 msgstr "「{title}」を更新しています..."
 
-#: gui/dialogs.py:5010 gui/dialogs.py:5967
+#: gui/dialogs.py:5023 gui/dialogs.py:5980
 msgid "Search:"
 msgstr "検索:"
 
-#: gui/dialogs.py:5019
+#: gui/dialogs.py:5032
 msgid "Source:"
 msgstr "ソース:"
 
-#: gui/dialogs.py:5047
+#: gui/dialogs.py:5060
 msgid ""
 "Sources: NewsBlur, iTunes, gPodder, fyyd, Podverse, YouTube, Feedspot, "
-"Google News, Bing News, Feedsearch, Website scan, Reddit, Fediverse "
-"(Lemmy/Kbin/Mastodon/Bluesky/PieFed). Feedly is available as an explicit "
-"source."
+"Google News, Bing News, Feedsearch, Website scan, Reddit, Fediverse (Lemmy/"
+"Kbin/Mastodon/Bluesky/PieFed). Feedly is available as an explicit source."
 msgstr ""
-"ソース: NewsBlur、iTunes、gPodder、fyyd、Podverse、YouTube、Feedspot、Google ニュース、Bing"
-" ニュース、Feedsearch、ウェブサイトスキャン、Reddit、フェディバース "
-"(Lemmy/Kbin/Mastodon/Bluesky/PieFed)。Feedly は明示的なソースとして利用できます。"
+"ソース: NewsBlur、iTunes、gPodder、fyyd、Podverse、YouTube、Feedspot、Google "
+"ニュース、Bing ニュース、Feedsearch、ウェブサイトスキャン、Reddit、フェディ"
+"バース (Lemmy/Kbin/Mastodon/Bluesky/PieFed)。Feedly は明示的なソースとして利"
+"用できます。"
 
-#: gui/dialogs.py:5453 gui/dialogs.py:5478
+#: gui/dialogs.py:5466 gui/dialogs.py:5491
 msgid "News search feed"
 msgstr "ニュース検索フィード"
 
-#: gui/dialogs.py:5981
+#: gui/dialogs.py:5994
 msgid "Search Sites:"
 msgstr "検索対象サイト:"
 
-#: gui/dialogs.py:5985
+#: gui/dialogs.py:5998
 msgid "Filter Results:"
 msgstr "結果を絞り込む:"
 
-#: gui/dialogs.py:5989
+#: gui/dialogs.py:6002
 msgid "Sort by:"
 msgstr "並べ替え:"
 
-#: gui/dialogs.py:7000
+#: gui/dialogs.py:7013
 msgid "{action} {n} site..."
 msgid_plural "{action} {n} sites..."
 msgstr[0] "{n} 件のサイトを{action}..."
 
-#: gui/dialogs.py:7147
+#: gui/dialogs.py:7160
 msgid "{sites}, {results}. {label} +{added}"
 msgstr "{sites}、{results}。{label} +{added}"
 
-#: gui/dialogs.py:7408
+#: gui/dialogs.py:7421
 msgid "Subscribe Error"
 msgstr "登録エラー"
 
-#: gui/dialogs.py:7446
+#: gui/dialogs.py:7459
 msgid "Copied URL."
 msgstr "URL をコピーしました。"
 
-#: gui/dialogs.py:7459
+#: gui/dialogs.py:7472
 msgid "Saved searches:"
 msgstr "保存済みの検索:"
 
-#: gui/dialogs.py:7966
+#: gui/dialogs.py:7979
 msgid "(none)"
 msgstr "(なし)"
 
-#: gui/dialogs.py:8101
+#: gui/dialogs.py:8114
 msgid "{sign}{v} dB"
 msgstr "{sign}{v} dB"
 
-#: gui/dialogs.py:8147
+#: gui/dialogs.py:8160
 msgid "&Preset:"
 msgstr "プリセット(&P):"
 
-#: gui/dialogs.py:750 gui/dialogs.py:2588 gui/dialogs.py:2708
+#: gui/dialogs.py:750 gui/dialogs.py:2600 gui/dialogs.py:2720
 msgid "Cookies"
 msgstr "Cookie"
 
-#: gui/dialogs.py:2020
+#: gui/dialogs.py:2032
 msgid "Loaded {n} OpenRouter model."
 msgid_plural "Loaded {n} OpenRouter models."
 msgstr[0] "{n} 件の OpenRouter モデルを読み込みました。"
 
-#: gui/dialogs.py:2146
+#: gui/dialogs.py:2158
 msgid "Notification APIs were unavailable. {hint}"
 msgstr "通知 API を利用できませんでした。{hint}"
 
-#: gui/dialogs.py:2170
+#: gui/dialogs.py:2182
 msgid ""
 "BlindRSS announcement test. If you can hear or read this, announcements are "
 "working."
-msgstr "BlindRSS アナウンステストです。これが聞こえるか読める場合、アナウンスは機能しています。"
+msgstr ""
+"BlindRSS アナウンステストです。これが聞こえるか読める場合、アナウンスは機能し"
+"ています。"
 
-#: gui/dialogs.py:2355
+#: gui/dialogs.py:2367
 msgid "Authorization cancelled."
 msgstr "承認をキャンセルしました。"
 
-#: gui/dialogs.py:2361
+#: gui/dialogs.py:2373
 msgid "No authorization code found in the pasted URL."
 msgstr "貼り付けられた URL に承認コードが見つかりませんでした。"
 
-#: gui/dialogs.py:2364
+#: gui/dialogs.py:2376
 msgid ""
 "Missing state parameter; paste the full redirected URL from your browser "
 "address bar."
-msgstr "state パラメーターがありません。ブラウザーのアドレスバーからリダイレクト先の URL 全体を貼り付けてください。"
+msgstr ""
+"state パラメーターがありません。ブラウザーのアドレスバーからリダイレクト先の "
+"URL 全体を貼り付けてください。"
 
-#: gui/dialogs.py:2368
+#: gui/dialogs.py:2380
 msgid "Invalid state (redirect does not match this authorization attempt)."
 msgstr "state が無効です (リダイレクトがこの承認処理と一致しません)。"
 
-#: gui/dialogs.py:2619
+#: gui/dialogs.py:2631
 msgid "The playback cache is already empty."
 msgstr "再生キャッシュはすでに空です。"
 
-#: gui/dialogs.py:2625
+#: gui/dialogs.py:2637
 msgid "Delete {n} cached file ({size})?"
 msgid_plural "Delete {n} cached files ({size})?"
 msgstr[0] "{n} 個のキャッシュファイルを削除しますか({size})?"
 
-#: gui/dialogs.py:2782
+#: gui/dialogs.py:2794
 msgid "Detected {nm}: not found"
 msgstr "検出された {nm}: 見つかりません"
 
-#: gui/dialogs.py:2814
+#: gui/dialogs.py:2826
 msgid "(not set)"
 msgstr "(未設定)"
 
-#: gui/dialogs.py:2847
+#: gui/dialogs.py:2859
 msgid ""
 "Launched the test command with a sample URL:\n"
 "\n"
@@ -4602,7 +4701,7 @@ msgstr ""
 "\n"
 "ブラウザーで https://example.com/ が想定どおり開いたか確認してください。"
 
-#: gui/dialogs.py:2856
+#: gui/dialogs.py:2868
 msgid ""
 "The command could not be run:\n"
 "\n"
@@ -4612,39 +4711,39 @@ msgstr ""
 "\n"
 "{error}"
 
-#: gui/dialogs.py:2998
+#: gui/dialogs.py:3010
 msgid "{label} executable path override"
 msgstr "{label} の実行ファイルのパスの上書き"
 
-#: gui/dialogs.py:3008
+#: gui/dialogs.py:3020
 msgid "Detected {label}"
 msgstr "検出された {label}"
 
-#: gui/dialogs.py:3023
+#: gui/dialogs.py:3035
 msgid "Downloads"
 msgstr "ダウンロード"
 
-#: gui/dialogs.py:3102
+#: gui/dialogs.py:3114
 msgid "Inoreader App ID:"
 msgstr "Inoreader アプリ ID:"
 
-#: gui/dialogs.py:3109
+#: gui/dialogs.py:3121
 msgid "Inoreader App Key:"
 msgstr "Inoreader アプリキー:"
 
-#: gui/dialogs.py:3120
+#: gui/dialogs.py:3132
 msgid "Redirect URI:"
 msgstr "リダイレクト URI:"
 
-#: gui/dialogs.py:3226
+#: gui/dialogs.py:3238
 msgid "Browse for {name}"
 msgstr "{name} を参照"
 
-#: gui/dialogs.py:4858
+#: gui/dialogs.py:4871
 msgid "feed"
 msgstr "フィード"
 
-#: gui/dialogs.py:4923
+#: gui/dialogs.py:4936
 msgid ""
 "Remove the feed “{title}”?\n"
 "\n"
@@ -4654,74 +4753,75 @@ msgstr ""
 "\n"
 "フィードとそのすべての記事が削除されます。"
 
-#: gui/dialogs.py:5194
+#: gui/dialogs.py:5207
 msgid "Searching {label}..."
 msgstr "{label} を検索しています..."
 
-#: gui/dialogs.py:5461
+#: gui/dialogs.py:5474
 msgid "News topic feed"
 msgstr "ニューストピックフィード"
 
-#: gui/dialogs.py:5828
+#: gui/dialogs.py:5841
 msgid "Website scan"
 msgstr "ウェブサイトスキャン"
 
-#: gui/dialogs.py:5848
+#: gui/dialogs.py:5861
 msgid "Found {n} result."
 msgid_plural "Found {n} results."
 msgstr[0] "{n} 件の結果が見つかりました。"
 
-#: gui/dialogs.py:6007
+#: gui/dialogs.py:6020
 msgid "yt-dlp global search (max {count} concurrent)"
 msgstr "yt-dlp グローバル検索 (最大 {count} 件同時)"
 
-#: gui/dialogs.py:7140
+#: gui/dialogs.py:7153
 msgid "{sites}, {results}. {label}: error"
 msgstr "{sites}、{results}。{label}: エラー"
 
-#: gui/dialogs.py:7180
+#: gui/dialogs.py:7193
 msgid "Stopped. {n} result."
 msgid_plural "Stopped. {n} results."
 msgstr[0] "停止しました。{n} 件の結果。"
 
-#: gui/dialogs.py:7382
+#: gui/dialogs.py:7395
 msgid "Playback Error"
 msgstr "再生エラー"
 
-#: gui/dialogs.py:7386 gui/dialogs.py:7324
+#: gui/dialogs.py:7399 gui/dialogs.py:7337
 msgid "Playing: {title}"
 msgstr "再生中: {title}"
 
-#: gui/dialogs.py:7688
+#: gui/dialogs.py:7701
 msgid "{index}. {title}, from {source}"
 msgstr "{index}. {title}、{source} より"
 
-#: gui/dialogs.py:7692
+#: gui/dialogs.py:7705
 msgid "{index}. {title}"
 msgstr "{index}. {title}"
 
-#: gui/dialogs.py:7699
+#: gui/dialogs.py:7712
 msgid "{n} item in queue."
 msgid_plural "{n} items in queue."
 msgstr[0] "キューに {n} 件あります。"
 
-#: gui/dialogs.py:7816
+#: gui/dialogs.py:7829
 msgid ""
 "Press the new shortcut for “{command}”.\n"
 "It must include Ctrl, Alt or Shift. Press Escape to cancel."
 msgstr ""
 "「{command}」の新しいショートカットを押してください。\n"
-"Ctrl、Alt、Shift のいずれかを含める必要があります。キャンセルするには Escape を押してください。"
+"Ctrl、Alt、Shift のいずれかを含める必要があります。キャンセルするには Escape "
+"を押してください。"
 
-#: gui/dialogs.py:8033
+#: gui/dialogs.py:8046
 msgid "Shortcut Conflict"
 msgstr "ショートカットの競合"
 
-#: gui/dialogs.py:8247
+#: gui/dialogs.py:8260
 msgid "{name} (my preset)"
 msgstr "{name} (マイプリセット)"
 
-#: gui/dialogs.py:8365
+#: gui/dialogs.py:8378
 msgid "Delete the preset \"{name}\"?"
 msgstr "プリセット「{name}」を削除しますか?"
 
@@ -4729,19 +4829,19 @@ msgstr "プリセット「{name}」を削除しますか?"
 msgid "Could not read cookies from {browser}."
 msgstr "{browser} から Cookie を読み取れませんでした。"
 
-#: gui/dialogs.py:1983
+#: gui/dialogs.py:1995
 msgid "OpenRouter model load failed: {error}"
 msgstr "OpenRouter モデルの読み込みに失敗しました: {error}"
 
-#: gui/dialogs.py:2353
+#: gui/dialogs.py:2365
 msgid "Timed out waiting for the redirected URL."
 msgstr "リダイレクト先の URL の待機がタイムアウトしました。"
 
-#: gui/dialogs.py:2540
+#: gui/dialogs.py:2552
 msgid "Saved device (currently unavailable): {device}"
 msgstr "保存済みデバイス (現在利用できません): {device}"
 
-#: gui/dialogs.py:2721
+#: gui/dialogs.py:2733
 msgid ""
 "That file is not a usable YouTube cookie export:\n"
 "\n"
@@ -4751,7 +4851,7 @@ msgstr ""
 "\n"
 "{error}"
 
-#: gui/dialogs.py:2728
+#: gui/dialogs.py:2740
 msgid ""
 "Could not import the cookies file:\n"
 "\n"
@@ -4761,15 +4861,15 @@ msgstr ""
 "\n"
 "{error}"
 
-#: gui/dialogs.py:2784
+#: gui/dialogs.py:2796
 msgid "Detected {nm}: {path} (failed version check)"
 msgstr "検出された {nm}: {path} (バージョン確認に失敗)"
 
-#: gui/dialogs.py:2786
+#: gui/dialogs.py:2798
 msgid "Detected {nm}: {path}"
 msgstr "検出された {nm}: {path}"
 
-#: gui/dialogs.py:2840
+#: gui/dialogs.py:2852
 msgid ""
 "The command could not be parsed:\n"
 "\n"
@@ -4779,15 +4879,15 @@ msgstr ""
 "\n"
 "{error}"
 
-#: gui/dialogs.py:3007
+#: gui/dialogs.py:3019
 msgid "Detected {label}: checking…"
 msgstr "検出された {label}: 確認中…"
 
-#: gui/dialogs.py:3229
+#: gui/dialogs.py:3241
 msgid "Choose {label}"
 msgstr "{label} を選択"
 
-#: gui/dialogs.py:3827
+#: gui/dialogs.py:3839
 msgid ""
 "User Data Folder path:\n"
 "  {path}\n"
@@ -4795,7 +4895,7 @@ msgstr ""
 "ユーザーデータフォルダーのパス:\n"
 "  {path}\n"
 
-#: gui/dialogs.py:3828
+#: gui/dialogs.py:3840
 msgid ""
 "App Install Folder path:\n"
 "  {path}"
@@ -4803,58 +4903,58 @@ msgstr ""
 "アプリのインストールフォルダーのパス:\n"
 "  {path}"
 
-#: gui/dialogs.py:5452
+#: gui/dialogs.py:5465
 msgid "Google News: {term}"
 msgstr "Google News: {term}"
 
-#: gui/dialogs.py:6637
+#: gui/dialogs.py:6650
 msgid "Adult: {site}"
 msgstr "アダルト: {site}"
 
-#: gui/dialogs.py:7183
+#: gui/dialogs.py:7196
 msgid "Loaded more. {n} result."
 msgid_plural "Loaded more. {n} results."
 msgstr[0] "追加で読み込みました。{n} 件の結果。"
 
-#: gui/dialogs.py:7185
+#: gui/dialogs.py:7198
 msgid "{n} result."
 msgid_plural "{n} results."
 msgstr[0] "{n} 件の結果。"
 
-#: gui/dialogs.py:7407
+#: gui/dialogs.py:7420
 msgid "Could not subscribe: {error}"
 msgstr "登録できませんでした: {error}"
 
-#: gui/dialogs.py:8339
+#: gui/dialogs.py:8352
 msgid "A preset named \"{name}\" already exists. Overwrite it?"
 msgstr "「{name}」という名前のプリセットは既に存在します。上書きしますか?"
 
-#: gui/dialogs.py:2359
+#: gui/dialogs.py:2371
 msgid "Inoreader authorization failed: {error}"
 msgstr "Inoreader の承認に失敗しました: {error}"
 
-#: gui/dialogs.py:2994
+#: gui/dialogs.py:3006
 msgid "{tool} path:"
 msgstr "{tool} のパス:"
 
-#: gui/dialogs.py:3229
+#: gui/dialogs.py:3241
 msgid "WAV files"
 msgstr "WAV ファイル"
 
-#: gui/dialogs.py:5460
+#: gui/dialogs.py:5473
 msgid "Google News: {topic} headlines"
 msgstr "Google News: {topic} の見出し"
 
-#: gui/dialogs.py:7324 gui/mainframe.py:1877 gui/player.py:4305
+#: gui/dialogs.py:7337 gui/mainframe.py:1877 gui/player.py:4305
 #: gui/player.py:6913
 msgid "Playing"
 msgstr "再生中"
 
-#: gui/dialogs.py:7381
+#: gui/dialogs.py:7394
 msgid "Could not start playback: {error}"
 msgstr "再生を開始できませんでした: {error}"
 
-#: gui/dialogs.py:8029
+#: gui/dialogs.py:8042
 msgid ""
 "{accel} is already assigned to “{other}”.\n"
 "Reassign it to “{this}”?"
@@ -4862,32 +4962,32 @@ msgstr ""
 "{accel} は既に「{other}」に割り当てられています。\n"
 "「{this}」に割り当て直しますか?"
 
-#: gui/dialogs.py:5477
+#: gui/dialogs.py:5490
 msgid "Bing News: {term}"
 msgstr "Bing News: {term}"
 
-#: gui/dialogs.py:7326 gui/mainframe.py:1877 gui/player.py:6969
+#: gui/dialogs.py:7339 gui/mainframe.py:1877 gui/player.py:6969
 #: gui/player.py:6986
 msgid "Paused"
 msgstr "一時停止中"
 
-#: gui/dialogs.py:7326
+#: gui/dialogs.py:7339
 msgid "Paused: {title}"
 msgstr "一時停止中: {title}"
 
-#: gui/dialogs.py:7330 gui/player.py:4366 gui/player.py:4913
+#: gui/dialogs.py:7343 gui/player.py:4366 gui/player.py:4913
 msgid "Buffering..."
 msgstr "バッファリング中..."
 
-#: gui/dialogs.py:7332 gui/player.py:4508
+#: gui/dialogs.py:7345 gui/player.py:4508
 msgid "Connecting..."
 msgstr "接続中..."
 
-#: gui/dialogs.py:7330
+#: gui/dialogs.py:7343
 msgid "Buffering: {title}"
 msgstr "バッファリング中: {title}"
 
-#: gui/dialogs.py:7332
+#: gui/dialogs.py:7345
 msgid "Connecting: {title}"
 msgstr "接続中: {title}"
 
@@ -5011,7 +5111,8 @@ msgstr "メディアの &URL を開く..."
 
 #: gui/mainframe.py:2263
 msgid "Stream or download media from any supported link"
-msgstr "対応しているリンクからメディアをストリーミング再生またはダウンロードします"
+msgstr ""
+"対応しているリンクからメディアをストリーミング再生またはダウンロードします"
 
 #: gui/mainframe.py:2266
 msgid "Scan a webpage for RSS, Atom, or JSON feed links"
@@ -5075,9 +5176,10 @@ msgstr "OPML からフィードをインポートする"
 
 #: gui/mainframe.py:2291
 msgid ""
-"Import YouTube subscriptions, playlists, channels, and watch-history "
-"channels"
-msgstr "YouTube の登録チャンネル、再生リスト、チャンネル、再生履歴のチャンネルをインポートします"
+"Import YouTube subscriptions, playlists, channels, and watch-history channels"
+msgstr ""
+"YouTube の登録チャンネル、再生リスト、チャンネル、再生履歴のチャンネルをイン"
+"ポートします"
 
 #: gui/mainframe.py:2293
 msgid "E&xport OPML..."
@@ -5285,7 +5387,9 @@ msgstr "受信した記事を分類、ラベル付け、削除するルールを
 
 #: gui/mainframe.py:2500
 msgid "Import browser cookies so challenge-protected sites can be read"
-msgstr "ブラウザーの Cookie をインポートして、検証で保護されたサイトを読めるようにします"
+msgstr ""
+"ブラウザーの Cookie をインポートして、検証で保護されたサイトを読めるようにし"
+"ます"
 
 #: gui/mainframe.py:2505
 msgid "View and customize keyboard shortcuts"
@@ -5756,9 +5860,11 @@ msgstr[0] "{n} 件の記事"
 
 #: gui/mainframe.py:7146
 msgid ""
-"Delete {subject}? Deleted articles can be restored from the Deleted Articles"
-" view."
-msgstr "{subject}を削除しますか? 削除した記事は「削除済みの記事」ビューから復元できます。"
+"Delete {subject}? Deleted articles can be restored from the Deleted Articles "
+"view."
+msgstr ""
+"{subject}を削除しますか? 削除した記事は「削除済みの記事」ビューから復元できま"
+"す。"
 
 #: gui/mainframe.py:7152
 msgid "This provider does not support permanently deleting articles."
@@ -5808,7 +5914,9 @@ msgstr "ダウンロードが無効です"
 msgid ""
 "This item is a direct media file, so it can only be downloaded in its "
 "original format."
-msgstr "この項目は直接のメディアファイルであるため、元の形式でのみダウンロードできます。"
+msgstr ""
+"この項目は直接のメディアファイルであるため、元の形式でのみダウンロードできま"
+"す。"
 
 #: gui/mainframe.py:13094
 msgid "No feeds detected on this page."
@@ -5874,7 +5982,9 @@ msgstr "インポートが完了しました。"
 msgid ""
 "Import failed. Please check the latest opml_debug_*.log in the temporary "
 "directory."
-msgstr "インポートに失敗しました。一時ディレクトリ内の最新の opml_debug_*.log を確認してください。"
+msgstr ""
+"インポートに失敗しました。一時ディレクトリ内の最新の opml_debug_*.log を確認"
+"してください。"
 
 #: gui/mainframe.py:14318
 msgid ""
@@ -5908,7 +6018,9 @@ msgstr "アップデートに失敗しました"
 
 #: gui/mainframe.py:14527
 msgid "The media player could not be opened, so this link cannot be streamed."
-msgstr "メディアプレーヤーを開けなかったため、このリンクはストリーミング再生できません。"
+msgstr ""
+"メディアプレーヤーを開けなかったため、このリンクはストリーミング再生できませ"
+"ん。"
 
 #: gui/mainframe.py:14692
 msgid "Show articles that match"
@@ -5948,9 +6060,11 @@ msgstr "ルールを有効にする(&E)"
 
 #: gui/mainframe.py:14954
 msgid ""
-"Choose at least one action for this rule (move, label, mark, delete, or skip"
-" notification)."
-msgstr "このルールに対して少なくとも1つの操作を選択してください(移動、ラベル付け、マーク、削除、通知スキップ)。"
+"Choose at least one action for this rule (move, label, mark, delete, or skip "
+"notification)."
+msgstr ""
+"このルールに対して少なくとも1つの操作を選択してください(移動、ラベル付け、"
+"マーク、削除、通知スキップ)。"
 
 #: gui/mainframe.py:14955
 msgid "No Actions"
@@ -5984,7 +6098,9 @@ msgstr "ルールを削除"
 msgid ""
 "Run all enabled rules against every existing article now? This may move, "
 "label, or delete articles."
-msgstr "有効なすべてのルールを、既存のすべての記事に対して今すぐ実行しますか? これにより記事が移動、ラベル付け、削除される場合があります。"
+msgstr ""
+"有効なすべてのルールを、既存のすべての記事に対して今すぐ実行しますか? これに"
+"より記事が移動、ラベル付け、削除される場合があります。"
 
 #: gui/mainframe.py:15152
 msgid "Apply to Existing Articles"
@@ -6121,7 +6237,8 @@ msgstr "全文抽出に失敗しました。フィードの内容を表示しま
 
 #: gui/mainframe.py:10763 gui/mainframe.py:11289
 msgid "No webpage URL for this item. Showing feed content."
-msgstr "この項目にはウェブページ URL がありません。フィードの内容を表示します。"
+msgstr ""
+"この項目にはウェブページ URL がありません。フィードの内容を表示します。"
 
 #: gui/mainframe.py:11449
 msgid "Chapters ({count}):"
@@ -6143,11 +6260,15 @@ msgstr "カスタムコマンドが失敗しました"
 msgid ""
 "{error}\n"
 "\n"
-"Browser cookies could not be read on this Windows session (Chromium App-Bound Encryption). If this item needs a login, export a cookies.txt from your browser and set it in Settings."
+"Browser cookies could not be read on this Windows session (Chromium App-"
+"Bound Encryption). If this item needs a login, export a cookies.txt from "
+"your browser and set it in Settings."
 msgstr ""
 "{error}\n"
 "\n"
-"この Windows セッションではブラウザーの Cookie を読み取れませんでした（Chromium のアプリバウンド暗号化）。この項目でログインが必要な場合は、ブラウザーから cookies.txt をエクスポートし、設定で指定してください。"
+"この Windows セッションではブラウザーの Cookie を読み取れませんでした"
+"（Chromium のアプリバウンド暗号化）。この項目でログインが必要な場合は、ブラウ"
+"ザーから cookies.txt をエクスポートし、設定で指定してください。"
 
 #: gui/mainframe.py:12864 gui/mainframe.py:12933 gui/mainframe.py:12804
 msgid "Download error"
@@ -6232,8 +6353,8 @@ msgid ""
 "That does not look like a media link. Enter a full web address, for example "
 "https://www.youtube.com/watch?v=..."
 msgstr ""
-"メディアのリンクではないようです。https://www.youtube.com/watch?v=... "
-"のような完全なウェブアドレスを入力してください。"
+"メディアのリンクではないようです。https://www.youtube.com/watch?v=... のよう"
+"な完全なウェブアドレスを入力してください。"
 
 #: gui/mainframe.py:14503
 msgid "Enter the address of the media you want to open."
@@ -6281,11 +6402,14 @@ msgstr "カテゴリでもラベル付け(&L):"
 
 #: gui/mainframe.py:14984
 msgid "Rules run top to bottom for each incoming article, like email filters."
-msgstr "ルールは、メールフィルターのように、受信した記事ごとに上から下へ順に実行されます。"
+msgstr ""
+"ルールは、メールフィルターのように、受信した記事ごとに上から下へ順に実行され"
+"ます。"
 
 #: gui/mainframe.py:525
 msgid ""
-"Would you like to install them automatically (via winget/Ninite) and add them to PATH?\n"
+"Would you like to install them automatically (via winget/Ninite) and add "
+"them to PATH?\n"
 "\n"
 "Tip: You can disable this prompt in Settings > YouTube."
 msgstr ""
@@ -6465,13 +6589,17 @@ msgstr "ダウンロード完了: {title}"
 
 #: gui/mainframe.py:13069
 msgid ""
-"BlindRSS could not complete this site's browser verification page automatically.\n"
+"BlindRSS could not complete this site's browser verification page "
+"automatically.\n"
 "\n"
-"You can still open the site in your web browser, export its cookies with a cookies.txt extension, then use Tools > Import Site Cookies."
+"You can still open the site in your web browser, export its cookies with a "
+"cookies.txt extension, then use Tools > Import Site Cookies."
 msgstr ""
 "BlindRSS はこのサイトのブラウザー検証ページを自動的に完了できませんでした。\n"
 "\n"
-"サイトを一度ウェブブラウザーで開き、cookies.txt ブラウザー拡張機能で Cookie をエクスポートしてから、ツール > サイトの Cookie をインポート を使用することもできます。"
+"サイトを一度ウェブブラウザーで開き、cookies.txt ブラウザー拡張機能で Cookie "
+"をエクスポートしてから、ツール > サイトの Cookie をインポート を使用すること"
+"もできます。"
 
 #: gui/mainframe.py:13076
 msgid "Unable to retrieve the page."
@@ -6517,7 +6645,9 @@ msgstr "保存場所"
 msgid ""
 "Config has been moved. The feed database will be migrated to the new "
 "location the next time BlindRSS starts."
-msgstr "設定が移動されました。次回 BlindRSS を起動する際に、フィードデータベースが新しい場所に移行されます。"
+msgstr ""
+"設定が移動されました。次回 BlindRSS を起動する際に、フィードデータベースが新"
+"しい場所に移行されます。"
 
 #: gui/mainframe.py:14002
 msgid "Storage Location Changed"
@@ -6536,8 +6666,11 @@ msgid "Condition {n} value"
 msgstr "条件 {n} の値"
 
 #: gui/mainframe.py:15108
-msgid "Delete filter rule \"{name}\"? Articles it already filed are not changed."
-msgstr "フィルタールール「{name}」を削除しますか? すでに処理済みの記事は変更されません。"
+msgid ""
+"Delete filter rule \"{name}\"? Articles it already filed are not changed."
+msgstr ""
+"フィルタールール「{name}」を削除しますか? すでに処理済みの記事は変更されませ"
+"ん。"
 
 #: gui/mainframe.py:15178
 msgid "Scanned {scanned} article; {changed} matched a rule."
@@ -6695,13 +6828,15 @@ msgid ""
 "\n"
 "{err}\n"
 "\n"
-"Opening in the default browser instead. You can change this in Settings > General > Article opening method."
+"Opening in the default browser instead. You can change this in Settings > "
+"General > Article opening method."
 msgstr ""
 "カスタムコマンドで記事を開けませんでした:\n"
 "\n"
 "{err}\n"
 "\n"
-"代わりに既定のブラウザーで開きます。この設定は 設定 > 全般 > 記事を開く方法 で変更できます。"
+"代わりに既定のブラウザーで開きます。この設定は 設定 > 全般 > 記事を開く方法 "
+"で変更できます。"
 
 #: gui/mainframe.py:12714
 msgid "Trying pytubefix: {title}"
@@ -6779,7 +6914,8 @@ msgstr "{count} 件の記事を復元できませんでした。"
 
 #: gui/mainframe.py:7602
 msgid "Remove category '{category}'? Feeds will be moved to Uncategorized."
-msgstr "カテゴリ「{category}」を削除しますか? フィードは「未分類」に移動されます。"
+msgstr ""
+"カテゴリ「{category}」を削除しますか? フィードは「未分類」に移動されます。"
 
 #: gui/mainframe.py:12923 gui/mainframe.py:12823
 msgid ""
@@ -6803,19 +6939,24 @@ msgstr "翻訳に失敗しました: {error}"
 
 #: gui/mainframe.py:556
 msgid ""
-"Install Homebrew (https://brew.sh) to let BlindRSS install these automatically, or install them yourself with:\n"
+"Install Homebrew (https://brew.sh) to let BlindRSS install these "
+"automatically, or install them yourself with:\n"
 "    brew install --cask vlc\n"
 "    brew install ffmpeg yt-dlp\n"
 "\n"
-"If this is a packaged build that should bundle them, see the log: {log_path}\n"
+"If this is a packaged build that should bundle them, see the log: "
+"{log_path}\n"
 "\n"
 "Tip: You can disable this prompt in Settings > YouTube."
 msgstr ""
-"BlindRSS がこれらを自動的にインストールできるように Homebrew (https://brew.sh) をインストールするか、次のコマンドで手動でインストールしてください:\n"
+"BlindRSS がこれらを自動的にインストールできるように Homebrew (https://"
+"brew.sh) をインストールするか、次のコマンドで手動でインストールしてくださ"
+"い:\n"
 "    brew install --cask vlc\n"
 "    brew install ffmpeg yt-dlp\n"
 "\n"
-"これらを同梱すべきパッケージビルドの場合は、ログを確認してください: {log_path}\n"
+"これらを同梱すべきパッケージビルドの場合は、ログを確認してください: "
+"{log_path}\n"
 "\n"
 "ヒント: この確認は 設定 > YouTube で無効にできます。"
 
@@ -6834,7 +6975,9 @@ msgstr ""
 #: gui/mainframe.py:12803
 msgid ""
 "yt-dlp is not installed. Install it via Settings to download YouTube items."
-msgstr "yt-dlp がインストールされていません。YouTube の項目をダウンロードするには、設定からインストールしてください。"
+msgstr ""
+"yt-dlp がインストールされていません。YouTube の項目をダウンロードするには、設"
+"定からインストールしてください。"
 
 #: gui/player.py:687 gui/player.py:2056
 msgid "No Track Loaded"
@@ -6983,11 +7126,13 @@ msgstr "キャストデバイスが切断されました。ローカル再生を
 #: gui/player.py:3179
 msgid ""
 "This link opens a web page, not audio or video. The server returned "
-"{content_type} instead of a media file, which often means the item needs you"
-" to sign in, or the feed has no downloadable enclosure."
+"{content_type} instead of a media file, which often means the item needs you "
+"to sign in, or the feed has no downloadable enclosure."
 msgstr ""
-"このリンクは音声や動画ではなく、Web ページを開きます。サーバーはメディアファイルではなく {content_type} "
-"を返しました。多くの場合、この項目にサインインが必要か、フィードにダウンロード可能なファイルが含まれていないことを意味します。"
+"このリンクは音声や動画ではなく、Web ページを開きます。サーバーはメディアファ"
+"イルではなく {content_type} を返しました。多くの場合、この項目にサインインが"
+"必要か、フィードにダウンロード可能なファイルが含まれていないことを意味しま"
+"す。"
 
 #: gui/player.py:3567 gui/player.py:4220
 msgid "Failed to load media"
@@ -7087,7 +7232,9 @@ msgstr "YouTube ブラウザーセッションを準備中..."
 
 #: gui/player.py:4810
 msgid "Could not play this YouTube item. yt-dlp could not fetch it: {error}"
-msgstr "この YouTube の項目を再生できませんでした。yt-dlp が取得できませんでした: {error}"
+msgstr ""
+"この YouTube の項目を再生できませんでした。yt-dlp が取得できませんでした: "
+"{error}"
 
 #: gui/player.py:5948
 msgid "Pause"
@@ -7113,7 +7260,8 @@ msgid ""
 msgstr ""
 "VLC を初期化できませんでした: {error}\n"
 "\n"
-"VLC media player がインストールされていることを確認してください (64 ビット版を推奨します)。"
+"VLC media player がインストールされていることを確認してください (64 ビット版"
+"を推奨します)。"
 
 #: gui/player.py:2314
 msgid "Chapters, {count} available, current chapter {current}"
@@ -7136,7 +7284,8 @@ msgid ""
 "Rokfin post is listed but not streamable right now: Rokfin returned an "
 "invalid playback ID for this post."
 msgstr ""
-"この Rokfin の投稿は一覧に表示されていますが、現在は再生できません。Rokfin がこの投稿に対して無効な再生 ID を返しました。"
+"この Rokfin の投稿は一覧に表示されていますが、現在は再生できません。Rokfin が"
+"この投稿に対して無効な再生 ID を返しました。"
 
 #: gui/player.py:5965
 msgid "Volume: {percent}%"
@@ -7156,18 +7305,22 @@ msgstr "yt-dlp による解決に失敗しました: {error}"
 
 #: gui/player.py:4138
 msgid ""
-"Rokfin post is not anonymously streamable right now. Rokfin requires a "
-"login/cookies to play this post."
-msgstr "この Rokfin の投稿は現在、匿名では再生できません。再生には Rokfin のログインまたは Cookie が必要です。"
+"Rokfin post is not anonymously streamable right now. Rokfin requires a login/"
+"cookies to play this post."
+msgstr ""
+"この Rokfin の投稿は現在、匿名では再生できません。再生には Rokfin のログイン"
+"または Cookie が必要です。"
 
 #: gui/player.py:4143
 msgid ""
 "yt-dlp resolve failed: this media may require a login, but browser cookies "
-"could not be loaded on this Windows session (DPAPI). Try running BlindRSS as"
-" your normal Windows user and restart the app."
+"could not be loaded on this Windows session (DPAPI). Try running BlindRSS as "
+"your normal Windows user and restart the app."
 msgstr ""
-"yt-dlp による解決に失敗しました: このメディアはログインが必要な可能性がありますが、この Windows セッションではブラウザーの "
-"Cookie を読み込めませんでした (DPAPI)。通常の Windows ユーザーで BlindRSS を実行し、アプリを再起動してください。"
+"yt-dlp による解決に失敗しました: このメディアはログインが必要な可能性がありま"
+"すが、この Windows セッションではブラウザーの Cookie を読み込めませんでした "
+"(DPAPI)。通常の Windows ユーザーで BlindRSS を実行し、アプリを再起動してくだ"
+"さい。"
 
 #: gui/tray.py:101
 msgid "Restore"
@@ -7193,9 +7346,27 @@ msgstr "終了"
 msgid "Unread: {count}"
 msgstr "未読: {count}"
 
-#: main.py:282
+#: main.py:291
 msgid "BlindRSS is already running."
 msgstr "BlindRSS はすでに実行されています。"
+
+#~ msgid ""
+#~ "yt-dlp cookies file (cookies.txt) — only needed for age-restricted, "
+#~ "private, or members-only YouTube content. Installed browsers are detected "
+#~ "automatically; Firefox is recommended. Chrome, Edge, and Brave may fail "
+#~ "on Windows because their cookies can be encrypted in a way yt-dlp cannot "
+#~ "read, so a cookies.txt is the reliable fallback. LibreWolf uses Firefox-"
+#~ "compatible cookies. Chrome \"Nightly\" means Chrome Canary; Edge "
+#~ "\"Nightly\" means Edge Canary."
+#~ msgstr ""
+#~ "yt-dlp 用 Cookie ファイル(cookies.txt)— 年齢制限付き、非公開、またはメン"
+#~ "バー限定の YouTube コンテンツにのみ必要です。インストール済みのブラウザー"
+#~ "は自動的に検出されます。Firefox を推奨します。Chrome、Edge、Brave は、"
+#~ "Cookie が yt-dlp で読み取れない形式で暗号化されている場合があるため、"
+#~ "Windows では失敗することがあります。その場合は cookies.txt を使う方法が確"
+#~ "実です。LibreWolf は Firefox 互換の Cookie を使用します。Chrome の"
+#~ "「Nightly」は Chrome Canary、Edge の「Nightly」は Edge Canary を意味しま"
+#~ "す。"
 
 #~ msgid "Failed to download update metadata: {error}"
 #~ msgstr "アップデートのメタデータをダウンロードできませんでした: {error}"
@@ -7227,8 +7398,10 @@ msgstr "BlindRSS はすでに実行されています。"
 #~ "\n"
 #~ "Tip: You can disable this prompt in Settings > YouTube."
 #~ msgstr ""
-#~ "この macOS/Linux ビルドには、これらのツールが既に同梱されているはずです。\n"
-#~ "それでも不足していると表示される場合は、ログを確認してください: {log_path}\n"
+#~ "この macOS/Linux ビルドには、これらのツールが既に同梱されているはずで"
+#~ "す。\n"
+#~ "それでも不足していると表示される場合は、ログを確認してください: "
+#~ "{log_path}\n"
 #~ "\n"
 #~ "ヒント: この確認は設定 > YouTube で無効にできます。"
 

@@ -118,6 +118,11 @@ packages_to_collect = [
     'sgmllib', 'six', 'soupsieve',
     'defusedxml', 'didl_lite', 'ifaddr',
     'certifi', 'curl_cffi',
+    # Chromium v20 cookie decryption (core/chromium_cookies.py) uses
+    # AES-256-GCM/ChaCha20-Poly1305 from cryptography, imported lazily inside
+    # the helpers, so PyInstaller's startup-graph analysis misses it. Its hook
+    # also bundles the C extension backends the AEAD classes need.
+    'cryptography',
     # Last-resort real-browser feed retrieval. Imported lazily after every
     # ordinary HTTP attempt fails, so PyInstaller cannot discover it from the
     # normal startup graph. Browser/driver binaries are downloaded per-user.

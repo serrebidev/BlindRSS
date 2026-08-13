@@ -40,6 +40,11 @@ class _DummyMain:
         self.refresh_feeds_calls = 0
         self.activity_status_updates = []
 
+    def _resume_auto_refresh(self):
+        # No-op for the refresh-activity stub (real MainFrame manages its own
+        # auto-refresh timer; _begin_refresh_activity calls this on every entry).
+        pass
+
     def _on_feed_refresh_progress(self, state):
         self.progress_states.append(dict(state or {}))
 

@@ -18,6 +18,8 @@ real jar would pass or fail based on which sites they happen to have visited.
 on a machine whose owner had browsed neowin.net.
 """
 
+import os
+
 import pytest
 
 
@@ -55,7 +57,26 @@ def _isolated_site_cookie_jar(tmp_path_factory, monkeypatch):
     # list_browser_profiles() so the real discovery code still runs and tests
     # that supply their own fake roots keep working.
     monkeypatch.setattr(site_cookies, "_firefox_like_roots", lambda: [])
-    site_cookies._invalidate()
+
+    # Tests that write the managed jar/UA files (set_user_agent,
+    # set_host_user_agent, import_jar) must not leak into the next case: a
+    # persisted UA + clearance cookie changed which fingerprint later
+    # full-text tests used, making them order-dependent. Clear the scratch
+    # files on both sides of every test.
+    def _reset():
+        for name in (
+            site_cookies.JAR_FILENAME,
+            site_cookies.UA_FILENAME,
+            site_cookies.HOST_UA_FILENAME,
+        ):
+            try:
+                os.remove(os.path.join(str(jar_dir), name))
+            except OSError:
+                pass
+        site_cookies._invalidate()
+
+    _reset()
     site_cookies._last_forced_refresh.clear()
     yield
-    site_cookies._invalidate()
+    _reset()
+    site_cookies._last_forced_refresh.clear()
