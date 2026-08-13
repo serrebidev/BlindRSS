@@ -150,11 +150,29 @@ _BOT_INTERSTITIAL_MARKERS = (
     "geo.captcha-delivery.com",
     "ct.captcha-delivery.com",
     "please enable js and disable any ad blocker",
+    # TollBit pay-per-crawl metering (npr.org and other publishers). It answers with a
+    # short JSON array rather than an HTML page, normally under HTTP 402, so both the
+    # status code and the body identify it.
+    "valid tollbit token",
+    "tollbit.dev",
 )
 
 # Block-page bodies are short; a long article that merely mentions one of these phrases should not be
 # discarded. Only treat a post-extraction body as a gate when it is small.
 _BOT_INTERSTITIAL_MAX_BODY_LEN = 1500
+
+# Status codes that mean "this client is being refused", not "the site is down". A gated
+# response has to run the full fallback chain (impersonation, read-proxies, Wayback, the
+# real browser) and report itself as a block, otherwise the reader shows the misleading
+# "offline, or connection problem" message for a page the user's browser opens fine.
+#   402 - pay-per-crawl metering (TollBit on npr.org)
+#   403 - the classic WAF refusal
+#   429 - rate limited
+#   451 - legally blocked in this region
+#   503 - Cloudflare and friends serve their challenge under this
+# 401 is deliberately absent: that is a genuine credential prompt, and escalating to a
+# ~40s headless browser launch cannot satisfy it.
+_GATE_STATUS_CODES = (402, 403, 429, 451, 503)
 
 def _has_stored_clearance(url: str) -> bool:
     """True when the cookie jar holds a bot-check clearance for this URL's site."""
@@ -3830,6 +3848,20 @@ def _fetch_page(url: str, timeout: int = 20, encoding_override: str = "") -> _Fe
         if lemmy_html:
             return _FetchResult(html=lemmy_html)
 
+    # npr.org meters its story pages through TollBit, which refuses the reader with
+    # HTTP 402 no matter which browser fingerprint it presents (see core/npr.py). NPR's
+    # own text-only edition is outside the meter and is the better source anyway: it
+    # carries the full story plus the radio transcript with no navigation or player
+    # chrome. Fails closed, so a non-story npr.org URL still takes the normal chain.
+    try:
+        from core import npr as npr_mod
+
+        npr_html = npr_mod.download_text_only_html(url, timeout=timeout)
+        if npr_html:
+            return _FetchResult(html=npr_html)
+    except Exception:
+        LOG.debug("NPR text-only routing failed for %s", url, exc_info=True)
+
     is_bloomberg = _is_bloomberg_url(url)
     is_bloomberg_video = _is_bloomberg_video_url(url)
     # A site with a stored browser session already goes out impersonated on the
@@ -3935,7 +3967,7 @@ def _fetch_page(url: str, timeout: int = 20, encoding_override: str = "") -> _Fe
                 return _try_fallbacks(gate_seen=True)
             return _FetchResult(html=body)
         try:
-            if r is not None and (r.status_code in (403, 503) or _looks_like_bot_interstitial(r.text or "")):
+            if r is not None and (r.status_code in _GATE_STATUS_CODES or _looks_like_bot_interstitial(r.text or "")):
                 return _try_fallbacks(gate_seen=True)
         except Exception:
             pass
