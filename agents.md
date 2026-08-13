@@ -452,6 +452,7 @@ sync-claude-memory.py after writing one:
 - [Speed shortcut interception](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\speed-shortcut-interception.md) — Ctrl+Shift+./,/0 eaten system-wide by NVDA add-on + Windows IME hotkeys; defaults now Ctrl+Shift+U/D/N; key-probe & GUI-verify techniques
 - [Playback rate gap & render lag](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\playback-rate-gap-and-render-lag.md) — directsound aout silenced audio on every set_rate (now mmdevice); large-category lag was per-row yt-dlp/HTML work in UI render batches (now loader-thread precompute)
 - [wx CallAfter timer starvation](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\wx-callafter-timer-starvation.md) — CallAfter self-requeue starves all wx timers (v1.90.5 startup hang); py-spy + IsHungAppWindow diagnosis technique
+- [NPR TollBit gate](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\npr-tollbit-gate.md) — NPR 402-meters story pages *intermittently*; no TLS fingerprint beats it; use text.npr.org + player/embed
 - [Full-text fetch fallback chain](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\fulltext-fetch-fallback-chain.md) — impersonation(safari184)/Jina/Smry/Wayback fallbacks; curl_cffi encoding read-once gotcha; Archive.today/GCache/12ft excluded; Register site rule
 - [Translation completion workflow](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\translation-completion-workflow.md) — msgmerge/polib pipeline to fully translate all 15 locales after a translator PR regenerates the pot
 - [Fulltext starvation during refresh](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\fulltext-prefetch-refresh-starvation.md) — v1.97.2 fix was a no-op (prefetch disabled since Jan 2026); real causes: list-churn result drop + guard leak + DB write on extraction path; fixed post-v1.98.0
@@ -520,6 +521,7 @@ sync-claude-memory.py after writing one:
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\localization-guardrails.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\macos-parity-v1112-2.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\miniflux-refresh-streaming.md
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\npr-tollbit-gate.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\nvda-columnsreview-focused-row-mutation.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\out-of-band-translation-updates.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\playback-rate-gap-and-render-lag.md
