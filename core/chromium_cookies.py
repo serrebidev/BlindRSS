@@ -98,6 +98,10 @@ _NT_TO_UNIX_OFFSET = 11644473600
 
 _DOMAIN_HASH_LEN = 32
 
+# Hide the console of child console apps (schtasks/powershell/icacls) so no
+# cmd window flashes when BlindRSS itself has no console. 0 on POSIX.
+_CREATE_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+
 _HELPER_FLAG = "--blindrss-chromium-key-helper"
 _VSS_HELPER_FLAG = "--blindrss-chromium-vss-copy"
 _ELEVATED_HELPER_FLAG = "--blindrss-elevated-helper"
@@ -795,7 +799,7 @@ def _run_elevated_helper_batch_runas(app_bound_keys_b64: list) -> list:
     if not _is_windows():
         raise OSError("Elevation is Windows-only")
 
-    exe = sys.executable
+    exe = _no_console_interpreter()
     args = [_HELPER_FLAG]
     if not getattr(sys, "frozen", False):
         # `sys.executable` is the interpreter, so the script must come first:
@@ -905,7 +909,7 @@ def _run_elevated_vss_copy_runas(copy_paths):
     """
     if not copy_paths or not _is_windows():
         return {}, None
-    exe = sys.executable
+    exe = _no_console_interpreter()
     args = [_VSS_HELPER_FLAG]
     if not getattr(sys, "frozen", False):
         script = os.path.join(
@@ -1067,10 +1071,11 @@ def _vss_copy_files(source_paths, dest_dir):
             "}"
         )
         proc = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+            ["powershell", "-NoProfile", "-NonInteractive", "-WindowStyle Hidden", "-Command", ps],
             capture_output=True,
             text=True,
             timeout=300,
+            creationflags=_CREATE_NO_WINDOW,
         )
         if proc.returncode != 0:
             detail = (proc.stderr or proc.stdout or "").strip()[-300:]
@@ -1083,6 +1088,7 @@ def _vss_copy_files(source_paths, dest_dir):
             capture_output=True,
             text=True,
             timeout=60,
+            creationflags=_CREATE_NO_WINDOW,
         )
         if grant.returncode != 0:
             log.warning(
@@ -1142,7 +1148,13 @@ def run_vss_copy_cli(argv) -> int:
 # later `schtasks /run` executes elevated with no prompt at all (same pattern
 # Chrome's own elevation service uses).
 
-_ELEVATED_TASK_NAME = "BlindRSS Elevated Helper"
+_ELEVATED_TASK_PREFIX = "BlindRSS Elevated Helper"
+# Task Scheduler requires a single name per task, but a dev checkout and the
+# installed app are different executables. A fixed name would make them steal
+# the task from each other (each sees the other's exe as "stale" and
+# re-registers, prompting UAC every switch), so the task name embeds a short
+# hash of the helper executable. Each install then owns its own task and never
+# interferes with another. See `_elevated_task_name`.
 _ELEVATED_REQUEST_PATH = os.path.join(
     tempfile.gettempdir(), "blindrss-elevated-request.json"
 )
@@ -1204,22 +1216,47 @@ def _runas_and_wait(exe: str, params: str, timeout: float = 180.0) -> None:
             pass
 
 
+def _no_console_interpreter() -> str:
+    """The interpreter to launch without a console window.
+
+    The packaged app is a GUI-subsystem exe (no console). In a dev checkout
+    ``sys.executable`` is console-app ``python.exe``, which would pop a cmd
+    window; the sibling ``pythonw.exe`` is the GUI-subsystem build.
+    """
+    if getattr(sys, "frozen", False):
+        return sys.executable
+    alt = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+    return alt if os.path.isfile(alt) else sys.executable
+
+
 def _elevated_helper_command():
     """``(execute, argument)`` for the fixed scheduled-task action."""
-    if getattr(sys, "frozen", False):
-        return sys.executable, _ELEVATED_HELPER_FLAG
     script = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main.py"
     )
-    return sys.executable, f'"{script}" {_ELEVATED_HELPER_FLAG}'
+    if getattr(sys, "frozen", False):
+        return sys.executable, _ELEVATED_HELPER_FLAG
+    return _no_console_interpreter(), f'"{script}" {_ELEVATED_HELPER_FLAG}'
 
 
 def _ps_quote(value: str) -> str:
     return str(value).replace("'", "''")
 
 
+def _elevated_task_name() -> str:
+    """The scheduled-task name owned by this executable.
+
+    Embeds a short hash of the helper exe so a dev checkout and the installed
+    app each own their own task instead of stealing each other's registration
+    (which would re-prompt UAC on every switch).
+    """
+    exe, _arg = _elevated_helper_command()
+    digest = hashlib.sha256(str(exe).encode("utf-8", errors="replace")).hexdigest()[:10]
+    return f"{_ELEVATED_TASK_PREFIX} {digest}"
+
+
 def _task_registered() -> bool:
-    """True when the task exists and points at the current helper executable.
+    """True when this executable's task exists and points at the current exe.
 
     A task left over from a moved/updated install would silently run stale
     code, so it is treated as not-registered (and re-registered) when its
@@ -1227,10 +1264,12 @@ def _task_registered() -> bool:
     """
     if not _is_windows():
         return False
+    name = _elevated_task_name()
     proc = subprocess.run(
-        ["schtasks", "/query", "/tn", _ELEVATED_TASK_NAME, "/xml"],
+        ["schtasks", "/query", "/tn", name, "/xml"],
         capture_output=True,
         text=True,
+        creationflags=_CREATE_NO_WINDOW,
     )
     if proc.returncode != 0:
         return False
@@ -1239,13 +1278,20 @@ def _task_registered() -> bool:
 
 
 def _register_elevated_task() -> None:
-    """Create the silent-elevation scheduled task (one-time UAC prompt)."""
+    """Create this executable's silent-elevation scheduled task (one-time UAC
+    prompt). Also removes tasks owned by other BlindRSS executables so stale
+    registrations from a moved/updated install never accumulate."""
     exe, arg = _elevated_helper_command()
+    task_name = _elevated_task_name()
     script = [
         "$ErrorActionPreference = 'Stop'",
+        f"$taskName = '{_ps_quote(task_name)}'",
         f"$action = New-ScheduledTaskAction -Execute '{_ps_quote(exe)}' -Argument '{_ps_quote(arg)}'",
         "$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Highest",
-        f"Register-ScheduledTask -TaskName '{_ps_quote(_ELEVATED_TASK_NAME)}' -Action $action -Principal $principal -Force | Out-Null",
+        "Register-ScheduledTask -TaskName $taskName -Action $action -Principal $principal -Force | Out-Null",
+        # Remove only other per-executable tasks (hashed suffix) — never the
+        # legacy fixed-name task, which an older installed app still uses.
+        "Get-ScheduledTask | Where-Object { $_.TaskName -match '^" + _ELEVATED_TASK_PREFIX + " [0-9a-f]{10}$' -and $_.TaskName -ne $taskName } | Unregister-ScheduledTask -Confirm:$false | Out-Null",
     ]
     fd, script_path = tempfile.mkstemp(suffix=".ps1", prefix="blindrss-task-")
     try:
@@ -1258,7 +1304,10 @@ def _register_elevated_task() -> None:
             "v1.0",
             "powershell.exe",
         )
-        _runas_and_wait(powershell, f'-NoProfile -ExecutionPolicy Bypass -File "{script_path}"')
+        _runas_and_wait(
+            powershell,
+            f'-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "{script_path}"',
+        )
     finally:
         try:
             os.remove(script_path)
@@ -1276,22 +1325,36 @@ def _run_elevated_task(request: dict) -> dict:
     response JSON and returns it. Raises OSError when the one-time task
     registration is cancelled, or when the helper fails.
     """
+    registered_here = False
     if not _task_registered():
         _register_elevated_task()
+        registered_here = True
+    task_name = _elevated_task_name()
     try:
         os.remove(_ELEVATED_RESPONSE_PATH)
     except OSError:
         pass
     _write_json_atomic(_ELEVATED_REQUEST_PATH, request)
     try:
-        proc = subprocess.run(
-            ["schtasks", "/run", "/tn", _ELEVATED_TASK_NAME],
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
-        if proc.returncode != 0:
-            raise OSError(f"schtasks /run failed: {proc.stderr.strip()}")
+        # The first `schtasks /run` immediately after registration can fail
+        # transiently (0x5 access denied / 0x41301 not-ready) while the Task
+        # Scheduler service catches up; retry a few times before giving up.
+        attempts = 5 if registered_here else 1
+        proc = None
+        for attempt in range(attempts):
+            if attempt:
+                time.sleep(1.0 + attempt * 0.5)
+            proc = subprocess.run(
+                ["schtasks", "/run", "/tn", task_name],
+                capture_output=True,
+                text=True,
+                timeout=60,
+                creationflags=_CREATE_NO_WINDOW,
+            )
+            if proc.returncode == 0:
+                break
+        if proc is None or proc.returncode != 0:
+            raise OSError(f"schtasks /run failed: {proc.stderr.strip() if proc else 'no run attempted'}")
         deadline = time.monotonic() + 300.0
         while time.monotonic() < deadline:
             if os.path.isfile(_ELEVATED_RESPONSE_PATH) and os.path.getsize(_ELEVATED_RESPONSE_PATH) > 0:
@@ -1348,9 +1411,14 @@ def run_elevated_helper_cli(argv) -> int:
         _write_json_atomic(_ELEVATED_RESPONSE_PATH, response)
         return 0
     except Exception as exc:
+        import traceback
+
         log.error("Elevated helper failed: %s", exc)
         try:
-            _write_json_atomic(_ELEVATED_RESPONSE_PATH, {"error": str(exc)})
+            _write_json_atomic(
+                _ELEVATED_RESPONSE_PATH,
+                {"error": str(exc), "trace": traceback.format_exc()[-2000:]},
+            )
         except OSError:
             pass
         return 1
@@ -1678,6 +1746,7 @@ def _macos_keychain_password(browser_key: str) -> bytes:
             ["/usr/bin/security", "find-generic-password", "-w", "-a", browser_key, "-s", service],
             capture_output=True,
             timeout=10,
+            creationflags=_CREATE_NO_WINDOW,
         )
     except (OSError, subprocess.SubprocessError):
         return b""
