@@ -385,7 +385,7 @@ if not exist "!CLEAN_ROOT!" goto :cleanup_root_ok
 if /I "!CLEAN_ROOT!"=="%INSTALL_DIR%" goto :cleanup_root_failed
 if /I "!CLEAN_ROOT!"=="%SystemRoot%" goto :cleanup_root_failed
 if /I "!CLEAN_ROOT!"=="%SystemDrive%\" goto :cleanup_root_failed
-echo(!CLEAN_ROOT!| find /I "BlindRSS_update_" >nul
+echo(!CLEAN_ROOT!| "%SystemRoot%\System32\find.exe" /I "BlindRSS_update_" >nul
 if errorlevel 1 goto :cleanup_root_failed
 
 set "CLEAN_ATTEMPTS=0"
@@ -451,7 +451,7 @@ if /I "%TARGET%"=="%SystemRoot%" goto :safe_done
 if /I "%TARGET%"=="%SystemDrive%\" goto :safe_done
 
 if not "%REQUIRED_SUBSTR%"=="" (
-    echo(%TARGET%| find /I "%REQUIRED_SUBSTR%" >nul
+    echo(%TARGET%| "%SystemRoot%\System32\find.exe" /I "%REQUIRED_SUBSTR%" >nul
     if errorlevel 1 goto :safe_done
 )
 
