@@ -33,6 +33,16 @@ if "--blindrss-chromium-key-helper" in sys.argv[1:]:
 
     sys.exit(run_key_helper_cli(sys.argv[1:]))
 
+if "--blindrss-chromium-vss-copy" in sys.argv[1:]:
+    from core.chromium_cookies import run_vss_copy_cli
+
+    sys.exit(run_vss_copy_cli(sys.argv[1:]))
+
+if "--blindrss-elevated-helper" in sys.argv[1:]:
+    from core.chromium_cookies import run_elevated_helper_cli
+
+    sys.exit(run_elevated_helper_cli(sys.argv[1:]))
+
 
 def _configure_file_logging(config_manager):
     """Attach a persistent debug log after config has resolved the data directory."""

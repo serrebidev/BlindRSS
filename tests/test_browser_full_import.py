@@ -59,7 +59,7 @@ def _no_chromium(monkeypatch):
         chromium_cookies,
         "import_chromium_cookies",
         lambda config_manager, profiles=None, elevate=True: {
-            "profiles": 0, "cookies": 0, "elevated": 0, "youtube": 0,
+            "profiles": 0, "cookies": 0, "elevated": 0, "youtube": 0, "vss": 0,
         },
     )
 
@@ -117,7 +117,7 @@ def test_full_import_disabled_by_setting(tmp_path, monkeypatch):
     _no_chromium(monkeypatch)
     cfg = _FakeConfig({"auto_import_installed_browser_cookies": False})
     stats = site_cookies.auto_import_installed_browser_cookies(cfg)
-    assert stats == {"firefox": 0, "chromium": 0, "cookies": 0, "youtube": 0, "elevated": 0}
+    assert stats == {"firefox": 0, "chromium": 0, "cookies": 0, "youtube": 0, "elevated": 0, "vss": 0}
 
 
 def test_full_import_skips_unchanged_profiles(tmp_path, monkeypatch):

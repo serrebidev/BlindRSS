@@ -20,11 +20,16 @@ whose values are encrypted. There are two encryption generations:
   once more (flag 1/2/3, see below). Decrypting it therefore requires running
   as SYSTEM for the first DPAPI step — which Windows only allows after a UAC
   elevation. BlindRSS performs that step once per key rotation in a short-lived
-  elevated helper process (``--blindrss-chromium-key-helper``), caches the
-  resulting 32-byte master key re-encrypted under the user's DPAPI, and then
-  decrypts cookies with no further prompts. All keys needing derivation are
-  batched into a single elevation, so a machine with several Chromium browsers
-  prompts exactly once.
+  elevated helper process, caches the resulting 32-byte master key
+  re-encrypted under the user's DPAPI, and then decrypts cookies with no
+  further prompts. All keys needing derivation are batched into a single
+  elevation, so a machine with several Chromium browsers prompts exactly once.
+
+The elevation itself is made silent after a one-time setup: a scheduled task
+(``--blindrss-elevated-helper``, "BlindRSS Elevated Helper") is registered
+with RunLevel=Highest on first use (one UAC prompt) and thereafter run with no
+prompt. The same helper reads a running browser's exclusively-locked
+``Cookies`` database via a Volume Shadow Copy snapshot (``--blindrss-chromium-vss-copy`` is the prompting runas fallback).
 
 The wire format (Chromium ``elevation_service`` ``DecryptData``/``EncryptData``)
 is::
@@ -94,6 +99,8 @@ _NT_TO_UNIX_OFFSET = 11644473600
 _DOMAIN_HASH_LEN = 32
 
 _HELPER_FLAG = "--blindrss-chromium-key-helper"
+_VSS_HELPER_FLAG = "--blindrss-chromium-vss-copy"
+_ELEVATED_HELPER_FLAG = "--blindrss-elevated-helper"
 
 # ---------------------------------------------------------------------------
 # Pure crypto (no OS calls)
@@ -775,8 +782,8 @@ _SW_HIDE = 0
 _ERROR_CANCELLED = 1223
 
 
-def _run_elevated_helper_batch(app_bound_keys_b64: list) -> list:
-    """Launch this app elevated once to derive several v20 master keys.
+def _run_elevated_helper_batch_runas(app_bound_keys_b64: list) -> list:
+    """Runas fallback: launch this app elevated once to derive v20 master keys.
 
     ``app_bound_keys_b64`` are base64 ``app_bound_encrypted_key`` values, one
     per line in the helper's input file. Returns a list of master-key bytes in
@@ -872,6 +879,101 @@ def _run_elevated_helper_batch(app_bound_keys_b64: list) -> list:
                 pass
 
 
+def _is_locked_file(path: str) -> bool:
+    """True when the file exists but cannot be opened for reading — the
+    exclusive ``dwShareMode=0`` lock a running Chromium browser holds on its
+    ``Cookies`` database."""
+    if not path:
+        return False
+    try:
+        with open(path, "rb") as fh:
+            fh.read(1)
+        return False
+    except PermissionError:
+        return True
+    except OSError:
+        return False
+
+
+def _run_elevated_vss_copy_runas(copy_paths):
+    """Runas fallback: copy locked files out via Volume Shadow Copy.
+
+    Returns ``(staged_map, staging_dir)`` where ``staged_map`` is
+    ``{index: staged_path}`` and ``staging_dir`` must be removed by the caller
+    once the staged files have been consumed. Raises OSError when the UAC
+    prompt is cancelled or the helper fails outright.
+    """
+    if not copy_paths or not _is_windows():
+        return {}, None
+    exe = sys.executable
+    args = [_VSS_HELPER_FLAG]
+    if not getattr(sys, "frozen", False):
+        script = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main.py"
+        )
+        args.insert(0, script)
+
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".txt", prefix="blindrss-vss-src-", delete=False, encoding="utf-8"
+    ) as fh:
+        fh.write("\n".join(copy_paths))
+        input_path = fh.name
+    staging_dir = tempfile.mkdtemp(prefix="blindrss-vss-stage-")
+    manifest_path = os.path.join(staging_dir, "manifest.txt")
+    try:
+        args += ["--input", input_path, "--output-dir", staging_dir, "--manifest", manifest_path]
+        params = subprocess.list2cmdline([str(a) for a in args])
+
+        shell32 = ctypes.windll.shell32
+        kernel32 = _kernel32()
+        sei = _SHELLEXECUTEINFO()
+        sei.cbSize = ctypes.sizeof(_SHELLEXECUTEINFO)
+        sei.fMask = _SEE_MASK_NOCLOSEPROCESS
+        sei.lpVerb = "runas"
+        sei.lpFile = exe
+        sei.lpParameters = params
+        sei.nShow = _SW_HIDE
+        ctypes.set_last_error(0)
+        ok = shell32.ShellExecuteExW(ctypes.byref(sei))
+        if not ok:
+            code = ctypes.get_last_error() or ctypes.GetLastError()
+            if code == _ERROR_CANCELLED:
+                raise OSError("User cancelled the permission prompt", _ERROR_CANCELLED)
+            raise OSError(f"ShellExecuteEx runas failed ({code})")
+        h_process = sei.hProcess
+        deadline = time.monotonic() + 180.0
+        while time.monotonic() < deadline:
+            if h_process and kernel32.WaitForSingleObject(h_process, 1000) == 0x00000000:
+                break
+            if os.path.isfile(manifest_path) and os.path.getsize(manifest_path) > 0:
+                break
+            time.sleep(0.25)
+        if h_process:
+            try:
+                kernel32.CloseHandle(h_process)
+            except Exception:
+                pass
+
+        staged_map = {}
+        try:
+            with open(manifest_path, "r", encoding="utf-8") as fh:
+                for index, line in enumerate(fh.read().splitlines()):
+                    line = line.strip()
+                    if line and not line.startswith("ERROR:"):
+                        staged_map[index] = line
+        except OSError as exc:
+            raise OSError(f"Elevated VSS helper produced no result: {exc}") from exc
+        return staged_map, staging_dir
+    except Exception:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
+    finally:
+        try:
+            os.remove(input_path)
+        except OSError:
+            pass
+
+
 def run_key_helper_cli(argv) -> int:
     """Entry point for the elevated ``--blindrss-chromium-key-helper`` process.
 
@@ -906,6 +1008,416 @@ def run_key_helper_cli(argv) -> int:
             pass
         log.error("Chromium v20 key helper failed: %s", exc)
         return 1
+
+
+# --- Volume Shadow Copy fallback for locked cookie DBs -----------------------
+
+
+def _vss_copy_files(source_paths, dest_dir):
+    """Copy (possibly locked) files out via Volume Shadow Copy snapshots.
+
+    Runs elevated. Creates a ``ClientAccessible`` snapshot per source drive and
+    copies the files from it — all inside one PowerShell process, because a
+    ClientAccessible snapshot is only visible to the process that created it
+    and is deleted when that process exits (``Persistent`` shadows are often
+    unsupported when no shadow storage area is configured; ``vssadmin create
+    shadow`` was removed from modern Windows).
+
+    The copies made by the elevated PowerShell carry the elevated token's
+    "protected administrator" DACL (owner = Administrators), which the
+    non-elevated app cannot read. ``icacls`` is therefore used to grant the
+    user's group full control on the staged files so the caller can read and
+    later delete them. Returns a list of staged file paths, one per source
+    (empty = not copied).
+    """
+    os.makedirs(dest_dir, exist_ok=True)
+    staged = [""] * len(source_paths)
+    if not source_paths:
+        return staged
+
+    fd, src_list = tempfile.mkstemp(prefix="blindrss-vss-list-", suffix=".txt")
+    with os.fdopen(fd, "w", encoding="utf-8") as fh:
+        fh.write("\n".join(source_paths))
+    try:
+        ps = (
+            "$ErrorActionPreference = 'Stop'; "
+            f"$srcList = '{src_list}'; "
+            f"$destDir = '{dest_dir}'; "
+            "$class = Get-WmiObject -List Win32_ShadowCopy; "
+            "$shadows = @{}; "
+            "$idx = 0; "
+            "foreach ($src in (Get-Content -LiteralPath $srcList)) { "
+            "  $src = $src.Trim(); if (-not $src) { continue }; "
+            "  $root = [System.IO.Path]::GetPathRoot($src).TrimEnd('\\'); "
+            "  $rel = $src.Substring($root.Length).TrimStart('\\'); "
+            "  if (-not $shadows.ContainsKey($root)) { "
+            "    $r = $class.Create($root + '\\', 'ClientAccessible'); "
+            "    if ($r.ReturnValue -ne 0) { throw ('VSS Create returned ' + $r.ReturnValue) }; "
+            "    $s = Get-WmiObject Win32_ShadowCopy | Where-Object { $_.ID -eq $r.ShadowID }; "
+            "    if (-not $s) { throw 'shadow copy not found after create' }; "
+            "    $shadows[$root] = $s.DeviceObject; "
+            "  }; "
+            "  $shadowSrc = $shadows[$root].TrimEnd('\\') + '\\' + $rel; "
+            "  $dst = Join-Path $destDir ($idx.ToString() + '.cookies'); "
+            "  if (Test-Path -LiteralPath $shadowSrc) { Copy-Item -LiteralPath $shadowSrc -Destination $dst -Force }; "
+            "  foreach ($sfx in @('-wal','-shm')) { "
+            "    if (Test-Path -LiteralPath ($shadowSrc + $sfx)) { Copy-Item -LiteralPath ($shadowSrc + $sfx) -Destination ($dst + $sfx) -Force } "
+            "  }; "
+            "  $idx++ "
+            "}"
+        )
+        proc = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command", ps],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or "").strip()[-300:]
+            log.warning("VSS copy failed: %s", detail)
+            raise OSError(f"VSS copy failed: {detail}")
+        # Grant the user's group full control so the non-elevated caller can
+        # read (and later delete) the staged files despite the elevated DACL.
+        grant = subprocess.run(
+            ["icacls", dest_dir, "/grant", "*S-1-5-32-545:(OI)(CI)F", "/T", "/Q"],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if grant.returncode != 0:
+            log.warning(
+                "Could not relax the staged-file ACL (%s): %s",
+                grant.returncode,
+                (grant.stderr or grant.stdout or "").strip()[-200:],
+            )
+        for index in range(len(source_paths)):
+            dst = os.path.join(dest_dir, f"{index}.cookies")
+            if os.path.isfile(dst):
+                staged[index] = dst
+    finally:
+        try:
+            os.remove(src_list)
+        except OSError:
+            pass
+    return staged
+
+
+def run_vss_copy_cli(argv) -> int:
+    """Entry point for the elevated ``--blindrss-chromium-vss-copy`` process.
+
+    Reads source paths (one per line) from ``--input``, copies them via Volume
+    Shadow Copy into ``--output-dir``, and writes the staged path per line
+    (empty = failure) to ``--manifest``.
+    """
+    import argparse
+
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--input", required=True)
+    parser.add_argument("--output-dir", required=True)
+    parser.add_argument("--manifest", required=True)
+    args, _unknown = parser.parse_known_args(argv)
+    try:
+        with open(args.input, "r", encoding="utf-8") as fh:
+            sources = [line.strip() for line in fh.read().splitlines() if line.strip()]
+        staged = _vss_copy_files(sources, args.output_dir)
+        with open(args.manifest, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(staged))
+        return 0
+    except Exception as exc:
+        log.error("Chromium VSS copy helper failed: %s", exc)
+        try:
+            with open(args.manifest, "w", encoding="utf-8") as fh:
+                fh.write("ERROR:" + str(exc))
+        except OSError:
+            pass
+        return 1
+
+
+# --- Silent elevation via a pre-registered scheduled task ---------------------
+#
+# A non-elevated process can never silently gain admin/SYSTEM rights on Windows
+# — the UAC consent prompt is the whole point of the boundary. The standard way
+# to make an app's privileged helper "automatic" is to register a one-off
+# scheduled task with RunLevel=Highest; creating it prompts once, and every
+# later `schtasks /run` executes elevated with no prompt at all (same pattern
+# Chrome's own elevation service uses).
+
+_ELEVATED_TASK_NAME = "BlindRSS Elevated Helper"
+_ELEVATED_REQUEST_PATH = os.path.join(
+    tempfile.gettempdir(), "blindrss-elevated-request.json"
+)
+_ELEVATED_RESPONSE_PATH = os.path.join(
+    tempfile.gettempdir(), "blindrss-elevated-response.json"
+)
+
+
+def _write_json_atomic(path: str, data) -> None:
+    fd, tmp = tempfile.mkstemp(
+        prefix="blindrss-req-", suffix=".tmp", dir=os.path.dirname(path) or "."
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            json.dump(data, fh)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+
+def _is_cancelled(exc: Exception) -> bool:
+    return getattr(exc, "winerror", None) == _ERROR_CANCELLED or "cancel" in str(exc).lower()
+
+
+def _runas_and_wait(exe: str, params: str, timeout: float = 180.0) -> None:
+    """Launch ``exe`` elevated via ShellExecuteEx runas and wait for exit."""
+    if not _is_windows():
+        raise OSError("Elevation is Windows-only")
+    shell32 = ctypes.windll.shell32
+    kernel32 = _kernel32()
+    sei = _SHELLEXECUTEINFO()
+    sei.cbSize = ctypes.sizeof(_SHELLEXECUTEINFO)
+    sei.fMask = _SEE_MASK_NOCLOSEPROCESS
+    sei.lpVerb = "runas"
+    sei.lpFile = exe
+    sei.lpParameters = params
+    sei.nShow = _SW_HIDE
+    ctypes.set_last_error(0)
+    ok = shell32.ShellExecuteExW(ctypes.byref(sei))
+    if not ok:
+        code = ctypes.get_last_error() or ctypes.GetLastError()
+        if code == _ERROR_CANCELLED:
+            raise OSError("User cancelled the permission prompt", _ERROR_CANCELLED)
+        raise OSError(f"ShellExecuteEx runas failed ({code})")
+    h_process = sei.hProcess
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        if h_process and kernel32.WaitForSingleObject(h_process, 1000) == 0x00000000:
+            break
+        time.sleep(0.25)
+    if h_process:
+        try:
+            kernel32.CloseHandle(h_process)
+        except Exception:
+            pass
+
+
+def _elevated_helper_command():
+    """``(execute, argument)`` for the fixed scheduled-task action."""
+    if getattr(sys, "frozen", False):
+        return sys.executable, _ELEVATED_HELPER_FLAG
+    script = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "main.py"
+    )
+    return sys.executable, f'"{script}" {_ELEVATED_HELPER_FLAG}'
+
+
+def _ps_quote(value: str) -> str:
+    return str(value).replace("'", "''")
+
+
+def _task_registered() -> bool:
+    """True when the task exists and points at the current helper executable.
+
+    A task left over from a moved/updated install would silently run stale
+    code, so it is treated as not-registered (and re-registered) when its
+    command no longer references the current executable.
+    """
+    if not _is_windows():
+        return False
+    proc = subprocess.run(
+        ["schtasks", "/query", "/tn", _ELEVATED_TASK_NAME, "/xml"],
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode != 0:
+        return False
+    exe, _arg = _elevated_helper_command()
+    return exe.lower() in (proc.stdout or "").lower()
+
+
+def _register_elevated_task() -> None:
+    """Create the silent-elevation scheduled task (one-time UAC prompt)."""
+    exe, arg = _elevated_helper_command()
+    script = [
+        "$ErrorActionPreference = 'Stop'",
+        f"$action = New-ScheduledTaskAction -Execute '{_ps_quote(exe)}' -Argument '{_ps_quote(arg)}'",
+        "$principal = New-ScheduledTaskPrincipal -UserId $env:USERNAME -LogonType Interactive -RunLevel Highest",
+        f"Register-ScheduledTask -TaskName '{_ps_quote(_ELEVATED_TASK_NAME)}' -Action $action -Principal $principal -Force | Out-Null",
+    ]
+    fd, script_path = tempfile.mkstemp(suffix=".ps1", prefix="blindrss-task-")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as fh:
+            fh.write("\n".join(script))
+        powershell = os.path.join(
+            os.environ.get("SystemRoot", r"C:\Windows"),
+            "System32",
+            "WindowsPowerShell",
+            "v1.0",
+            "powershell.exe",
+        )
+        _runas_and_wait(powershell, f'-NoProfile -ExecutionPolicy Bypass -File "{script_path}"')
+    finally:
+        try:
+            os.remove(script_path)
+        except OSError:
+            pass
+    if not _task_registered():
+        raise OSError("Scheduled-task registration did not take effect")
+
+
+def _run_elevated_task(request: dict) -> dict:
+    """Run the silent-elevation helper via the pre-registered scheduled task.
+
+    Writes ``request`` JSON to a fixed location, triggers the task (which runs
+    this app elevated as the current user with no UAC prompt), waits for the
+    response JSON and returns it. Raises OSError when the one-time task
+    registration is cancelled, or when the helper fails.
+    """
+    if not _task_registered():
+        _register_elevated_task()
+    try:
+        os.remove(_ELEVATED_RESPONSE_PATH)
+    except OSError:
+        pass
+    _write_json_atomic(_ELEVATED_REQUEST_PATH, request)
+    try:
+        proc = subprocess.run(
+            ["schtasks", "/run", "/tn", _ELEVATED_TASK_NAME],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if proc.returncode != 0:
+            raise OSError(f"schtasks /run failed: {proc.stderr.strip()}")
+        deadline = time.monotonic() + 300.0
+        while time.monotonic() < deadline:
+            if os.path.isfile(_ELEVATED_RESPONSE_PATH) and os.path.getsize(_ELEVATED_RESPONSE_PATH) > 0:
+                break
+            time.sleep(0.2)
+        try:
+            with open(_ELEVATED_RESPONSE_PATH, "r", encoding="utf-8") as fh:
+                response = json.load(fh)
+        except (OSError, ValueError) as exc:
+            raise OSError(f"Elevated helper produced no response: {exc}") from exc
+        if response.get("error"):
+            raise OSError(f"Elevated helper failed: {response['error']}")
+        return response
+    finally:
+        try:
+            os.remove(_ELEVATED_REQUEST_PATH)
+        except OSError:
+            pass
+
+
+def run_elevated_helper_cli(argv) -> int:
+    """Unified elevated helper, run by the silent scheduled task.
+
+    Reads the request JSON from the fixed request path and writes the response
+    JSON to the fixed response path (so the task needs no dynamic arguments).
+    Handles v20 key derivation and Volume Shadow Copy file copies.
+    """
+    request = {}
+    try:
+        with open(_ELEVATED_REQUEST_PATH, "r", encoding="utf-8") as fh:
+            request = json.load(fh)
+    except Exception as exc:
+        log.error("Elevated helper could not read its request: %s", exc)
+        _write_json_atomic(_ELEVATED_RESPONSE_PATH, {"error": str(exc)})
+        return 1
+
+    response = {"keys": [], "copies": {}}
+    try:
+        for app_bound_key_b64 in request.get("keys") or []:
+            try:
+                master_key = derive_master_key_from_app_bound_key(app_bound_key_b64)
+                response["keys"].append(base64.b64encode(master_key).decode("ascii"))
+            except Exception as exc:
+                log.error("Could not derive one Chromium v20 key: %s", exc)
+                response["keys"].append("ERROR:" + str(exc))
+
+        copy_paths = request.get("copy") or []
+        if copy_paths:
+            dest_dir = request.get("copy_dir") or tempfile.mkdtemp(prefix="blindrss-vss-stage-")
+            staged = _vss_copy_files(copy_paths, dest_dir)
+            for index, path in enumerate(staged):
+                if path:
+                    response["copies"][str(index)] = path
+        _write_json_atomic(_ELEVATED_RESPONSE_PATH, response)
+        return 0
+    except Exception as exc:
+        log.error("Elevated helper failed: %s", exc)
+        try:
+            _write_json_atomic(_ELEVATED_RESPONSE_PATH, {"error": str(exc)})
+        except OSError:
+            pass
+        return 1
+
+
+def _run_elevated_helper_batch(app_bound_keys_b64: list) -> list:
+    """Derive v20 master keys, silently via the scheduled task when possible.
+
+    Returns master-key bytes in the same order as ``app_bound_keys_b64`` (None
+    for a key the helper could not derive). Falls back to a prompting runas
+    helper only when the silent task cannot be used.
+    """
+    if not app_bound_keys_b64:
+        return []
+    if not _is_windows():
+        raise OSError("Elevation is Windows-only")
+    try:
+        response = _run_elevated_task({"keys": list(app_bound_keys_b64)})
+    except OSError as exc:
+        if _is_cancelled(exc):
+            raise
+        log.warning("Silent elevation unavailable (%s); falling back to a UAC prompt", exc)
+        return _run_elevated_helper_batch_runas(app_bound_keys_b64)
+    raw_keys = response.get("keys") or []
+    results = []
+    for line in raw_keys:
+        line = str(line).strip()
+        if not line or line.startswith("ERROR:"):
+            results.append(None)
+            continue
+        try:
+            key = base64.b64decode(line)
+        except Exception:
+            results.append(None)
+            continue
+        results.append(key if len(key) == 32 else None)
+    if len(results) < len(app_bound_keys_b64):
+        results.extend([None] * (len(app_bound_keys_b64) - len(results)))
+    return results[: len(app_bound_keys_b64)]
+
+
+def _run_elevated_vss_copy(copy_paths):
+    """Copy locked files via Volume Shadow Copy, silently when possible.
+
+    Returns ``(staged_map, staging_dir)`` where ``staged_map`` is
+    ``{index: staged_path}`` and ``staging_dir`` must be removed by the caller
+    once the staged files have been consumed.
+    """
+    if not copy_paths or not _is_windows():
+        return {}, None
+    staging_dir = tempfile.mkdtemp(prefix="blindrss-vss-stage-")
+    try:
+        response = _run_elevated_task({"copy": list(copy_paths), "copy_dir": staging_dir})
+    except OSError as exc:
+        if not _is_cancelled(exc):
+            log.warning("Silent elevation unavailable (%s); falling back to a UAC prompt", exc)
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            return _run_elevated_vss_copy_runas(copy_paths)
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
+    staged_map = {}
+    for key, path in (response.get("copies") or {}).items():
+        try:
+            staged_map[int(key)] = path
+        except (TypeError, ValueError):
+            continue
+    return staged_map, staging_dir
 
 
 # --- v20 key cache (DPAPI-protected at rest) ----------------------------------
@@ -1452,7 +1964,7 @@ def import_chromium_cookies(config_manager, *, profiles=None, elevate: bool = Tr
     """
     from core import site_cookies
 
-    stats = {"profiles": 0, "cookies": 0, "elevated": 0, "youtube": 0}
+    stats = {"profiles": 0, "cookies": 0, "elevated": 0, "youtube": 0, "vss": 0}
     if profiles is None:
         profiles = list_chromium_profiles()
     profiles = list(profiles or [])
@@ -1467,6 +1979,26 @@ def import_chromium_cookies(config_manager, *, profiles=None, elevate: bool = Tr
     v20_map = resolve_master_keys(app_bound_map, elevate=elevate)
     elevated_count = len(v20_map)
 
+    # A running browser holds its ``Cookies`` database with exclusive access,
+    # so a plain copy fails. Read those via a Volume Shadow Copy snapshot
+    # (one elevation covers every locked profile) instead of skipping them.
+    locked = [
+        (i, str(profile.get("cookie_db") or ""))
+        for i, profile in enumerate(profiles)
+        if _is_locked_file(str(profile.get("cookie_db") or ""))
+    ]
+    staged_map = {}
+    staging_dir = None
+    if locked:
+        try:
+            staged_map, staging_dir = _run_elevated_vss_copy([path for _i, path in locked])
+        except OSError as exc:
+            if getattr(exc, "winerror", None) == _ERROR_CANCELLED or "cancel" in str(exc).lower():
+                log.info("Chromium VSS copy was cancelled by the user")
+            else:
+                log.warning("Chromium VSS copy failed: %s", exc)
+            staged_map = {}
+
     all_records = []
     youtube_records = []
     # A clearance cookie is only valid for the exact browser identity that
@@ -1474,37 +2006,44 @@ def import_chromium_cookies(config_manager, *, profiles=None, elevate: bool = Tr
     # UA of the profile that supplied each clearance so `_apply_site_cookies`
     # can force a matching fingerprint on later requests.
     clearance_ua = {}
-    for profile in profiles:
-        v10_key, v20_key = _profile_v10_v20_keys(profile, v20_map)
-        try:
-            rows = read_cookie_db(
-                str(profile.get("cookie_db") or ""), v10_key=v10_key, v20_key=v20_key
-            )
-        except Exception:
-            log.debug(
-                "Could not read Chromium cookies from %s", profile.get("cookie_db"), exc_info=True
-            )
-            continue
-        if not rows:
-            continue
-        stats["profiles"] += 1
-        records = _records_for_rows(rows)
-        stats["cookies"] += len(records)
-        profile_ua = ""
-        for record in records:
-            domain = str(record[0]).replace("#HttpOnly_", "", 1).lstrip(".").lower()
-            all_records.append(record)
-            if site_cookies._is_harvestable(str(record[5] or "")):
-                if not profile_ua:
-                    profile_ua = chromium_profile_user_agent(profile)
-                clearance_ua.setdefault(domain, profile_ua or "")
-            if (
-                domain == "youtube.com"
-                or domain.endswith(".youtube.com")
-                or domain == "google.com"
-                or domain.endswith(".google.com")
-            ):
-                youtube_records.append(record)
+    try:
+        for index, profile in enumerate(profiles):
+            v10_key, v20_key = _profile_v10_v20_keys(profile, v20_map)
+            cookie_db = staged_map.get(index) or str(profile.get("cookie_db") or "")
+            if index in staged_map:
+                stats["vss"] += 1
+            try:
+                rows = read_cookie_db(
+                    cookie_db, v10_key=v10_key, v20_key=v20_key
+                )
+            except Exception:
+                log.debug(
+                    "Could not read Chromium cookies from %s", profile.get("cookie_db"), exc_info=True
+                )
+                continue
+            if not rows:
+                continue
+            stats["profiles"] += 1
+            records = _records_for_rows(rows)
+            stats["cookies"] += len(records)
+            profile_ua = ""
+            for record in records:
+                domain = str(record[0]).replace("#HttpOnly_", "", 1).lstrip(".").lower()
+                all_records.append(record)
+                if site_cookies._is_harvestable(str(record[5] or "")):
+                    if not profile_ua:
+                        profile_ua = chromium_profile_user_agent(profile)
+                    clearance_ua.setdefault(domain, profile_ua or "")
+                if (
+                    domain == "youtube.com"
+                    or domain.endswith(".youtube.com")
+                    or domain == "google.com"
+                    or domain.endswith(".google.com")
+                ):
+                    youtube_records.append(record)
+    finally:
+        if staging_dir:
+            shutil.rmtree(staging_dir, ignore_errors=True)
 
     stats["elevated"] = elevated_count
     if all_records:

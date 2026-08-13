@@ -1215,7 +1215,7 @@ def auto_import_installed_browser_cookies(
 
     Runs on the CookieImportWatcher thread. Returns a stats dict.
     """
-    stats = {"firefox": 0, "chromium": 0, "cookies": 0, "youtube": 0, "elevated": 0}
+    stats = {"firefox": 0, "chromium": 0, "cookies": 0, "youtube": 0, "elevated": 0, "vss": 0}
     try:
         if not bool(config_manager.get("auto_import_installed_browser_cookies", True)):
             return stats
@@ -1343,6 +1343,7 @@ def auto_import_installed_browser_cookies(
     stats["cookies"] += int(cstats.get("cookies", 0) or 0)
     stats["elevated"] = int(cstats.get("elevated", 0) or 0)
     stats["youtube"] = int(cstats.get("youtube", 0) or 0)
+    stats["vss"] = int(cstats.get("vss", 0) or 0)
 
     # --- Firefox YouTube cookies -> yt-dlp jar -------------------------------
     if youtube_records:
