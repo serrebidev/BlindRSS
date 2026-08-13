@@ -290,8 +290,22 @@ def _crypt32():
 def _kernel32():
     lib = ctypes.windll.kernel32
     if not getattr(lib.LocalFree, "_blindrss_argtypes", False):
-        lib.LocalFree.argtypes = [ctypes.c_void_p]
-        lib.LocalFree.restype = ctypes.c_void_p
+        HANDLE = ctypes.c_void_p
+        wintypes = ctypes.wintypes
+        lib.LocalFree.argtypes = [HANDLE]
+        lib.LocalFree.restype = HANDLE
+        lib.CloseHandle.argtypes = [HANDLE]
+        lib.CloseHandle.restype = wintypes.BOOL
+        # Handle-returning APIs default to a 32-bit c_int restype in ctypes, so
+        # on 64-bit Windows a snapshot/process handle above 2**32 is silently
+        # truncated. Fix the signatures once so every caller is safe.
+        lib.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+        lib.OpenProcess.restype = HANDLE
+        lib.GetCurrentProcess.restype = HANDLE
+        lib.WaitForSingleObject.argtypes = [HANDLE, wintypes.DWORD]
+        lib.WaitForSingleObject.restype = wintypes.DWORD
+        lib.CreateToolhelp32Snapshot.argtypes = [wintypes.DWORD, wintypes.DWORD]
+        lib.CreateToolhelp32Snapshot.restype = HANDLE
         lib.LocalFree._blindrss_argtypes = True
     return lib
 
@@ -371,6 +385,8 @@ class _TOKEN_PRIVILEGES(ctypes.Structure):
 
 
 class _PROCESSENTRY32(ctypes.Structure):
+    """PROCESSENTRY32W — matches the wide Process32FirstW/NextW calls below."""
+
     _fields_ = [
         ("dwSize", ctypes.wintypes.DWORD),
         ("cntUsage", ctypes.wintypes.DWORD),
@@ -381,32 +397,195 @@ class _PROCESSENTRY32(ctypes.Structure):
         ("th32ParentProcessID", ctypes.wintypes.DWORD),
         ("pcPriClassBase", ctypes.c_long),
         ("dwFlags", ctypes.wintypes.DWORD),
-        ("szExeFile", ctypes.c_char * 260),
+        ("szExeFile", ctypes.c_wchar * 260),
     ]
 
 
-def _find_process_id(name: str) -> int:
-    name_bytes = name.encode("ascii", "ignore").lower()
+def _advapi32():
+    """advapi32 with 64-bit-safe handle signatures (see ``_kernel32`` note)."""
+    lib = ctypes.windll.advapi32
+    if not getattr(lib.OpenProcessToken, "_blindrss_argtypes", False):
+        HANDLE = ctypes.c_void_p
+        lib.OpenProcessToken.argtypes = [
+            HANDLE,
+            ctypes.wintypes.DWORD,
+            ctypes.POINTER(ctypes.wintypes.HANDLE),
+        ]
+        lib.OpenProcessToken.restype = ctypes.wintypes.BOOL
+        lib.LookupPrivilegeValueW.argtypes = [
+            ctypes.c_wchar_p,
+            ctypes.c_wchar_p,
+            ctypes.POINTER(_LUID),
+        ]
+        lib.LookupPrivilegeValueW.restype = ctypes.wintypes.BOOL
+        lib.AdjustTokenPrivileges.argtypes = [
+            HANDLE,
+            ctypes.wintypes.BOOL,
+            ctypes.POINTER(_TOKEN_PRIVILEGES),
+            ctypes.wintypes.DWORD,
+            ctypes.c_void_p,
+            ctypes.c_void_p,
+        ]
+        lib.AdjustTokenPrivileges.restype = ctypes.wintypes.BOOL
+        lib.DuplicateTokenEx.argtypes = [
+            HANDLE,
+            ctypes.wintypes.DWORD,
+            ctypes.c_void_p,
+            ctypes.c_int,
+            ctypes.c_int,
+            ctypes.POINTER(ctypes.wintypes.HANDLE),
+        ]
+        lib.DuplicateTokenEx.restype = ctypes.wintypes.BOOL
+        lib.SetThreadToken.argtypes = [
+            ctypes.POINTER(ctypes.wintypes.HANDLE),
+            HANDLE,
+        ]
+        lib.SetThreadToken.restype = ctypes.wintypes.BOOL
+        lib.GetTokenInformation.argtypes = [
+            HANDLE,
+            ctypes.c_int,
+            ctypes.c_void_p,
+            ctypes.wintypes.DWORD,
+            ctypes.POINTER(ctypes.wintypes.DWORD),
+        ]
+        lib.GetTokenInformation.restype = ctypes.wintypes.BOOL
+        lib.ConvertSidToStringSidW.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        lib.ConvertSidToStringSidW.restype = ctypes.wintypes.BOOL
+        lib.OpenProcessToken._blindrss_argtypes = True
+    return lib
+
+
+def _list_processes():
+    """Yield ``(pid, exe_name)`` for every running process."""
     kernel32 = _kernel32()
+    if not getattr(kernel32.Process32FirstW, "_blindrss_argtypes", False):
+        kernel32.Process32FirstW.argtypes = [
+            ctypes.c_void_p,
+            ctypes.POINTER(_PROCESSENTRY32),
+        ]
+        kernel32.Process32FirstW.restype = ctypes.wintypes.BOOL
+        kernel32.Process32NextW.argtypes = kernel32.Process32FirstW.argtypes
+        kernel32.Process32NextW.restype = ctypes.wintypes.BOOL
+        kernel32.Process32FirstW._blindrss_argtypes = True
     snap = kernel32.CreateToolhelp32Snapshot(_TH32CS_SNAPPROCESS, 0)
     if not snap or snap == ctypes.c_void_p(-1).value:
-        return 0
+        return
     try:
         entry = _PROCESSENTRY32()
         entry.dwSize = ctypes.sizeof(_PROCESSENTRY32)
         if kernel32.Process32FirstW(snap, ctypes.byref(entry)):
             while True:
-                if entry.szExeFile.lower() == name_bytes:
-                    return int(entry.th32ProcessID)
+                yield int(entry.th32ProcessID), str(entry.szExeFile or "")
                 if not kernel32.Process32NextW(snap, ctypes.byref(entry)):
                     break
     finally:
         kernel32.CloseHandle(snap)
-    return 0
+
+
+# TOKEN_INFORMATION_CLASS TokenUser.
+_TOKEN_USER = 1
+_SYSTEM_SID = "S-1-5-18"
+
+
+def _token_is_system(token) -> bool:
+    """True when ``token`` belongs to the local SYSTEM account (S-1-5-18)."""
+    advapi32 = _advapi32()
+    kernel32 = _kernel32()
+    needed = ctypes.wintypes.DWORD(0)
+    advapi32.GetTokenInformation(token, _TOKEN_USER, None, 0, ctypes.byref(needed))
+    if not needed.value:
+        return False
+    buf = ctypes.create_string_buffer(needed.value)
+    if not advapi32.GetTokenInformation(token, _TOKEN_USER, buf, needed.value, ctypes.byref(needed)):
+        return False
+    # TOKEN_USER begins with SID_AND_ATTRIBUTES { PSID Sid; DWORD Attributes; }.
+    sid_addr = ctypes.cast(buf, ctypes.POINTER(ctypes.c_size_t)).contents.value
+    if not sid_addr:
+        return False
+    sid_ptr = ctypes.c_void_p()
+    if not advapi32.ConvertSidToStringSidW(sid_addr, ctypes.byref(sid_ptr)):
+        return False
+    try:
+        return ctypes.wstring_at(sid_ptr.value) == _SYSTEM_SID
+    finally:
+        kernel32.LocalFree(sid_ptr)
+
+
+def _open_system_dup_token():
+    """Return ``(dup_token_handle, source_name, source_pid)`` for a SYSTEM
+    impersonation token, or raise OSError.
+
+    lsass.exe/csrss.exe are PPL-protected on modern Windows, so
+    ``SeDebugPrivilege`` alone cannot open them; we prefer the non-protected
+    SYSTEM processes (winlogon, services, spoolsv, svchost) and verify the SID
+    before duplicating.
+    """
+    kernel32 = _kernel32()
+    advapi32 = _advapi32()
+    priority = (
+        "winlogon.exe",
+        "services.exe",
+        "spoolsv.exe",
+        "svchost.exe",
+        "lsass.exe",
+        "csrss.exe",
+        "wininit.exe",
+        "fontdrvhost.exe",
+    )
+    procs = list(_list_processes())
+    by_name = {}
+    for pid, name in procs:
+        by_name.setdefault(name.lower(), []).append(pid)
+    ordered = []
+    for name in priority:
+        ordered.extend((name, pid) for pid in by_name.pop(name.lower(), []))
+    # Any remaining process as a last resort (the SID check keeps it SYSTEM-only).
+    ordered.extend((name, pid) for pid, name in procs if name.lower() in by_name)
+
+    errors = []
+    for name, pid in ordered:
+        h = kernel32.OpenProcess(_PROCESS_QUERY_INFORMATION, False, pid)
+        if not h:
+            errors.append(f"{name}:{pid} open err {ctypes.GetLastError()}")
+            continue
+        token = ctypes.wintypes.HANDLE()
+        try:
+            if not advapi32.OpenProcessToken(
+                h,
+                _TOKEN_DUPLICATE | _TOKEN_QUERY | _TOKEN_IMPERSONATE,
+                ctypes.byref(token),
+            ):
+                errors.append(f"{name}:{pid} token err {ctypes.GetLastError()}")
+                continue
+            if not _token_is_system(token):
+                errors.append(f"{name}:{pid} not SYSTEM")
+                continue
+            dup = ctypes.wintypes.HANDLE()
+            if not advapi32.DuplicateTokenEx(
+                token,
+                _MAXIMUM_ALLOWED,
+                None,
+                _SECURITY_IMPERSONATION,
+                _TOKEN_IMPERSONATION,
+                ctypes.byref(dup),
+            ):
+                errors.append(f"{name}:{pid} dup err {ctypes.GetLastError()}")
+                continue
+            return dup, name, pid
+        finally:
+            if token:
+                kernel32.CloseHandle(token)
+            kernel32.CloseHandle(h)
+    raise OSError(
+        "Could not obtain a SYSTEM token from any process: " + "; ".join(errors[:8])
+    )
 
 
 class _SystemImpersonation:
-    """Context manager that impersonates the SYSTEM token of lsass.exe.
+    """Context manager that impersonates a SYSTEM token.
 
     Requires an elevated (admin) process so SeDebugPrivilege can be enabled.
     Used for the SYSTEM DPAPI step and the flag-3 CNG decryption, matching how
@@ -430,7 +609,7 @@ class _SystemImpersonation:
 
     def _enter_impl(self):
         kernel32 = _kernel32()
-        advapi32 = ctypes.windll.advapi32
+        advapi32 = _advapi32()
 
         current = ctypes.wintypes.HANDLE()
         advapi32.OpenProcessToken(
@@ -447,42 +626,16 @@ class _SystemImpersonation:
             tp.Privileges[0].Attributes = _SE_PRIVILEGE_ENABLED
             advapi32.AdjustTokenPrivileges(current, False, ctypes.byref(tp), 0, None, None)
 
-        lsass_pid = _find_process_id("lsass.exe")
-        if not lsass_pid:
-            raise OSError("lsass.exe not found (cannot reach the SYSTEM token)")
-
-        h_lsass = kernel32.OpenProcess(_PROCESS_QUERY_INFORMATION, False, lsass_pid)
-        if not h_lsass:
-            raise OSError(f"OpenProcess(lsass) failed ({ctypes.GetLastError()})")
-        self._handles.append(h_lsass)
-
-        lsass_token = ctypes.wintypes.HANDLE()
-        if not advapi32.OpenProcessToken(
-            h_lsass,
-            _TOKEN_DUPLICATE | _TOKEN_QUERY | _TOKEN_IMPERSONATE,
-            ctypes.byref(lsass_token),
-        ):
-            raise OSError(f"OpenProcessToken(lsass) failed ({ctypes.GetLastError()})")
-        self._handles.append(lsass_token)
-
-        dup = ctypes.wintypes.HANDLE()
-        if not advapi32.DuplicateTokenEx(
-            lsass_token,
-            _MAXIMUM_ALLOWED,
-            None,
-            _SECURITY_IMPERSONATION,
-            _TOKEN_IMPERSONATION,
-            ctypes.byref(dup),
-        ):
-            raise OSError(f"DuplicateTokenEx failed ({ctypes.GetLastError()})")
+        dup, source_name, source_pid = _open_system_dup_token()
         self._handles.append(dup)
         self._dup_token = dup
+        log.debug("Impersonating SYSTEM via %s (pid %s)", source_name, source_pid)
 
         if not advapi32.SetThreadToken(None, dup):
             raise OSError(f"SetThreadToken failed ({ctypes.GetLastError()})")
 
     def _revert(self):
-        advapi32 = ctypes.windll.advapi32
+        advapi32 = _advapi32()
         kernel32 = _kernel32()
         try:
             advapi32.SetThreadToken(None, None)
