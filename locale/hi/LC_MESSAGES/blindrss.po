@@ -102,7 +102,7 @@ msgstr "शीर्षक"
 msgid "Author"
 msgstr "लेखक"
 
-#: core/article_columns.py:70 core/shortcuts.py:143 gui/mainframe.py:1850
+#: core/article_columns.py:70 core/shortcuts.py:143 gui/mainframe.py:1864
 msgid "Media"
 msgstr "मीडिया"
 
@@ -122,7 +122,7 @@ msgstr "विवरण"
 msgid "Status"
 msgstr "स्थिति"
 
-#: core/article_extractor.py:198
+#: core/article_extractor.py:216
 msgid ""
 "This page is behind an anti-bot / human-verification check (e.g. Cloudflare "
 "or a \"you're not a robot\" page), so the full text can't be fetched "
@@ -132,7 +132,7 @@ msgstr ""
 " हैं\" पृष्ठ) के पीछे है, इसलिए पूरा पाठ स्वचालित रूप से प्राप्त नहीं किया "
 "जा सकता। इसे पढ़ने के लिए मूल लिंक अपने ब्राउज़र में खोलें।"
 
-#: core/article_extractor.py:225
+#: core/article_extractor.py:243
 msgid ""
 "The page has no readable article text — only navigation or related-story "
 "links were found (common for video-only pages). Open the original link in "
@@ -142,7 +142,7 @@ msgstr ""
 " लिंक मिले (केवल-वीडियो पृष्ठों के लिए सामान्य)। इसे देखने के लिए मूल लिंक "
 "अपने ब्राउज़र में खोलें।"
 
-#: core/article_extractor.py:317
+#: core/article_extractor.py:335
 msgid ""
 "This article is behind a paywall (subscription required), so the full text "
 "can't be fetched automatically. Open the original link in your browser to "
@@ -152,7 +152,7 @@ msgstr ""
 "प्राप्त नहीं किया जा सकता। इसे पढ़ने के लिए मूल लिंक अपने ब्राउज़र में "
 "खोलें।"
 
-#: core/article_extractor.py:352
+#: core/article_extractor.py:370
 msgid ""
 "Only the free preview of this article is published on the page — the rest "
 "requires a subscription. Open the original link in your browser to read it."
@@ -160,7 +160,7 @@ msgstr ""
 "पृष्ठ पर इस लेख का केवल निःशुल्क पूर्वावलोकन प्रकाशित है — शेष के लिए "
 "सदस्यता आवश्यक है। इसे पढ़ने के लिए मूल लिंक अपने ब्राउज़र में खोलें।"
 
-#: core/article_extractor.py:2873
+#: core/article_extractor.py:2891
 msgid ""
 "Google News could not resolve the original publisher link. Open the original"
 " link in your browser to read it."
@@ -168,31 +168,31 @@ msgstr ""
 "Google News मूल प्रकाशक लिंक को हल नहीं कर सका। इसे पढ़ने के लिए मूल लिंक "
 "अपने ब्राउज़र में खोलें।"
 
-#: core/article_extractor.py:4681 gui/dialogs.py:4777
+#: core/article_extractor.py:4713 gui/dialogs.py:4777
 msgid "(unknown)"
 msgstr "(अज्ञात)"
 
-#: core/article_extractor.py:4753
+#: core/article_extractor.py:4785
 msgid "Could not extract full text from the webpage or from feed content."
 msgstr "वेबपृष्ठ या फ़ीड सामग्री से पूरा पाठ निकाला नहीं जा सका।"
 
-#: core/article_extractor.py:4509
+#: core/article_extractor.py:4541
 msgid ""
 "trafilatura is not installed or failed to import. Reinstall requirements."
 msgstr ""
 "trafilatura स्थापित नहीं है या आयात नहीं हो सका। आवश्यक घटक पुनः स्थापित "
 "करें।"
 
-#: core/article_extractor.py:4603
+#: core/article_extractor.py:4635
 msgid "Download failed (site blocked, offline, or connection problem)."
 msgstr "डाउनलोड विफल (साइट अवरुद्ध, ऑफ़लाइन, या कनेक्शन समस्या)।"
 
-#: core/article_extractor.py:4627
+#: core/article_extractor.py:4659
 msgid "Downloaded page, but could not extract readable text (empty result)."
 msgstr ""
 "पृष्ठ डाउनलोड हुआ, लेकिन पढ़ने योग्य पाठ नहीं निकाला जा सका (खाली परिणाम)।"
 
-#: core/article_extractor.py:192
+#: core/article_extractor.py:210
 msgid ""
 "This page is behind an anti-bot / human-verification check, and the access "
 "BlindRSS had for this site has expired — these checks only stay valid for a "
@@ -204,20 +204,20 @@ msgstr ""
 "{browser} में खोलें और BlindRSS एक मिनट के भीतर पहुँच स्वयं पुनः प्राप्त कर "
 "लेगा।"
 
-#: core/article_extractor.py:4682 gui/dialogs.py:4146
+#: core/article_extractor.py:4714 gui/dialogs.py:4146
 msgid "Title:"
 msgstr "शीर्षक:"
 
-#: core/article_extractor.py:4683 gui/accessibility.py:1500
-#: gui/mainframe.py:5980 gui/mainframe.py:9878
+#: core/article_extractor.py:4715 gui/accessibility.py:1500
+#: gui/mainframe.py:6113 gui/mainframe.py:10023
 msgid "Author:"
 msgstr "लेखक:"
 
-#: core/article_extractor.py:4495 core/article_extractor.py:4506
+#: core/article_extractor.py:4527 core/article_extractor.py:4538
 msgid "Could not retrieve YouTube video details."
 msgstr "YouTube वीडियो का विवरण प्राप्त नहीं किया जा सका।"
 
-#: core/article_extractor.py:4744
+#: core/article_extractor.py:4776
 msgid "Unknown extraction error"
 msgstr "अज्ञात निष्कर्षण त्रुटि"
 
@@ -225,21 +225,21 @@ msgstr "अज्ञात निष्कर्षण त्रुटि"
 msgid "Uncategorized"
 msgstr "अवर्गीकृत"
 
-#: core/config.py:774
+#: core/config.py:779
 msgid "Installed Windows builds store data in the User Data Folder."
 msgstr ""
 "इंस्टॉल किए गए Windows बिल्ड डेटा को उपयोगकर्ता डेटा फ़ोल्डर में संग्रहीत "
 "करते हैं।"
 
-#: core/config.py:776
+#: core/config.py:781
 msgid "No change."
 msgstr "कोई बदलाव नहीं।"
 
-#: core/config.py:802
+#: core/config.py:807
 msgid "Config moved to {path}."
 msgstr "कॉन्फ़िगरेशन {path} पर ले जाया गया।"
 
-#: core/config.py:789
+#: core/config.py:794
 msgid "Could not write config at new location: {error}"
 msgstr "नए स्थान पर कॉन्फ़िगरेशन नहीं लिखा जा सका: {error}"
 
@@ -404,7 +404,7 @@ msgstr "असीमित"
 msgid "Feeds"
 msgstr "फ़ीड"
 
-#: core/shortcuts.py:142 gui/accessibility.py:512 gui/mainframe.py:676
+#: core/shortcuts.py:142 gui/accessibility.py:512 gui/mainframe.py:690
 msgid "Articles"
 msgstr "लेख"
 
@@ -436,29 +436,29 @@ msgstr "प्लेबैक गति"
 msgid "Tools"
 msgstr "उपकरण"
 
-#: core/shortcuts.py:152 gui/dialogs.py:210 gui/mainframe.py:14274
+#: core/shortcuts.py:152 gui/dialogs.py:210 gui/mainframe.py:14419
 msgid "Add Feed"
 msgstr "फ़ीड जोड़ें"
 
-#: core/shortcuts.py:153 gui/mainframe.py:12896 gui/mainframe.py:12950
-#: gui/mainframe.py:12935
+#: core/shortcuts.py:153 gui/mainframe.py:13041 gui/mainframe.py:13095
+#: gui/mainframe.py:13080
 msgid "Detect Feeds on Page"
 msgstr "पृष्ठ पर फ़ीड पहचानें"
 
-#: core/shortcuts.py:154 gui/mainframe.py:4729
+#: core/shortcuts.py:154 gui/mainframe.py:4862
 msgid "Remove Feed"
 msgstr "फ़ीड हटाएं"
 
 #: core/shortcuts.py:155 gui/accessibility.py:444 gui/accessibility.py:443
-#: gui/mainframe.py:3226
+#: gui/mainframe.py:3240
 msgid "Refresh Feeds"
 msgstr "फ़ीड ताज़ा करें"
 
-#: core/shortcuts.py:156 gui/mainframe.py:3232
+#: core/shortcuts.py:156 gui/mainframe.py:3247
 msgid "Stop Refresh"
 msgstr "ताज़ा करना रोकें"
 
-#: core/shortcuts.py:157 gui/mainframe.py:4678
+#: core/shortcuts.py:157 gui/mainframe.py:4811
 msgid "Refresh Feed"
 msgstr "फ़ीड ताज़ा करें"
 
@@ -466,7 +466,7 @@ msgstr "फ़ीड ताज़ा करें"
 msgid "Edit Feed or Category"
 msgstr "फ़ीड या श्रेणी संपादित करें"
 
-#: core/shortcuts.py:159 gui/mainframe.py:4645 gui/mainframe.py:4686
+#: core/shortcuts.py:159 gui/mainframe.py:4778 gui/mainframe.py:4819
 msgid "Mark All Items as Read"
 msgstr "सभी आइटम को पढ़ा गया चिह्नित करें"
 
@@ -474,28 +474,28 @@ msgstr "सभी आइटम को पढ़ा गया चिह्नि�
 msgid "View Feed Errors"
 msgstr "फ़ीड त्रुटियां देखें"
 
-#: core/shortcuts.py:161 gui/mainframe.py:4704
+#: core/shortcuts.py:161 gui/mainframe.py:4837
 msgid "Copy Feed URL"
 msgstr "फ़ीड URL कॉपी करें"
 
-#: core/shortcuts.py:162 gui/mainframe.py:7394
+#: core/shortcuts.py:162 gui/mainframe.py:7527
 msgid "Add Category"
 msgstr "श्रेणी जोड़ें"
 
-#: core/shortcuts.py:163 gui/mainframe.py:4663
+#: core/shortcuts.py:163 gui/mainframe.py:4796
 msgid "Remove Category"
 msgstr "श्रेणी हटाएं"
 
-#: core/shortcuts.py:164 gui/mainframe.py:13366
+#: core/shortcuts.py:164 gui/mainframe.py:13511
 msgid "Import OPML"
 msgstr "OPML आयात करें"
 
-#: core/shortcuts.py:165 gui/dialogs.py:470 gui/mainframe.py:13377
-#: gui/mainframe.py:13456
+#: core/shortcuts.py:165 gui/dialogs.py:470 gui/mainframe.py:13522
+#: gui/mainframe.py:13601
 msgid "Import YouTube Takeout"
 msgstr "YouTube Takeout आयात करें"
 
-#: core/shortcuts.py:166 gui/mainframe.py:13724
+#: core/shortcuts.py:166 gui/mainframe.py:13869
 msgid "Export OPML"
 msgstr "OPML निर्यात करें"
 
@@ -507,8 +507,8 @@ msgstr "पॉडकास्ट या RSS फ़ीड खोजें"
 msgid "Video Search"
 msgstr "वीडियो खोज"
 
-#: core/shortcuts.py:169 gui/dialogs.py:317 gui/mainframe.py:14359
-#: gui/mainframe.py:14383
+#: core/shortcuts.py:169 gui/dialogs.py:317 gui/mainframe.py:14504
+#: gui/mainframe.py:14528
 msgid "Open Media URL"
 msgstr "मीडिया URL खोलें"
 
@@ -516,15 +516,15 @@ msgstr "मीडिया URL खोलें"
 msgid "Open in Browser"
 msgstr "ब्राउज़र में खोलें"
 
-#: core/shortcuts.py:171 gui/mainframe.py:4989
+#: core/shortcuts.py:171 gui/mainframe.py:5122
 msgid "Copy Link"
 msgstr "लिंक कॉपी करें"
 
-#: core/shortcuts.py:172 gui/mainframe.py:5010
+#: core/shortcuts.py:172 gui/mainframe.py:5143
 msgid "Copy Media Link"
 msgstr "मीडिया लिंक कॉपी करें"
 
-#: core/shortcuts.py:173 gui/mainframe.py:4996
+#: core/shortcuts.py:173 gui/mainframe.py:5129
 msgid "Copy Text"
 msgstr "टेक्स्ट कॉपी करें"
 
@@ -540,12 +540,12 @@ msgstr "पसंदीदा में जोड़ें या हटाए�
 msgid "Delete Article"
 msgstr "लेख हटाएं"
 
-#: core/shortcuts.py:177 gui/accessibility.py:464 gui/mainframe.py:12335
-#: gui/mainframe.py:12354
+#: core/shortcuts.py:177 gui/accessibility.py:464 gui/mainframe.py:12480
+#: gui/mainframe.py:12499
 msgid "Download"
 msgstr "डाउनलोड करें"
 
-#: core/shortcuts.py:178 gui/mainframe.py:12376 gui/mainframe.py:12362
+#: core/shortcuts.py:178 gui/mainframe.py:12521 gui/mainframe.py:12507
 msgid "Download As"
 msgstr "इस रूप में डाउनलोड करें"
 
@@ -573,7 +573,7 @@ msgstr "समृद्ध पूर्ण-पाठ दृश्य"
 msgid "Open Accessible Browser"
 msgstr "सुलभ ब्राउज़र खोलें"
 
-#: core/shortcuts.py:185 gui/accessibility.py:252 gui/mainframe.py:8569
+#: core/shortcuts.py:185 gui/accessibility.py:252 gui/mainframe.py:8714
 msgid "All Articles"
 msgstr "सभी लेख"
 
@@ -625,16 +625,16 @@ msgstr "स्थिति के अनुसार क्रमबद्ध �
 msgid "Toggle Ascending Sort"
 msgstr "आरोही क्रम टॉगल करें"
 
-#: core/shortcuts.py:198 gui/mainframe.py:2400 gui/tray.py:109
+#: core/shortcuts.py:198 gui/mainframe.py:2414 gui/tray.py:109
 msgid "Play/Pause"
 msgstr "चलाएं/रोकें"
 
-#: core/shortcuts.py:199 gui/mainframe.py:2403 gui/player.py:2113
+#: core/shortcuts.py:199 gui/mainframe.py:2417 gui/player.py:2113
 #: gui/tray.py:110
 msgid "Stop"
 msgstr "रोकें"
 
-#: core/shortcuts.py:200 gui/mainframe.py:2395 gui/tray.py:102
+#: core/shortcuts.py:200 gui/mainframe.py:2409 gui/tray.py:102
 msgid "Show/Hide Player"
 msgstr "प्लेयर दिखाएं/छिपाएं"
 
@@ -650,11 +650,11 @@ msgstr "अध्याय दिखाएं"
 msgid "Open Play Queue"
 msgstr "प्ले कतार खोलें"
 
-#: core/shortcuts.py:204 gui/mainframe.py:2411
+#: core/shortcuts.py:204 gui/mainframe.py:2425
 msgid "Play Next in Queue"
 msgstr "कतार में अगला चलाएँ"
 
-#: core/shortcuts.py:205 gui/mainframe.py:2415
+#: core/shortcuts.py:205 gui/mainframe.py:2429
 msgid "Play Previous in Queue"
 msgstr "कतार में पिछला चलाएँ"
 
@@ -670,7 +670,7 @@ msgstr "प्लेबैक गति घटाएँ"
 msgid "Reset Playback Speed (1x)"
 msgstr "प्लेबैक गति रीसेट करें (1x)"
 
-#: core/shortcuts.py:209 gui/mainframe.py:14832
+#: core/shortcuts.py:209 gui/mainframe.py:14977
 msgid "Filter Rules"
 msgstr "फ़िल्टर नियम"
 
@@ -687,7 +687,7 @@ msgstr "स्थायी खोज कॉन्फ़िगर करें"
 msgid "Keyboard Shortcuts"
 msgstr "कीबोर्ड शॉर्टकट"
 
-#: core/shortcuts.py:213 gui/dialogs.py:848 gui/mainframe.py:13942
+#: core/shortcuts.py:213 gui/dialogs.py:848 gui/mainframe.py:14087
 msgid "Settings"
 msgstr "सेटिंग्स"
 
@@ -763,196 +763,236 @@ msgstr "बराबर है"
 msgid "starts with"
 msgstr "से शुरू होता है"
 
-#: core/updater.py:306
+#: core/updater.py:458
 msgid "Update available."
 msgstr "अपडेट उपलब्ध है।"
 
-#: core/updater.py:509
+#: core/updater.py:661
 msgid "Authenticode verification failed: PowerShell was not found."
 msgstr "Authenticode सत्यापन विफल: PowerShell नहीं मिला।"
 
-#: core/updater.py:830
+#: core/updater.py:1006
 msgid "Verifying download…"
 msgstr "डाउनलोड सत्यापित किया जा रहा है…"
 
-#: core/updater.py:845
+#: core/updater.py:1021
 msgid "Extracting update…"
 msgstr "अपडेट निकाला जा रहा है…"
 
-#: core/updater.py:883 core/updater.py:938 core/updater.py:1017
+#: core/updater.py:1059 core/updater.py:1114 core/updater.py:1193
 msgid "Verifying signature…"
 msgstr "हस्ताक्षर सत्यापित किया जा रहा है…"
 
-#: core/updater.py:888 core/updater.py:943 core/updater.py:1022
-#: core/updater.py:1042
+#: core/updater.py:1064 core/updater.py:1119 core/updater.py:1198
+#: core/updater.py:1218
 msgid "Preparing restart…"
 msgstr "पुनरारंभ की तैयारी हो रही है…"
 
-#: core/updater.py:206
+#: core/updater.py:244
+msgid "No download URL available."
+msgstr "कोई डाउनलोड URL उपलब्ध नहीं है।"
+
+#: core/updater.py:284
+msgid "Unknown network error."
+msgstr "अज्ञात नेटवर्क त्रुटि।"
+
+#: core/updater.py:352
 msgid "No release data from GitHub."
 msgstr "GitHub से कोई रिलीज़ डेटा प्राप्त नहीं हुआ।"
 
-#: core/updater.py:231
+#: core/updater.py:380
 msgid "Update manifest is empty."
 msgstr "अपडेट मेनिफ़ेस्ट खाली है।"
 
-#: core/updater.py:235
+#: core/updater.py:384
 msgid "Update manifest has invalid version."
 msgstr "अपडेट मेनिफ़ेस्ट में अमान्य संस्करण है।"
 
-#: core/updater.py:237
+#: core/updater.py:386
 msgid "Update manifest version does not match the latest release."
 msgstr "अपडेट मेनिफ़ेस्ट का संस्करण नवीनतम रिलीज़ से मेल नहीं खाता।"
 
-#: core/updater.py:241
+#: core/updater.py:390
 msgid "Update manifest is missing asset name."
 msgstr "अपडेट मेनिफ़ेस्ट में एसेट का नाम गायब है।"
 
-#: core/updater.py:251
+#: core/updater.py:400
 msgid "Update manifest is missing a download URL."
 msgstr "अपडेट मेनिफ़ेस्ट में डाउनलोड URL गायब है।"
 
-#: core/updater.py:255
+#: core/updater.py:405
 msgid "Update manifest has an invalid SHA-256 hash."
 msgstr "अपडेट मेनिफ़ेस्ट में अमान्य SHA-256 हैश है।"
 
-#: core/updater.py:785
+#: core/updater.py:937
 msgid "Auto-update is not available for this build."
 msgstr "इस बिल्ड के लिए स्वचालित अपडेट उपलब्ध नहीं हैं।"
 
-#: core/updater.py:833
+#: core/updater.py:1009
 msgid "Downloaded update failed SHA-256 verification."
 msgstr "डाउनलोड किया गया अपडेट SHA-256 सत्यापन में विफल रहा।"
 
-#: core/updater.py:936
+#: core/updater.py:1112
 msgid "Downloaded Windows installer is missing."
 msgstr "डाउनलोड किया गया Windows इंस्टॉलर मौजूद नहीं है।"
 
-#: core/updater.py:1005
+#: core/updater.py:1181
 msgid "Could not locate the running .app bundle to update."
 msgstr "अपडेट करने के लिए चल रहा .app बंडल नहीं मिला।"
 
-#: core/updater.py:1013
+#: core/updater.py:1189
 msgid "Update package does not contain a BlindRSS.app bundle."
 msgstr "अपडेट पैकेज में BlindRSS.app बंडल नहीं है।"
 
-#: core/updater.py:1015
+#: core/updater.py:1191
 msgid "Update package .app is missing its executable."
 msgstr "अपडेट पैकेज के .app में उसकी निष्पादन योग्य फ़ाइल मौजूद नहीं है।"
 
-#: core/updater.py:1040
+#: core/updater.py:1216
 msgid "Update package is missing the BlindRSS executable."
 msgstr "अपडेट पैकेज में BlindRSS निष्पादन योग्य फ़ाइल मौजूद नहीं है।"
 
-#: core/updater.py:817 core/updater.py:825
+#: core/updater.py:337
+msgid ""
+"Failed to download update metadata. GitHub may be temporarily unavailable; "
+"please try again in a few minutes."
+msgstr ""
+"अपडेट मेटाडेटा डाउनलोड करने में विफल। GitHub अस्थायी रूप से अनुपलब्ध हो सकता"
+" है; कृपया कुछ मिनटों में फिर से प्रयास करें।"
+
+#: core/updater.py:982 core/updater.py:990
 msgid "Downloading update…"
 msgstr "अपडेट डाउनलोड हो रहा है…"
 
-#: core/updater.py:858 core/updater.py:218
+#: core/updater.py:1001
+msgid ""
+"Failed to download update. GitHub may be temporarily unavailable; please try"
+" again in a few minutes."
+msgstr ""
+"अपडेट डाउनलोड करने में विफल। GitHub अस्थायी रूप से अनुपलब्ध हो सकता है; "
+"कृपया कुछ मिनटों में फिर से प्रयास करें।"
+
+#: core/updater.py:1034 core/updater.py:364
 msgid "Auto-update is not supported on this platform ({platform})."
 msgstr "इस प्लेटफ़ॉर्म पर स्वचालित अपडेट समर्थित नहीं हैं ({platform})।"
 
-#: core/updater.py:999
+#: core/updater.py:1175
 msgid "Update signature verification failed: {error}"
 msgstr "अपडेट हस्ताक्षर सत्यापन विफल: {error}"
 
-#: core/updater.py:168
-msgid "{msg} Reset time (epoch): {reset}"
-msgstr "{msg} रीसेट समय (epoch): {reset}"
-
-#: core/updater.py:172
-msgid "GitHub API error: HTTP {status}"
-msgstr "GitHub API त्रुटि: HTTP {status}"
-
-#: core/updater.py:200
-msgid "Invalid current version: {version}"
-msgstr "अमान्य वर्तमान संस्करण: {version}"
-
-#: core/updater.py:211
-msgid "Latest release tag is not semver: {tag}"
-msgstr "नवीनतम रिलीज़ टैग semver प्रारूप में नहीं है: {tag}"
-
-#: core/updater.py:214
-msgid "BlindRSS is up to date ({version})."
-msgstr "BlindRSS अद्यतित है ({version})।"
-
-#: core/updater.py:225
-msgid "Update manifest '{manifest}' not found in release assets."
-msgstr "रिलीज़ एसेट में अपडेट मेनिफ़ेस्ट '{manifest}' नहीं मिला।"
-
-#: core/updater.py:243
-msgid "Update asset must be a {extension} file."
-msgstr "अपडेट एसेट {extension} फ़ाइल होनी चाहिए।"
-
-#: core/updater.py:247
-msgid "Update asset '{name}' not found in release assets."
-msgstr "रिलीज़ एसेट में अपडेट एसेट '{name}' नहीं मिला।"
-
-#: core/updater.py:273
-msgid "Windows installer asset must be an .exe file."
-msgstr "Windows इंस्टॉलर एसेट .exe फ़ाइल होनी चाहिए।"
-
-#: core/updater.py:282
-msgid "Update installer has an invalid SHA-256 hash."
-msgstr "अपडेट इंस्टॉलर में अमान्य SHA-256 हैश है।"
-
-#: core/updater.py:289
-msgid "Update installer is missing a download URL."
-msgstr "अपडेट इंस्टॉलर में डाउनलोड URL गायब है।"
-
-#: core/updater.py:508
-msgid "Authenticode verification failed: {error}"
-msgstr "Authenticode सत्यापन विफल: {error}"
-
-#: core/updater.py:865
-msgid "Update package is missing {name}."
-msgstr "अपडेट पैकेज में {name} मौजूद नहीं है।"
-
-#: core/updater.py:879 core/updater.py:934 core/updater.py:1036
-msgid "{name} is missing from the install directory."
-msgstr "इंस्टॉल निर्देशिका में {name} मौजूद नहीं है।"
-
-#: core/updater.py:1009
-msgid "{name} is missing from the app bundle."
-msgstr "ऐप बंडल में {name} मौजूद नहीं है।"
-
-#: core/updater.py:162
+#: core/updater.py:294
 msgid "Network error while checking GitHub: {error}"
 msgstr "GitHub जांचते समय नेटवर्क त्रुटि: {error}"
 
-#: core/updater.py:177
+#: core/updater.py:300
+msgid "{msg} Reset time (epoch): {reset}"
+msgstr "{msg} रीसेट समय (epoch): {reset}"
+
+#: core/updater.py:304
+msgid "GitHub API error: HTTP {status}"
+msgstr "GitHub API त्रुटि: HTTP {status}"
+
+#: core/updater.py:346
+msgid "Invalid current version: {version}"
+msgstr "अमान्य वर्तमान संस्करण: {version}"
+
+#: core/updater.py:357
+msgid "Latest release tag is not semver: {tag}"
+msgstr "नवीनतम रिलीज़ टैग semver प्रारूप में नहीं है: {tag}"
+
+#: core/updater.py:360
+msgid "BlindRSS is up to date ({version})."
+msgstr "BlindRSS अद्यतित है ({version})।"
+
+#: core/updater.py:371
+msgid "Update manifest '{manifest}' not found in release assets."
+msgstr "रिलीज़ एसेट में अपडेट मेनिफ़ेस्ट '{manifest}' नहीं मिला।"
+
+#: core/updater.py:392
+msgid "Update asset must be a {extension} file."
+msgstr "अपडेट एसेट {extension} फ़ाइल होनी चाहिए।"
+
+#: core/updater.py:396
+msgid "Update asset '{name}' not found in release assets."
+msgstr "रिलीज़ एसेट में अपडेट एसेट '{name}' नहीं मिला।"
+
+#: core/updater.py:423
+msgid "Windows installer asset must be an .exe file."
+msgstr "Windows इंस्टॉलर एसेट .exe फ़ाइल होनी चाहिए।"
+
+#: core/updater.py:432
+msgid "Update installer has an invalid SHA-256 hash."
+msgstr "अपडेट इंस्टॉलर में अमान्य SHA-256 हैश है।"
+
+#: core/updater.py:439
+msgid "Update installer is missing a download URL."
+msgstr "अपडेट इंस्टॉलर में डाउनलोड URL गायब है।"
+
+#: core/updater.py:660
+msgid "Authenticode verification failed: {error}"
+msgstr "Authenticode सत्यापन विफल: {error}"
+
+#: core/updater.py:1041
+msgid "Update package is missing {name}."
+msgstr "अपडेट पैकेज में {name} मौजूद नहीं है।"
+
+#: core/updater.py:1055 core/updater.py:1110 core/updater.py:1212
+msgid "{name} is missing from the install directory."
+msgstr "इंस्टॉल निर्देशिका में {name} मौजूद नहीं है।"
+
+#: core/updater.py:1185
+msgid "{name} is missing from the app bundle."
+msgstr "ऐप बंडल में {name} मौजूद नहीं है।"
+
+#: core/updater.py:264
+msgid "HTTP {status} from {url}"
+msgstr "{url} से HTTP {status}"
+
+#: core/updater.py:309
 msgid "Invalid GitHub response: {error}"
 msgstr "अमान्य GitHub प्रतिक्रिया: {error}"
 
-#: core/updater.py:194
-msgid "Failed to download update metadata: {error}"
-msgstr "अपडेट मेटाडेटा डाउनलोड करने में विफल: {error}"
-
-#: core/updater.py:417
+#: core/updater.py:569
 msgid "Unsupported update archive type: {type}"
 msgstr "असमर्थित अपडेट संग्रह प्रकार: {type}"
 
-#: core/updater.py:599 core/updater.py:893 core/updater.py:947
-#: core/updater.py:1100
+#: core/updater.py:751 core/updater.py:1069 core/updater.py:1123
+#: core/updater.py:1276
 msgid "Failed to start update helper: {error}"
 msgstr "अपडेट हेल्पर शुरू करने में विफल: {error}"
 
-#: core/updater.py:828
-msgid "Failed to download update: {error}"
-msgstr "अपडेट डाउनलोड करने में विफल: {error}"
+#: core/updater.py:964
+msgid "Download failed; retrying (attempt {attempt})…"
+msgstr "डाउनलोड विफल; पुनः प्रयास किया जा रहा है (प्रयास {attempt})…"
 
-#: core/updater.py:849
+#: core/updater.py:1025
 msgid "Failed to extract update: {error}"
 msgstr "अपडेट निकालने में विफल: {error}"
 
-#: core/updater.py:278
+#: core/updater.py:333
+msgid ""
+"Failed to download update metadata: {error}. GitHub may be temporarily "
+"unavailable; please try again in a few minutes."
+msgstr ""
+"अपडेट मेटाडेटा डाउनलोड करने में विफल: {error}। GitHub अस्थायी रूप से "
+"अनुपलब्ध हो सकता है; कृपया कुछ मिनटों में फिर से प्रयास करें।"
+
+#: core/updater.py:428
 msgid "Update installer '{name}' not found in release assets."
 msgstr "रिलीज़ एसेट में अपडेट इंस्टॉलर '{name}' नहीं मिला।"
 
-#: core/updater.py:496
+#: core/updater.py:648
 msgid "Update is signed but not by a trusted certificate{suffix}"
 msgstr ""
 "अपडेट पर हस्ताक्षर है, लेकिन किसी विश्वसनीय प्रमाणपत्र से नहीं{suffix}"
+
+#: core/updater.py:997
+msgid ""
+"Failed to download update: {error}. GitHub may be temporarily unavailable; "
+"please try again in a few minutes."
+msgstr ""
+"अपडेट डाउनलोड करने में विफल: {error}। GitHub अस्थायी रूप से अनुपलब्ध हो सकता"
+" है; कृपया कुछ मिनटों में फिर से प्रयास करें।"
 
 #: core/user_agents.py:486
 msgid "Automatic"
@@ -1018,7 +1058,7 @@ msgstr "विस्तारित"
 msgid "collapsed"
 msgstr "संक्षिप्त"
 
-#: gui/accessibility.py:54 gui/mainframe.py:3596 gui/mainframe.py:11307
+#: gui/accessibility.py:54 gui/mainframe.py:3611 gui/mainframe.py:11452
 msgid "Untitled chapter"
 msgstr "बिना शीर्षक वाला अध्याय"
 
@@ -1078,7 +1118,7 @@ msgstr "सुलभ लेख सामग्री"
 msgid "&Add Feed...\tCtrl+N"
 msgstr "फ़ीड जोड़ें...\tCtrl+N"
 
-#: gui/accessibility.py:611 gui/mainframe.py:2251
+#: gui/accessibility.py:611 gui/mainframe.py:2265
 msgid "Detect Feeds on &Page..."
 msgstr "पृष्ठ पर फ़ीड &पहचानें..."
 
@@ -1090,11 +1130,11 @@ msgstr "श्रेणी जोड़ें..."
 msgid "New Smart F&older..."
 msgstr "नया स्मार्ट फ़ोल्डर..."
 
-#: gui/accessibility.py:614 gui/mainframe.py:2274
+#: gui/accessibility.py:614 gui/mainframe.py:2288
 msgid "&Import OPML..."
 msgstr "OPML &आयात करें..."
 
-#: gui/accessibility.py:615 gui/mainframe.py:2276
+#: gui/accessibility.py:615 gui/mainframe.py:2290
 msgid "Import &YouTube Takeout..."
 msgstr "&YouTube Takeout आयात करें..."
 
@@ -1114,7 +1154,7 @@ msgstr "ताज़ा करना रोकें"
 msgid "Mark All in Current View as R&ead"
 msgstr "वर्तमान दृश्य में सभी को पढ़ा गया चिह्नित करें"
 
-#: gui/accessibility.py:622 gui/mainframe.py:2494
+#: gui/accessibility.py:622 gui/mainframe.py:2508
 msgid "&Settings..."
 msgstr "&सेटिंग्स..."
 
@@ -1122,7 +1162,7 @@ msgstr "&सेटिंग्स..."
 msgid "Close &Window\tCtrl+W"
 msgstr "विंडो बंद करें\tCtrl+W"
 
-#: gui/accessibility.py:624 gui/mainframe.py:2509
+#: gui/accessibility.py:624 gui/mainframe.py:2523
 msgid "&File"
 msgstr "&फ़ाइल"
 
@@ -1158,7 +1198,7 @@ msgstr "पढ़ा हुआ चिह्नित करें"
 msgid "Mark &Unread"
 msgstr "अपठित चिह्नित करें"
 
-#: gui/accessibility.py:637 gui/mainframe.py:14852
+#: gui/accessibility.py:637 gui/mainframe.py:14997
 msgid "De&lete"
 msgstr "&हटाएं"
 
@@ -1202,11 +1242,11 @@ msgstr "कतार में अगला चलाएँ"
 msgid "Play &Previous in Queue"
 msgstr "कतार में पिछला चलाएँ"
 
-#: gui/accessibility.py:651 gui/mainframe.py:2446
+#: gui/accessibility.py:651 gui/mainframe.py:2460
 msgid "&Equalizer..."
 msgstr "इक्वलाइज़र(&E)..."
 
-#: gui/accessibility.py:652 gui/mainframe.py:2512
+#: gui/accessibility.py:652 gui/mainframe.py:2526
 msgid "&Player"
 msgstr "&प्लेयर"
 
@@ -1222,47 +1262,47 @@ msgstr "फ़िल्टर &नियम..."
 msgid "Find a Podcast or &RSS..."
 msgstr "पॉडकास्ट या RSS खोजें..."
 
-#: gui/accessibility.py:658 gui/mainframe.py:2476
+#: gui/accessibility.py:658 gui/mainframe.py:2490
 msgid "&Video Search..."
 msgstr "&वीडियो खोज..."
 
-#: gui/accessibility.py:659 gui/mainframe.py:2485
+#: gui/accessibility.py:659 gui/mainframe.py:2499
 msgid "Import Site &Cookies..."
 msgstr "साइट कुकीज़ आयात करें..."
 
-#: gui/accessibility.py:660 gui/mainframe.py:2513
+#: gui/accessibility.py:660 gui/mainframe.py:2527
 msgid "&Tools"
 msgstr "&उपकरण"
 
-#: gui/accessibility.py:663 gui/mainframe.py:2490
+#: gui/accessibility.py:663 gui/mainframe.py:2504
 msgid "&Keyboard Shortcuts..."
 msgstr "कीबोर्ड शॉर्टकट(&K)..."
 
-#: gui/accessibility.py:664 gui/mainframe.py:2265
+#: gui/accessibility.py:664 gui/mainframe.py:2279
 msgid "View Feed &Errors..."
 msgstr "फ़ीड त्रु&टियां देखें..."
 
-#: gui/accessibility.py:665 gui/mainframe.py:2500
+#: gui/accessibility.py:665 gui/mainframe.py:2514
 msgid "Check for &Updates..."
 msgstr "&अपडेट के लिए जांचें..."
 
-#: gui/accessibility.py:666 gui/mainframe.py:2507
+#: gui/accessibility.py:666 gui/mainframe.py:2521
 msgid "&About"
 msgstr "&बारे में"
 
-#: gui/accessibility.py:667 gui/mainframe.py:2514
+#: gui/accessibility.py:667 gui/mainframe.py:2528
 msgid "&Help"
 msgstr "&सहायता"
 
-#: gui/accessibility.py:808 gui/mainframe.py:5274
+#: gui/accessibility.py:808 gui/mainframe.py:5407
 msgid "No feed description is available for this item."
 msgstr "इस आइटम के लिए कोई फ़ीड विवरण उपलब्ध नहीं है।"
 
-#: gui/accessibility.py:823 gui/mainframe.py:10283
+#: gui/accessibility.py:823 gui/mainframe.py:10428
 msgid "Find in article:"
 msgstr "लेख में खोजें:"
 
-#: gui/accessibility.py:823 gui/mainframe.py:10283
+#: gui/accessibility.py:823 gui/mainframe.py:10428
 msgid "Find"
 msgstr "खोजें"
 
@@ -1290,7 +1330,7 @@ msgstr "श्रेणी जोड़ें..."
 msgid "New Smart &Folder..."
 msgstr "नया स्मार्ट फ़ोल्डर..."
 
-#: gui/accessibility.py:1196 gui/mainframe.py:7823
+#: gui/accessibility.py:1196 gui/mainframe.py:7960
 msgid "Refreshing feeds..."
 msgstr "फ़ीड ताज़ा हो रहे हैं..."
 
@@ -1302,11 +1342,11 @@ msgstr "लेख लोड हो रहे हैं..."
 msgid "Chapter availability: Loading."
 msgstr "अध्यायों की उपलब्धता: लोड हो रहा है।"
 
-#: gui/accessibility.py:2007 gui/mainframe.py:5944
+#: gui/accessibility.py:2007 gui/mainframe.py:6077
 msgid "Full text loaded."
 msgstr "पूर्ण पाठ लोड हो गया।"
 
-#: gui/accessibility.py:2009 gui/mainframe.py:5946
+#: gui/accessibility.py:2009 gui/mainframe.py:6079
 msgid "Full text unavailable. Showing feed content."
 msgstr "पूर्ण पाठ उपलब्ध नहीं है। फ़ीड सामग्री दिखाई जा रही है।"
 
@@ -1322,7 +1362,7 @@ msgstr "उपलब्ध अध्याय: {count}।"
 msgid "Chapter {index}: {timestamp}, {title}."
 msgstr "अध्याय {index}: {timestamp}, {title}।"
 
-#: gui/accessibility.py:257 gui/mainframe.py:8578
+#: gui/accessibility.py:257 gui/mainframe.py:8723
 msgid "Favorites"
 msgstr "पसंदीदा"
 
@@ -1382,7 +1422,7 @@ msgstr "पसंदीदा से हटाया गया।"
 msgid "Article deleted."
 msgstr "लेख हटा दिया गया।"
 
-#: gui/accessibility.py:810 gui/mainframe.py:5276
+#: gui/accessibility.py:810 gui/mainframe.py:5409
 msgid "Feed Description"
 msgstr "फ़ीड विवरण"
 
@@ -1414,19 +1454,19 @@ msgstr "फ़ीड URL कॉपी करें"
 msgid "&Notifications for This Feed"
 msgstr "इस फ़ीड के लिए सूचनाएं"
 
-#: gui/accessibility.py:940 gui/mainframe.py:4718
+#: gui/accessibility.py:940 gui/mainframe.py:4851
 msgid "Use default setting"
 msgstr "डिफ़ॉल्ट सेटिंग का उपयोग करें"
 
-#: gui/accessibility.py:941 gui/mainframe.py:4719
+#: gui/accessibility.py:941 gui/mainframe.py:4852
 msgid "Always show image alt text"
 msgstr "हमेशा छवि alt टेक्स्ट दिखाएं"
 
-#: gui/accessibility.py:942 gui/mainframe.py:4720
+#: gui/accessibility.py:942 gui/mainframe.py:4853
 msgid "Never show image alt text"
 msgstr "कभी भी छवि alt टेक्स्ट न दिखाएं"
 
-#: gui/accessibility.py:943 gui/mainframe.py:4727
+#: gui/accessibility.py:943 gui/mainframe.py:4860
 msgid "Image Alt Text"
 msgstr "छवि alt टेक्स्ट"
 
@@ -1434,12 +1474,12 @@ msgstr "छवि alt टेक्स्ट"
 msgid "Remove &Feed"
 msgstr "फ़ीड हटाएं"
 
-#: gui/accessibility.py:1030 gui/mainframe.py:7494 gui/mainframe.py:7466
+#: gui/accessibility.py:1030 gui/mainframe.py:7627 gui/mainframe.py:7599
 msgid "The Uncategorized folder cannot be removed."
 msgstr "अवर्गीकृत फ़ोल्डर को हटाया नहीं जा सकता।"
 
-#: gui/accessibility.py:1030 gui/mainframe.py:7332 gui/mainframe.py:7489
-#: gui/mainframe.py:7494
+#: gui/accessibility.py:1030 gui/mainframe.py:7465 gui/mainframe.py:7622
+#: gui/mainframe.py:7627
 msgid "Info"
 msgstr "जानकारी"
 
@@ -1447,11 +1487,11 @@ msgstr "जानकारी"
 msgid "Failed to load articles."
 msgstr "लेख लोड करने में विफल।"
 
-#: gui/accessibility.py:1499 gui/mainframe.py:5979 gui/mainframe.py:9877
+#: gui/accessibility.py:1499 gui/mainframe.py:6112 gui/mainframe.py:10022
 msgid "Date:"
 msgstr "तारीख़:"
 
-#: gui/accessibility.py:1501 gui/mainframe.py:5981 gui/mainframe.py:9879
+#: gui/accessibility.py:1501 gui/mainframe.py:6114 gui/mainframe.py:10024
 msgid "Link:"
 msgstr "लिंक:"
 
@@ -1483,8 +1523,8 @@ msgstr "श्रेणी हटाएं"
 msgid "Remove this feed?"
 msgstr "इस फ़ीड को हटाएं?"
 
-#: gui/accessibility.py:1007 gui/accessibility.py:1037 gui/mainframe.py:7517
-#: gui/mainframe.py:7472
+#: gui/accessibility.py:1007 gui/accessibility.py:1037 gui/mainframe.py:7650
+#: gui/mainframe.py:7605
 msgid "Confirm"
 msgstr "पुष्टि करें"
 
@@ -1492,12 +1532,12 @@ msgstr "पुष्टि करें"
 msgid "Remove this category? Feeds will be moved to Uncategorized."
 msgstr "इस श्रेणी को हटाएं? फ़ीड \"अवर्गीकृत\" में ले जाए जाएंगे।"
 
-#: gui/accessibility.py:1047 gui/mainframe.py:7479
+#: gui/accessibility.py:1047 gui/mainframe.py:7612
 msgid "Could not remove category."
 msgstr "श्रेणी हटाई नहीं जा सकी।"
 
-#: gui/accessibility.py:1047 gui/dialogs.py:4670 gui/mainframe.py:13312
-#: gui/mainframe.py:13363
+#: gui/accessibility.py:1047 gui/dialogs.py:4670 gui/mainframe.py:13457
+#: gui/mainframe.py:13508
 msgid "Error"
 msgstr "त्रुटि"
 
@@ -1518,12 +1558,12 @@ msgstr "श्रेणी संक्षिप्त: {label}"
 msgid "Failed to load articles: {error}"
 msgstr "लेख लोड करने में विफल: {error}"
 
-#: gui/accessibility.py:1439 gui/mainframe.py:1263 gui/mainframe.py:1663
-#: gui/mainframe.py:1707
+#: gui/accessibility.py:1439 gui/mainframe.py:1277 gui/mainframe.py:1677
+#: gui/mainframe.py:1721
 msgid "No articles found."
 msgstr "कोई लेख नहीं मिला।"
 
-#: gui/accessibility.py:1572 gui/mainframe.py:5342 gui/mainframe.py:5503
+#: gui/accessibility.py:1572 gui/mainframe.py:5475 gui/mainframe.py:5636
 msgid "Article text"
 msgstr "लेख का पाठ"
 
@@ -1543,15 +1583,15 @@ msgstr "लोड किए गए लेख: {count}।"
 msgid "Articles loaded: {count} of {total}."
 msgstr "लोड किए गए लेख: {total} में से {count}।"
 
-#: gui/accessibility.py:1669 gui/mainframe.py:5813
+#: gui/accessibility.py:1669 gui/mainframe.py:5946
 msgid "Loading full text..."
 msgstr "पूर्ण पाठ लोड हो रहा है..."
 
-#: gui/accessibility.py:846 gui/mainframe.py:10073
+#: gui/accessibility.py:846 gui/mainframe.py:10218
 msgid "\"{term}\" was not found."
 msgstr "\"{term}\" नहीं मिला।"
 
-#: gui/accessibility.py:1161 gui/mainframe.py:8586
+#: gui/accessibility.py:1161 gui/mainframe.py:8731
 msgid "Deleted Articles"
 msgstr "हटाए गए लेख"
 
@@ -1893,7 +1933,7 @@ msgid "Provider"
 msgstr "प्रदाता"
 
 #: gui/dialogs.py:1699 gui/dialogs.py:2110 gui/dialogs.py:2147
-#: gui/mainframe.py:13958
+#: gui/mainframe.py:14103
 msgid "Notifications"
 msgstr "सूचनाएं"
 
@@ -2156,7 +2196,7 @@ msgstr "पूर्ण-पाठ निष्कर्षण एन्कोड
 msgid "Delete behavior for this feed"
 msgstr "इस फ़ीड के लिए हटाने का व्यवहार"
 
-#: gui/dialogs.py:4583 gui/mainframe.py:7399
+#: gui/dialogs.py:4583 gui/mainframe.py:7532
 msgid "Category name"
 msgstr "श्रेणी का नाम"
 
@@ -2197,8 +2237,8 @@ msgstr "बिना शीर्षक की फ़ीड"
 msgid "No successful update recorded."
 msgstr "कोई सफल अपडेट दर्ज नहीं किया गया।"
 
-#: gui/dialogs.py:4782 gui/dialogs.py:1968 gui/mainframe.py:621
-#: gui/mainframe.py:11643
+#: gui/dialogs.py:4782 gui/dialogs.py:1968 gui/mainframe.py:635
+#: gui/mainframe.py:11788
 msgid "Unknown error"
 msgstr "अज्ञात त्रुटि"
 
@@ -2266,8 +2306,8 @@ msgstr "प्लेज़"
 msgid "Kind"
 msgstr "प्रकार"
 
-#: gui/dialogs.py:6028 gui/dialogs.py:7548 gui/mainframe.py:6389
-#: gui/mainframe.py:5304
+#: gui/dialogs.py:6028 gui/dialogs.py:7548 gui/mainframe.py:6522
+#: gui/mainframe.py:5437
 msgid "Close"
 msgstr "बंद करें"
 
@@ -2363,11 +2403,11 @@ msgstr "प्रीसेट सहेजें"
 msgid "Use the global column layout"
 msgstr "वैश्विक स्तंभ लेआउट का उपयोग करें"
 
-#: gui/dialogs.py:129 gui/dialogs.py:7606 gui/mainframe.py:14853
+#: gui/dialogs.py:129 gui/dialogs.py:7606 gui/mainframe.py:14998
 msgid "Move &Up"
 msgstr "&ऊपर ले जाएं"
 
-#: gui/dialogs.py:130 gui/dialogs.py:7610 gui/mainframe.py:14854
+#: gui/dialogs.py:130 gui/dialogs.py:7610 gui/mainframe.py:14999
 msgid "Move &Down"
 msgstr "&नीचे ले जाएं"
 
@@ -2383,8 +2423,8 @@ msgstr "ठीक है: YouTube स्रोत के रूप में प
 msgid "OK: Supported by yt-dlp"
 msgstr "ठीक: yt-dlp द्वारा समर्थित"
 
-#: gui/dialogs.py:386 gui/mainframe.py:12338 gui/mainframe.py:12357
-#: gui/mainframe.py:14408
+#: gui/dialogs.py:386 gui/mainframe.py:12483 gui/mainframe.py:12502
+#: gui/mainframe.py:14553
 msgid "Downloads are disabled. Enable them in Settings > Downloads."
 msgstr "डाउनलोड अक्षम हैं। उन्हें सेटिंग्स > डाउनलोड में सक्षम करें।"
 
@@ -2392,15 +2432,15 @@ msgstr "डाउनलोड अक्षम हैं। उन्हें �
 msgid "Add BlindRSS Shortcuts"
 msgstr "BlindRSS शॉर्टकट जोड़ें"
 
-#: gui/dialogs.py:428 gui/mainframe.py:615
+#: gui/dialogs.py:428 gui/mainframe.py:629
 msgid "Desktop"
 msgstr "डेस्कटॉप"
 
-#: gui/dialogs.py:432 gui/mainframe.py:616
+#: gui/dialogs.py:432 gui/mainframe.py:630
 msgid "Start Menu"
 msgstr "प्रारंभ मेनू"
 
-#: gui/dialogs.py:436 gui/mainframe.py:617
+#: gui/dialogs.py:436 gui/mainframe.py:631
 msgid "Taskbar"
 msgstr "टास्कबार"
 
@@ -3577,7 +3617,7 @@ msgstr ""
 "उपयोगकर्ता डेटा फ़ोल्डर ऐप अपग्रेड में आपकी सेटिंग्स और फ़ीड को बनाए रखता है,\n"
 "विशेष रूप से macOS पर जहाँ इंस्टॉल किया गया ऐप बंडल बदल दिया जाता है।"
 
-#: gui/dialogs.py:3836 gui/mainframe.py:14190 gui/mainframe.py:14158
+#: gui/dialogs.py:3836 gui/mainframe.py:14335 gui/mainframe.py:14303
 msgid "Updates"
 msgstr "अपडेट"
 
@@ -3743,7 +3783,7 @@ msgstr "जोड़ें..."
 msgid "Remove"
 msgstr "हटाएं"
 
-#: gui/dialogs.py:7521 gui/mainframe.py:2507
+#: gui/dialogs.py:7521 gui/mainframe.py:2521
 msgid "About BlindRSS"
 msgstr "BlindRSS के बारे में"
 
@@ -4476,7 +4516,7 @@ msgstr ""
 "यह प्रदाता श्रेणियों को एक सपाट सूची में रखता है, इसलिए इस श्रेणी को "
 "स्थानांतरित नहीं किया जा सकता।"
 
-#: gui/dialogs.py:4599 gui/mainframe.py:7406
+#: gui/dialogs.py:4599 gui/mainframe.py:7539
 msgid "(None - Top Level)"
 msgstr "(कोई नहीं - शीर्ष स्तर)"
 
@@ -4882,7 +4922,7 @@ msgstr "WAV फ़ाइलें"
 msgid "Google News: {topic} headlines"
 msgstr "Google News: {topic} की सुर्खियाँ"
 
-#: gui/dialogs.py:7324 gui/mainframe.py:1863 gui/player.py:4305
+#: gui/dialogs.py:7324 gui/mainframe.py:1877 gui/player.py:4305
 #: gui/player.py:6913
 msgid "Playing"
 msgstr "चल रहा है"
@@ -4903,7 +4943,7 @@ msgstr ""
 msgid "Bing News: {term}"
 msgstr "Bing News: {term}"
 
-#: gui/dialogs.py:7326 gui/mainframe.py:1863 gui/player.py:6969
+#: gui/dialogs.py:7326 gui/mainframe.py:1877 gui/player.py:6969
 #: gui/player.py:6986
 msgid "Paused"
 msgstr "रुका हुआ"
@@ -4988,811 +5028,813 @@ msgstr "और आइटम लोड करें (Enter)"
 msgid "Loading more..."
 msgstr "और लोड हो रहा है..."
 
-#: gui/mainframe.py:4110 gui/mainframe.py:4242
+#: gui/mainframe.py:4219 gui/mainframe.py:4351
 msgid "New article available."
 msgstr "नया लेख उपलब्ध है।"
 
-#: gui/mainframe.py:11603 gui/mainframe.py:1428 gui/mainframe.py:11569
-#: gui/mainframe.py:11782
+#: gui/mainframe.py:11748 gui/mainframe.py:1442 gui/mainframe.py:11714
+#: gui/mainframe.py:11927
 msgid "Read"
 msgstr "पठित"
 
-#: gui/mainframe.py:12528
+#: gui/mainframe.py:12673
 msgid "yt-dlp download failed"
 msgstr "yt-dlp डाउनलोड विफल"
 
-#: gui/mainframe.py:13309
+#: gui/mainframe.py:13454
 msgid "Could not update feed."
 msgstr "फ़ीड अपडेट नहीं किया जा सका।"
 
-#: gui/mainframe.py:13360
+#: gui/mainframe.py:13505
 msgid "Could not reset feed title."
 msgstr "फ़ीड का शीर्षक रीसेट नहीं किया जा सका।"
 
-#: gui/mainframe.py:629 gui/mainframe.py:608
+#: gui/mainframe.py:643 gui/mainframe.py:622
 msgid "Shortcuts"
 msgstr "शॉर्टकट"
 
-#: gui/mainframe.py:647
+#: gui/mainframe.py:661
 msgid "Feeds and folders"
 msgstr "फ़ीड और फ़ोल्डर"
 
-#: gui/mainframe.py:649
+#: gui/mainframe.py:663
 msgid "All Feeds"
 msgstr "सभी फ़ीड"
 
-#: gui/mainframe.py:656
+#: gui/mainframe.py:670
 msgid "Search articles"
 msgstr "लेख खोजें"
 
-#: gui/mainframe.py:887
+#: gui/mainframe.py:901
 msgid "Configure Persistent Search..."
 msgstr "स्थायी खोज कॉन्फ़िगर करें..."
 
-#: gui/mainframe.py:1663 gui/mainframe.py:1707 gui/mainframe.py:9143
-#: gui/mainframe.py:9272
+#: gui/mainframe.py:1677 gui/mainframe.py:1721 gui/mainframe.py:9288
+#: gui/mainframe.py:9417
 msgid "No matches."
 msgstr "कोई मेल नहीं।"
 
-#: gui/mainframe.py:2246
+#: gui/mainframe.py:2260
 msgid "&Add Feed"
 msgstr "फ़ीड &जोड़ें"
 
-#: gui/mainframe.py:2246
+#: gui/mainframe.py:2260
 msgid "Add a new RSS feed"
 msgstr "एक नई RSS फ़ीड जोड़ें"
 
-#: gui/mainframe.py:2248
+#: gui/mainframe.py:2262
 msgid "Open Media &URL..."
 msgstr "मीडिया &URL खोलें..."
 
-#: gui/mainframe.py:2249
+#: gui/mainframe.py:2263
 msgid "Stream or download media from any supported link"
 msgstr "किसी भी समर्थित लिंक से मीडिया स्ट्रीम करें या डाउनलोड करें"
 
-#: gui/mainframe.py:2252
+#: gui/mainframe.py:2266
 msgid "Scan a webpage for RSS, Atom, or JSON feed links"
 msgstr "किसी वेब पृष्ठ पर RSS, Atom या JSON फ़ीड लिंक खोजें"
 
-#: gui/mainframe.py:2254
+#: gui/mainframe.py:2268
 msgid "&Remove Feed"
 msgstr "फ़ीड हटा&एं"
 
-#: gui/mainframe.py:2254
+#: gui/mainframe.py:2268
 msgid "Remove selected feed"
 msgstr "चयनित फ़ीड हटाएं"
 
-#: gui/mainframe.py:2256
+#: gui/mainframe.py:2270
 msgid "&Refresh Feeds"
 msgstr "फ़ीड ता&ज़ा करें"
 
-#: gui/mainframe.py:2256
+#: gui/mainframe.py:2270
 msgid "Refresh all feeds"
 msgstr "सभी फ़ीड ताज़ा करें"
 
-#: gui/mainframe.py:2259
+#: gui/mainframe.py:2273
 msgid "S&top Refresh"
 msgstr "रिफ़्रेश रोकें(&T)"
 
-#: gui/mainframe.py:2260
+#: gui/mainframe.py:2274
 msgid "Stop the feed refresh currently in progress"
 msgstr "वर्तमान में चल रहे फ़ीड रिफ़्रेश को रोकें"
 
-#: gui/mainframe.py:2262
+#: gui/mainframe.py:2276
 msgid "Mark All Items as &Read"
 msgstr "सभी आइटम को &पढ़ा गया चिह्नित करें"
 
-#: gui/mainframe.py:2263
+#: gui/mainframe.py:2277
 msgid "Mark all items in all feeds as read"
 msgstr "सभी फ़ीड में सभी आइटम को पढ़ा गया चिह्नित करें"
 
-#: gui/mainframe.py:2266
+#: gui/mainframe.py:2280
 msgid "View feeds that failed to update"
 msgstr "उन फ़ीड को देखें जिन्हें अपडेट करने में विफलता हुई"
 
-#: gui/mainframe.py:2269
+#: gui/mainframe.py:2283
 msgid "Add &Category"
 msgstr "&श्रेणी जोड़ें"
 
-#: gui/mainframe.py:2269
+#: gui/mainframe.py:2283
 msgid "Add a new category"
 msgstr "एक नई श्रेणी जोड़ें"
 
-#: gui/mainframe.py:2271
+#: gui/mainframe.py:2285
 msgid "Remove C&ategory"
 msgstr "श्र&ेणी हटाएं"
 
-#: gui/mainframe.py:2271
+#: gui/mainframe.py:2285
 msgid "Remove selected category"
 msgstr "चयनित श्रेणी हटाएं"
 
-#: gui/mainframe.py:2274
+#: gui/mainframe.py:2288
 msgid "Import feeds from OPML"
 msgstr "OPML से फ़ीड आयात करें"
 
-#: gui/mainframe.py:2277
+#: gui/mainframe.py:2291
 msgid ""
 "Import YouTube subscriptions, playlists, channels, and watch-history "
 "channels"
 msgstr ""
 "YouTube सदस्यताएँ, प्लेलिस्ट, चैनल और देखने के इतिहास के चैनल आयात करें"
 
-#: gui/mainframe.py:2279
+#: gui/mainframe.py:2293
 msgid "E&xport OPML..."
 msgstr "OPML नि&र्यात करें..."
 
-#: gui/mainframe.py:2279
+#: gui/mainframe.py:2293
 msgid "Export feeds to OPML"
 msgstr "फ़ीड को OPML में निर्यात करें"
 
-#: gui/mainframe.py:2282
+#: gui/mainframe.py:2296
 msgid "Configure &Persistent Search..."
 msgstr "स्थायी खोज कॉन्फ़िगर करें(&P)..."
 
-#: gui/mainframe.py:2283
+#: gui/mainframe.py:2297
 msgid "Configure saved search queries"
 msgstr "सहेजी गई खोज क्वेरी कॉन्फ़िगर करें"
 
-#: gui/mainframe.py:2289
+#: gui/mainframe.py:2303
 msgid "E&xit"
 msgstr "बाहर नि&कलें"
 
-#: gui/mainframe.py:2289
+#: gui/mainframe.py:2303
 msgid "Exit application"
 msgstr "एप्लिकेशन से बाहर निकलें"
 
-#: gui/mainframe.py:2296
+#: gui/mainframe.py:2310
 msgid "Cut the selection"
 msgstr "चयन काटें"
 
-#: gui/mainframe.py:2297
+#: gui/mainframe.py:2311
 msgid "Copy the selection"
 msgstr "चयन कॉपी करें"
 
-#: gui/mainframe.py:2298
+#: gui/mainframe.py:2312
 msgid "Paste from the clipboard"
 msgstr "क्लिपबोर्ड से पेस्ट करें"
 
-#: gui/mainframe.py:2299
+#: gui/mainframe.py:2313
 msgid "Select all"
 msgstr "सभी चुनें"
 
-#: gui/mainframe.py:2303
+#: gui/mainframe.py:2317
 msgid "Show &Search Field"
 msgstr "&खोज फ़ील्ड दिखाएं"
 
-#: gui/mainframe.py:2304
+#: gui/mainframe.py:2318
 msgid "Show or hide the search field"
 msgstr "खोज फ़ील्ड दिखाएं या छिपाएं"
 
-#: gui/mainframe.py:2311
+#: gui/mainframe.py:2325
 msgid "&Rich Full-Text View"
 msgstr "&समृद्ध पूर्ण-पाठ दृश्य"
 
-#: gui/mainframe.py:2312
+#: gui/mainframe.py:2326
 msgid "Switch the reader between plain full text and the rich HTML view"
 msgstr "रीडर को सादे पूर्ण पाठ और समृद्ध HTML दृश्य के बीच बदलें"
 
-#: gui/mainframe.py:2351
+#: gui/mainframe.py:2365
 msgid "Article &Filter"
 msgstr "लेख &फ़िल्टर"
 
-#: gui/mainframe.py:2351
+#: gui/mainframe.py:2365
 msgid "Filter all views by read status and media"
 msgstr "सभी दृश्यों को पठन स्थिति और मीडिया के अनुसार फ़िल्टर करें"
 
-#: gui/mainframe.py:2353
+#: gui/mainframe.py:2367
 msgid "Open &Accessible Browser"
 msgstr "&सुलभ ब्राउज़र खोलें"
 
-#: gui/mainframe.py:2354
+#: gui/mainframe.py:2368
 msgid "Open the VoiceOver-friendly browser window"
 msgstr "VoiceOver-अनुकूल ब्राउज़र विंडो खोलें"
 
-#: gui/mainframe.py:2356
+#: gui/mainframe.py:2370
 msgid "Show/Hide &Player"
 msgstr "प्लेयर दिखाएं/छिपाएं"
 
-#: gui/mainframe.py:2357 gui/mainframe.py:2396
+#: gui/mainframe.py:2371 gui/mainframe.py:2410
 msgid "Show or hide the media player window"
 msgstr "मीडिया प्लेयर विंडो दिखाएं या छिपाएं"
 
-#: gui/mainframe.py:2382
+#: gui/mainframe.py:2396
 msgid "&Ascending"
 msgstr "आरोही(&A)"
 
-#: gui/mainframe.py:2383
+#: gui/mainframe.py:2397
 msgid "Sort in ascending order (default is descending by date)"
 msgstr "आरोही क्रम में क्रमबद्ध करें (डिफ़ॉल्ट तारीख़ के अनुसार अवरोही है)"
 
-#: gui/mainframe.py:2387
+#: gui/mainframe.py:2401
 msgid "Sort &By"
 msgstr "इस अनुसार क्रमबद्ध &करें"
 
-#: gui/mainframe.py:2400
+#: gui/mainframe.py:2414
 msgid "Toggle play/pause"
 msgstr "चलाएं/रोकें टॉगल करें"
 
-#: gui/mainframe.py:2403
+#: gui/mainframe.py:2417
 msgid "Stop playback"
 msgstr "प्लेबैक रोकें"
 
-#: gui/mainframe.py:2407
+#: gui/mainframe.py:2421
 msgid "Play &Queue..."
 msgstr "प्ले कतार(&Q)..."
 
-#: gui/mainframe.py:2408
+#: gui/mainframe.py:2422
 msgid "View and manage the media play queue"
 msgstr "मीडिया प्ले कतार देखें और प्रबंधित करें"
 
-#: gui/mainframe.py:2412
+#: gui/mainframe.py:2426
 msgid "Play the next item in the play queue"
 msgstr "प्ले कतार में अगला आइटम चलाएँ"
 
-#: gui/mainframe.py:2416
+#: gui/mainframe.py:2430
 msgid "Play the previous item in the play queue"
 msgstr "प्ले कतार में पिछला आइटम चलाएँ"
 
-#: gui/mainframe.py:2422
+#: gui/mainframe.py:2436
 msgid "Increase Speed"
 msgstr "गति बढ़ाएँ"
 
-#: gui/mainframe.py:2422
+#: gui/mainframe.py:2436
 msgid "Play faster"
 msgstr "तेज़ चलाएँ"
 
-#: gui/mainframe.py:2425
+#: gui/mainframe.py:2439
 msgid "Decrease Speed"
 msgstr "गति घटाएँ"
 
-#: gui/mainframe.py:2425
+#: gui/mainframe.py:2439
 msgid "Play slower"
 msgstr "धीमा चलाएँ"
 
-#: gui/mainframe.py:2428
+#: gui/mainframe.py:2442
 msgid "Normal Speed (1x)"
 msgstr "सामान्य गति (1x)"
 
-#: gui/mainframe.py:2428
+#: gui/mainframe.py:2442
 msgid "Reset to normal speed"
 msgstr "सामान्य गति पर रीसेट करें"
 
-#: gui/mainframe.py:2443
+#: gui/mainframe.py:2457
 msgid "Playback &Speed"
 msgstr "प्लेबैक गति(&S)"
 
-#: gui/mainframe.py:2447
+#: gui/mainframe.py:2461
 msgid "Adjust the audio equalizer"
 msgstr "ऑडियो इक्वलाइज़र समायोजित करें"
 
-#: gui/mainframe.py:2453
+#: gui/mainframe.py:2467
 msgid "Rewind (Ctrl+Left)"
 msgstr "रिवाइंड करें (Ctrl+बायां)"
 
-#: gui/mainframe.py:2453 gui/tray.py:111
+#: gui/mainframe.py:2467 gui/tray.py:111
 msgid "Rewind"
 msgstr "रिवाइंड करें"
 
-#: gui/mainframe.py:2454
+#: gui/mainframe.py:2468
 msgid "Fast Forward (Ctrl+Right)"
 msgstr "फ़ास्ट फ़ॉरवर्ड करें (Ctrl+दायां)"
 
-#: gui/mainframe.py:2454
+#: gui/mainframe.py:2468
 msgid "Fast forward"
 msgstr "फ़ास्ट फ़ॉरवर्ड करें"
 
-#: gui/mainframe.py:2456
+#: gui/mainframe.py:2470
 msgid "Volume Up (Ctrl+Up)"
 msgstr "वॉल्यूम बढ़ाएं (Ctrl+ऊपर)"
 
-#: gui/mainframe.py:2456
+#: gui/mainframe.py:2470
 msgid "Increase volume"
 msgstr "वॉल्यूम बढ़ाएं"
 
-#: gui/mainframe.py:2457
+#: gui/mainframe.py:2471
 msgid "Volume Down (Ctrl+Down)"
 msgstr "वॉल्यूम घटाएं (Ctrl+नीचे)"
 
-#: gui/mainframe.py:2457
+#: gui/mainframe.py:2471
 msgid "Decrease volume"
 msgstr "वॉल्यूम घटाएं"
 
-#: gui/mainframe.py:2460 gui/player.py:2161 gui/player.py:2136
+#: gui/mainframe.py:2474 gui/player.py:2161 gui/player.py:2136
 msgid "Chapters"
 msgstr "अध्याय"
 
-#: gui/mainframe.py:2472
+#: gui/mainframe.py:2486
 msgid "Find a &Podcast or RSS Feed..."
 msgstr "&पॉडकास्ट या RSS फ़ीड खोजें..."
 
-#: gui/mainframe.py:2473
+#: gui/mainframe.py:2487
 msgid "Find and add a podcast or RSS feed"
 msgstr "एक पॉडकास्ट या RSS फ़ीड खोजें और जोड़ें"
 
-#: gui/mainframe.py:2477
+#: gui/mainframe.py:2491
 msgid "Search all yt-dlp query-search sites"
 msgstr "सभी yt-dlp क्वेरी-खोज साइटों में खोजें"
 
-#: gui/mainframe.py:2481
+#: gui/mainframe.py:2495
 msgid "Filter &Rules..."
 msgstr "फ़िल्टर &नियम..."
 
-#: gui/mainframe.py:2482
+#: gui/mainframe.py:2496
 msgid "Create rules that categorize, label, or delete articles as they arrive"
 msgstr "ऐसे नियम बनाएं जो आने वाले लेखों को वर्गीकृत, लेबल या हटाते हैं"
 
-#: gui/mainframe.py:2486
+#: gui/mainframe.py:2500
 msgid "Import browser cookies so challenge-protected sites can be read"
 msgstr "ब्राउज़र कुकीज़ आयात करें ताकि सत्यापन-सुरक्षित साइटें पढ़ी जा सकें"
 
-#: gui/mainframe.py:2491
+#: gui/mainframe.py:2505
 msgid "View and customize keyboard shortcuts"
 msgstr "कीबोर्ड शॉर्टकट देखें और अनुकूलित करें"
 
-#: gui/mainframe.py:2494
+#: gui/mainframe.py:2508
 msgid "Configure application"
 msgstr "एप्लिकेशन कॉन्फ़िगर करें"
 
-#: gui/mainframe.py:2501
+#: gui/mainframe.py:2515
 msgid "Check for new versions"
 msgstr "नए संस्करणों के लिए जांचें"
 
-#: gui/mainframe.py:2504
+#: gui/mainframe.py:2518
 msgid "Announce &Version"
 msgstr "&संस्करण बताएँ"
 
-#: gui/mainframe.py:2505
+#: gui/mainframe.py:2519
 msgid "Speak the running BlindRSS version"
 msgstr "चल रहे BlindRSS का संस्करण बोलें"
 
-#: gui/mainframe.py:2510
+#: gui/mainframe.py:2524
 msgid "&Edit"
 msgstr "सं&पादित करें"
 
-#: gui/mainframe.py:2511
+#: gui/mainframe.py:2525
 msgid "&View"
 msgstr "&दृश्य"
 
-#: gui/mainframe.py:4011 gui/mainframe.py:4123 gui/mainframe.py:4157
-#: gui/mainframe.py:4261
+#: gui/mainframe.py:4120 gui/mainframe.py:4232 gui/mainframe.py:4266
+#: gui/mainframe.py:4370
 msgid "New article"
 msgstr "नया लेख"
 
-#: gui/mainframe.py:4878
+#: gui/mainframe.py:5011
 msgid "this Smart Folder"
 msgstr "यह स्मार्ट फ़ोल्डर"
 
-#: gui/mainframe.py:4948
+#: gui/mainframe.py:5081
 msgid "Open Article"
 msgstr "लेख खोलें"
 
-#: gui/mainframe.py:6116
+#: gui/mainframe.py:6249
 msgid "Scanning for audio... This may take a few seconds."
 msgstr "ऑडियो के लिए स्कैन किया जा रहा है... इसमें कुछ सेकंड लग सकते हैं।"
 
-#: gui/mainframe.py:6116 gui/mainframe.py:5019
+#: gui/mainframe.py:6249 gui/mainframe.py:5152
 msgid "Detect Audio"
 msgstr "ऑडियो का पता लगाएं"
 
-#: gui/mainframe.py:6375
+#: gui/mainframe.py:6508
 msgid "Versions"
 msgstr "संस्करण"
 
-#: gui/mainframe.py:6385
+#: gui/mainframe.py:6518
 msgid "Version content"
 msgstr "संस्करण की सामग्री"
 
-#: gui/mainframe.py:7440 gui/mainframe.py:4656
+#: gui/mainframe.py:7573 gui/mainframe.py:4789
 msgid "Add Subcategory"
 msgstr "उपश्रेणी जोड़ें"
 
-#: gui/mainframe.py:7511
+#: gui/mainframe.py:7644
 msgid " (including subcategories)"
 msgstr " (उप-श्रेणियों सहित)"
 
-#: gui/mainframe.py:7515
+#: gui/mainframe.py:7648
 msgid "This will remove the feeds and their articles."
 msgstr "इससे फ़ीड और उनके लेख हट जाएंगे।"
 
-#: gui/mainframe.py:7782 gui/mainframe.py:7886
+#: gui/mainframe.py:7915 gui/mainframe.py:8025
 msgid "Refresh complete"
 msgstr "रिफ़्रेश पूर्ण"
 
-#: gui/mainframe.py:10077
+#: gui/mainframe.py:10222
 msgid "No more occurrences of \"{term}\"."
 msgstr "\"{term}\" की और कोई घटना नहीं।"
 
-#: gui/mainframe.py:10079
+#: gui/mainframe.py:10224
 msgid "No previous occurrences of \"{term}\"."
 msgstr "\"{term}\" की पिछली कोई घटना नहीं।"
 
-#: gui/mainframe.py:11601 gui/mainframe.py:1428 gui/mainframe.py:11580
+#: gui/mainframe.py:11746 gui/mainframe.py:1442 gui/mainframe.py:11725
 msgid "Unread"
 msgstr "अपठित"
 
-#: gui/mainframe.py:11608
+#: gui/mainframe.py:11753
 msgid "Mark all items in all feeds as read?"
 msgstr "सभी फ़ीड में सभी आइटम को पढ़ा गया चिह्नित करें?"
 
-#: gui/mainframe.py:11762
+#: gui/mainframe.py:11907
 msgid "Failed to mark all items as read."
 msgstr "सभी आइटम पढ़े हुए चिह्नित नहीं किए जा सके।"
 
-#: gui/mainframe.py:12375
+#: gui/mainframe.py:12520
 msgid "Choose the format to download this item in:"
 msgstr "इस आइटम को डाउनलोड करने का प्रारूप चुनें:"
 
-#: gui/mainframe.py:12895
+#: gui/mainframe.py:13040
 msgid "Enter the address of a webpage to scan for feeds:"
 msgstr "फ़ीड खोजने के लिए वेब पृष्ठ का पता दर्ज करें:"
 
-#: gui/mainframe.py:12965
+#: gui/mainframe.py:13110
 msgid "Select a feed to subscribe to:"
 msgstr "सदस्यता के लिए एक फ़ीड चुनें:"
 
-#: gui/mainframe.py:12966
+#: gui/mainframe.py:13111
 msgid "Detected Feeds"
 msgstr "पहचानी गई फ़ीड"
 
-#: gui/mainframe.py:13388
+#: gui/mainframe.py:13533
 msgid "BlindRSS - Reading YouTube Takeout..."
 msgstr "BlindRSS - YouTube Takeout पढ़ा जा रहा है..."
 
-#: gui/mainframe.py:13410 gui/mainframe.py:13509
+#: gui/mainframe.py:13555 gui/mainframe.py:13654
 msgid "YouTube Takeout import failed."
 msgstr "YouTube Takeout आयात विफल रहा।"
 
-#: gui/mainframe.py:13455
+#: gui/mainframe.py:13600
 msgid "Choose the category for imported YouTube subscriptions:"
 msgstr "आयातित YouTube सदस्यताओं के लिए श्रेणी चुनें:"
 
-#: gui/mainframe.py:13469
+#: gui/mainframe.py:13614
 msgid "BlindRSS - Importing YouTube Takeout..."
 msgstr "BlindRSS - YouTube Takeout आयात किया जा रहा है..."
 
-#: gui/mainframe.py:13666
+#: gui/mainframe.py:13811
 msgid "Refreshing imported feeds..."
 msgstr "आयातित फ़ीड ताज़ा हो रहे हैं..."
 
-#: gui/mainframe.py:14172
+#: gui/mainframe.py:14317
 msgid "Release notes are available on GitHub."
 msgstr "रिलीज़ नोट्स GitHub पर उपलब्ध हैं।"
 
-#: gui/mainframe.py:14199
+#: gui/mainframe.py:14344
 msgid "Updating BlindRSS"
 msgstr "BlindRSS अपडेट हो रहा है"
 
-#: gui/mainframe.py:14200
+#: gui/mainframe.py:14345
 msgid "Starting update..."
 msgstr "अपडेट शुरू हो रहा है..."
 
-#: gui/mainframe.py:14274
+#: gui/mainframe.py:14419
 msgid "Choose category:"
 msgstr "श्रेणी चुनें:"
 
-#: gui/mainframe.py:14542
+#: gui/mainframe.py:14687
 msgid "Folder name"
 msgstr "फ़ोल्डर का नाम"
 
-#: gui/mainframe.py:14625 gui/mainframe.py:14534 gui/mainframe.py:8603
+#: gui/mainframe.py:14770 gui/mainframe.py:14679 gui/mainframe.py:8748
 msgid "Smart Folder"
 msgstr "स्मार्ट फ़ोल्डर"
 
-#: gui/mainframe.py:14673
+#: gui/mainframe.py:14818
 msgid "Rule name"
 msgstr "नियम का नाम"
 
-#: gui/mainframe.py:14712
+#: gui/mainframe.py:14857
 msgid "Then do this"
 msgstr "फिर यह करें"
 
-#: gui/mainframe.py:14720
+#: gui/mainframe.py:14865
 msgid "Move to category (full path, blank for none)"
 msgstr "श्रेणी में ले जाएँ (पूरा पथ, खाली = कोई नहीं)"
 
-#: gui/mainframe.py:14731
+#: gui/mainframe.py:14876
 msgid "Also show under category (label, blank for none)"
 msgstr "श्रेणी के अंतर्गत भी दिखाएँ (लेबल, खाली = कोई नहीं)"
 
-#: gui/mainframe.py:14845
+#: gui/mainframe.py:14990
 msgid "Filter rules"
 msgstr "फ़िल्टर नियम"
 
-#: gui/mainframe.py:14903
+#: gui/mainframe.py:15048
 msgid " [stop]"
 msgstr " [रोकें]"
 
-#: gui/mainframe.py:14961
+#: gui/mainframe.py:15106
 msgid "this rule"
 msgstr "यह नियम"
 
-#: gui/mainframe.py:622
+#: gui/mainframe.py:636
 msgid "OK"
 msgstr "ठीक"
 
-#: gui/mainframe.py:622
+#: gui/mainframe.py:636
 msgid "Failed"
 msgstr "विफल"
 
-#: gui/mainframe.py:626
+#: gui/mainframe.py:640
 msgid "No shortcut actions were performed."
 msgstr "शॉर्टकट से जुड़ी कोई कार्रवाई नहीं की गई।"
 
-#: gui/mainframe.py:658 gui/mainframe.py:661
+#: gui/mainframe.py:672 gui/mainframe.py:675
 msgid "Filter current view (Enter)"
 msgstr "वर्तमान दृश्य फ़िल्टर करें (Enter)"
 
-#: gui/mainframe.py:883
+#: gui/mainframe.py:897
 msgid "(No saved searches)"
 msgstr "(कोई सहेजी गई खोज नहीं)"
 
-#: gui/mainframe.py:1912 gui/mainframe.py:12022
+#: gui/mainframe.py:1926 gui/mainframe.py:12167
 msgid "Contains audio"
 msgstr "ऑडियो शामिल है"
 
-#: gui/mainframe.py:2287
+#: gui/mainframe.py:2301
 msgid "Add &Shortcuts..."
 msgstr "&शॉर्टकट जोड़ें..."
 
-#: gui/mainframe.py:2287
+#: gui/mainframe.py:2301
 msgid "Create desktop, taskbar, or Start Menu shortcuts"
 msgstr "डेस्कटॉप, टास्कबार, या स्टार्ट मेनू शॉर्टकट बनाएं"
 
-#: gui/mainframe.py:2296
+#: gui/mainframe.py:2310
 msgid "Cu&t"
 msgstr "का&टें"
 
-#: gui/mainframe.py:2297 gui/mainframe.py:9996
+#: gui/mainframe.py:2311 gui/mainframe.py:10141
 msgid "&Copy"
 msgstr "&कॉपी करें"
 
-#: gui/mainframe.py:2298
+#: gui/mainframe.py:2312
 msgid "&Paste"
 msgstr "&पेस्ट करें"
 
-#: gui/mainframe.py:2299 gui/mainframe.py:9998
+#: gui/mainframe.py:2313 gui/mainframe.py:10143
 msgid "Select &All"
 msgstr "&सभी चुनें"
 
-#: gui/mainframe.py:2325
+#: gui/mainframe.py:2339
 msgid "&All Articles"
 msgstr "&सभी लेख"
 
-#: gui/mainframe.py:2325
+#: gui/mainframe.py:2339
 msgid "Show read and unread articles in all views"
 msgstr "सभी दृश्यों में पढ़े और अपठित लेख दिखाएं"
 
-#: gui/mainframe.py:2326
+#: gui/mainframe.py:2340
 msgid "&Unread Only"
 msgstr "केवल &अपठित"
 
-#: gui/mainframe.py:2326
+#: gui/mainframe.py:2340
 msgid "Show only unread articles in all views"
 msgstr "सभी दृश्यों में केवल अपठित लेख दिखाएं"
 
-#: gui/mainframe.py:2327
+#: gui/mainframe.py:2341
 msgid "&Read Only"
 msgstr "केवल &पढ़े गए"
 
-#: gui/mainframe.py:2327
+#: gui/mainframe.py:2341
 msgid "Show only read articles in all views"
 msgstr "सभी दृश्यों में केवल पढ़े गए लेख दिखाएं"
 
-#: gui/mainframe.py:2341
+#: gui/mainframe.py:2355
 msgid "Media and &Non-media"
 msgstr "मीडिया और बिना मीडिया(&N)"
 
-#: gui/mainframe.py:2341
+#: gui/mainframe.py:2355
 msgid "Show articles whether or not they have media"
 msgstr "लेख दिखाएँ चाहे उनमें मीडिया हो या नहीं"
 
-#: gui/mainframe.py:2342
+#: gui/mainframe.py:2356
 msgid "With &Media Only"
 msgstr "केवल मीडिया वाले(&M)"
 
-#: gui/mainframe.py:2342
+#: gui/mainframe.py:2356
 msgid "Show only articles that have playable media"
 msgstr "केवल वे लेख दिखाएँ जिनमें चलाने योग्य मीडिया है"
 
-#: gui/mainframe.py:2343
+#: gui/mainframe.py:2357
 msgid "Wit&hout Media Only"
 msgstr "केवल बिना मीडिया वाले(&H)"
 
-#: gui/mainframe.py:2343
+#: gui/mainframe.py:2357
 msgid "Show only articles that have no playable media"
 msgstr "केवल वे लेख दिखाएँ जिनमें चलाने योग्य मीडिया नहीं है"
 
-#: gui/mainframe.py:2364
+#: gui/mainframe.py:2378
 msgid "&Date"
 msgstr "तारीख(&D)"
 
-#: gui/mainframe.py:2364
+#: gui/mainframe.py:2378
 msgid "Sort articles by date"
 msgstr "लेख को तारीख़ के अनुसार क्रमबद्ध करें"
 
-#: gui/mainframe.py:2365
+#: gui/mainframe.py:2379
 msgid "&Name"
 msgstr "नाम(&N)"
 
-#: gui/mainframe.py:2365
+#: gui/mainframe.py:2379
 msgid "Sort articles by name"
 msgstr "लेख को नाम के अनुसार क्रमबद्ध करें"
 
-#: gui/mainframe.py:2366
+#: gui/mainframe.py:2380
 msgid "A&uthor"
 msgstr "लेखक(&U)"
 
-#: gui/mainframe.py:2366
+#: gui/mainframe.py:2380
 msgid "Sort articles by author"
 msgstr "लेख को लेखक के अनुसार क्रमबद्ध करें"
 
-#: gui/mainframe.py:2367
+#: gui/mainframe.py:2381
 msgid "De&scription"
 msgstr "विवरण(&S)"
 
-#: gui/mainframe.py:2367
+#: gui/mainframe.py:2381
 msgid "Sort articles by description"
 msgstr "लेख को विवरण के अनुसार क्रमबद्ध करें"
 
-#: gui/mainframe.py:2368
+#: gui/mainframe.py:2382
 msgid "&Feed"
 msgstr "फ़ीड(&F)"
 
-#: gui/mainframe.py:2368
+#: gui/mainframe.py:2382
 msgid "Sort articles by feed"
 msgstr "लेख को फ़ीड के अनुसार क्रमबद्ध करें"
 
-#: gui/mainframe.py:2369
+#: gui/mainframe.py:2383
 msgid "S&tatus"
 msgstr "स्थिति(&T)"
 
-#: gui/mainframe.py:2369
+#: gui/mainframe.py:2383
 msgid "Sort articles by status"
 msgstr "लेख को स्थिति के अनुसार क्रमबद्ध करें"
 
-#: gui/mainframe.py:3020
+#: gui/mainframe.py:3034
 msgid "Play queue is empty."
 msgstr "प्ले कतार खाली है।"
 
-#: gui/mainframe.py:3505 gui/mainframe.py:3097
+#: gui/mainframe.py:3520 gui/mainframe.py:3111
 msgid "Playback speed {speed}x"
 msgstr "प्लेबैक गति {speed}x"
 
-#: gui/mainframe.py:3661
+#: gui/mainframe.py:3676
 msgid "Show chapter list"
 msgstr "अध्याय सूची दिखाएं"
 
-#: gui/mainframe.py:3671
+#: gui/mainframe.py:3686
 msgid "Previous Chapter (Ctrl+Shift+Left)"
 msgstr "पिछला अध्याय (Ctrl+Shift+बायां)"
 
-#: gui/mainframe.py:3672
+#: gui/mainframe.py:3687
 msgid "Jump to previous chapter"
 msgstr "पिछले अध्याय पर जाएं"
 
-#: gui/mainframe.py:3682
+#: gui/mainframe.py:3697
 msgid "Next Chapter (Ctrl+Shift+Right)"
 msgstr "अगला अध्याय (Ctrl+Shift+दायां)"
 
-#: gui/mainframe.py:3683
+#: gui/mainframe.py:3698
 msgid "Jump to next chapter"
 msgstr "अगले अध्याय पर जाएं"
 
-#: gui/mainframe.py:3759
+#: gui/mainframe.py:3810
+msgid "Automatic refresh paused for {minutes} minute."
+msgid_plural "Automatic refresh paused for {minutes} minutes."
+msgstr[0] "स्वचालित रिफ़्रेश {minutes} मिनट के लिए रोका गया।"
+msgstr[1] "स्वचालित रिफ़्रेश {minutes} मिनट के लिए रोका गया।"
+
+#: gui/mainframe.py:3865
 msgid "Stopping refresh..."
 msgstr "रिफ़्रेश रोका जा रहा है..."
 
-#: gui/mainframe.py:3761
-msgid "No refresh in progress"
-msgstr "कोई रिफ़्रेश जारी नहीं है"
-
-#: gui/mainframe.py:4642
+#: gui/mainframe.py:4775
 msgid "Refresh Category"
 msgstr "श्रेणी ताज़ा करें"
 
-#: gui/mainframe.py:4669
+#: gui/mainframe.py:4802
 msgid "Import OPML Here..."
 msgstr "यहां OPML आयात करें..."
 
-#: gui/mainframe.py:4672
+#: gui/mainframe.py:4805
 msgid "Export Category to OPML..."
 msgstr "श्रेणी को OPML में निर्यात करें..."
 
-#: gui/mainframe.py:4812
+#: gui/mainframe.py:4945
 msgid "The current provider does not support filter rules."
 msgstr "वर्तमान प्रदाता फ़िल्टर नियमों का समर्थन नहीं करता है।"
 
-#: gui/mainframe.py:4813 gui/mainframe.py:6958 gui/mainframe.py:7020
+#: gui/mainframe.py:4946 gui/mainframe.py:7091 gui/mainframe.py:7153
 msgid "Not Supported"
 msgstr "समर्थित नहीं"
 
-#: gui/mainframe.py:4881 gui/mainframe.py:4740
+#: gui/mainframe.py:5014 gui/mainframe.py:4873
 msgid "Delete Smart Folder"
 msgstr "स्मार्ट फ़ोल्डर हटाएं"
 
-#: gui/mainframe.py:4950
+#: gui/mainframe.py:5083
 msgid "Open in Default Browser"
 msgstr "डिफ़ॉल्ट ब्राउज़र में खोलें"
 
-#: gui/mainframe.py:4956
+#: gui/mainframe.py:5089
 msgid "Mark as &Read"
 msgstr "&पढ़ा गया चिह्नित करें"
 
-#: gui/mainframe.py:4957
+#: gui/mainframe.py:5090
 msgid "Mark as &Unread"
 msgstr "&अपठित चिह्नित करें"
 
-#: gui/mainframe.py:4967
+#: gui/mainframe.py:5100
 msgid "Delete Article\tDel"
 msgstr "लेख हटाएं\tDel"
 
-#: gui/mainframe.py:4982
+#: gui/mainframe.py:5115
 msgid "Restore Article"
 msgstr "लेख पुनर्स्थापित करें"
 
-#: gui/mainframe.py:4988
+#: gui/mainframe.py:5121
 msgid "Copy Links"
 msgstr "लिंक कॉपी करें"
 
-#: gui/mainframe.py:5000
+#: gui/mainframe.py:5133
 msgid "View Feed Description..."
 msgstr "फ़ीड विवरण देखें..."
 
-#: gui/mainframe.py:5074
+#: gui/mainframe.py:5207
 msgid "Open Play Queue..."
 msgstr "प्ले कतार खोलें..."
 
-#: gui/mainframe.py:5299 gui/mainframe.py:5290
+#: gui/mainframe.py:5432 gui/mainframe.py:5423
 msgid "Feed description"
 msgstr "फ़ीड का विवरण"
 
-#: gui/mainframe.py:6099
+#: gui/mainframe.py:6232
 msgid "Opening link."
 msgstr "लिंक खोला जा रहा है।"
 
-#: gui/mainframe.py:6358
+#: gui/mainframe.py:6491
 msgid "No change history for this article."
 msgstr "इस लेख के लिए कोई परिवर्तन इतिहास नहीं है।"
 
-#: gui/mainframe.py:6358 gui/mainframe.py:6363
+#: gui/mainframe.py:6491 gui/mainframe.py:6496
 msgid "Article History"
 msgstr "लेख इतिहास"
 
-#: gui/mainframe.py:6379
+#: gui/mainframe.py:6512
 msgid "unknown time"
 msgstr "अज्ञात समय"
 
-#: gui/mainframe.py:6380
+#: gui/mainframe.py:6513
 msgid " (current)"
 msgstr " (वर्तमान)"
 
-#: gui/mainframe.py:6434
+#: gui/mainframe.py:6567
 msgid "Chapters available"
 msgstr "अध्याय उपलब्ध हैं"
 
-#: gui/mainframe.py:6490
+#: gui/mainframe.py:6623
 msgid ", played"
 msgstr ", चलाया गया"
 
-#: gui/mainframe.py:6522
+#: gui/mainframe.py:6655
 msgid "played"
 msgstr "चलाया गया"
 
-#: gui/mainframe.py:6636
+#: gui/mainframe.py:6769
 msgid "Already in play queue."
 msgstr "पहले से प्ले कतार में है।"
 
-#: gui/mainframe.py:6957
+#: gui/mainframe.py:7090
 msgid "This provider does not support deleting articles."
 msgstr "यह प्रदाता लेखों को हटाने का समर्थन नहीं करता है।"
 
-#: gui/mainframe.py:7006
+#: gui/mainframe.py:7139
 msgid "this article"
 msgid_plural "{n} articles"
 msgstr[0] "इस लेख"
 msgstr[1] "{n} लेख"
 
-#: gui/mainframe.py:7013
+#: gui/mainframe.py:7146
 msgid ""
 "Delete {subject}? Deleted articles can be restored from the Deleted Articles"
 " view."
@@ -5800,57 +5842,53 @@ msgstr ""
 "{subject} हटाएं? हटाए गए लेखों को हटाए गए लेख दृश्य से पुनर्स्थापित किया जा "
 "सकता है।"
 
-#: gui/mainframe.py:7019
+#: gui/mainframe.py:7152
 msgid "This provider does not support permanently deleting articles."
 msgstr "यह प्रदाता लेखों को स्थायी रूप से हटाने का समर्थन नहीं करता है।"
 
-#: gui/mainframe.py:7033
+#: gui/mainframe.py:7166
 msgid "Permanently delete this article? It cannot be restored."
 msgstr "इस लेख को स्थायी रूप से हटाएं? इसे पुनर्स्थापित नहीं किया जा सकेगा।"
 
-#: gui/mainframe.py:7263
+#: gui/mainframe.py:7396
 msgid "Added to favorites"
 msgstr "पसंदीदा में जोड़ा गया"
 
-#: gui/mainframe.py:7263
+#: gui/mainframe.py:7396
 msgid "Removed from favorites"
 msgstr "पसंदीदा से हटाया गया"
 
-#: gui/mainframe.py:7331
+#: gui/mainframe.py:7464
 msgid "The Uncategorized folder cannot be renamed or moved."
 msgstr ""
 "'Uncategorized' फ़ोल्डर का नाम नहीं बदला जा सकता और न ही इसे स्थानांतरित "
 "किया जा सकता है।"
 
-#: gui/mainframe.py:7489 gui/mainframe.py:7481
+#: gui/mainframe.py:7622 gui/mainframe.py:7614
 msgid "Please select a category to remove."
 msgstr "कृपया हटाने के लिए एक श्रेणी चुनें।"
 
-#: gui/mainframe.py:7587
+#: gui/mainframe.py:7720
 msgid "Warning"
 msgstr "चेतावनी"
 
-#: gui/mainframe.py:7884
-msgid "Refresh stopped"
-msgstr "रिफ़्रेश रोका गया"
-
-#: gui/mainframe.py:8977 gui/mainframe.py:9858
+#: gui/mainframe.py:9122 gui/mainframe.py:10003
 msgid "Loading..."
 msgstr "लोड हो रहा है..."
 
-#: gui/mainframe.py:12022 gui/mainframe.py:12029
+#: gui/mainframe.py:12167 gui/mainframe.py:12174
 msgid "No audio"
 msgstr "कोई ऑडियो नहीं"
 
-#: gui/mainframe.py:12335 gui/mainframe.py:12354
+#: gui/mainframe.py:12480 gui/mainframe.py:12499
 msgid "No downloadable media found for this item."
 msgstr "इस आइटम के लिए कोई डाउनलोड करने योग्य मीडिया नहीं मिला।"
 
-#: gui/mainframe.py:12338 gui/mainframe.py:12357 gui/mainframe.py:14409
+#: gui/mainframe.py:12483 gui/mainframe.py:12502 gui/mainframe.py:14554
 msgid "Downloads disabled"
 msgstr "डाउनलोड अक्षम"
 
-#: gui/mainframe.py:12361
+#: gui/mainframe.py:12506
 msgid ""
 "This item is a direct media file, so it can only be downloaded in its "
 "original format."
@@ -5858,23 +5896,23 @@ msgstr ""
 "यह आइटम एक सीधी मीडिया फ़ाइल है, इसलिए इसे केवल इसके मूल प्रारूप में ही "
 "डाउनलोड किया जा सकता है।"
 
-#: gui/mainframe.py:12949
+#: gui/mainframe.py:13094
 msgid "No feeds detected on this page."
 msgstr "इस पृष्ठ पर कोई फ़ीड नहीं मिली।"
 
-#: gui/mainframe.py:13103
+#: gui/mainframe.py:13248
 msgid "Failed to add feed."
 msgstr "फ़ीड जोड़ने में विफल।"
 
-#: gui/mainframe.py:13133
+#: gui/mainframe.py:13278
 msgid "BlindRSS - Removing feed..."
 msgstr "BlindRSS - फ़ीड हटाया जा रहा है..."
 
-#: gui/mainframe.py:13181
+#: gui/mainframe.py:13326
 msgid "Please try again."
 msgstr "कृपया पुनः प्रयास करें।"
 
-#: gui/mainframe.py:13275
+#: gui/mainframe.py:13420
 msgid ""
 "This provider does not support changing the feed URL.\n"
 "The title and category will be updated, but the URL will stay the same."
@@ -5882,50 +5920,50 @@ msgstr ""
 "यह प्रदाता फ़ीड URL बदलने का समर्थन नहीं करता है।\n"
 "शीर्षक और श्रेणी अपडेट की जाएंगी, लेकिन URL वही रहेगा।"
 
-#: gui/mainframe.py:13279
+#: gui/mainframe.py:13424
 msgid "Feed URL not supported"
 msgstr "फ़ीड URL समर्थित नहीं है"
 
-#: gui/mainframe.py:13369
+#: gui/mainframe.py:13514
 msgid "BlindRSS - Importing OPML..."
 msgstr "BlindRSS - OPML आयात हो रहा है..."
 
-#: gui/mainframe.py:13417
+#: gui/mainframe.py:13562
 msgid "Subscribed channels ({count})"
 msgstr "सदस्यता लिए गए चैनल ({count})"
 
-#: gui/mainframe.py:13418
+#: gui/mainframe.py:13563
 msgid "Channels from watch history ({count})"
 msgstr "देखने के इतिहास से चैनल ({count})"
 
-#: gui/mainframe.py:13419
+#: gui/mainframe.py:13564
 msgid "Owned channels ({count})"
 msgstr "स्वामित्व वाले चैनल ({count})"
 
-#: gui/mainframe.py:13420
+#: gui/mainframe.py:13565
 msgid "Playlists ({count})"
 msgstr "प्लेलिस्ट ({count})"
 
-#: gui/mainframe.py:13437
+#: gui/mainframe.py:13582
 msgid "Select at least one item type to import."
 msgstr "आयात करने के लिए कम से कम एक आइटम प्रकार चुनें।"
 
-#: gui/mainframe.py:13443
+#: gui/mainframe.py:13588
 msgid "No subscribable items were selected."
 msgstr "सदस्यता लेने योग्य कोई आइटम नहीं चुना गया।"
 
-#: gui/mainframe.py:13719
+#: gui/mainframe.py:13864
 msgid "Import successful."
 msgstr "आयात सफल।"
 
-#: gui/mainframe.py:13721
+#: gui/mainframe.py:13866
 msgid ""
 "Import failed. Please check the latest opml_debug_*.log in the temporary "
 "directory."
 msgstr ""
 "आयात विफल। कृपया अस्थायी निर्देशिका में नवीनतम opml_debug_*.log जांचें।"
 
-#: gui/mainframe.py:14173
+#: gui/mainframe.py:14318
 msgid ""
 "A new version of BlindRSS is available ({version}).\n"
 "\n"
@@ -5939,11 +5977,11 @@ msgstr ""
 "\n"
 "क्या अभी इस अपडेट को डाउनलोड और इंस्टॉल करें?"
 
-#: gui/mainframe.py:14178
+#: gui/mainframe.py:14323
 msgid "Update Available"
 msgstr "अपडेट उपलब्ध है"
 
-#: gui/mainframe.py:14186
+#: gui/mainframe.py:14331
 msgid ""
 "Auto-update is only available in the packaged app build.\n"
 "Download the latest release from GitHub."
@@ -5951,52 +5989,52 @@ msgstr ""
 "ऑटो-अपडेट केवल पैकेज्ड ऐप बिल्ड में उपलब्ध है।\n"
 "GitHub से नवीनतम रिलीज़ डाउनलोड करें।"
 
-#: gui/mainframe.py:14255
+#: gui/mainframe.py:14400
 msgid "Update Failed"
 msgstr "अपडेट विफल"
 
-#: gui/mainframe.py:14382
+#: gui/mainframe.py:14527
 msgid "The media player could not be opened, so this link cannot be streamed."
 msgstr ""
 "मीडिया प्लेयर नहीं खोला जा सका, इसलिए इस लिंक को स्ट्रीम नहीं किया जा सकता।"
 
-#: gui/mainframe.py:14547
+#: gui/mainframe.py:14692
 msgid "Show articles that match"
 msgstr "मेल खाने वाले लेख दिखाएं"
 
-#: gui/mainframe.py:14656
+#: gui/mainframe.py:14801
 msgid "Filter Rule"
 msgstr "फ़िल्टर नियम"
 
-#: gui/mainframe.py:14678
+#: gui/mainframe.py:14823
 msgid "Apply this rule to articles that match"
 msgstr "इस नियम को मेल खाने वाले लेखों पर लागू करें"
 
-#: gui/mainframe.py:14735
+#: gui/mainframe.py:14880
 msgid "Mark as &read"
 msgstr "&पढ़ा गया चिह्नित करें"
 
-#: gui/mainframe.py:14737
+#: gui/mainframe.py:14882
 msgid "Mark as &favorite"
 msgstr "&पसंदीदा चिह्नित करें"
 
-#: gui/mainframe.py:14739
+#: gui/mainframe.py:14884
 msgid "&Delete (uses the configured delete behavior)"
 msgstr "&हटाएं (कॉन्फ़िगर किए गए हटाने के व्यवहार का उपयोग करता है)"
 
-#: gui/mainframe.py:14741
+#: gui/mainframe.py:14886
 msgid "Skip &notification"
 msgstr "सूचना &छोड़ें"
 
-#: gui/mainframe.py:14747
+#: gui/mainframe.py:14892
 msgid "&Stop processing later rules when this rule matches"
 msgstr "जब यह नियम मेल खाता है तो बाद के नियमों को संसाधित करना &रोकें"
 
-#: gui/mainframe.py:14750
+#: gui/mainframe.py:14895
 msgid "Rule &enabled"
 msgstr "नियम &सक्षम"
 
-#: gui/mainframe.py:14809
+#: gui/mainframe.py:14954
 msgid ""
 "Choose at least one action for this rule (move, label, mark, delete, or skip"
 " notification)."
@@ -6004,35 +6042,35 @@ msgstr ""
 "इस नियम के लिए कम से कम एक क्रिया चुनें (स्थानांतरित करें, लेबल करें, "
 "चिह्नित करें, हटाएं, या सूचना छोड़ें)।"
 
-#: gui/mainframe.py:14810
+#: gui/mainframe.py:14955
 msgid "No Actions"
 msgstr "कोई क्रिया नहीं"
 
-#: gui/mainframe.py:14850
+#: gui/mainframe.py:14995
 msgid "&Add..."
 msgstr "&जोड़ें..."
 
-#: gui/mainframe.py:14851
+#: gui/mainframe.py:14996
 msgid "&Edit..."
 msgstr "&संपादित करें..."
 
-#: gui/mainframe.py:14855
+#: gui/mainframe.py:15000
 msgid "En&able/Disable"
 msgstr "&सक्षम/अक्षम करें"
 
-#: gui/mainframe.py:14856
+#: gui/mainframe.py:15001
 msgid "Apply to E&xisting Articles"
 msgstr "मौजूदा लेखों पर &लागू करें"
 
-#: gui/mainframe.py:14899
+#: gui/mainframe.py:15044
 msgid "{name}: if {condition} then {actions}"
 msgstr "{name}: यदि {condition} तो {actions}"
 
-#: gui/mainframe.py:14964
+#: gui/mainframe.py:15109
 msgid "Delete Rule"
 msgstr "नियम हटाएं"
 
-#: gui/mainframe.py:15003
+#: gui/mainframe.py:15148
 msgid ""
 "Run all enabled rules against every existing article now? This may move, "
 "label, or delete articles."
@@ -6040,155 +6078,163 @@ msgstr ""
 "क्या अभी सभी सक्षम नियमों को हर मौजूदा लेख पर चलाना है? इससे लेख "
 "स्थानांतरित, लेबल या हटाए जा सकते हैं।"
 
-#: gui/mainframe.py:15007
+#: gui/mainframe.py:15152
 msgid "Apply to Existing Articles"
 msgstr "मौजूदा लेखों पर लागू करें"
 
-#: gui/mainframe.py:15040
+#: gui/mainframe.py:15185
 msgid "Filter Rules Applied"
 msgstr "फ़िल्टर नियम लागू किए गए"
 
-#: gui/mainframe.py:503
+#: gui/mainframe.py:517
 msgid "Missing recommended tools:"
 msgstr "अनुशंसित उपकरण गायब हैं:"
 
-#: gui/mainframe.py:569
+#: gui/mainframe.py:583
 msgid "Install Incomplete"
 msgstr "स्थापना अधूरी"
 
-#: gui/mainframe.py:575
+#: gui/mainframe.py:589
 msgid "Dependencies installed and PATH updated. A restart is recommended."
 msgstr ""
 "निर्भरताएं स्थापित हो गई हैं और PATH अपडेट हो गया है। पुनः आरंभ करने की सलाह"
 " दी जाती है।"
 
-#: gui/mainframe.py:576 gui/mainframe.py:6133
+#: gui/mainframe.py:590 gui/mainframe.py:6266
 msgid "Success"
 msgstr "सफलता"
 
-#: gui/mainframe.py:3030
+#: gui/mainframe.py:3044
 msgid "End of play queue."
 msgstr "प्ले कतार का अंत।"
 
-#: gui/mainframe.py:3030
+#: gui/mainframe.py:3044
 msgid "Start of play queue."
 msgstr "प्ले कतार की शुरुआत।"
 
-#: gui/mainframe.py:3244
+#: gui/mainframe.py:3259
 msgid "BlindRSS version {version}"
 msgstr "BlindRSS संस्करण {version}"
 
-#: gui/mainframe.py:3629 gui/player.py:2354
+#: gui/mainframe.py:3644 gui/player.py:2354
 msgid "No chapters available"
 msgstr "कोई अध्याय उपलब्ध नहीं"
 
-#: gui/mainframe.py:3660
+#: gui/mainframe.py:3675
 msgid "Show Chapters..."
 msgstr "अध्याय दिखाएं..."
 
-#: gui/mainframe.py:4326
+#: gui/mainframe.py:3869
+msgid "No refresh in progress"
+msgstr "कोई रिफ़्रेश जारी नहीं है"
+
+#: gui/mainframe.py:4435
 msgid "Refreshing feed..."
 msgstr "फ़ीड ताज़ा हो रहा है..."
 
-#: gui/mainframe.py:4660
+#: gui/mainframe.py:4793
 msgid "Edit Category"
 msgstr "श्रेणी संपादित करें"
 
-#: gui/mainframe.py:4666
+#: gui/mainframe.py:4799
 msgid "Delete Category and Feeds"
 msgstr "श्रेणी और फ़ीड हटाएं"
 
-#: gui/mainframe.py:4684
+#: gui/mainframe.py:4817
 msgid "Mark all items in this feed as read?"
 msgstr "इस फ़ीड में सभी आइटम को पढ़ा गया चिह्नित करें?"
 
-#: gui/mainframe.py:4707
+#: gui/mainframe.py:4840
 msgid "Notifications for This Feed"
 msgstr "इस फ़ीड के लिए सूचनाएं"
 
-#: gui/mainframe.py:4974
+#: gui/mainframe.py:5107
 msgid "Delete Article Permanently\tDel"
 msgstr "लेख स्थायी रूप से हटाएं\tDel"
 
-#: gui/mainframe.py:5094
+#: gui/mainframe.py:5227
 msgid "Chapter Links"
 msgstr "अध्याय लिंक"
 
-#: gui/mainframe.py:5303
+#: gui/mainframe.py:5436
 msgid "Copy"
 msgstr "कॉपी करें"
 
-#: gui/mainframe.py:6380
+#: gui/mainframe.py:6513
 msgid " (original)"
 msgstr " (मूल)"
 
-#: gui/mainframe.py:6526
+#: gui/mainframe.py:6659
 msgid "not played"
 msgstr "नहीं चलाया गया"
 
-#: gui/mainframe.py:6972
+#: gui/mainframe.py:7105
 msgid "Confirm Delete"
 msgstr "हटाने की पुष्टि करें"
 
-#: gui/mainframe.py:7010
+#: gui/mainframe.py:7143
 msgid "Move {subject} to the '{category}' category?"
 msgstr "{subject} को '{category}' श्रेणी में ले जाएं?"
 
-#: gui/mainframe.py:7012
+#: gui/mainframe.py:7145
 msgid "Permanently delete {subject}? This cannot be undone."
 msgstr "{subject} को स्थायी रूप से हटाएं? इसे पूर्ववत नहीं किया जा सकेगा।"
 
-#: gui/mainframe.py:7038
+#: gui/mainframe.py:7171
 msgid "Confirm Permanent Delete"
 msgstr "स्थायी रूप से हटाने की पुष्टि करें"
 
-#: gui/mainframe.py:7118
+#: gui/mainframe.py:7251
 msgid "Could not delete article."
 msgid_plural "Could not delete {n} articles."
 msgstr[0] "लेख हटाया नहीं जा सका।"
 msgstr[1] "{n} लेख हटाए नहीं जा सके।"
 
-#: gui/mainframe.py:7380
+#: gui/mainframe.py:7513
 msgid "Could not move category."
 msgstr "श्रेणी स्थानांतरित नहीं की जा सकी।"
 
-#: gui/mainframe.py:7385
+#: gui/mainframe.py:7518
 msgid "Could not rename category."
 msgstr "श्रेणी का नाम नहीं बदला जा सका।"
 
-#: gui/mainframe.py:7397
+#: gui/mainframe.py:7530
 msgid "Category name:"
 msgstr "श्रेणी का नाम:"
 
-#: gui/mainframe.py:7439
+#: gui/mainframe.py:7572
 msgid "Enter subcategory name (under '{category}'):"
 msgstr "उपश्रेणी का नाम दर्ज करें ('{category}' के अंतर्गत):"
 
-#: gui/mainframe.py:10617 gui/mainframe.py:11146
+#: gui/mainframe.py:8022
+msgid "Refresh stopped"
+msgstr "रिफ़्रेश रोका गया"
+
+#: gui/mainframe.py:10762 gui/mainframe.py:11291
 msgid "Full-text extraction failed. Showing feed content."
 msgstr "पूर्ण-पाठ निष्कर्षण विफल रहा। फ़ीड सामग्री दिखाई जा रही है।"
 
-#: gui/mainframe.py:10618 gui/mainframe.py:11144
+#: gui/mainframe.py:10763 gui/mainframe.py:11289
 msgid "No webpage URL for this item. Showing feed content."
 msgstr "इस आइटम के लिए कोई वेबपेज URL नहीं है। फ़ीड सामग्री दिखाई जा रही है।"
 
-#: gui/mainframe.py:11304
+#: gui/mainframe.py:11449
 msgid "Chapters ({count}):"
 msgstr "अध्याय ({count}):"
 
-#: gui/mainframe.py:11615 gui/mainframe.py:11770
+#: gui/mainframe.py:11760 gui/mainframe.py:11915
 msgid "Mark All as Read"
 msgstr "सभी को पढ़ा गया चिह्नित करें"
 
-#: gui/mainframe.py:11770
+#: gui/mainframe.py:11915
 msgid "All items are already marked as read."
 msgstr "सभी आइटम पहले से ही पढ़ा गया चिह्नित हैं।"
 
-#: gui/mainframe.py:11938
+#: gui/mainframe.py:12083
 msgid "Custom command failed"
 msgstr "कस्टम कमांड विफल"
 
-#: gui/mainframe.py:12710
+#: gui/mainframe.py:12855
 msgid ""
 "{error}\n"
 "\n"
@@ -6198,35 +6244,35 @@ msgstr ""
 "\n"
 "इस Windows सत्र में ब्राउज़र कुकीज़ पढ़ी नहीं जा सकीं (Chromium ऐप-बाउंड एन्क्रिप्शन)। यदि इस आइटम के लिए लॉगिन आवश्यक है, तो अपने ब्राउज़र से cookies.txt निर्यात करें और उसे सेटिंग्स में निर्धारित करें।"
 
-#: gui/mainframe.py:12719 gui/mainframe.py:12788 gui/mainframe.py:12659
+#: gui/mainframe.py:12864 gui/mainframe.py:12933 gui/mainframe.py:12804
 msgid "Download error"
 msgstr "डाउनलोड त्रुटि"
 
-#: gui/mainframe.py:12723 gui/mainframe.py:12792 gui/mainframe.py:12660
+#: gui/mainframe.py:12868 gui/mainframe.py:12937 gui/mainframe.py:12805
 msgid "Download failed: {title}"
 msgstr "डाउनलोड विफल: {title}"
 
-#: gui/mainframe.py:12748 gui/mainframe.py:14457
+#: gui/mainframe.py:12893 gui/mainframe.py:14602
 msgid "Downloading: {title}"
 msgstr "डाउनलोड हो रहा है: {title}"
 
-#: gui/mainframe.py:13172
+#: gui/mainframe.py:13317
 msgid "Could not remove feed."
 msgstr "फ़ीड हटाया नहीं जा सका।"
 
-#: gui/mainframe.py:13229
+#: gui/mainframe.py:13374
 msgid "This provider does not support editing feeds."
 msgstr "यह प्रदाता फ़ीड संपादित करने का समर्थन नहीं करता है।"
 
-#: gui/mainframe.py:13229 gui/mainframe.py:13329
+#: gui/mainframe.py:13374 gui/mainframe.py:13474
 msgid "Not supported"
 msgstr "समर्थित नहीं"
 
-#: gui/mainframe.py:13328
+#: gui/mainframe.py:13473
 msgid "This provider does not support resetting feed titles."
 msgstr "यह प्रदाता फ़ीड शीर्षकों को रीसेट करने का समर्थन नहीं करता है।"
 
-#: gui/mainframe.py:13518
+#: gui/mainframe.py:13663
 msgid ""
 "YouTube Takeout import complete.\n"
 "\n"
@@ -6248,35 +6294,35 @@ msgstr ""
 "\n"
 "आयातित फ़ीड सामान्य पृष्ठभूमि ताज़ाकरण के दौरान अपडेट होंगी।"
 
-#: gui/mainframe.py:13588
+#: gui/mainframe.py:13733
 msgid "Refreshing category: {title}..."
 msgstr "श्रेणी ताज़ा हो रही है: {title}..."
 
-#: gui/mainframe.py:13764
+#: gui/mainframe.py:13909
 msgid "Export failed for category \"{category}\"."
 msgstr "श्रेणी \"{category}\" का निर्यात विफल।"
 
-#: gui/mainframe.py:13772
+#: gui/mainframe.py:13917
 msgid "Export \"{category}\" Category OPML"
 msgstr "श्रेणी \"{category}\" का OPML निर्यात करें"
 
-#: gui/mainframe.py:14148
+#: gui/mainframe.py:14293
 msgid "Update Check Failed"
 msgstr "अपडेट जांच विफल"
 
-#: gui/mainframe.py:14153
+#: gui/mainframe.py:14298
 msgid "No Updates"
 msgstr "कोई अपडेट नहीं"
 
-#: gui/mainframe.py:14158
+#: gui/mainframe.py:14303
 msgid "Unable to determine update status."
 msgstr "अपडेट स्थिति निर्धारित करने में असमर्थ।"
 
-#: gui/mainframe.py:14280 gui/mainframe.py:12887
+#: gui/mainframe.py:14425 gui/mainframe.py:13032
 msgid "BlindRSS - Adding feed {url}..."
 msgstr "BlindRSS - फ़ीड {url} जोड़ा जा रहा है..."
 
-#: gui/mainframe.py:14355
+#: gui/mainframe.py:14500
 msgid ""
 "That does not look like a media link. Enter a full web address, for example "
 "https://www.youtube.com/watch?v=..."
@@ -6284,57 +6330,57 @@ msgstr ""
 "यह मीडिया लिंक जैसा नहीं लगता। पूरा वेब पता दर्ज करें, उदाहरण के लिए "
 "https://www.youtube.com/watch?v=..."
 
-#: gui/mainframe.py:14358
+#: gui/mainframe.py:14503
 msgid "Enter the address of the media you want to open."
 msgstr "उस मीडिया का पता दर्ज करें जिसे आप खोलना चाहते हैं।"
 
-#: gui/mainframe.py:14393 gui/mainframe.py:14448
+#: gui/mainframe.py:14538 gui/mainframe.py:14593
 msgid "Opening: {title}"
 msgstr "खोला जा रहा है: {title}"
 
-#: gui/mainframe.py:14539
+#: gui/mainframe.py:14684
 msgid "Folder &name:"
 msgstr "फ़ोल्डर का &नाम:"
 
-#: gui/mainframe.py:14548 gui/mainframe.py:14679
+#: gui/mainframe.py:14693 gui/mainframe.py:14824
 msgid "All conditions (AND)"
 msgstr "सभी शर्तें (AND)"
 
-#: gui/mainframe.py:14548 gui/mainframe.py:14679
+#: gui/mainframe.py:14693 gui/mainframe.py:14824
 msgid "Any condition (OR)"
 msgstr "कोई भी शर्त (OR)"
 
-#: gui/mainframe.py:14556 gui/mainframe.py:14688
+#: gui/mainframe.py:14701 gui/mainframe.py:14833
 msgid "Field"
 msgstr "फ़ील्ड"
 
-#: gui/mainframe.py:14557 gui/mainframe.py:14689
+#: gui/mainframe.py:14702 gui/mainframe.py:14834
 msgid "Condition"
 msgstr "स्थिति"
 
-#: gui/mainframe.py:14558 gui/mainframe.py:14690
+#: gui/mainframe.py:14703 gui/mainframe.py:14835
 msgid "Value"
 msgstr "मान"
 
-#: gui/mainframe.py:14670
+#: gui/mainframe.py:14815
 msgid "Rule &name:"
 msgstr "नियम का &नाम:"
 
-#: gui/mainframe.py:14714
+#: gui/mainframe.py:14859
 msgid "&Move to category:"
 msgstr "श्रेणी में &स्थानांतरित करें:"
 
-#: gui/mainframe.py:14725
+#: gui/mainframe.py:14870
 msgid "Also &label with category:"
 msgstr "इसके साथ भी &लेबल करें:"
 
-#: gui/mainframe.py:14839
+#: gui/mainframe.py:14984
 msgid "Rules run top to bottom for each incoming article, like email filters."
 msgstr ""
 "नियम प्रत्येक आने वाले लेख के लिए ऊपर से नीचे तक चलते हैं, ईमेल फ़िल्टर की "
 "तरह।"
 
-#: gui/mainframe.py:511
+#: gui/mainframe.py:525
 msgid ""
 "Would you like to install them automatically (via winget/Ninite) and add them to PATH?\n"
 "\n"
@@ -6344,181 +6390,181 @@ msgstr ""
 "\n"
 "सुझाव: आप इस संकेत को सेटिंग्स > YouTube में अक्षम कर सकते हैं।"
 
-#: gui/mainframe.py:1733 gui/mainframe.py:1685 gui/mainframe.py:2072
+#: gui/mainframe.py:1747 gui/mainframe.py:1699 gui/mainframe.py:2086
 msgid "Filter: {count} of {total}"
 msgstr "फ़िल्टर: {total} में से {count}"
 
-#: gui/mainframe.py:1858
+#: gui/mainframe.py:1872
 msgid "{elapsed} / {total} ({remaining} left)"
 msgstr "{elapsed} / {total} ({remaining} शेष)"
 
-#: gui/mainframe.py:2439
+#: gui/mainframe.py:2453
 msgid "{speed}x"
 msgstr "{speed}x"
 
-#: gui/mainframe.py:4694
+#: gui/mainframe.py:4827
 msgid "Edit Feed..."
 msgstr "फ़ीड संपादित करें..."
 
-#: gui/mainframe.py:4733 gui/mainframe.py:4742
+#: gui/mainframe.py:4866 gui/mainframe.py:4875
 msgid "New Smart Folder..."
 msgstr "नया स्मार्ट फ़ोल्डर..."
 
-#: gui/mainframe.py:4880
+#: gui/mainframe.py:5013
 msgid "Delete Smart Folder \"{name}\"? Your articles are not affected."
 msgstr "स्मार्ट फ़ोल्डर \"{name}\" हटाएं? आपके लेख प्रभावित नहीं होंगे।"
 
-#: gui/mainframe.py:4953
+#: gui/mainframe.py:5086
 msgid "Mark {count} as &Read"
 msgstr "{count} को &पढ़ा गया चिह्नित करें"
 
-#: gui/mainframe.py:4954
+#: gui/mainframe.py:5087
 msgid "Mark {count} as &Unread"
 msgstr "{count} को &अपठित चिह्नित करें"
 
-#: gui/mainframe.py:4965
+#: gui/mainframe.py:5098
 msgid "Delete {count} Articles\tDel"
 msgstr "{count} लेख हटाएं\tDel"
 
-#: gui/mainframe.py:4980
+#: gui/mainframe.py:5113
 msgid "Restore {count} Articles"
 msgstr "{count} लेख पुनर्स्थापित करें"
 
-#: gui/mainframe.py:4994
+#: gui/mainframe.py:5127
 msgid "Copy Text ({count} articles)"
 msgstr "टेक्स्ट कॉपी करें ({count} लेख)"
 
-#: gui/mainframe.py:5016
+#: gui/mainframe.py:5149
 msgid "Download As..."
 msgstr "इस रूप में डाउनलोड करें..."
 
-#: gui/mainframe.py:5023
+#: gui/mainframe.py:5156
 msgid "Copy Image Link"
 msgstr "छवि लिंक कॉपी करें"
 
-#: gui/mainframe.py:5099
+#: gui/mainframe.py:5232
 msgid "Remove from Favorites"
 msgstr "पसंदीदा से हटाएं"
 
-#: gui/mainframe.py:5101
+#: gui/mainframe.py:5234
 msgid "Add to Favorites"
 msgstr "पसंदीदा में जोड़ें"
 
-#: gui/mainframe.py:5112
+#: gui/mainframe.py:5245
 msgid "View History..."
 msgstr "इतिहास देखें..."
 
-#: gui/mainframe.py:6139
+#: gui/mainframe.py:6272
 msgid "No audio found."
 msgstr "कोई ऑडियो नहीं मिला।"
 
-#: gui/mainframe.py:6139
+#: gui/mainframe.py:6272
 msgid "Result"
 msgstr "परिणाम"
 
-#: gui/mainframe.py:6369
+#: gui/mainframe.py:6502
 msgid "{total} versions of: {title}"
 msgstr "{title} के {total} संस्करण"
 
-#: gui/mainframe.py:6381
+#: gui/mainframe.py:6514
 msgid "Version {num} - {when}{suffix}"
 msgstr "संस्करण {num} - {when}{suffix}"
 
-#: gui/mainframe.py:6492
+#: gui/mainframe.py:6625
 msgid ", {position} of {total}"
 msgstr ", {total} में से {position}"
 
-#: gui/mainframe.py:6496
+#: gui/mainframe.py:6629
 msgid ", {total}"
 msgstr ", {total}"
 
-#: gui/mainframe.py:6498
+#: gui/mainframe.py:6631
 msgid ", {position} played"
 msgstr ", {position} चलाया गया"
 
-#: gui/mainframe.py:6633
+#: gui/mainframe.py:6766
 msgid "Added {count} to play queue ({total} queued)."
 msgstr "{count} को प्ले कतार में जोड़ा गया (कतार में {total})।"
 
-#: gui/mainframe.py:6654
+#: gui/mainframe.py:6787
 msgid "Removed {count} from play queue ({total} queued)."
 msgstr "{count} को प्ले कतार से हटाया गया (कतार में {total})।"
 
-#: gui/mainframe.py:7035
+#: gui/mainframe.py:7168
 msgid "Permanently delete {count} articles? They cannot be restored."
 msgstr ""
 "{count} लेखों को स्थायी रूप से हटाएं? उन्हें पुनर्स्थापित नहीं किया जा "
 "सकेगा।"
 
-#: gui/mainframe.py:7203
+#: gui/mainframe.py:7336
 msgid "Could not restore article."
 msgstr "लेख पुनर्स्थापित नहीं किया जा सका।"
 
-#: gui/mainframe.py:7409
+#: gui/mainframe.py:7542
 msgid "Parent category:"
 msgstr "मूल श्रेणी:"
 
-#: gui/mainframe.py:7430
+#: gui/mainframe.py:7563
 msgid "Could not add category."
 msgstr "श्रेणी नहीं जोड़ी जा सकी।"
 
-#: gui/mainframe.py:7448
+#: gui/mainframe.py:7581
 msgid "Could not add subcategory."
 msgstr "उपश्रेणी नहीं जोड़ी जा सकी।"
 
-#: gui/mainframe.py:7513
+#: gui/mainframe.py:7646
 msgid "Delete category '{title}'{note} and its {count} feed?"
 msgid_plural "Delete category '{title}'{note} and its {count} feeds?"
 msgstr[0] "श्रेणी '{title}'{note} और उसकी {count} फ़ीड हटाएं?"
 msgstr[1] "श्रेणी '{title}'{note} और उसकी {count} फ़ीड हटाएं?"
 
-#: gui/mainframe.py:7579
+#: gui/mainframe.py:7712
 msgid "Category '{title}' could not be deleted."
 msgstr "श्रेणी '{title}' को हटाया नहीं जा सका।"
 
-#: gui/mainframe.py:7584
+#: gui/mainframe.py:7717
 msgid "{n} feed could not be removed."
 msgid_plural "{n} feeds could not be removed."
 msgstr[0] "{n} फ़ीड हटाई नहीं जा सकी।"
 msgstr[1] "{n} फ़ीड हटाई नहीं जा सकीं।"
 
-#: gui/mainframe.py:7900
+#: gui/mainframe.py:8039
 msgid "Error checking: {title} ({done} out of {total})"
 msgstr "जाँचने में त्रुटि: {title} ({total} में से {done})"
 
-#: gui/mainframe.py:7904
+#: gui/mainframe.py:8043
 msgid "Checked {done} out of {total}"
 msgstr "{total} में से {done} जाँचे गए"
 
-#: gui/mainframe.py:7916
+#: gui/mainframe.py:8055
 msgid "Error checking: {title}"
 msgstr "जाँचने में त्रुटि: {title}"
 
-#: gui/mainframe.py:7918
+#: gui/mainframe.py:8057
 msgid "Checked: {title}"
 msgstr "जाँचा गया: {title}"
 
-#: gui/mainframe.py:8598
+#: gui/mainframe.py:8743
 msgid "Smart Folders"
 msgstr "स्मार्ट फ़ोल्डर"
 
-#: gui/mainframe.py:11170
+#: gui/mainframe.py:11315
 msgid "No text available.\n"
 msgstr "कोई पाठ उपलब्ध नहीं।\n"
 
-#: gui/mainframe.py:11311
+#: gui/mainframe.py:11456
 msgid ". Link: {url}"
 msgstr "। लिंक: {url}"
 
-#: gui/mainframe.py:12779 gui/mainframe.py:12679
+#: gui/mainframe.py:12924 gui/mainframe.py:12824
 msgid "Download complete"
 msgstr "डाउनलोड पूर्ण"
 
-#: gui/mainframe.py:12782 gui/mainframe.py:12682
+#: gui/mainframe.py:12927 gui/mainframe.py:12827
 msgid "Download complete: {title}"
 msgstr "डाउनलोड पूर्ण: {title}"
 
-#: gui/mainframe.py:12924
+#: gui/mainframe.py:13069
 msgid ""
 "BlindRSS could not complete this site's browser verification page automatically.\n"
 "\n"
@@ -6528,47 +6574,47 @@ msgstr ""
 "\n"
 "आप अब भी साइट को अपने वेब ब्राउज़र में खोल सकते हैं, cookies.txt एक्सटेंशन से इसकी कुकीज़ निर्यात कर सकते हैं, फिर उपकरण > साइट कुकीज़ आयात करें का उपयोग कर सकते हैं।"
 
-#: gui/mainframe.py:12931
+#: gui/mainframe.py:13076
 msgid "Unable to retrieve the page."
 msgstr "पृष्ठ प्राप्त नहीं किया जा सका।"
 
-#: gui/mainframe.py:13110
+#: gui/mainframe.py:13255
 msgid "Are you sure you want to remove this feed?"
 msgstr "क्या आप वाकई इस फ़ीड को हटाना चाहते हैं?"
 
-#: gui/mainframe.py:13131
+#: gui/mainframe.py:13276
 msgid "BlindRSS - Removing feed {title}..."
 msgstr "BlindRSS - फ़ीड {title} हटाया जा रहा है..."
 
-#: gui/mainframe.py:13177
+#: gui/mainframe.py:13322
 msgid "It may be busy due to another operation."
 msgstr "यह किसी अन्य कार्रवाई के कारण व्यस्त हो सकता है।"
 
-#: gui/mainframe.py:13366 gui/mainframe.py:13724 gui/mainframe.py:13773
+#: gui/mainframe.py:13511 gui/mainframe.py:13869 gui/mainframe.py:13918
 msgid "OPML files"
 msgstr "OPML फ़ाइलें"
 
-#: gui/mainframe.py:13378
+#: gui/mainframe.py:13523
 msgid "ZIP archives"
 msgstr "ZIP संग्रह"
 
-#: gui/mainframe.py:13730 gui/mainframe.py:13783
+#: gui/mainframe.py:13875 gui/mainframe.py:13928
 msgid "Export successful."
 msgstr "निर्यात सफल।"
 
-#: gui/mainframe.py:13732 gui/mainframe.py:13785
+#: gui/mainframe.py:13877 gui/mainframe.py:13930
 msgid "Export failed."
 msgstr "निर्यात विफल।"
 
-#: gui/mainframe.py:13760
+#: gui/mainframe.py:13905
 msgid "No feeds found in category \"{category}\"."
 msgstr "श्रेणी \"{category}\" में कोई फ़ीड नहीं मिला।"
 
-#: gui/mainframe.py:13848
+#: gui/mainframe.py:13993
 msgid "Storage Location"
 msgstr "संग्रहण स्थान"
 
-#: gui/mainframe.py:13853
+#: gui/mainframe.py:13998
 msgid ""
 "Config has been moved. The feed database will be migrated to the new "
 "location the next time BlindRSS starts."
@@ -6576,55 +6622,55 @@ msgstr ""
 "कॉन्फ़िग स्थानांतरित कर दिया गया है। अगली बार जब BlindRSS शुरू होगा तो फ़ीड "
 "डेटाबेस को नए स्थान पर माइग्रेट किया जाएगा।"
 
-#: gui/mainframe.py:13857
+#: gui/mainframe.py:14002
 msgid "Storage Location Changed"
 msgstr "संग्रहण स्थान बदला गया"
 
-#: gui/mainframe.py:14563 gui/mainframe.py:14695
+#: gui/mainframe.py:14708 gui/mainframe.py:14840
 msgid "Condition {n} field"
 msgstr "शर्त {n} फ़ील्ड"
 
-#: gui/mainframe.py:14566 gui/mainframe.py:14698
+#: gui/mainframe.py:14711 gui/mainframe.py:14843
 msgid "Condition {n} operator"
 msgstr "शर्त {n} ऑपरेटर"
 
-#: gui/mainframe.py:14569 gui/mainframe.py:14701
+#: gui/mainframe.py:14714 gui/mainframe.py:14846
 msgid "Condition {n} value"
 msgstr "शर्त {n} मान"
 
-#: gui/mainframe.py:14963
+#: gui/mainframe.py:15108
 msgid "Delete filter rule \"{name}\"? Articles it already filed are not changed."
 msgstr ""
 "फ़िल्टर नियम \"{name}\" हटाएं? यह जिन लेखों को पहले ही फ़ाइल कर चुका है वे "
 "नहीं बदलेंगे।"
 
-#: gui/mainframe.py:15033
+#: gui/mainframe.py:15178
 msgid "Scanned {scanned} article; {changed} matched a rule."
 msgid_plural "Scanned {scanned} articles; {changed} matched a rule."
 msgstr[0] "{scanned} लेख स्कैन किया गया; नियमों से मिलान: {changed}।"
 msgstr[1] "{scanned} लेख स्कैन किए गए; नियमों से मिलान: {changed}।"
 
-#: gui/mainframe.py:505
+#: gui/mainframe.py:519
 msgid "VLC Media Player (required for playback)"
 msgstr "VLC मीडिया प्लेयर (प्लेबैक के लिए आवश्यक)"
 
-#: gui/mainframe.py:507
+#: gui/mainframe.py:521
 msgid "FFmpeg (required for some podcasts)"
 msgstr "FFmpeg (कुछ पॉडकास्ट के लिए आवश्यक)"
 
-#: gui/mainframe.py:509
+#: gui/mainframe.py:523
 msgid "yt-dlp (required for YouTube and many media sources)"
 msgstr "yt-dlp (YouTube और कई अन्य मीडिया स्रोतों के लिए आवश्यक)"
 
-#: gui/mainframe.py:516 gui/mainframe.py:530
+#: gui/mainframe.py:530 gui/mainframe.py:544
 msgid "Install Dependencies"
 msgstr "निर्भरताएं इंस्टॉल करें"
 
-#: gui/mainframe.py:517 gui/mainframe.py:531
+#: gui/mainframe.py:531 gui/mainframe.py:545
 msgid "Installing dependencies..."
 msgstr "निर्भरताएँ स्थापित हो रही हैं..."
 
-#: gui/mainframe.py:525
+#: gui/mainframe.py:539
 msgid ""
 "Would you like to install them automatically via Homebrew?\n"
 "\n"
@@ -6634,11 +6680,11 @@ msgstr ""
 "\n"
 "सुझाव: आप इस संकेत को सेटिंग्स > YouTube में अक्षम कर सकते हैं।"
 
-#: gui/mainframe.py:556
+#: gui/mainframe.py:570
 msgid "Missing Dependencies"
 msgstr "गुम निर्भरताएं"
 
-#: gui/mainframe.py:568
+#: gui/mainframe.py:582
 msgid ""
 "Some dependencies are still missing.\n"
 "\n"
@@ -6648,11 +6694,11 @@ msgstr ""
 "\n"
 "लॉग देखें: {log_path}"
 
-#: gui/mainframe.py:580
+#: gui/mainframe.py:594
 msgid "Installation failed: {error}"
 msgstr "स्थापना विफल: {error}"
 
-#: gui/mainframe.py:607
+#: gui/mainframe.py:621
 msgid ""
 "Could not add shortcuts:\n"
 "{error}"
@@ -6660,97 +6706,97 @@ msgstr ""
 "शॉर्टकट नहीं जोड़े जा सके:\n"
 "{error}"
 
-#: gui/mainframe.py:3040
+#: gui/mainframe.py:3054
 msgid "Playing {position} of {total}: {title}"
 msgstr "{total} में से {position} चल रहा है: {title}"
 
-#: gui/mainframe.py:3044
+#: gui/mainframe.py:3058
 msgid "Playing {position} of {total}"
 msgstr "{total} में से {position} चल रहा है"
 
-#: gui/mainframe.py:4324
+#: gui/mainframe.py:4433
 msgid "Refreshing feed: {title}..."
 msgstr "फ़ीड ताज़ा हो रहा है: {title}..."
 
-#: gui/mainframe.py:4352
+#: gui/mainframe.py:4461
 msgid "{hidden} new article notification(s) were suppressed by your cap."
 msgstr "{hidden} नए लेख अधिसूचना(एं) आपकी सीमा के कारण दबा दी गईं।"
 
-#: gui/mainframe.py:4500
+#: gui/mainframe.py:4633
 msgid "{count} new article notification was suppressed by your cap."
 msgid_plural "{count} new article notifications were suppressed by your cap."
 msgstr[0] "आपकी सीमा के कारण नए लेख की {count} सूचना दबा दी गई।"
 msgstr[1] "आपकी सीमा के कारण नए लेखों की {count} सूचनाएँ दबा दी गईं।"
 
-#: gui/mainframe.py:4683
+#: gui/mainframe.py:4816
 msgid "Mark all items in \"{feed}\" as read?"
 msgstr "\"{feed}\" में सभी आइटम को पढ़ा गया चिह्नित करें?"
 
-#: gui/mainframe.py:4699
+#: gui/mainframe.py:4832
 msgid "Reset Title to Feed Default"
 msgstr "शीर्षक को फ़ीड डिफ़ॉल्ट पर रीसेट करें"
 
-#: gui/mainframe.py:4738
+#: gui/mainframe.py:4871
 msgid "Edit Smart Folder..."
 msgstr "स्मार्ट फ़ोल्डर संपादित करें..."
 
-#: gui/mainframe.py:4840
+#: gui/mainframe.py:4973
 msgid "Could not create the Smart Folder."
 msgstr "स्मार्ट फ़ोल्डर नहीं बनाया जा सका।"
 
-#: gui/mainframe.py:4864
+#: gui/mainframe.py:4997
 msgid "Could not update the Smart Folder."
 msgstr "स्मार्ट फ़ोल्डर अपडेट नहीं किया जा सका।"
 
-#: gui/mainframe.py:4972
+#: gui/mainframe.py:5105
 msgid "Delete {count} Articles Permanently\tDel"
 msgstr "{count} लेख स्थायी रूप से हटाएं\tDel"
 
-#: gui/mainframe.py:5061
+#: gui/mainframe.py:5194
 msgid "Remove from Play Queue"
 msgstr "प्ले कतार से हटाएँ"
 
-#: gui/mainframe.py:5068
+#: gui/mainframe.py:5201
 msgid "Add to Play Queue"
 msgstr "प्ले कतार में जोड़ें"
 
-#: gui/mainframe.py:5085
+#: gui/mainframe.py:5218
 msgid "Open {chapter}"
 msgstr "{chapter} खोलें"
 
-#: gui/mainframe.py:6132
+#: gui/mainframe.py:6265
 msgid "Audio detected and added!"
 msgstr "ऑडियो पहचाना गया और जोड़ा गया!"
 
-#: gui/mainframe.py:6137
+#: gui/mainframe.py:6270
 msgid "Provider does not support updating media."
 msgstr "यह प्रदाता मीडिया अपडेट करने का समर्थन नहीं करता।"
 
-#: gui/mainframe.py:6489
+#: gui/mainframe.py:6622
 msgid ", played, {total}"
 msgstr ", चलाया गया, {total}"
 
-#: gui/mainframe.py:6524
+#: gui/mainframe.py:6657
 msgid "played {position}"
 msgstr "चलाया गया {position}"
 
-#: gui/mainframe.py:7581 gui/mainframe.py:13179
+#: gui/mainframe.py:7714 gui/mainframe.py:13324
 msgid "Error: {error}"
 msgstr "त्रुटि: {error}"
 
-#: gui/mainframe.py:7687
+#: gui/mainframe.py:7820
 msgid "Error fetching feeds: {error}"
 msgstr "फ़ीड प्राप्त करने में त्रुटि: {error}"
 
-#: gui/mainframe.py:7912
+#: gui/mainframe.py:8051
 msgid "Refreshing: {done} out of {total}"
 msgstr "ताज़ा हो रहा है: {total} में से {done}"
 
-#: gui/mainframe.py:9148 gui/mainframe.py:9277 gui/mainframe.py:9779
+#: gui/mainframe.py:9293 gui/mainframe.py:9422 gui/mainframe.py:9924
 msgid "Filter: {shown} of {total}"
 msgstr "फ़िल्टर: {total} में से {shown}"
 
-#: gui/mainframe.py:11933
+#: gui/mainframe.py:12078
 msgid ""
 "Could not open the article with your custom command:\n"
 "\n"
@@ -6764,47 +6810,47 @@ msgstr ""
 "\n"
 "इसके बजाय डिफ़ॉल्ट ब्राउज़र में खोला जा रहा है। आप इसे सेटिंग्स > सामान्य > लेख खोलने की विधि में बदल सकते हैं।"
 
-#: gui/mainframe.py:12569
+#: gui/mainframe.py:12714
 msgid "Trying pytubefix: {title}"
 msgstr "pytubefix का प्रयास किया जा रहा है: {title}"
 
-#: gui/mainframe.py:12592
+#: gui/mainframe.py:12737
 msgid "Preparing YouTube browser session: {title}"
 msgstr "YouTube ब्राउज़र सत्र तैयार किया जा रहा है: {title}"
 
-#: gui/mainframe.py:12663
+#: gui/mainframe.py:12808
 msgid "yt-dlp download timed out"
 msgstr "yt-dlp डाउनलोड का समय समाप्त"
 
-#: gui/mainframe.py:12718 gui/mainframe.py:12787
+#: gui/mainframe.py:12863 gui/mainframe.py:12932
 msgid "Download failed: {error}"
 msgstr "डाउनलोड विफल: {error}"
 
-#: gui/mainframe.py:13170
+#: gui/mainframe.py:13315
 msgid "Could not remove feed '{title}'."
 msgstr "फ़ीड '{title}' हटाया नहीं जा सका।"
 
-#: gui/mainframe.py:13847
+#: gui/mainframe.py:13992
 msgid "Could not move config file."
 msgstr "कॉन्फ़िग फ़ाइल स्थानांतरित नहीं की जा सकी।"
 
-#: gui/mainframe.py:13941
+#: gui/mainframe.py:14086
 msgid "Could not update startup registration."
 msgstr "स्टार्टअप पंजीकरण अपडेट नहीं किया जा सका।"
 
-#: gui/mainframe.py:14139
+#: gui/mainframe.py:14284
 msgid "Update check failed: {error}"
 msgstr "अपडेट जाँच विफल: {error}"
 
-#: gui/mainframe.py:14921
+#: gui/mainframe.py:15066
 msgid "Could not create the rule."
 msgstr "नियम नहीं बनाया जा सका।"
 
-#: gui/mainframe.py:14950
+#: gui/mainframe.py:15095
 msgid "Could not update the rule."
 msgstr "नियम अपडेट नहीं किया जा सका।"
 
-#: gui/mainframe.py:15026
+#: gui/mainframe.py:15171
 msgid ""
 "Could not apply rules.\n"
 "\n"
@@ -6814,36 +6860,36 @@ msgstr ""
 "\n"
 "{error}"
 
-#: gui/mainframe.py:3644
+#: gui/mainframe.py:3659
 msgid "Current chapter, {label}"
 msgstr "वर्तमान अध्याय, {label}"
 
-#: gui/mainframe.py:4650
+#: gui/mainframe.py:4783
 msgid "Mark all items in category \"{category}\" as read?"
 msgstr "श्रेणी \"{category}\" में सभी आइटम को पढ़ा गया चिह्नित करें?"
 
-#: gui/mainframe.py:5044
+#: gui/mainframe.py:5177
 msgid "Add {count} to Play Queue"
 msgstr "{count} को प्ले कतार में जोड़ें"
 
-#: gui/mainframe.py:5052
+#: gui/mainframe.py:5185
 msgid "Remove {count} from Play Queue"
 msgstr "{count} को प्ले कतार से हटाएँ"
 
-#: gui/mainframe.py:6141
+#: gui/mainframe.py:6274
 msgid "Error detecting audio: {error}"
 msgstr "ऑडियो का पता लगाने में त्रुटि: {error}"
 
-#: gui/mainframe.py:7204
+#: gui/mainframe.py:7337
 msgid "Could not restore {count} articles."
 msgstr "{count} लेख पुनर्स्थापित नहीं किए जा सके।"
 
-#: gui/mainframe.py:7469
+#: gui/mainframe.py:7602
 msgid "Remove category '{category}'? Feeds will be moved to Uncategorized."
 msgstr ""
 "श्रेणी '{category}' हटाएं? फ़ीड को अवर्गीकृत में स्थानांतरित कर दिया जाएगा।"
 
-#: gui/mainframe.py:12778 gui/mainframe.py:12678
+#: gui/mainframe.py:12923 gui/mainframe.py:12823
 msgid ""
 "Downloaded to:\n"
 "{path}"
@@ -6851,19 +6897,19 @@ msgstr ""
 "इसमें डाउनलोड किया गया:\n"
 "{path}"
 
-#: gui/mainframe.py:13787
+#: gui/mainframe.py:13932
 msgid "Export failed: {error}"
 msgstr "निर्यात विफल: {error}"
 
-#: gui/mainframe.py:13957
+#: gui/mainframe.py:14102
 msgid "Windows notification prerequisites could not be fully configured."
 msgstr "Windows सूचना पूर्वापेक्षाएं पूरी तरह कॉन्फ़िगर नहीं की जा सकीं।"
 
-#: gui/mainframe.py:10541
+#: gui/mainframe.py:10686
 msgid "Translation failed: {error}"
 msgstr "अनुवाद विफल: {error}"
 
-#: gui/mainframe.py:542
+#: gui/mainframe.py:556
 msgid ""
 "Install Homebrew (https://brew.sh) to let BlindRSS install these automatically, or install them yourself with:\n"
 "    brew install --cask vlc\n"
@@ -6881,7 +6927,7 @@ msgstr ""
 "\n"
 "सुझाव: आप इस संकेत को सेटिंग्स > YouTube में अक्षम कर सकते हैं।"
 
-#: gui/mainframe.py:551
+#: gui/mainframe.py:565
 msgid ""
 "This Linux build should already bundle these tools.\n"
 "If they still appear missing, see the log: {log_path}\n"
@@ -6893,7 +6939,7 @@ msgstr ""
 "\n"
 "सुझाव: आप इस संकेत को सेटिंग्स > YouTube में अक्षम कर सकते हैं।"
 
-#: gui/mainframe.py:12658
+#: gui/mainframe.py:12803
 msgid ""
 "yt-dlp is not installed. Install it via Settings to download YouTube items."
 msgstr ""
@@ -7267,6 +7313,12 @@ msgstr "अपठित: {count}"
 #: main.py:282
 msgid "BlindRSS is already running."
 msgstr "BlindRSS पहले से ही चल रहा है।"
+
+#~ msgid "Failed to download update metadata: {error}"
+#~ msgstr "अपडेट मेटाडेटा डाउनलोड करने में विफल: {error}"
+
+#~ msgid "Failed to download update: {error}"
+#~ msgstr "अपडेट डाउनलोड करने में विफल: {error}"
 
 #~ msgid "https://www.youtube.com/watch?v=..."
 #~ msgstr "https://www.youtube.com/watch?v=..."

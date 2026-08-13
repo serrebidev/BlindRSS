@@ -1103,6 +1103,11 @@ class MinifluxProvider(RSSProvider):
                 bool(info.get("ok", False)),
                 info.get("status_code"),
             )
+            # Requests already on the wire when the user stopped still land.
+            # Their result is recorded, but reporting it would keep the UI's
+            # refresh progress moving after the stop.
+            if self._refresh_cancelled(cancel_event):
+                return
             if progress_cb is not None:
                 self._emit_progress(
                     progress_cb,
@@ -1259,6 +1264,10 @@ class MinifluxProvider(RSSProvider):
             self._record_targeted_refresh_attempt_result(
                 fid, bool(info.get("ok", False)), info.get("status_code")
             )
+            # See _refresh_targeted_feeds: a stopped refresh records results but
+            # reports none, so the UI's progress does not advance after a stop.
+            if self._refresh_cancelled(cancel_event):
+                return
             if progress_cb is not None:
                 self._emit_progress(
                     progress_cb,
@@ -1304,8 +1313,13 @@ class MinifluxProvider(RSSProvider):
             try:
                 for fut in concurrent.futures.as_completed(pending_snapshot):
                     if self._refresh_cancelled(cancel_event):
+                        # Stopped: drop the queued stragglers and leave the ones
+                        # already on the wire to end on their own. Waiting out
+                        # the remaining feed timeouts would hold the refresh
+                        # "active" long after the user asked it to stop.
                         for f in pending_snapshot:
                             f.cancel()
+                        break
                     fid = futures[fut]
                     _store(fid, self._future_result_info(fut, fid))
             except Exception:
@@ -1555,9 +1569,22 @@ class MinifluxProvider(RSSProvider):
         started_at = datetime.now(timezone.utc)
         cancel_event = self._begin_refresh_cancel_scope()
         # When a manual refresh reports "complete" while slow feeds keep loading, the
-        # background straggler daemon -- not this call's finally -- owns releasing the
-        # cancel scope, so a user "stop" still cancels those stragglers.
-        background_owns_scope = False
+        # background straggler daemon keeps the cancel scope alive, so a user "stop"
+        # still cancels those stragglers. Both this call and that daemon have to be
+        # finished before the scope goes away: whichever ends last releases it.
+        # Releasing on the daemon alone let it end the scope while this body was
+        # still emitting progress, and Stop Refresh then had nothing to cancel.
+        scope_lock = threading.Lock()
+        scope_state = {"main_done": False, "background_pending": False, "released": False}
+
+        def _release_scope_when_idle() -> None:
+            with scope_lock:
+                if scope_state["released"]:
+                    return
+                if not scope_state["main_done"] or scope_state["background_pending"]:
+                    return
+                scope_state["released"] = True
+            self._end_refresh_cancel_scope(cancel_event)
 
         def _stopped(feeds_count: int = 0) -> bool:
             duration_s = (datetime.now(timezone.utc) - started_at).total_seconds()
@@ -1756,8 +1783,14 @@ class MinifluxProvider(RSSProvider):
                             "Miniflux refresh stragglers finished force=%s stragglers=%s total_duration_s=%.2f",
                             force, len(straggler_ids or []), total_dur,
                         )
-                        self._end_refresh_cancel_scope(cancel_event)
+                        with scope_lock:
+                            scope_state["background_pending"] = False
+                        _release_scope_when_idle()
 
+                    # Claimed before the call: the daemon can finish (and call
+                    # _straggler_done) before _run_targeted_with_deadline returns.
+                    with scope_lock:
+                        scope_state["background_pending"] = True
                     straggler_ids = self._run_targeted_with_deadline(
                         targeted_ids,
                         force=force,
@@ -1769,11 +1802,15 @@ class MinifluxProvider(RSSProvider):
                         on_background_done=_straggler_done,
                     )
                     if straggler_ids:
-                        background_owns_scope = True
                         log.info(
                             "Miniflux refresh reporting complete with %s straggler feed(s) finishing in background force=%s",
                             len(straggler_ids), force,
                         )
+                    else:
+                        # Nothing was handed off, so no daemon will ever release
+                        # the claim made above.
+                        with scope_lock:
+                            scope_state["background_pending"] = False
                 else:
                     self._refresh_targeted_feeds(
                         targeted_ids,
@@ -1808,9 +1845,11 @@ class MinifluxProvider(RSSProvider):
                 )
 
             duration_s = (datetime.now(timezone.utc) - started_at).total_seconds()
+            with scope_lock:
+                stragglers_bg = scope_state["background_pending"]
             log.info(
                 "Miniflux refresh finished force=%s duration_s=%.2f feeds=%s stragglers_bg=%s",
-                force, duration_s, len(feeds or []), background_owns_scope,
+                force, duration_s, len(feeds or []), stragglers_bg,
             )
             # The companion filters this list server-side and queues work only
             # for feeds whose latest Miniflux error indicates a browser gate.
@@ -1819,11 +1858,12 @@ class MinifluxProvider(RSSProvider):
             self._queue_browser_feed_recovery()
             return True
         finally:
-            # When stragglers are still loading, the background daemon releases the
-            # cancel scope once it finishes; releasing it here would let a "stop"
-            # silently no-op against the in-flight stragglers.
-            if not background_owns_scope:
-                self._end_refresh_cancel_scope(cancel_event)
+            # Whichever of this call and the straggler daemon finishes last
+            # releases the cancel scope. Releasing it while the other is still
+            # working would let a "stop" silently no-op against live work.
+            with scope_lock:
+                scope_state["main_done"] = True
+            _release_scope_when_idle()
 
     def refresh_feed(self, feed_id: str, progress_cb=None) -> bool:
         """Refresh a single Miniflux feed and emit one progress state for the UI."""

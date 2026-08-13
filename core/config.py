@@ -143,6 +143,11 @@ DEFAULT_CONFIG = {
     "auto_download_podcasts": False,
     "auto_download_period": "unlimited",
     "refresh_interval": 300,  # seconds
+    # How long Stop Refresh keeps the periodic refresh loop quiet. Without a
+    # pause, a short refresh_interval starts another batch seconds after the
+    # user stopped one, so "Stop Refresh" appears to do nothing. Any refresh the
+    # user asks for (Refresh Feeds, a feed, a category) lifts it immediately.
+    "refresh_stop_pause_seconds": 300,
     # Refresh is network-bound (worker threads mostly block on sockets), so the
     # ceiling can go well above what CPU-bound parallelism would tolerate. Actual
     # effective values are further adapted to CPU tier and clamped per host --

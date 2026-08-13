@@ -79,6 +79,10 @@ class _StatusBarHost:
     _set_tray_activity_label = mainframe.MainFrame._set_tray_activity_label
     _update_tray_status_label = mainframe.MainFrame._update_tray_status_label
     _total_unread_count_for_tray = mainframe.MainFrame._total_unread_count_for_tray
+    _resume_auto_refresh = mainframe.MainFrame._resume_auto_refresh
+    _auto_refresh_pause_remaining = mainframe.MainFrame._auto_refresh_pause_remaining
+    _auto_refresh_pause_note = mainframe.MainFrame._auto_refresh_pause_note
+    _refresh_stopped_status = mainframe.MainFrame._refresh_stopped_status
 
     def __init__(self):
         self.fields = {0: "", 1: ""}
@@ -91,6 +95,8 @@ class _StatusBarHost:
         self._refresh_progress_pending = {}
         self._refresh_progress_lock = threading.Lock()
         self._refresh_progress_flush_scheduled = False
+        self._refresh_progress_muted = False
+        self._auto_refresh_paused_until = 0.0
 
     def SetStatusText(self, text, number=0):
         number = int(number)

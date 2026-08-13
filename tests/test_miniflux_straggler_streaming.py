@@ -41,7 +41,13 @@ def _feeds_payload():
     ]
 
 
-def _provider(deadline_s, slow_feed_delay_s, slow_feed_id="4"):
+def _provider(deadline_s, slow_feed_delay_s, slow_feed_id="4", feed_list_delays=()):
+    """Provider whose HTTP layer is a stub.
+
+    feed_list_delays is a per-call sleep for successive ``GET /v1/feeds`` calls
+    (the refresh reads the feed list twice), used to hold refresh() inside its
+    own body while background stragglers finish.
+    """
     cfg = {
         "feed_timeout_seconds": 15,
         "miniflux_refresh_soft_deadline_s": deadline_s,
@@ -52,6 +58,7 @@ def _provider(deadline_s, slow_feed_delay_s, slow_feed_id="4"):
 
     lock = threading.Lock()
     calls = []
+    feed_list_calls = {"n": 0}
 
     def _fake_request(method, url, headers=None, json=None, params=None, timeout=None):
         endpoint = url.split("example.test", 1)[-1].split("?", 1)[0]
@@ -59,6 +66,11 @@ def _provider(deadline_s, slow_feed_delay_s, slow_feed_id="4"):
         with lock:
             calls.append((m, endpoint))
         if m == "GET" and endpoint == "/v1/feeds":
+            with lock:
+                index = feed_list_calls["n"]
+                feed_list_calls["n"] += 1
+            if index < len(feed_list_delays):
+                time.sleep(feed_list_delays[index])
             return _DummyResp(200, _feeds_payload())
         if m == "GET" and endpoint == "/v1/feeds/counters":
             return _DummyResp(200, {"unreads": {"1": 1, "2": 1, "3": 1, "4": 5}})
@@ -126,6 +138,99 @@ def test_manual_refresh_all_fast_has_no_stragglers_and_releases_scope():
     result = p.refresh(progress_cb=lambda s: None, force=True)
     assert result is True
     assert p._current_refresh_cancel_event() is None
+
+
+def test_scope_survives_stragglers_that_finish_before_the_refresh_body():
+    # Stop Refresh can only cancel while a cancel scope exists. The straggler
+    # daemon used to end the scope the moment it finished, even though refresh()
+    # was still running (and still emitting progress), so a stop pressed in that
+    # window found nothing to cancel and silently did nothing.
+    p, _calls = _provider(
+        deadline_s=0.05,
+        slow_feed_delay_s=0.1,          # straggler, but a short-lived one
+        feed_list_delays=(0.0, 0.6),    # refresh() then sits in its second read
+    )
+
+    done = threading.Event()
+
+    def _run():
+        try:
+            p.refresh(progress_cb=lambda s: None, force=True)
+        finally:
+            done.set()
+
+    worker = threading.Thread(target=_run, daemon=True)
+    worker.start()
+    try:
+        # Well after the straggler finished, while refresh() is still inside its
+        # slow feed-list read.
+        time.sleep(0.35)
+        assert not done.is_set(), "refresh finished too early to test the window"
+        assert p.cancel_refresh() is True, "Stop Refresh had no scope to cancel"
+    finally:
+        assert done.wait(timeout=5.0)
+
+    deadline_at = time.monotonic() + 1.0
+    while p._current_refresh_cancel_event() is not None and time.monotonic() < deadline_at:
+        time.sleep(0.02)
+    assert p._current_refresh_cancel_event() is None
+
+
+def test_stop_ends_progress_reporting_for_requests_already_on_the_wire():
+    # Per-feed refreshes already issued when the user stops still land. Reporting
+    # them walked the UI's "Checked X out of Y" forward after the stop, which is
+    # what made Stop Refresh look ignored.
+    p, _calls = _provider(deadline_s=0.0, slow_feed_delay_s=0.0, slow_feed_id="none")
+
+    in_flight = threading.Semaphore(0)
+    release = threading.Event()
+    inner_request = p._session.request
+
+    def _blocking_request(method, url, headers=None, json=None, params=None, timeout=None):
+        endpoint = url.split("example.test", 1)[-1].split("?", 1)[0]
+        if str(method or "").upper() == "PUT" and endpoint.endswith("/refresh") and endpoint != "/v1/feeds/refresh":
+            in_flight.release()
+            release.wait(5.0)
+        return inner_request(method, url, headers=headers, json=json, params=params, timeout=timeout)
+
+    p._session.request = _blocking_request  # type: ignore[assignment]
+
+    states = []
+    states_lock = threading.Lock()
+
+    def progress_cb(state):
+        with states_lock:
+            states.append(str(state.get("id") or ""))
+
+    done = threading.Event()
+
+    def _run():
+        try:
+            p.refresh(progress_cb=progress_cb, force=True)
+        finally:
+            done.set()
+
+    # The batch route-breaker probes with a small first window, so only that
+    # many requests reach the wire before any of them answers.
+    probe_limit = p._targeted_refresh_route_batch_5xx_limit()
+    expected_in_flight = max(1, min(4, probe_limit if probe_limit > 0 else 4))
+
+    worker = threading.Thread(target=_run, daemon=True)
+    worker.start()
+    try:
+        # The per-feed refreshes are on the wire before the stop.
+        for _ in range(expected_in_flight):
+            assert in_flight.acquire(timeout=5.0)
+        with states_lock:
+            assert states == [], "a feed reported before it was released"
+        assert p.cancel_refresh() is True
+    finally:
+        release.set()
+        assert done.wait(timeout=5.0)
+
+    time.sleep(0.1)  # let any late worker report, if it were going to
+    with states_lock:
+        assert states == [], f"progress reported after the stop: {states}"
 
 
 def test_streaming_disabled_when_deadline_zero_blocks_until_done():

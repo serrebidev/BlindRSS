@@ -92,10 +92,16 @@ class _DummyMainFrame:
     _end_refresh_activity = mainframe.MainFrame._end_refresh_activity
     _post_activity_status = mainframe.MainFrame._post_activity_status
     _set_activity_status = mainframe.MainFrame._set_activity_status
+    _resume_auto_refresh = mainframe.MainFrame._resume_auto_refresh
+    _auto_refresh_pause_remaining = mainframe.MainFrame._auto_refresh_pause_remaining
+    _auto_refresh_pause_note = mainframe.MainFrame._auto_refresh_pause_note
+    _refresh_stopped_status = mainframe.MainFrame._refresh_stopped_status
 
     def __init__(self, provider):
         self.provider = provider
         self._refresh_guard = threading.Lock()
+        self._refresh_progress_muted = False
+        self._auto_refresh_paused_until = 0.0
         self.title_updates = []
         self.refresh_feeds_calls = 0
         self.manual_refresh_calls = 0

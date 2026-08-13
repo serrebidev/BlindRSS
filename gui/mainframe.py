@@ -333,6 +333,20 @@ class MainFrame(wx.Frame):
         # Set by Stop Refresh so the end-of-refresh announcement says
         # "Refresh stopped" instead of "Refresh complete".
         self._refresh_stop_requested = False
+        # Bumped by every Stop Refresh. A refresh that was requested before the
+        # bump -- including one still blocked on _refresh_guard behind the batch
+        # being stopped -- is abandoned instead of starting, so "stop" does not
+        # simply hand the machine to the next queued refresh.
+        self._refresh_stop_epoch = 0
+        # time.monotonic() deadline until which the periodic refresh loop skips
+        # its ticks. Stopping a refresh only to have the loop start another one
+        # seconds later reads as "Stop Refresh does nothing"; any user-initiated
+        # refresh clears the pause again.
+        self._auto_refresh_paused_until = 0.0
+        # Set by Stop Refresh: per-feed progress still arriving from the stopped
+        # batch is dropped instead of being applied, so the status bar stops
+        # counting ("Checked 44 out of 51") the moment the user stops.
+        self._refresh_progress_muted = False
         # Category-tree expansion memory (issue #33). The tree is fully rebuilt on
         # every refresh, so we track which category nodes the user explicitly
         # expanded/collapsed (keyed by category id/path) and re-apply that across
@@ -3226,8 +3240,9 @@ class MainFrame(wx.Frame):
         self._announce_event("start_update", _("Refresh Feeds"))
 
     def _cmd_stop_refresh(self, event=None):
-        if not self._is_feed_refresh_active():
-            return
+        # No "nothing is running" early return: the keypress still pauses the
+        # periodic loop, and a command that answers with silence reads as
+        # broken. on_stop_refresh reports what actually happened.
         self.on_stop_refresh()
         self._announce_event("stop_update", _("Stop Refresh"))
 
@@ -3743,22 +3758,116 @@ class MainFrame(wx.Frame):
         event.Enable(not self._is_feed_refresh_active())
 
     def on_update_stop_refresh_ui(self, event):
-        event.Enable(self._is_feed_refresh_active())
+        # Also actionable with nothing on the wire: it pauses the periodic loop,
+        # which is what a user with a short refresh interval is asking for. Read
+        # the interval from config, not _scheduled_refresh_tick_seconds(), so an
+        # idle UI update never queries the database.
+        if self._is_feed_refresh_active():
+            event.Enable(True)
+            return
+        try:
+            interval = int(self.config_manager.get("refresh_interval", 300))
+        except (TypeError, ValueError):
+            interval = 300
+        event.Enable(interval > 0 and self._auto_refresh_pause_remaining() <= 0)
+
+    def _auto_refresh_pause_seconds(self) -> float:
+        """How long Stop Refresh keeps the periodic refresh loop quiet."""
+        try:
+            return max(0.0, float(self.config_manager.get("refresh_stop_pause_seconds", 300) or 0))
+        except (TypeError, ValueError):
+            return 300.0
+
+    def _auto_refresh_pause_remaining(self) -> float:
+        """Seconds left on the post-stop pause, 0 when scheduled refreshes may run."""
+        try:
+            until = float(getattr(self, "_auto_refresh_paused_until", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            return 0.0
+        return max(0.0, until - time.monotonic())
+
+    def _resume_auto_refresh(self) -> None:
+        """Clear a Stop Refresh pause. Any user-initiated refresh means the user
+        wants refreshing again, so it lifts the pause with no extra keystroke."""
+        self._auto_refresh_paused_until = 0.0
+
+    def _auto_refresh_pause_note(self) -> str:
+        """Localized 'automatic refresh is paused' clause, or '' when it says nothing.
+
+        A pause that is shorter than the configured interval (or an interval of
+        "Never") delays no tick the user would have seen, so it is not mentioned.
+        """
+        remaining = self._auto_refresh_pause_remaining()
+        if remaining <= 0:
+            return ""
+        try:
+            interval = int(self._scheduled_refresh_tick_seconds())
+        except Exception:
+            interval = 0
+        if interval <= 0 or interval >= remaining:
+            return ""
+        minutes = max(1, int(round(remaining / 60.0)))
+        return ngettext(
+            "Automatic refresh paused for {minutes} minute.",
+            "Automatic refresh paused for {minutes} minutes.",
+            minutes,
+        ).format(minutes=minutes)
+
+    def _refresh_stopped_status(self, base: str) -> str:
+        """base ("Refresh stopped") plus the pause clause when there is one."""
+        note = self._auto_refresh_pause_note()
+        return f"{base}. {note}" if note else base
+
+    def _mute_refresh_progress(self) -> None:
+        """Drop per-feed progress belonging to the batch the user just stopped.
+
+        Provider workers already on the wire still report their feed when they
+        land. Applying those keeps the status bar counting up ("Checked 44 out
+        of 51") after a stop, which reads as the stop having been ignored. The
+        batch is marked dirty so its single final tree reload still runs and the
+        counts that did arrive before the stop are not left half-applied.
+        """
+        self._refresh_progress_muted = True
+        try:
+            with self._refresh_progress_lock:
+                self._refresh_progress_pending.clear()
+        except Exception:
+            log.debug("Failed to drop queued refresh progress on stop", exc_info=True)
+        if getattr(self, "_refresh_ui_batch_active", False):
+            self._refresh_ui_batch_dirty = True
 
     def on_stop_refresh(self, event=None):
-        """Stop the batch feed refresh currently in flight (cooperative:
-        feeds already being fetched finish, queued ones are skipped)."""
+        """Stop feed refreshing (cooperative: feeds already being fetched finish,
+        queued ones are skipped).
+
+        "Stop" means the whole activity, not just the batch currently on the
+        wire: refreshes queued behind the refresh guard are abandoned and the
+        periodic loop is paused for a cooldown, otherwise a short refresh
+        interval restarts within seconds and nothing appears to have stopped.
+        """
+        self._refresh_stop_epoch = int(getattr(self, "_refresh_stop_epoch", 0) or 0) + 1
+        pause_s = self._auto_refresh_pause_seconds()
+        if pause_s > 0:
+            self._auto_refresh_paused_until = time.monotonic() + pause_s
+        active = self._is_feed_refresh_active()
         try:
             requested = bool(self.provider.cancel_refresh())
         except Exception:
             log.exception("Failed to request refresh cancellation")
             requested = False
-        if requested:
-            log.info("User requested refresh stop")
+        if active or requested:
+            log.info(
+                "User requested refresh stop provider_cancelled=%s guard_held=%s pause_s=%.0f",
+                requested, active, pause_s,
+            )
             self._refresh_stop_requested = True
+            self._mute_refresh_progress()
             self._post_activity_status(_("Stopping refresh..."))
         else:
-            self._post_activity_status(_("No refresh in progress"))
+            log.info("Stop Refresh with no refresh in progress; pause_s=%.0f", pause_s)
+            self._post_activity_status(
+                self._refresh_stopped_status(_("No refresh in progress"))
+            )
 
     def on_refresh_single_feed(self, event):
         item = self.tree.GetSelection()
@@ -4402,6 +4511,17 @@ class MainFrame(wx.Frame):
             force,
             threading.current_thread().name,
         )
+        # Stop Refresh pauses the periodic loop for a cooldown. Without this a
+        # short refresh interval restarts the batch the user just stopped.
+        if scheduled:
+            paused_for = self._auto_refresh_pause_remaining()
+            if paused_for > 0:
+                log.info(
+                    "Scheduled refresh skipped: paused by Stop Refresh for another %.0fs",
+                    paused_for,
+                )
+                return False
+        stop_epoch = int(getattr(self, "_refresh_stop_epoch", 0) or 0)
         acquired = False
         try:
             acquired = self._refresh_guard.acquire(blocking=block)
@@ -4414,6 +4534,19 @@ class MainFrame(wx.Frame):
                 block,
                 force,
             )
+            return False
+        # Stopped while this run was queued behind the guard: the user asked for
+        # refreshing to stop, not for the next one in line to take over.
+        if int(getattr(self, "_refresh_stop_epoch", 0) or 0) != stop_epoch:
+            log.info(
+                "Refresh run abandoned: Stop Refresh was pressed while it waited for the guard provider=%s force=%s",
+                provider_name,
+                force,
+            )
+            try:
+                self._refresh_guard.release()
+            except Exception:
+                pass
             return False
         self._begin_refresh_activity(total=self._expected_refresh_feed_count())
         # Keep tree/count progress live, but do not repeatedly reload the
@@ -7819,6 +7952,10 @@ class MainFrame(wx.Frame):
         of whichever feed happened to finish last, which is what tells a user
         how much of a long refresh is left (issue #85).
         """
+        # Reaching here means a refresh the user asked for (or the startup one)
+        # is starting: scheduled ticks are turned away earlier while paused.
+        self._resume_auto_refresh()
+        self._refresh_progress_muted = False
         self._reset_refresh_progress_counter(total)
         self._post_activity_status(message or _("Refreshing feeds..."))
 
@@ -7881,7 +8018,9 @@ class MainFrame(wx.Frame):
         stopped by the user via Stop Refresh)."""
         if getattr(self, "_refresh_stop_requested", False):
             self._refresh_stop_requested = False
-            self._post_activity_status(_("Refresh stopped"))
+            self._post_activity_status(
+                self._refresh_stopped_status(_("Refresh stopped"))
+            )
             return
         self._post_activity_status(_("Refresh complete"))
 
@@ -8021,6 +8160,12 @@ class MainFrame(wx.Frame):
             return
         feed_id = state.get("id")
         if not feed_id:
+            return
+        # The user stopped this batch. Workers already on the wire keep landing
+        # for a few seconds; counting them would walk the status bar forward
+        # after "Refresh stopped", which is exactly what looks like a stop that
+        # did nothing.
+        if getattr(self, "_refresh_progress_muted", False):
             return
 
         with self._refresh_progress_lock:
