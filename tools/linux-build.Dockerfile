@@ -4,8 +4,6 @@ FROM ubuntu:22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
 
-COPY --from=uv /uv /uvx /usr/local/bin/
-
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
@@ -27,5 +25,7 @@ RUN apt-get update \
         unzip \
         vlc \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=uv /uv /uvx /usr/local/bin/
 
 WORKDIR /src
