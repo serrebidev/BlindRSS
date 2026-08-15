@@ -1,6 +1,10 @@
+FROM ghcr.io/astral-sh/uv:0.11.6 AS uv
+
 FROM ubuntu:22.04
 
 ARG DEBIAN_FRONTEND=noninteractive
+
+COPY --from=uv /uv /uvx /usr/local/bin/
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -23,7 +27,5 @@ RUN apt-get update \
         unzip \
         vlc \
     && rm -rf /var/lib/apt/lists/*
-
-ENV PIP_FIND_LINKS=https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-22.04
 
 WORKDIR /src

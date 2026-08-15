@@ -55,7 +55,7 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 
 ### Prerequisites & toggles
 - Windows release host: Python 3.14 (`py`/`python`), VLC 64-bit at `C:\Program Files\VideoLAN\VLC`, Inno Setup 6/7 (`ISCC.exe`; per-user/Program Files/PATH auto-detected or `INNO_SETUP_COMPILER`), authenticated `gh`, Windows SDK `signtool.exe`, OpenSSH `ssh`/`scp`, network access, and key-based root access to `root@serrebiradio.com`.
-- Linux release host: `root@serrebiradio.com` with Git and a working Docker daemon. The tracked `tools/linux-build.Dockerfile` supplies Python, wxPython wheel routing, VLC, ffmpeg, and build dependencies inside Ubuntu 22.04; do not install those desktop packages into the server host.
+- Linux release host: `root@serrebiradio.com` with Git and a working Docker daemon. The tracked `tools/linux-build.Dockerfile` supplies a uv-managed Python 3.12, a direct pinned wxPython 4.2.5 wheel, VLC, ffmpeg, and build dependencies inside Ubuntu 22.04; do not install those desktop packages into the server host.
 - Pushes to `main` trigger `cross-platform-release.yml` to build macOS/Linux validation artifacts (no published release). A canonical release dispatch passes `build_windows=false` and `build_linux=false`; CI builds macOS only because Windows and Linux have already been built on user-controlled machines.
 - Linux packaging pins wxPython 4.2.5 through both `requirements.txt` and a
   workflow constraint. Keep the constraint for existing-tag re-dispatches:

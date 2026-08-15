@@ -116,8 +116,9 @@ default release dispatch.
 
 - `root@serrebiradio.com` must be reachable with key-based SSH authentication.
 - The host needs Git and a running Docker daemon. Its host Python, VLC, ffmpeg,
-  and GUI packages are irrelevant because the build runs in the tracked Ubuntu
-  22.04 container from `tools/linux-build.Dockerfile`.
+  and GUI packages are irrelevant because the tracked Ubuntu 22.04 container
+  provisions Python 3.12 with `uv`, installs the pinned wxPython wheel directly,
+  and supplies the remaining build/runtime dependencies.
 - `tools/build_linux_docker.sh` builds the current checkout, verifies the
   tarball contains `BlindRSS/BlindRSS` and a bundled `libpython`, and leaves the
   artifact in `dist/` for `build.bat` to copy.
