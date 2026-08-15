@@ -14,9 +14,13 @@ RUN apt-get update \
         libgstreamer-plugins-base1.0-0 \
         libgstreamer1.0-0 \
         libgtk-3-0 \
+        libjavascriptcoregtk-4.0-18 \
         libnotify4 \
+        libpcre2-32-0 \
         libsdl2-2.0-0 \
         libvlc-dev \
+        libwebkit2gtk-4.0-37 \
+        libxtst6 \
         python3 \
         python3-dev \
         python3-pip \

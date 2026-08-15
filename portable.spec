@@ -340,7 +340,13 @@ a = Analysis(
     # optional behave test runner. Keep that legacy package out of frozen builds.
     # Avoid bundling pytubefix's duplicate 100+ MB Node runtime; its signature
     # worker is routed through the Deno executable already shipped for yt-dlp.
-    excludes=["behave", "seleniumbase.behave", "nodejs_wheel"],
+    excludes=[
+        "behave",
+        "seleniumbase.behave",
+        "nodejs_wheel",
+        "tkinter",
+        "_tkinter",
+    ],
     noarchive=False,
     optimize=0,
 )

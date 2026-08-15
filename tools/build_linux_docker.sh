@@ -40,11 +40,11 @@ if (( ${#archives[@]} != 1 )); then
   exit 1
 fi
 archive="${archives[0]}"
-if ! tar -tzf "$archive" | grep -qx 'BlindRSS/BlindRSS'; then
+if ! tar -tzf "$archive" BlindRSS/BlindRSS >/dev/null; then
   echo "[X] Linux tarball does not contain the BlindRSS executable."
   exit 1
 fi
-if ! tar -tzf "$archive" | grep -Eq '^BlindRSS/(_internal/)?libpython[^/]*\.so'; then
+if ! tar -tzf "$archive" --wildcards 'BlindRSS/_internal/libpython*.so*' >/dev/null; then
   echo "[X] Linux tarball does not contain its bundled Python runtime."
   exit 1
 fi
