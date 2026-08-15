@@ -70,23 +70,6 @@ detect_python() {
   exit 1
 }
 
-verify_release_remote() {
-  local remote_url
-  remote_url="$(git remote get-url origin 2>/dev/null || true)"
-  if [[ -z "$remote_url" ]]; then
-    echo "[X] Git remote 'origin' was not found."
-    exit 1
-  fi
-  case "$remote_url" in
-    *serrebidev/BlindRSS*) ;;
-    *)
-      echo "[X] Git remote 'origin' points to '$remote_url'."
-      echo "[X] Expected a GitHub remote for serrebidev/BlindRSS."
-      exit 1
-      ;;
-  esac
-}
-
 setup_venv() {
   detect_python
   VENV_DIR="$SCRIPT_DIR/.venv"
@@ -386,66 +369,7 @@ ensure_vlc_linux() {
   echo "[BlindRSS Build] Using VLC plugins: $plugin_dir"
 }
 
-cut_release() {
-  verify_release_remote
-  if ! command -v gh >/dev/null 2>&1; then
-    echo "[X] GitHub CLI (gh) not found on PATH."
-    exit 1
-  fi
-  if ! gh auth status >/dev/null 2>&1; then
-    echo "[X] gh is not authenticated."
-    exit 1
-  fi
-  detect_python
-
-  echo "[BlindRSS Release] Syncing tags..."
-  git fetch origin --tags --prune >/dev/null 2>&1 || echo "[WARN] Failed to fetch tags from origin. Using local tags."
-
-  local next_version="" next_tag="" latest_tag=""
-  while IFS='=' read -r key value; do
-    case "$key" in
-      NEXT_VERSION) next_version="$value" ;;
-      NEXT_TAG) next_tag="$value" ;;
-      LATEST_TAG) latest_tag="$value" ;;
-    esac
-  done < <("$PYTHON_EXE" tools/release.py next-version)
-  if [[ -z "$next_version" || -z "$next_tag" ]]; then
-    echo "[X] Failed to compute next version."
-    exit 1
-  fi
-
-  echo "[BlindRSS Release] Bumping version to $next_tag..."
-  "$PYTHON_EXE" tools/release.py bump-version --version "$next_version"
-
-  mkdir -p "$SCRIPT_DIR/dist"
-  local notes_file="$SCRIPT_DIR/dist/release-notes-$next_tag.md"
-  echo "[BlindRSS Release] Generating release notes..."
-  "$PYTHON_EXE" tools/release.py write-notes --from-tag "$latest_tag" --to-tag "$next_tag" --output "$notes_file"
-
-  echo "[BlindRSS Release] Updating CHANGELOG.md..."
-  "$PYTHON_EXE" tools/release.py update-changelog --version-tag "$next_tag" --notes-file "$notes_file" --output "$SCRIPT_DIR/CHANGELOG.md"
-
-  echo "[BlindRSS Release] Committing version bump..."
-  git add core/version.py CHANGELOG.md
-  git commit -m "Release $next_tag"
-
-  echo "[BlindRSS Release] Tagging $next_tag..."
-  git tag "$next_tag"
-
-  echo "[BlindRSS Release] Pushing branch and tag..."
-  git push origin HEAD
-  git push origin "$next_tag"
-
-  echo "[BlindRSS Release] Creating GitHub release in serrebidev/BlindRSS..."
-  gh release create "$next_tag" --repo serrebidev/BlindRSS --title "$next_tag" --notes-file "$notes_file" --latest
-
-  echo "[BlindRSS Release] Release $next_tag created with no assets yet."
-  echo "[BlindRSS Release] The dispatched Windows/macOS/Linux CI jobs will attach signed"
-  echo "[BlindRSS Release] assets and update manifests to it over the next few minutes."
-  CUT_RELEASE_TAG="$next_tag"
-}
-
-dispatch_cross_platform_release() {
+dispatch_macos_release() {
   local release_tag="$1"
   if [[ -z "$release_tag" ]]; then
     echo "[X] ./build.sh release requires an existing GitHub release tag."
@@ -465,11 +389,10 @@ dispatch_cross_platform_release() {
     echo "[X] Create the release first (e.g. 'gh release create $release_tag')."
     exit 1
   fi
-  echo "[BlindRSS Build] Dispatching GitHub Windows/macOS/Linux release workflow for $release_tag..."
-  gh workflow run cross-platform-release.yml -f release_tag="$release_tag"
+  echo "[BlindRSS Build] Dispatching the GitHub macOS release workflow for $release_tag..."
+  gh workflow run cross-platform-release.yml -f release_tag="$release_tag" -f build_windows=false -f build_linux=false
   echo "[BlindRSS Build] Workflow dispatched."
-  echo "[BlindRSS Build] GitHub Actions will build the signed Windows installer plus the"
-  echo "[BlindRSS Build] macOS and Linux artifacts, and upload them to release $release_tag."
+  echo "[BlindRSS Build] GitHub Actions will build and upload the macOS artifact."
 }
 
 read_version() {
@@ -528,24 +451,24 @@ if [[ "$MODE" == "dry-run" ]]; then
   if [[ "$PLATFORM_ID" == "macos" ]]; then
     echo "[Dry Run] Would prepare .venv, install dependencies, compile translations, bundle yt-dlp, deno, ffmpeg, and macOS VLC assets."
     echo "[Dry Run] Would ad-hoc sign dist/BlindRSS.app and zip it to dist/BlindRSS-macos-v<version>.zip"
-    echo "[Dry Run] ./build.sh release (no tag) would bump the version, tag, push, create the GitHub"
-    echo "[Dry Run] release, then dispatch GitHub Actions to build and sign Windows plus build macOS/Linux."
-    echo "[Dry Run] ./build.sh release <tag> would just re-dispatch that CI build for an existing tag."
+    echo "[Dry Run] Official releases start on Windows with build.bat release."
+    echo "[Dry Run] ./build.sh release <tag> re-dispatches only the macOS asset build for an existing tag."
   else
     echo "[Dry Run] Would prepare .venv, install dependencies, compile translations, bundle yt-dlp, deno, ffmpeg, and Linux VLC assets."
     echo "[Dry Run] Would build dist/BlindRSS/ and tar it to dist/BlindRSS-linux-v<version>.tar.gz"
-    echo "[Dry Run] ./build.sh release (no tag) would cut a new release and dispatch the full Windows/macOS/Linux CI build."
-    echo "[Dry Run] ./build.sh release <tag> would just re-dispatch that CI build for an existing tag."
+    echo "[Dry Run] Official releases start on Windows with build.bat release."
+    echo "[Dry Run] ./build.sh release <tag> re-dispatches only the macOS asset build for an existing tag."
   fi
   exit 0
 fi
 
 if [[ "$MODE" == "release" ]]; then
   if [[ -z "$RELEASE_TAG" ]]; then
-    cut_release
-    RELEASE_TAG="$CUT_RELEASE_TAG"
+    echo "[X] Official releases must start on Windows with: build.bat release"
+    echo "[X] Use ./build.sh release vX.Y.Z only to rebuild macOS for an existing release."
+    exit 1
   fi
-  dispatch_cross_platform_release "$RELEASE_TAG"
+  dispatch_macos_release "$RELEASE_TAG"
   exit 0
 fi
 

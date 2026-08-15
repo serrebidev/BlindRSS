@@ -30,6 +30,8 @@ if defined SIGNTOOL_PATH (
 )
 if not defined GITHUB_REPO_SLUG set "GITHUB_REPO_SLUG=serrebidev/BlindRSS"
 if not defined RELEASE_REMOTE set "RELEASE_REMOTE=origin"
+if not defined LINUX_BUILD_HOST set "LINUX_BUILD_HOST=root@serrebiradio.com"
+if not defined LINUX_BUILD_REPO_URL set "LINUX_BUILD_REPO_URL=https://github.com/%GITHUB_REPO_SLUG%.git"
 
 if /I "%MODE%"=="dry-run" (
     call :detect_python
@@ -41,10 +43,13 @@ if /I "%MODE%"=="dry-run" (
     if errorlevel 1 exit /b 1
     call :find_inno_setup
     if errorlevel 1 exit /b 1
+    call :verify_linux_builder
+    if errorlevel 1 exit /b 1
     echo [Dry Run] Latest tag: !LATEST_TAG!
     echo [Dry Run] Next version: v!NEXT_VERSION! [!BUMP! bump]
     echo [Dry Run] Inno Setup compiler: !INNO_SETUP_EXE!
-    echo [Dry Run] Would bump core/version.py, compile translations, build, sign with "%SIGNTOOL_EXE%", create the portable ZIP and Program Files installer, generate release notes, update CHANGELOG.md, generate the manifest, tag, push to "%RELEASE_REMOTE%", create a GitHub release in "%GITHUB_REPO_SLUG%", and dispatch the macOS/Linux GitHub Actions asset build.
+    echo [Dry Run] Linux builder: %LINUX_BUILD_HOST% [Docker, Ubuntu 22.04]
+    echo [Dry Run] Would bump core/version.py, compile translations, build and sign Windows locally, create the portable ZIP and Program Files installer, generate release notes, update CHANGELOG.md, generate the Windows manifest, tag, push to "%RELEASE_REMOTE%", create a GitHub release in "%GITHUB_REPO_SLUG%", build Linux over SSH on %LINUX_BUILD_HOST%, upload the Linux tarball and manifest, and dispatch the macOS GitHub Actions asset build.
     goto :done
 )
 
@@ -54,6 +59,8 @@ set "TOOL_PY=%VENV_PYTHON%"
 
 if /I "%MODE%"=="release" (
     call :verify_release_remote
+    if errorlevel 1 exit /b 1
+    call :verify_linux_builder
     if errorlevel 1 exit /b 1
     call :compute_next_version
     if errorlevel 1 exit /b 1
@@ -90,7 +97,9 @@ if /I "%MODE%"=="release" (
     if errorlevel 1 exit /b 1
     call :git_release
     if errorlevel 1 exit /b 1
-    call :dispatch_cross_platform_release
+    call :build_linux_release
+    if errorlevel 1 exit /b 1
+    call :dispatch_macos_release
     if errorlevel 1 exit /b 1
 ) else (
     call :compute_current_version
@@ -638,14 +647,86 @@ if /I not "!API_LATEST_TAG!"=="%VERSION_TAG%" (
 echo [BlindRSS Release] GitHub latest release is %VERSION_TAG%.
 exit /b 0
 
-:dispatch_cross_platform_release
-echo [BlindRSS Release] Dispatching GitHub Actions macOS/Linux artifact build in %GITHUB_REPO_SLUG%...
-gh workflow run "cross-platform-release.yml" --repo "%GITHUB_REPO_SLUG%" --ref "%VERSION_TAG%" -f release_tag="%VERSION_TAG%" -f build_windows=false
+:verify_linux_builder
+where /q ssh
 if errorlevel 1 (
-    echo [X] Failed to dispatch cross-platform GitHub Actions build.
+    echo [X] OpenSSH ssh was not found in PATH.
     exit /b 1
 )
-echo [BlindRSS Release] macOS/Linux build dispatched for %VERSION_TAG%.
+where /q scp
+if errorlevel 1 (
+    echo [X] OpenSSH scp was not found in PATH.
+    exit /b 1
+)
+echo [BlindRSS Release] Verifying Linux Docker builder %LINUX_BUILD_HOST%...
+ssh -o BatchMode=yes -o ConnectTimeout=15 "%LINUX_BUILD_HOST%" "command -v git >/dev/null && command -v docker >/dev/null && command -v mktemp >/dev/null && docker info >/dev/null"
+if errorlevel 1 (
+    echo [X] Linux builder verification failed for %LINUX_BUILD_HOST%.
+    exit /b 1
+)
+exit /b 0
+
+:build_linux_release
+call :verify_linux_builder
+if errorlevel 1 exit /b 1
+set "REMOTE_BUILD_DIR="
+for /f "usebackq delims=" %%D in (`ssh -o BatchMode=yes "%LINUX_BUILD_HOST%" "mktemp -d /tmp/blindrss-release-%VERSION_TAG%-XXXXXX"`) do set "REMOTE_BUILD_DIR=%%D"
+if not defined REMOTE_BUILD_DIR (
+    echo [X] Failed to create a temporary Linux build directory on %LINUX_BUILD_HOST%.
+    exit /b 1
+)
+echo [BlindRSS Release] Building Linux %VERSION_TAG% on %LINUX_BUILD_HOST% in !REMOTE_BUILD_DIR!...
+ssh -o BatchMode=yes "%LINUX_BUILD_HOST%" "git clone --quiet --depth 1 --branch '%VERSION_TAG%' '%LINUX_BUILD_REPO_URL%' '!REMOTE_BUILD_DIR!/source' && cd '!REMOTE_BUILD_DIR!/source' && chmod +x tools/build_linux_docker.sh && tools/build_linux_docker.sh"
+set "LINUX_BUILD_ERROR=!ERRORLEVEL!"
+set "LINUX_ASSET_NAME=BlindRSS-linux-v%VERSION_NO_V%.tar.gz"
+set "LINUX_ASSET_PATH=%SCRIPT_DIR%dist\!LINUX_ASSET_NAME!"
+if "!LINUX_BUILD_ERROR!"=="0" (
+    echo [BlindRSS Release] Copying !LINUX_ASSET_NAME! from %LINUX_BUILD_HOST%...
+    scp -q "%LINUX_BUILD_HOST%:!REMOTE_BUILD_DIR!/source/dist/!LINUX_ASSET_NAME!" "!LINUX_ASSET_PATH!"
+    set "LINUX_BUILD_ERROR=!ERRORLEVEL!"
+)
+ssh -o BatchMode=yes "%LINUX_BUILD_HOST%" "case '!REMOTE_BUILD_DIR!' in /tmp/blindrss-release-%VERSION_TAG%-??????) rm -rf -- '!REMOTE_BUILD_DIR!' ;; *) echo 'Refusing unsafe cleanup path' >&2; exit 2 ;; esac" >nul 2>&1
+set "LINUX_CLEANUP_ERROR=!ERRORLEVEL!"
+if not "!LINUX_CLEANUP_ERROR!"=="0" (
+    echo [X] Refused or failed to clean the verified remote Linux build directory.
+    exit /b 1
+)
+if not "!LINUX_BUILD_ERROR!"=="0" (
+    echo [X] Linux release build or artifact copy failed.
+    exit /b 1
+)
+if not exist "!LINUX_ASSET_PATH!" (
+    echo [X] Linux artifact was not copied to !LINUX_ASSET_PATH!.
+    exit /b 1
+)
+
+set "LINUX_SHA="
+set "LINUX_HASH_FILE=%TEMP%\BlindRSS_linux_hash.txt"
+"%TOOL_PY%" tools\build_utils.py sha256 --input "!LINUX_ASSET_PATH!" --output "!LINUX_HASH_FILE!"
+if exist "!LINUX_HASH_FILE!" set /p LINUX_SHA=<"!LINUX_HASH_FILE!"
+if exist "!LINUX_HASH_FILE!" del /f /q "!LINUX_HASH_FILE!" >nul 2>&1
+if not defined LINUX_SHA (
+    echo [X] Failed to compute the Linux artifact SHA-256.
+    exit /b 1
+)
+set "LINUX_MANIFEST_PATH=%SCRIPT_DIR%dist\BlindRSS-update-linux.json"
+"%TOOL_PY%" tools\release.py write-manifest --version-tag "%VERSION_TAG%" --asset-name "!LINUX_ASSET_NAME!" --sha256 "!LINUX_SHA!" --output "!LINUX_MANIFEST_PATH!"
+if errorlevel 1 exit /b 1
+
+echo [BlindRSS Release] Uploading Linux artifact and manifest to %VERSION_TAG%...
+gh release upload "%VERSION_TAG%" "!LINUX_ASSET_PATH!" "!LINUX_MANIFEST_PATH!" --repo "%GITHUB_REPO_SLUG%" --clobber
+if errorlevel 1 exit /b 1
+echo [BlindRSS Release] Linux assets uploaded for %VERSION_TAG%.
+exit /b 0
+
+:dispatch_macos_release
+echo [BlindRSS Release] Dispatching GitHub Actions macOS artifact build in %GITHUB_REPO_SLUG%...
+gh workflow run "cross-platform-release.yml" --repo "%GITHUB_REPO_SLUG%" --ref "%VERSION_TAG%" -f release_tag="%VERSION_TAG%" -f build_windows=false -f build_linux=false
+if errorlevel 1 (
+    echo [X] Failed to dispatch the macOS GitHub Actions build.
+    exit /b 1
+)
+echo [BlindRSS Release] macOS build dispatched for %VERSION_TAG%.
 exit /b 0
 
 :done

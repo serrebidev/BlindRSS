@@ -24,13 +24,12 @@
 ## Build & Release
 You should not need to open `build.bat`/`build.sh` to cut a release — everything operational is here. `build.md` has the long-form prose and the full env-var list.
 
-### Ship a release (two equivalent paths — pick the machine you're on)
-- Windows: `.\build.bat release` — bumps the version, builds and signs Windows locally, publishes the GitHub release with the Windows assets, and dispatches GitHub Actions to build macOS/Linux.
-- macOS/Linux: `./build.sh release` (NO tag argument) — bumps the version, commits/tags/pushes, creates the GitHub release (no assets yet), and dispatches `cross-platform-release.yml`, which builds and attaches ALL THREE platforms — the Windows installer/ZIP/manifest are built and Authenticode-signed on a `windows-latest` runner using the `WINDOWS_CODESIGN_PFX`/`WINDOWS_CODESIGN_PASSWORD` repo secrets.
-- Either way: do not hand-edit the version, tag manually, or run `gh release create` yourself. `./build.sh release vX.Y.Z` (WITH a tag) is only for re-dispatching CI assets onto an EXISTING release.
+### Ship a release (one canonical path)
+- Run `.\build.bat release` on this Windows machine. It bumps the version, builds and signs Windows locally, publishes the GitHub release with the Windows assets, builds Linux in an Ubuntu 22.04 Docker container over SSH on `root@serrebiradio.com`, copies back and uploads the self-contained Linux tarball + manifest, then dispatches GitHub Actions for macOS only.
+- Do not hand-edit the version, tag manually, or run `gh release create` yourself. `./build.sh release` without a tag is intentionally rejected. `./build.sh release vX.Y.Z` is only for re-dispatching the macOS asset onto an EXISTING release.
 
 ### `build.bat` modes (Windows)
-- `release` — full release, in order: verify `origin` is `serrebidev/BlindRSS` → compute next version → bump `core/version.py` → compile gettext `.po` catalogs to ignored `.mo` artifacts → clean PyInstaller build (`main.spec`) → Authenticode-sign `BlindRSS.exe` (signtool) → create portable ZIP → build/sign the Program Files Inno Setup installer → SHA-256 both → release notes → update `CHANGELOG.md` → write `BlindRSS-update.json` → `git commit "Release vX.Y.Z"` + tag + push → `gh release create` (ZIP + installer + manifest, `--latest`) → force `--draft=false --latest` → assert no drafts → assert `/releases/latest` == new tag → dispatch `cross-platform-release.yml`. Any failed step aborts non-zero; fix it, don't bypass.
+- `release` — full release, in order: verify `origin` is `serrebidev/BlindRSS` → verify the SSH/Docker Linux builder → compute next version → bump `core/version.py` → compile gettext `.po` catalogs to ignored `.mo` artifacts → clean PyInstaller build (`main.spec`) → Authenticode-sign `BlindRSS.exe` (signtool) → create portable ZIP → build/sign the Program Files Inno Setup installer → SHA-256 both → release notes → update `CHANGELOG.md` → write `BlindRSS-update.json` → `git commit "Release vX.Y.Z"` + tag + push → `gh release create` (ZIP + installer + manifest, `--latest`) → force `--draft=false --latest` → assert no drafts → assert `/releases/latest` == new tag → clone that tag into a temporary directory on `root@serrebiradio.com` → run `tools/build_linux_docker.sh` there → copy, hash, manifest, and upload the Linux artifact → clean the remote temp directory → dispatch `cross-platform-release.yml` with Windows/Linux disabled so macOS alone builds in CI. Any failed step aborts non-zero; fix it, don't bypass.
 - `build` — iterative LOCAL build only; no version bump, no git, no GitHub. Preserves `dist\BlindRSS` user data (`rss.db*`, `podcasts\`) across rebuilds.
 - `dry-run` — prints the next version and planned steps; changes nothing.
 
@@ -43,11 +42,11 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 - `dist\BlindRSS-Setup-vX.Y.Z.exe` (signed, per-machine Program Files installer; requires admin/UAC, including for in-app installer updates).
 - `dist\BlindRSS-update.json` (Windows updater manifest: portable ZIP metadata plus installer metadata, published-at, optional notes summary, and signing thumbprint). Installed copies select the installer; portable/legacy copies select the ZIP.
 - `dist\release-notes-vX.Y.Z.md`.
-- The GitHub release carries the Windows ZIP + manifest immediately; the macOS ZIP + `BlindRSS-update-macos.json` and Linux tarball + `BlindRSS-update-linux.json` are added minutes later by `cross-platform-release.yml`.
+- The GitHub release carries Windows first, then the locally controlled Linux tarball + `BlindRSS-update-linux.json`; the macOS ZIP + `BlindRSS-update-macos.json` are added by `cross-platform-release.yml`.
 
 ### macOS / Linux (`build.sh`, auto-detects platform)
 - `build` — LOCAL packaging only (compiles gettext `.po` catalogs to ignored `.mo` artifacts, bundles `yt-dlp`/`deno`/`ffmpeg`/VLC, runs `portable.spec`). macOS → ad-hoc-signed `dist/BlindRSS.app` + `dist/BlindRSS-macos-vX.Y.Z.zip`; Linux → `dist/BlindRSS/` + `dist/BlindRSS-linux-vX.Y.Z.tar.gz`. Never versions or releases.
-- `release` (no tag) — cuts a full official release from macOS/Linux (see "Ship a release" above). `release <tag>` — does NOT build; re-dispatches `cross-platform-release.yml` to attach Windows/mac/Linux assets to an EXISTING tag.
+- `release` (no tag) — rejected; official releases start on Windows. `release <tag>` — does NOT build; re-dispatches only the macOS CI asset for an EXISTING tag.
 - `dry-run` — prints the plan; changes nothing.
 
 ### Updater visibility (why the guards exist)
@@ -55,17 +54,14 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 - Post-release check: `gh api repos/serrebidev/BlindRSS/releases/latest --jq .tag_name` must print the new tag.
 
 ### Prerequisites & toggles
-- Windows release host: Python 3.14 (`py`/`python`), VLC 64-bit at `C:\Program Files\VideoLAN\VLC`, Inno Setup 6/7 (`ISCC.exe`; per-user/Program Files/PATH auto-detected or `INNO_SETUP_COMPILER`), authenticated `gh`, Windows SDK `signtool.exe`, network access.
-- Pushes to `main` trigger `cross-platform-release.yml` to build macOS/Linux
-  validation artifacts (no published release). A Windows-hosted release passes
-  `build_windows=false` because `build.bat` already built, signed, and uploaded
-  Windows locally; macOS/Linux release dispatches keep the default true so CI
-  produces all three platforms.
+- Windows release host: Python 3.14 (`py`/`python`), VLC 64-bit at `C:\Program Files\VideoLAN\VLC`, Inno Setup 6/7 (`ISCC.exe`; per-user/Program Files/PATH auto-detected or `INNO_SETUP_COMPILER`), authenticated `gh`, Windows SDK `signtool.exe`, OpenSSH `ssh`/`scp`, network access, and key-based root access to `root@serrebiradio.com`.
+- Linux release host: `root@serrebiradio.com` with Git and a working Docker daemon. The tracked `tools/linux-build.Dockerfile` supplies Python, wxPython wheel routing, VLC, ffmpeg, and build dependencies inside Ubuntu 22.04; do not install those desktop packages into the server host.
+- Pushes to `main` trigger `cross-platform-release.yml` to build macOS/Linux validation artifacts (no published release). A canonical release dispatch passes `build_windows=false` and `build_linux=false`; CI builds macOS only because Windows and Linux have already been built on user-controlled machines.
 - Linux packaging pins wxPython 4.2.5 through both `requirements.txt` and a
   workflow constraint. Keep the constraint for existing-tag re-dispatches:
   unpinned pip otherwise prefers the source-only wxPython 4.3.0 release over the
   compatible Ubuntu 22.04 wheel and fails while compiling wxWidgets.
-- Env toggles (full list in `build.md`): `SKIP_SIGN=1` (build mode only), `SIGNTOOL_PATH`, `SIGN_CERT_THUMBPRINT`, `GITHUB_REPO_SLUG`, `RELEASE_REMOTE`, `BLINDRSS_VLC_*`, `BLINDRSS_*CODESIGN*`.
+- Env toggles (full list in `build.md`): `SKIP_SIGN=1` (build mode only), `SIGNTOOL_PATH`, `SIGN_CERT_THUMBPRINT`, `GITHUB_REPO_SLUG`, `RELEASE_REMOTE`, `LINUX_BUILD_HOST`, `LINUX_BUILD_REPO_URL`, `BLINDRSS_LINUX_BUILD_IMAGE`, `BLINDRSS_VLC_*`, `BLINDRSS_*CODESIGN*`.
 
 ## File Structure & Responsibilities
 - `main.py`
@@ -381,7 +377,7 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 
 ### 6. Updates (packaged app, all platforms)
 - Checks latest GitHub release + a per-platform manifest (`BlindRSS-update.json` / `-macos.json` / `-linux.json`).
-- Each platform's manifest is published by the build flow that produces that platform's asset, so its SHA-256 always matches the asset on the same release. The macOS/Linux manifests are uploaded by the dispatched GitHub Actions job, so there is a short window after a Windows release where the mac/Linux manifest is not yet present (the client just reports "manifest not found" until the workflow finishes).
+- Each platform's manifest is published by the build flow that produces that platform's asset, so its SHA-256 always matches the asset on the same release. Windows writes its manifest locally, the SSH Linux build is copied back and manifested locally, and the dispatched GitHub Actions macOS job writes the macOS manifest. There can be a short window where the macOS manifest is not yet present (the client reports "manifest not found" until that workflow finishes).
 - Verifies asset SHA-256 before apply. Windows also verifies the signed executable (Authenticode); macOS does a best-effort `codesign --verify`; Linux relies on SHA-256.
 - Windows uses `update_helper.bat`; macOS/Linux use `update_helper.sh`.
 - Installed Windows copies use signed installer metadata from
@@ -442,7 +438,7 @@ sync-claude-memory.py after writing one:
 - [Silent no-op UI failures](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\silent-noop-ui-failures.md) — a refused action must SAY so; silent early-returns and omitted controls read as broken to an NVDA user (v1.114.0 lesson)
 - [Category identity model](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\category-identity-model.md) — categories are path-strings; nested identity is path-based (issue #27)
 - [Provider flat vs nested](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\provider-flat-vs-nested.md) — never simulate subcategories on providers that are flat upstream
-- [Release build process](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\release-build-process.md) — build.bat release auto-bumps from commit subjects; run via PowerShell `&`, not cmd //c
+- [Release build process](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\release-build-process.md) — build.bat release builds Windows locally, Linux over SSH/Docker on serrebiradio, and macOS in CI
 - [curl_cffi impersonation transport](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\curl-cffi-impersonation-transport.md) — how feed fetching beats anti-bot WAFs; per-feed feed_settings overrides (issue #29)
 - [Refresh speed fixes](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\refresh-speed-fixes.md) — root cause of multi-minute refreshes: fixed worker pool + unbounded per-feed retry time, not mainly transport
 - [YouTube live format selection](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\youtube-live-format-selection.md) — live streams w/o audio-only tracks picked the highest-bitrate combined format, causing stalls

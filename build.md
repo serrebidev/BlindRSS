@@ -4,49 +4,31 @@ This is the only approved workflow for packaging and publishing BlindRSS.
 
 ## Every Release, Bluntly
 
-There are two equivalent ways to cut a release:
+Run `.\build.bat release` on the Windows development machine. This is the one
+canonical release command. It builds and signs Windows locally, creates the
+GitHub release, builds Linux inside an Ubuntu 22.04 Docker container reached via
+`ssh root@serrebiradio.com`, copies the self-contained Linux tarball back and
+uploads it with its manifest, then dispatches GitHub Actions for macOS only.
 
-- On Windows: run `.\build.bat release`. It bumps the version, builds and signs
-  the Windows release locally, creates the GitHub release with the Windows
-  assets attached, and dispatches GitHub Actions to build macOS and Linux.
-- On macOS/Linux: run `./build.sh release` (no tag). It bumps the version,
-  creates the GitHub release with no assets yet, and dispatches GitHub Actions
-  to build **all three platforms** — including a signed Windows build, using a
-  code-signing certificate stored as the `WINDOWS_CODESIGN_PFX` /
-  `WINDOWS_CODESIGN_PASSWORD` repo secrets.
-
-Only run `./build.sh release vX.Y.Z` (with an existing tag) if you need to
-manually rerun or republish CI-built assets for a release that's already been
-created.
-
-You do not normally need to build locally on both Windows and macOS — pick
-whichever machine you're on and run its release command.
+`./build.sh release` without a tag is rejected. Only run
+`./build.sh release vX.Y.Z` to re-dispatch the macOS CI asset for an existing
+release.
 
 ## Supported Flow Matrix
 
 - Official release from Windows:
   - Run `.\build.bat release`.
-  - Windows builds locally.
-  - GitHub Actions builds macOS and Linux automatically and uploads the mac ZIP and Linux tarball to the same GitHub release.
+  - Windows builds and signs locally on this machine.
+  - Linux builds on the user-controlled `root@serrebiradio.com` Docker host and
+    is copied back, hashed, manifested, and uploaded by `build.bat`.
+  - GitHub Actions builds and uploads macOS only.
 - Local build from macOS or Linux:
   - Run `./build.sh build`.
   - This builds the mac app (macOS) or Linux tarball locally only.
   - If you push to `main`, GitHub Actions will build validation artifacts for macOS and Linux automatically.
-- Official release from macOS:
-  - Run `./build.sh release` (no tag) on macOS or Linux.
-  - This bumps `core/version.py`, tags, pushes, and creates the GitHub release (no assets yet).
-  - It then dispatches `cross-platform-release.yml`, which builds and attaches
-    the signed **Windows** installer/ZIP/`BlindRSS-update.json` (via a
-    `windows-latest` runner using the `WINDOWS_CODESIGN_PFX` /
-    `WINDOWS_CODESIGN_PASSWORD` secrets), plus the **macOS** and **Linux**
-    assets, all to that same release.
-  - Requires `WINDOWS_CODESIGN_PFX` and `WINDOWS_CODESIGN_PASSWORD` to be set
-    as repo secrets (see "GitHub Actions Windows Build" below).
 - Re-dispatch an existing release:
-  - Run `./build.sh release vX.Y.Z` with an existing tag to re-trigger the
-    Windows/macOS/Linux CI build for a release that's already been created
-    (Windows only runs there too — no more mac/Linux-only re-dispatch).
-  - Windows can still be built and signed locally instead with `.\build.bat release` on a Windows machine.
+  - Run `./build.sh release vX.Y.Z` with an existing tag to re-trigger only the
+    macOS CI build for a release that's already been created.
 
 ## Commands
 
@@ -54,22 +36,22 @@ whichever machine you're on and run its release command.
 - Official Windows release build: `.\build.bat release`
 - No-change preview: `.\build.bat dry-run`
 - Local macOS/Linux package build: `./build.sh build`
-- Official macOS/Linux/Windows release build: `./build.sh release`
-- Re-dispatch CI build for an existing release: `./build.sh release vX.Y.Z`
+- Re-dispatch macOS for an existing release: `./build.sh release vX.Y.Z`
 - Local macOS/Linux preview: `./build.sh dry-run`
 
 ## Mandatory Release Rule
 
-Use `.\build.bat release` (Windows) or `./build.sh release` (macOS/Linux) to cut a release — never hand-assemble a GitHub release. Whichever one you run:
+Use `.\build.bat release` on Windows to cut a release—never hand-assemble a GitHub release. It:
 
 - Creates `BlindRSS-update.json` for Windows auto-updates (locally by `build.bat`, or by the `windows` CI job when dispatched from `build.sh`).
 - Computes the release ZIP SHA-256 hash.
 - Builds the Program Files Windows installer and computes its SHA-256 hash.
-- Signs `BlindRSS.exe` and the installer — locally via `signtool.exe` for `build.bat`, or in CI via the `WINDOWS_CODESIGN_PFX`/`WINDOWS_CODESIGN_PASSWORD` secrets for `build.sh`.
+- Signs `BlindRSS.exe` and the installer locally via `signtool.exe`.
 - Bumps `core/version.py`, tags Git, pushes, and creates the GitHub release.
-- Dispatches the GitHub Actions release-asset build. `build.bat` passes
-  `build_windows=false` so CI builds only macOS/Linux after Windows was built
-  and signed locally; `build.sh` keeps the default and dispatches all three.
+- Builds Linux over SSH on `root@serrebiradio.com`, verifies the tarball includes
+  the executable and bundled Python runtime, uploads it and
+  `BlindRSS-update-linux.json`, then dispatches GitHub Actions with Windows and
+  Linux disabled so CI builds macOS only.
 - Pushes to `main` also trigger GitHub Actions workflow builds for macOS and Linux as workflow artifacts so you can validate packaging without publishing a release. The Windows CI job only runs on `workflow_dispatch` (release cuts), not on every push, since it's a heavier build.
 - `build.bat release` forces the created GitHub release to published/latest, verifies there are no draft releases, and verifies GitHub's `/releases/latest` endpoint points at the new tag before exiting. Never leave draft releases behind. Do not automatically delete releases during this check; publish or delete drafts manually by exact tag if needed.
 
@@ -84,7 +66,10 @@ BlindRSS auto-update does not look at Git tags, commits on `main`, or GitHub Act
 - macOS: `BlindRSS-update-macos.json` -> `BlindRSS-macos-vX.Y.Z.zip`
 - Linux: `BlindRSS-update-linux.json` -> `BlindRSS-linux-vX.Y.Z.tar.gz`
 
-When `.\build.bat release` runs on Windows, the Windows manifest is created locally. When `./build.sh release` runs on macOS/Linux, the Windows manifest instead comes from the `windows` job in `cross-platform-release.yml` (built and signed on a `windows-latest` runner). Either way, the macOS and Linux manifests are always created and uploaded by the dispatched `cross-platform-release.yml` job (alongside their assets), so all platform manifests appear on the release a few minutes after the release is created, not instantly. Until each job finishes, that platform's clients report "manifest not found" for the new tag.
+`build.bat release` creates the Windows manifest locally. It creates the Linux
+manifest after copying the server-built artifact back to Windows. The dispatched
+workflow creates only the macOS manifest and asset, so macOS may appear a few
+minutes after Windows and Linux.
 
 After cutting a release, the latest endpoint must return the new tag:
 
@@ -94,18 +79,25 @@ gh api repos/serrebidev/BlindRSS/releases/latest --jq .tag_name
 
 If this returns the previous tag, users will see "BlindRSS is up to date" for that previous version even when newer code exists on `main`.
 
-`./build.sh release vX.Y.Z` (with an existing tag) re-dispatches the Windows/macOS/Linux CI build for a release that's already been created — useful to retry a failed CI job or republish an asset. It does not bump the version or create a new release.
+`./build.sh release vX.Y.Z` re-dispatches the macOS CI build for an existing
+release. It does not bump the version or create a new release.
 
-## GitHub Actions Windows Build
+## Emergency GitHub Actions Windows/Linux Builds
 
-`cross-platform-release.yml`'s `windows` job lets a release be cut entirely from macOS/Linux without touching a Windows machine. It only runs on `workflow_dispatch` (an actual release cut), reuses `build.bat build` unchanged, and needs two repo secrets:
+`cross-platform-release.yml` retains opt-in `build_windows` and `build_linux`
+inputs for disaster recovery, but the canonical `build.bat release` dispatch
+sets both false. Normal release assets must come from this Windows machine and
+`root@serrebiradio.com`, not hosted runners. The emergency Windows job needs two
+repo secrets:
 
 - `WINDOWS_CODESIGN_PFX`: base64-encoded, password-protected PFX export of the code-signing certificate (`Export-PfxCertificate` on the machine that holds it, then base64-encode the file).
 - `WINDOWS_CODESIGN_PASSWORD`: the PFX's password.
 
 The job imports the cert into `Cert:\CurrentUser\My` on the runner, installs VLC and Inno Setup via Chocolatey (VLC must land at `C:\Program Files\VideoLAN\VLC` — the path `main.spec` hardcodes), locates `signtool.exe` under the Windows SDK, then runs `build.bat build` with `SIGNTOOL_PATH` pointed at it. Rotate these secrets with `gh secret set WINDOWS_CODESIGN_PFX --repo serrebidev/BlindRSS` / `gh secret set WINDOWS_CODESIGN_PASSWORD --repo serrebidev/BlindRSS` (each reads the value from stdin) if the certificate is ever replaced.
 
-An earlier attempt at a Windows CI job was reverted because the runner had no VLC installed at the path `main.spec` expects, so `libvlc.dll` was missing and the PyInstaller build failed. This version fixes that by installing VLC via Chocolatey before building.
+The Linux CI job remains enabled on ordinary pushes as packaging validation and
+can be manually selected for an existing release, but it is not part of the
+default release dispatch.
 
 ## Windows Release Prerequisites
 
@@ -117,7 +109,21 @@ An earlier attempt at a Windows CI job was reverted because the runner had no VL
   `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`, standard Program Files
   installs, and `ISCC.exe` on PATH. Set `INNO_SETUP_COMPILER` to override.
 - Network access (the script installs deps and can download `yt-dlp.exe` and `deno.exe`).
-- These prerequisites apply to the machine actually building Windows — either your local Windows machine (`build.bat`) or the GitHub Actions `windows-latest` runner (`build.sh release`, see "GitHub Actions Windows Build" above), which provisions VLC and Inno Setup itself.
+- OpenSSH `ssh` and `scp`, with non-interactive key access to
+  `root@serrebiradio.com`.
+
+## Remote Linux Release Prerequisites
+
+- `root@serrebiradio.com` must be reachable with key-based SSH authentication.
+- The host needs Git and a running Docker daemon. Its host Python, VLC, ffmpeg,
+  and GUI packages are irrelevant because the build runs in the tracked Ubuntu
+  22.04 container from `tools/linux-build.Dockerfile`.
+- `tools/build_linux_docker.sh` builds the current checkout, verifies the
+  tarball contains `BlindRSS/BlindRSS` and a bundled `libpython`, and leaves the
+  artifact in `dist/` for `build.bat` to copy.
+- `build.bat` clones the exact release tag into a `mktemp` directory under
+  `/tmp`, builds there, copies the artifact to Windows, and removes only that
+  resolved temporary directory.
 
 ## macOS Local Build Prerequisites
 
@@ -179,8 +185,8 @@ An earlier attempt at a Windows CI job was reverted because the runner had no VL
   - `dist\release-notes-vX.Y.Z.md`
 - Updates `CHANGELOG.md`, commits the version bump + changelog entry, tags,
   pushes, creates GitHub release assets (ZIP + installer + manifest), and
-  dispatches the `cross-platform-release.yml` GitHub Actions workflow to attach
-  the macOS/Linux assets to the same release.
+  builds/uploads Linux through `root@serrebiradio.com`, then dispatches the
+  `cross-platform-release.yml` workflow to attach macOS to the same release.
 
 ## Windows Installer and Data Locations
 
@@ -236,21 +242,12 @@ An earlier attempt at a Windows CI job was reverted because the runner had no VL
 
 ### `build.sh release`
 
-- **No tag given** (`./build.sh release`): computes the next version, bumps
-  `core/version.py`, writes release notes, updates `CHANGELOG.md`, commits,
-  tags, pushes, and creates the GitHub release (no assets yet) — the macOS/Linux
-  equivalent of `build.bat release`'s version-bump step. Then dispatches
-  `cross-platform-release.yml` with the new tag.
+- **No tag given** (`./build.sh release`): rejected with instructions to run the
+  canonical Windows `.\build.bat release` process.
 - **Tag given** (`./build.sh release vX.Y.Z`): requires that tag's GitHub
-  release to already exist, and just dispatches `cross-platform-release.yml`
-  with `release_tag=<tag>` to re-trigger CI for it. Does not bump versions or
-  create a new release.
-- Either way, GitHub Actions then builds and uploads (with updater manifests):
-  the signed **Windows** installer/ZIP (`windows-latest` runner, using the
-  `WINDOWS_CODESIGN_PFX`/`WINDOWS_CODESIGN_PASSWORD` secrets), the **macOS**
-  ZIP (macOS runner), and the **Linux** tarball (Ubuntu runner).
-- Windows can still be built and signed locally instead via `.\build.bat release`
-  on a Windows machine, if you'd rather not depend on the CI signing secrets.
+  release to already exist and dispatches `cross-platform-release.yml` with
+  Windows and Linux disabled, rebuilding macOS only. It does not bump versions
+  or create a new release.
 
 ## Optional Environment Variables
 
@@ -266,6 +263,13 @@ An earlier attempt at a Windows CI job was reverted because the runner had no VL
 - `BLINDRSS_SKIP_MACOS_CODESIGN=1`: skip ad-hoc signing in `build.sh`.
 - `BLINDRSS_VLC_LIB_DIR`: override the directory `build.sh`/`portable.spec` search for `libvlc.so*` on Linux.
 - `BLINDRSS_VLC_PLUGINS`: override the VLC plugins directory bundled on Linux.
+- `LINUX_BUILD_HOST`: SSH destination for release Linux builds. Default:
+  `root@serrebiradio.com`.
+- `LINUX_BUILD_REPO_URL`: Git URL cloned by the remote release builder. Default:
+  `https://github.com/serrebidev/BlindRSS.git`.
+- `BLINDRSS_LINUX_BUILD_IMAGE`: Docker image tag used/cached by
+  `tools/build_linux_docker.sh`. Default:
+  `blindrss-linux-builder:ubuntu-22.04`.
 
 ## Typical Usage
 

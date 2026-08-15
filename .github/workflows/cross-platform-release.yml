@@ -15,6 +15,11 @@ on:
         required: false
         default: true
         type: boolean
+      build_linux:
+        description: Build Linux assets in CI (disable when serrebiradio built them)
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -164,6 +169,7 @@ jobs:
 
   linux:
     name: Build Linux Artifact
+    if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_linux }}
     runs-on: ubuntu-22.04
     steps:
       - name: Check out release tag
