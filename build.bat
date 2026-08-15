@@ -670,7 +670,15 @@ exit /b 0
 call :verify_linux_builder
 if errorlevel 1 exit /b 1
 set "REMOTE_BUILD_DIR="
-for /f "usebackq delims=" %%D in (`ssh -o BatchMode=yes "%LINUX_BUILD_HOST%" "mktemp -d /tmp/blindrss-release-%VERSION_TAG%-XXXXXX"`) do set "REMOTE_BUILD_DIR=%%D"
+set "REMOTE_BUILD_DIR_FILE=%TEMP%\BlindRSS_remote_build_dir_%RANDOM%.txt"
+ssh -o BatchMode=yes "%LINUX_BUILD_HOST%" "mktemp -d /tmp/blindrss-release-%VERSION_TAG%-XXXXXX" >"!REMOTE_BUILD_DIR_FILE!"
+if errorlevel 1 (
+    if exist "!REMOTE_BUILD_DIR_FILE!" del /f /q "!REMOTE_BUILD_DIR_FILE!" >nul 2>&1
+    echo [X] Failed to create a temporary Linux build directory on %LINUX_BUILD_HOST%.
+    exit /b 1
+)
+if exist "!REMOTE_BUILD_DIR_FILE!" set /p REMOTE_BUILD_DIR=<"!REMOTE_BUILD_DIR_FILE!"
+if exist "!REMOTE_BUILD_DIR_FILE!" del /f /q "!REMOTE_BUILD_DIR_FILE!" >nul 2>&1
 if not defined REMOTE_BUILD_DIR (
     echo [X] Failed to create a temporary Linux build directory on %LINUX_BUILD_HOST%.
     exit /b 1
