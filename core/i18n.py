@@ -53,8 +53,12 @@ def override_locale_dir() -> str:
     instead (see core.translation_updates).
     """
     try:
-        from core.translation_updates import override_root
+        from core.translation_updates import (
+            override_root,
+            prepare_overrides_for_app_version,
+        )
 
+        prepare_overrides_for_app_version()
         return override_root()
     except Exception:
         return ""
@@ -63,8 +67,9 @@ def override_locale_dir() -> str:
 def catalog_dirs() -> list:
     """Directories to search for catalogs, most preferred first.
 
-    Downloaded catalogs win over bundled ones. They come from the same branch
-    releases are built from, so they are never older than what shipped.
+    Downloaded catalogs win over bundled ones within one app version. On an app
+    version change, override_locale_dir() first removes them so an older
+    downloaded snapshot cannot shadow the new release's bundled catalog.
     """
     dirs = []
     override = override_locale_dir()

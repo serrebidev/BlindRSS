@@ -413,7 +413,10 @@ class MainFrame(wx.Frame):
         wx.CallLater(4000, self._check_media_dependencies)
         # Later than the app-update check so a slow network cannot make the two
         # compete during the first seconds of a session.
-        wx.CallLater(25000, self._maybe_auto_update_translations)
+        self._translation_update_inflight = False
+        self._translation_update_timer = wx.CallLater(
+            25000, self._maybe_auto_update_translations
+        )
 
     def _start_startup_background_work(self) -> None:
         """Start initial tree loading and feed refresh after the window gets an
@@ -14233,11 +14236,24 @@ class MainFrame(wx.Frame):
         Silent by design: the user asked for translations, not for a dialog. A
         downloaded catalog is applied on the next launch, so there is nothing
         actionable to report and nothing to interrupt a screen reader with.
+
+        This callback reschedules itself at the shortest supported interval.
+        The former one-shot startup callback missed a daily/weekly/monthly due
+        time whenever BlindRSS remained open across that boundary (issue #99).
         """
         try:
             from core import translation_updates as tu
 
+            stop_event = getattr(self, "stop_event", None)
+            if stop_event is None or not stop_event.is_set():
+                self._translation_update_timer = wx.CallLater(
+                    tu.AUTO_UPDATE_POLL_SECONDS * 1000,
+                    self._maybe_auto_update_translations,
+                )
+
             if not bool(self.config_manager.get(tu.CFG_ENABLED, tu.DEFAULT_ENABLED)):
+                return
+            if getattr(self, "_translation_update_inflight", False):
                 return
             frequency = str(
                 self.config_manager.get(tu.CFG_FREQUENCY, tu.DEFAULT_FREQUENCY) or ""
@@ -14247,6 +14263,8 @@ class MainFrame(wx.Frame):
         except Exception:
             log.debug("Translation auto-update gate failed", exc_info=True)
             return
+
+        self._translation_update_inflight = True
 
         def worker():
             try:
@@ -14259,8 +14277,14 @@ class MainFrame(wx.Frame):
                     log.info("Updated translations: %s", ", ".join(result.updated))
             except Exception:
                 log.debug("Translation auto-update failed", exc_info=True)
+            finally:
+                self._translation_update_inflight = False
 
-        threading.Thread(target=worker, daemon=True).start()
+        threading.Thread(
+            target=worker,
+            daemon=True,
+            name="BlindRSSTranslationUpdate",
+        ).start()
 
     def _maybe_auto_check_updates(self):
         try:

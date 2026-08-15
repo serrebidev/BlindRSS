@@ -1858,9 +1858,15 @@ class SettingsDialog(wx.Dialog):
             0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5,
         )
         # Parallel lists: labels are translated, stored values never are.
-        self._translation_frequency_values = ["daily", "weekly", "monthly"]
+        self._translation_frequency_values = [
+            "ten_minutes",
+            "daily",
+            "weekly",
+            "monthly",
+        ]
         self.translation_frequency_ctrl = wx.Choice(
-            panel, choices=[_("Daily"), _("Weekly"), _("Monthly")]
+            panel,
+            choices=[_("10 minutes"), _("Daily"), _("Weekly"), _("Monthly")],
         )
         self.translation_frequency_ctrl.SetName(_("Check for updates:"))
         current = str(config.get(tu.CFG_FREQUENCY, tu.DEFAULT_FREQUENCY) or "").lower()
@@ -1869,7 +1875,9 @@ class SettingsDialog(wx.Dialog):
                 self._translation_frequency_values.index(current)
             )
         except ValueError:
-            self.translation_frequency_ctrl.SetSelection(0)
+            self.translation_frequency_ctrl.SetSelection(
+                self._translation_frequency_values.index(tu.DEFAULT_FREQUENCY)
+            )
         row.Add(self.translation_frequency_ctrl, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
 
         self.translation_check_now_btn = wx.Button(panel, label=_("Check for Updates"))

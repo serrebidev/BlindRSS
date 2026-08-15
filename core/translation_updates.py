@@ -18,7 +18,11 @@ Design notes:
   compiled locally (core.po_compile) rather than downloaded pre-compiled.
 - Freshness uses HTTP ETags against raw.githubusercontent.com: an unchanged
   catalog costs one conditional request answered with 304 and no body. That
-  keeps a daily check cheap and avoids the GitHub API's 60/hour anonymous limit.
+  keeps even a ten-minute check cheap and avoids the GitHub API's 60/hour
+  anonymous limit.
+- A newly installed app version discards downloaded overrides before gettext
+  starts. The new release's bundled catalogs are authoritative until a later
+  check downloads an equal or newer catalog from ``main``.
 - Catalogs are written atomically via a temp file and only after they parse into
   a non-empty message map, so an interrupted or truncated download can never
   leave a broken catalog that would blank the whole UI.
@@ -58,14 +62,24 @@ DEFAULT_FREQUENCY = "daily"
 
 FREQUENCY_SECONDS = {
     "startup": 0,
+    "ten_minutes": 10 * 60,
     "daily": 24 * 60 * 60,
     "weekly": 7 * 24 * 60 * 60,
     "monthly": 30 * 24 * 60 * 60,
 }
 
+# Re-evaluate the setting at the shortest supported interval. This is separate
+# from the selected update frequency: it lets a long-running process notice
+# when an interval becomes due or when Settings enables/changes the feature.
+AUTO_UPDATE_POLL_SECONDS = FREQUENCY_SECONDS["ten_minutes"]
+
 # A catalog that parses to fewer than this many messages is treated as damaged
 # rather than installed; the real catalogs carry >1000 entries.
 MIN_SANE_MESSAGES = 50
+
+# Avoid repeated state-file reads through i18n.catalog_dirs() during one
+# process. Tests reset this when exercising version transitions.
+_prepared_app_version = ""
 
 
 @dataclass
@@ -123,6 +137,56 @@ def save_state(state: dict) -> None:
 
 def catalog_path(language: str) -> str:
     return os.path.join(override_root(), language, "LC_MESSAGES", DOMAIN + ".mo")
+
+
+def prepare_overrides_for_app_version(app_version: str | None = None) -> bool:
+    """Make bundled catalogs authoritative after installing a new app version.
+
+    Downloaded catalogs are snapshots of ``main`` at their check time. They can
+    therefore be older than the catalogs in a later BlindRSS release, despite
+    coming from the same branch. Remove them once per version before gettext
+    chooses a catalog, clear their ETags, and make the first background check
+    due immediately. Returns True when a version transition was handled.
+    """
+    global _prepared_app_version
+
+    if app_version is None:
+        from core.version import APP_VERSION
+
+        app_version = APP_VERSION
+    current = str(app_version or "").strip()
+    if not current or _prepared_app_version == current:
+        return False
+
+    state = load_state()
+    recorded = str(state.get("app_version") or "").strip()
+    if recorded == current:
+        _prepared_app_version = current
+        return False
+
+    root = override_root()
+    try:
+        if os.path.exists(root):
+            shutil.rmtree(root)
+    except Exception:
+        # Do not record the new version if cleanup failed; retry next launch so
+        # an old override cannot be accepted permanently. The caller in i18n
+        # falls back to the bundled tree when this exception escapes.
+        log.warning("Could not remove stale translation overrides", exc_info=True)
+        raise
+
+    state["app_version"] = current
+    state.pop("etags", None)
+    state.pop("last_check", None)
+    save_state(state)
+    _prepared_app_version = current
+    if recorded:
+        log.info(
+            "Reset translation overrides after app update %s -> %s",
+            recorded,
+            current,
+        )
+    return True
 
 
 def installed_languages() -> list:

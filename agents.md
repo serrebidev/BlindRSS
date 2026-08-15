@@ -104,6 +104,13 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
     looking like a valid empty account.
 
 - `core/`
+  - `i18n.py` / `translation_updates.py`: UI gettext catalogs are bundled with
+    every release and may be refreshed between releases from `main`. Downloaded
+    overrides win only within the same app version; on an app-version change,
+    remove them before gettext loads so an older snapshot cannot shadow the new
+    bundled catalog. Automatic checks are recurring (not startup-only), poll
+    the due gate every 10 minutes, and support a user-selected 10-minute
+    interval. Catalog downloads and compilation remain off the wx UI thread.
   - `user_agents.py`: the browser identity every outbound request presents — installed-browser detection, built-in Chrome/Edge/Firefox presets, custom strings, and the `sec-ch-ua*` hints that must travel with each. Owns `utils.HEADERS["User-Agent"]`; see "Browser identity" under Full Text & Discovery.
   - `db.py`: SQLite schema setup/migrations, WAL/busy timeout pragmas, connection helpers, retention cleanup.
     - Includes tables: `feeds`, `articles`, `chapters`, `chapter_cache`, `chapter_sources`, `categories`, `playback_state`.

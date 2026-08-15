@@ -13,6 +13,7 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 import gui.mainframe as mainframe
+from core import i18n, translation_updates as tu
 
 
 class _Config:
@@ -193,6 +194,67 @@ def test_startup_background_work_does_nothing_after_shutdown_begins(monkeypatch)
 
     assert host._startup_background_work_started is False
     assert host.tree_loads == 0
+
+
+class _TranslationUpdateHost:
+    _maybe_auto_update_translations = mainframe.MainFrame._maybe_auto_update_translations
+
+    def __init__(self, values=None):
+        self.config_manager = _Config(values or {})
+        self.stop_event = threading.Event()
+        self._translation_update_inflight = False
+        self._translation_update_timer = None
+
+
+def test_translation_update_scheduler_rechecks_every_ten_minutes(monkeypatch):
+    timers = []
+    monkeypatch.setattr(
+        mainframe.wx,
+        "CallLater",
+        lambda delay, callback, *args: timers.append((delay, callback, args)),
+    )
+    monkeypatch.setattr(tu, "is_due", lambda _frequency: False)
+    host = _TranslationUpdateHost({tu.CFG_FREQUENCY: "daily"})
+
+    host._maybe_auto_update_translations()
+
+    assert len(timers) == 1
+    assert timers[0][0] == 10 * 60 * 1000
+    assert timers[0][1] == host._maybe_auto_update_translations
+
+
+def test_translation_update_scheduler_runs_due_check_single_flight(monkeypatch):
+    checked = []
+    threads = []
+    monkeypatch.setattr(mainframe.wx, "CallLater", lambda *_args, **_kwargs: object())
+    monkeypatch.setattr(tu, "is_due", lambda _frequency: True)
+    monkeypatch.setattr(tu, "installed_languages", lambda: ["fr", "ru"])
+    monkeypatch.setattr(i18n, "current_language", lambda: "ru")
+    monkeypatch.setattr(
+        tu,
+        "check_and_update",
+        lambda languages: checked.append(languages) or tu.UpdateResult(updated=["ru"]),
+    )
+
+    class _Thread:
+        def __init__(self, *, target, daemon, name):
+            self.target = target
+            self.daemon = daemon
+            self.name = name
+
+        def start(self):
+            threads.append(self)
+            self.target()
+
+    monkeypatch.setattr(mainframe.threading, "Thread", _Thread)
+    host = _TranslationUpdateHost({tu.CFG_FREQUENCY: "ten_minutes"})
+
+    host._maybe_auto_update_translations()
+
+    assert checked == [["ru", "fr"]]
+    assert len(threads) == 1
+    assert threads[0].name == "BlindRSSTranslationUpdate"
+    assert host._translation_update_inflight is False
 
 
 class _RefreshUiBatchHost:

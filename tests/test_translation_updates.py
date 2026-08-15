@@ -39,6 +39,7 @@ def _po_with(count):
 def data_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(tu, "override_root", lambda: str(tmp_path / "locale"))
     monkeypatch.setattr(tu, "_state_path", lambda: str(tmp_path / "state.json"))
+    monkeypatch.setattr(tu, "_prepared_app_version", "")
     return tmp_path
 
 
@@ -184,9 +185,65 @@ def test_mislabelled_encoding_still_decodes_as_utf8(data_dir, monkeypatch):
 def test_is_due_respects_frequency(data_dir, monkeypatch):
     assert tu.is_due("daily") is True  # never checked
     tu.save_state({"last_check": 1_000_000})
+    assert tu.is_due("ten_minutes", now=1_000_000 + 599) is False
+    assert tu.is_due("ten_minutes", now=1_000_000 + 600) is True
     assert tu.is_due("daily", now=1_000_000 + 60) is False
     assert tu.is_due("daily", now=1_000_000 + 25 * 3600) is True
     assert tu.is_due("weekly", now=1_000_000 + 25 * 3600) is False
+
+
+def test_new_app_version_removes_stale_override_before_gettext_loads(
+    data_dir, tmp_path, monkeypatch
+):
+    bundled = tmp_path / "bundled"
+    bundled_mo = bundled / "xx" / "LC_MESSAGES" / "blindrss.mo"
+    bundled_mo.parent.mkdir(parents=True)
+    po_compile.write_mo({"All Articles": "new bundled text"}, bundled_mo)
+
+    override_mo = tmp_path / "locale" / "xx" / "LC_MESSAGES" / "blindrss.mo"
+    override_mo.parent.mkdir(parents=True)
+    po_compile.write_mo({"All Articles": "old downloaded text"}, override_mo)
+    tu.save_state(
+        {
+            "app_version": "1.0.0",
+            "last_check": 1_000_000,
+            "etags": {"xx": '"old"'},
+        }
+    )
+
+    monkeypatch.setattr(i18n, "locale_dir", lambda: str(bundled))
+    monkeypatch.setattr("core.version.APP_VERSION", "2.0.0")
+    try:
+        i18n.setup("xx")
+        assert i18n._("All Articles") == "new bundled text"
+        assert not override_mo.exists()
+        state = tu.load_state()
+        assert state["app_version"] == "2.0.0"
+        assert "etags" not in state
+        assert "last_check" not in state
+    finally:
+        i18n.setup("en")
+
+
+def test_same_app_version_keeps_newer_downloaded_override(data_dir, tmp_path, monkeypatch):
+    bundled = tmp_path / "bundled"
+    bundled_mo = bundled / "xx" / "LC_MESSAGES" / "blindrss.mo"
+    bundled_mo.parent.mkdir(parents=True)
+    po_compile.write_mo({"All Articles": "bundled text"}, bundled_mo)
+
+    override_mo = tmp_path / "locale" / "xx" / "LC_MESSAGES" / "blindrss.mo"
+    override_mo.parent.mkdir(parents=True)
+    po_compile.write_mo({"All Articles": "new downloaded text"}, override_mo)
+    tu.save_state({"app_version": "2.0.0", "etags": {"xx": '"new"'}})
+
+    monkeypatch.setattr(i18n, "locale_dir", lambda: str(bundled))
+    monkeypatch.setattr("core.version.APP_VERSION", "2.0.0")
+    try:
+        i18n.setup("xx")
+        assert i18n._("All Articles") == "new downloaded text"
+        assert override_mo.exists()
+    finally:
+        i18n.setup("en")
 
 
 def test_downloaded_catalog_wins_over_bundled(tmp_path, monkeypatch):
