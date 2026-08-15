@@ -4,6 +4,15 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.130.3 - 2026-08-15
+
+- Silence foreign library scans on Linux.
+- Include Linux GUI runtime libraries.
+- Use Python 3.12 for Linux packaging.
+- Require consent for browser cookie elevation.
+- Preserve Linux Docker dependency cache.
+- Make Linux releases locally over SSH.
+
 ## v1.130.2 - 2026-08-15
 
 - Apply translation updates automatically.
