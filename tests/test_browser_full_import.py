@@ -59,7 +59,12 @@ def _no_chromium(monkeypatch):
         chromium_cookies,
         "import_chromium_cookies",
         lambda config_manager, profiles=None, elevate=True: {
-            "profiles": 0, "cookies": 0, "elevated": 0, "youtube": 0, "vss": 0,
+            "profiles": 0,
+            "cookies": 0,
+            "elevated": 0,
+            "youtube": 0,
+            "vss": 0,
+            "elevation_failed": 0,
         },
     )
 
@@ -100,7 +105,7 @@ def test_full_import_firefox_and_gate(tmp_path, monkeypatch):
     )
     _no_chromium(monkeypatch)
 
-    cfg = _FakeConfig()
+    cfg = _FakeConfig({"installed_browser_cookie_import_enabled": True})
     stats = site_cookies.auto_import_installed_browser_cookies(cfg)
     assert stats["cookies"] == 2
     assert stats["youtube"] > 0
@@ -112,12 +117,20 @@ def test_full_import_firefox_and_gate(tmp_path, monkeypatch):
     assert cfg.get("ytdlp_cookies_file") == str(jar)
 
 
-def test_full_import_disabled_by_setting(tmp_path, monkeypatch):
+def test_full_import_requires_new_explicit_consent(tmp_path, monkeypatch):
     monkeypatch.setattr(site_cookies, "list_browser_profiles", lambda: [])
     _no_chromium(monkeypatch)
-    cfg = _FakeConfig({"auto_import_installed_browser_cookies": False})
+    cfg = _FakeConfig({"auto_import_installed_browser_cookies": True})
     stats = site_cookies.auto_import_installed_browser_cookies(cfg)
-    assert stats == {"firefox": 0, "chromium": 0, "cookies": 0, "youtube": 0, "elevated": 0, "vss": 0}
+    assert stats == {
+        "firefox": 0,
+        "chromium": 0,
+        "cookies": 0,
+        "youtube": 0,
+        "elevated": 0,
+        "vss": 0,
+        "elevation_failed": 0,
+    }
 
 
 def test_full_import_skips_unchanged_profiles(tmp_path, monkeypatch):
@@ -131,6 +144,38 @@ def test_full_import_skips_unchanged_profiles(tmp_path, monkeypatch):
     )
     _no_chromium(monkeypatch)
 
-    cfg = _FakeConfig({"site_cookies_full_profile_mtimes": {os.path.abspath(profile).lower(): 2000.0}})
+    cfg = _FakeConfig({
+        "installed_browser_cookie_import_enabled": True,
+        "site_cookies_full_profile_mtimes": {os.path.abspath(profile).lower(): 2000.0},
+    })
     stats = site_cookies.auto_import_installed_browser_cookies(cfg)
     assert stats["cookies"] == 0  # mtime marker matched -> skipped
+
+
+def test_elevation_failure_revokes_consent_and_prevents_retry(monkeypatch):
+    monkeypatch.setattr(site_cookies, "list_browser_profiles", lambda: [])
+    profile = {"cookie_db": "C:/browser/Cookies", "mtime": 2000.0}
+    monkeypatch.setattr(chromium_cookies, "list_chromium_profiles", lambda: [profile])
+    calls = []
+
+    def failed_import(config_manager, profiles=None, elevate=True):
+        calls.append(list(profiles or []))
+        return {
+            "profiles": 0,
+            "cookies": 0,
+            "elevated": 0,
+            "youtube": 0,
+            "vss": 0,
+            "elevation_failed": 1,
+        }
+
+    monkeypatch.setattr(chromium_cookies, "import_chromium_cookies", failed_import)
+    cfg = _FakeConfig({"installed_browser_cookie_import_enabled": True})
+
+    first = site_cookies.auto_import_installed_browser_cookies(cfg)
+    second = site_cookies.auto_import_installed_browser_cookies(cfg)
+
+    assert first["elevation_failed"] == 1
+    assert cfg.get("installed_browser_cookie_import_enabled") is False
+    assert second["elevation_failed"] == 0
+    assert len(calls) == 1

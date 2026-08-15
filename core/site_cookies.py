@@ -1203,7 +1203,9 @@ def auto_import_installed_browser_cookies(
 ) -> dict:
     """Full-cookie import from every installed browser (Firefox + Chromium).
 
-    Gated by the ``auto_import_installed_browser_cookies`` consent (default on).
+    Gated by the explicit ``installed_browser_cookie_import_enabled`` consent,
+    which defaults off. The previous default-on preference is intentionally not
+    consulted so upgrades cannot inherit implicit permission to elevate.
     Unlike the clearance-only watcher this copies the user's *session* cookies
     — the whole point of the feature: YouTube login and any other site. Firefox
     profiles are read directly (plain SQLite); Chromium cookies are decrypted
@@ -1215,9 +1217,17 @@ def auto_import_installed_browser_cookies(
 
     Runs on the CookieImportWatcher thread. Returns a stats dict.
     """
-    stats = {"firefox": 0, "chromium": 0, "cookies": 0, "youtube": 0, "elevated": 0, "vss": 0}
+    stats = {
+        "firefox": 0,
+        "chromium": 0,
+        "cookies": 0,
+        "youtube": 0,
+        "elevated": 0,
+        "vss": 0,
+        "elevation_failed": 0,
+    }
     try:
-        if not bool(config_manager.get("auto_import_installed_browser_cookies", True)):
+        if not bool(config_manager.get("installed_browser_cookie_import_enabled", False)):
             return stats
     except Exception:
         return stats
@@ -1344,6 +1354,16 @@ def auto_import_installed_browser_cookies(
     stats["elevated"] = int(cstats.get("elevated", 0) or 0)
     stats["youtube"] = int(cstats.get("youtube", 0) or 0)
     stats["vss"] = int(cstats.get("vss", 0) or 0)
+    stats["elevation_failed"] = int(bool(cstats.get("elevation_failed", 0)))
+    if stats["elevation_failed"]:
+        try:
+            config_manager.set("installed_browser_cookie_import_enabled", False)
+        except Exception:
+            log.exception("Failed to disable installed-browser cookie import after elevation failure")
+        else:
+            log.warning(
+                "Installed-browser cookie import was disabled after elevation failed or was declined"
+            )
 
     # --- Firefox YouTube cookies -> yt-dlp jar -------------------------------
     if youtube_records:
@@ -1358,4 +1378,3 @@ def auto_import_installed_browser_cookies(
         except Exception:
             log.exception("Failed to persist full-browser cookie import state")
     return stats
-

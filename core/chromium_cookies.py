@@ -1562,7 +1562,9 @@ def _store_cached_v20_key(fingerprint: str, key: bytes) -> None:
                     pass
 
 
-def resolve_master_keys(app_bound_map: dict, *, elevate: bool = True) -> dict:
+def resolve_master_keys(
+    app_bound_map: dict, *, elevate: bool = True, elevation_status: dict | None = None
+) -> dict:
     """Resolve v20 master keys for ``{fingerprint: app_bound_key_b64}``.
 
     Cached keys are used when present; the rest are derived in a single
@@ -1585,12 +1587,21 @@ def resolve_master_keys(app_bound_map: dict, *, elevate: bool = True) -> dict:
         try:
             keys = _run_elevated_helper_batch([b64 for _fp, b64 in ordered])
         except OSError as exc:
+            if elevation_status is not None:
+                elevation_status["failed"] = True
+                elevation_status["cancelled"] = bool(
+                    getattr(exc, "winerror", None) == _ERROR_CANCELLED
+                    or "cancel" in str(exc).lower()
+                )
             if getattr(exc, "winerror", None) == _ERROR_CANCELLED or "cancel" in str(exc).lower():
                 log.info("Chromium v20 key derivation was cancelled by the user")
             else:
                 log.warning("Chromium v20 key derivation failed: %s", exc)
             return resolved
         except Exception:
+            if elevation_status is not None:
+                elevation_status["failed"] = True
+                elevation_status["cancelled"] = False
             log.exception("Chromium v20 key derivation failed")
             return resolved
         for (fingerprint, _b64), key in zip(ordered, keys):
@@ -2033,7 +2044,14 @@ def import_chromium_cookies(config_manager, *, profiles=None, elevate: bool = Tr
     """
     from core import site_cookies
 
-    stats = {"profiles": 0, "cookies": 0, "elevated": 0, "youtube": 0, "vss": 0}
+    stats = {
+        "profiles": 0,
+        "cookies": 0,
+        "elevated": 0,
+        "youtube": 0,
+        "vss": 0,
+        "elevation_failed": 0,
+    }
     if profiles is None:
         profiles = list_chromium_profiles()
     profiles = list(profiles or [])
@@ -2045,7 +2063,11 @@ def import_chromium_cookies(config_manager, *, profiles=None, elevate: bool = Tr
         app_bound_b64 = str(os_crypt.get("app_bound_encrypted_key") or "")
         if app_bound_b64:
             app_bound_map[_fingerprint(app_bound_b64)] = app_bound_b64
-    v20_map = resolve_master_keys(app_bound_map, elevate=elevate)
+    elevation_status = {}
+    v20_map = resolve_master_keys(
+        app_bound_map, elevate=elevate, elevation_status=elevation_status
+    )
+    stats["elevation_failed"] = int(bool(elevation_status.get("failed")))
     elevated_count = len(v20_map)
 
     # A running browser holds its ``Cookies`` database with exclusive access,
@@ -2062,6 +2084,7 @@ def import_chromium_cookies(config_manager, *, profiles=None, elevate: bool = Tr
         try:
             staged_map, staging_dir = _run_elevated_vss_copy([path for _i, path in locked])
         except OSError as exc:
+            stats["elevation_failed"] = 1
             if getattr(exc, "winerror", None) == _ERROR_CANCELLED or "cancel" in str(exc).lower():
                 log.info("Chromium VSS copy was cancelled by the user")
             else:

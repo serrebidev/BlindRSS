@@ -21,6 +21,26 @@ def _wrap(content: bytes) -> bytes:
     return struct.pack("<I", 0) + struct.pack("<I", len(content)) + content
 
 
+def test_resolve_master_keys_reports_cancelled_elevation(monkeypatch):
+    cancelled = OSError("The operation was cancelled by the user")
+    cancelled.winerror = cc._ERROR_CANCELLED
+    monkeypatch.setattr(cc, "_is_windows", lambda: True)
+    monkeypatch.setattr(cc, "_load_cached_v20_key", lambda _fingerprint: None)
+
+    def cancel_elevation(_keys):
+        raise cancelled
+
+    monkeypatch.setattr(cc, "_run_elevated_helper_batch", cancel_elevation)
+    status = {}
+
+    resolved = cc.resolve_master_keys(
+        {"fingerprint": "app-bound-key"}, elevation_status=status
+    )
+
+    assert resolved == {}
+    assert status == {"failed": True, "cancelled": True}
+
+
 # --- parse_app_bound_key_blob -------------------------------------------------
 
 

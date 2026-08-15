@@ -1458,7 +1458,7 @@ class SettingsDialog(wx.Dialog):
         )
         self.auto_import_installed_cookies_chk.SetName(_("Read cookies from installed browsers"))
         self.auto_import_installed_cookies_chk.SetValue(
-            bool(config.get("auto_import_installed_browser_cookies", True))
+            bool(config.get("installed_browser_cookie_import_enabled", False))
         )
         youtube_sizer.Add(self.auto_import_installed_cookies_chk, 0, wx.ALL, 5)
 
@@ -4075,7 +4075,7 @@ class SettingsDialog(wx.Dialog):
             "groups_io_api_key": self.groups_io_api_key_ctrl.GetValue().strip(),
             "github_token": self.github_token_ctrl.GetValue().strip(),
             "auto_import_browser_cookies": self.auto_import_cookies_chk.GetValue(),
-            "auto_import_installed_browser_cookies": self.auto_import_installed_cookies_chk.GetValue(),
+            "installed_browser_cookie_import_enabled": self.auto_import_installed_cookies_chk.GetValue(),
             "youtube_play_via_download": self.youtube_play_via_download_chk.GetValue(),
             "youtube_play_cache_dir": self.youtube_play_cache_dir_ctrl.GetValue().strip(),
             "youtube_play_cache_max_mb": int(self.youtube_play_cache_max_mb_ctrl.GetValue()),
