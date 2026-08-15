@@ -33,6 +33,27 @@ ROOT = Path(os.getcwd())
 BIN_DIR = ROOT / "bin"
 PLATFORM = sys.platform
 
+# PyInstaller's ctypes scanner cannot evaluate our platform guards and treats
+# Windows DLL handles plus python-vlc's macOS candidates as Linux libraries.
+# Suppress only those impossible foreign-platform names; real missing Linux
+# shared libraries must remain visible and fail release review.
+if PLATFORM.startswith("linux"):
+    from PyInstaller.depend import dylib as _pyi_dylib
+
+    _foreign_ctypes_libraries = {
+        r"^Iphlpapi$",
+        r"^libvlc\.dylib$",
+        r"^libvlccore\.dylib$",
+        r"^msvcrt$",
+        r"^ntdll$",
+        r"^ole32$",
+        r"^shell32$",
+        r"^user32$",
+    }
+    _pyi_dylib.exclude_list = _pyi_dylib.MatchList(
+        _pyi_dylib._excludes | _foreign_ctypes_libraries
+    )
+
 
 def _read_app_version():
     """Read APP_VERSION from core/version.py without importing the app package.
