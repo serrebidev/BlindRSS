@@ -439,6 +439,7 @@ sync-claude-memory.py after writing one:
 - [Category identity model](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\category-identity-model.md) — categories are path-strings; nested identity is path-based (issue #27)
 - [Provider flat vs nested](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\provider-flat-vs-nested.md) — never simulate subcategories on providers that are flat upstream
 - [Release build process](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\release-build-process.md) — build.bat release builds Windows locally, Linux over SSH/Docker on serrebiradio, and macOS in CI
+- [Linux builder Docker firewall](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\linux-builder-docker-firewall.md) — serrebiradio's Docker lost its nft/iptables rules so containers have no network; SSH Linux build fails as "DNS", use the CI dispatch fallback
 - [curl_cffi impersonation transport](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\curl-cffi-impersonation-transport.md) — how feed fetching beats anti-bot WAFs; per-feed feed_settings overrides (issue #29)
 - [Refresh speed fixes](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\refresh-speed-fixes.md) — root cause of multi-minute refreshes: fixed worker pool + unbounded per-feed retry time, not mainly transport
 - [YouTube live format selection](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\youtube-live-format-selection.md) — live streams w/o audio-only tracks picked the highest-bitrate combined format, causing stalls
@@ -522,6 +523,7 @@ sync-claude-memory.py after writing one:
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\gsmarena-headings-and-richedit-rtl.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\installed-app-debug-landscape.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\large-reader-render-and-swap.md
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\linux-builder-docker-firewall.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\local-tcp-delivery-bbr2.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\localization-guardrails.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\macos-parity-v1112-2.md
