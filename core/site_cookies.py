@@ -49,6 +49,23 @@ UA_FILENAME = "site_cookies_ua.txt"
 # change the fingerprint the app presents to any other.
 HOST_UA_FILENAME = "site_cookies_ua_hosts.json"
 
+# Ceiling for the Cookie header a request may carry (issue #101).
+#
+# A busy site stores dozens of per-session cookies -- youtube.com alone keeps
+# ~25 unique ``ST-<random>`` tokens plus the Google login set -- and the
+# full-browser harvest unions the jars of every installed browser and profile,
+# so the total only ever grows. Google's frontend answers 413 once a request's
+# Cookie header passes roughly 50 KB, which turned every YouTube feed refresh
+# into "no articles available". Other servers cap lower still (nginx defaults
+# to 8 KB per header), so stay inside the smallest common limit.
+MAX_COOKIE_HEADER_BYTES = 8192
+
+# Minimum gap between full session-cookie harvests from the installed browsers.
+# The harvest is expensive (it shadow-copies locked Chromium databases through
+# an elevated helper), so it runs on a slow cadence rather than every watcher
+# tick. See auto_import_installed_browser_cookies.
+FULL_IMPORT_MIN_INTERVAL_S = 6 * 60 * 60
+
 _lock = threading.Lock()
 _write_lock = threading.Lock()
 _cache = {"path": None, "mtime": None, "cookies": [], "ua_mtime": None, "ua": ""}
@@ -187,8 +204,42 @@ def cookies_for(url: str, *, now: float | None = None) -> dict:
     return matched
 
 
+def _trim_cookies_to_budget(cookies: dict, budget: int = MAX_COOKIE_HEADER_BYTES) -> dict:
+    """Drop cookies until the rendered header fits ``budget`` bytes.
+
+    Sending everything the jar holds is what broke YouTube (issue #101): past
+    ~50 KB Google answers 413 and the feed parses as zero entries. Clearance
+    cookies are kept first because they are the reason this jar exists at all;
+    the rest are kept smallest-first, which retains the most sessions per byte
+    and sheds exactly the bloated per-session tokens that caused the overflow.
+    Relative order is preserved so a server that cares about it still sees the
+    jar's ordering.
+    """
+    parts = {name: f"{name}={value}" for name, value in cookies.items()}
+    if not parts:
+        return cookies
+    total = sum(len(part) for part in parts.values()) + 2 * (len(parts) - 1)
+    if total <= budget:
+        return cookies
+
+    kept: set[str] = set()
+    used = 0
+    for name in sorted(parts, key=lambda n: (0 if _is_harvestable(n) else 1, len(parts[n]))):
+        cost = len(parts[name]) + (2 if kept else 0)
+        if used + cost > budget:
+            continue
+        kept.add(name)
+        used += cost
+    log.warning(
+        "Site cookie header trimmed from %d to %d bytes (%d of %d cookies dropped)",
+        total, used, len(parts) - len(kept), len(parts),
+    )
+    return {name: value for name, value in cookies.items() if name in kept}
+
+
 def cookie_header_for(url: str, *, now: float | None = None) -> str:
-    return "; ".join(f"{k}={v}" for k, v in cookies_for(url, now=now).items())
+    cookies = _trim_cookies_to_budget(cookies_for(url, now=now))
+    return "; ".join(f"{k}={v}" for k, v in cookies.items())
 
 
 def _load_host_user_agents() -> dict:
@@ -432,23 +483,53 @@ def _record_key(fields):
     return (key_domain, fields[2], fields[5])
 
 
-def _merge_records_into_jar(new_records) -> None:
+def _is_ignorable_record(fields) -> bool:
+    """True for cookies that must never enter the jar (issue #101).
+
+    ``ST-<random>`` are YouTube's per-page state tokens: every one has a unique
+    name, so they are never replaced on merge and simply pile up as more
+    browsers and profiles are harvested. They carry no login or clearance
+    state, and they were the bulk of the oversized Cookie header that made
+    YouTube answer 413 to every feed refresh.
+    """
+    try:
+        domain = str(fields[0]).replace("#HttpOnly_", "", 1).lstrip(".").lower()
+        name = str(fields[5] or "")
+    except (IndexError, TypeError):
+        return False
+    if not name.startswith("ST-"):
+        return False
+    return domain == "youtube.com" or domain.endswith(".youtube.com")
+
+
+def _merge_records_into_jar(new_records) -> int:
     """Write the managed jar as (existing records) overridden by new_records.
 
     Existing entries for the same (domain, path, name) are replaced;
     everything else is kept, so importing from a second browser or for a
-    second site never wipes an earlier import.
+    second site never wipes an earlier import. Returns the number of records
+    that were actually added or changed, so callers can stay quiet when a
+    re-scan found nothing new.
     """
     dest = jar_path()
     dest_dir = os.path.dirname(dest)
     os.makedirs(dest_dir, exist_ok=True)
     temp_path = ""
+    changed = 0
     with _write_lock:
         merged = {}
         for fields in _jar_records():
+            if _is_ignorable_record(fields):
+                # Prune pollution written by an earlier version on this rewrite.
+                continue
             merged[_record_key(fields)] = fields
         for fields in new_records:
-            merged[_record_key(fields)] = fields
+            if _is_ignorable_record(fields):
+                continue
+            key = _record_key(fields)
+            if merged.get(key) != fields:
+                changed += 1
+            merged[key] = fields
         fd, temp_path = tempfile.mkstemp(prefix="site-cookies-", suffix=".tmp", dir=dest_dir)
         try:
             with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
@@ -465,6 +546,7 @@ def _merge_records_into_jar(new_records) -> None:
                 except OSError:
                     pass
     _invalidate()
+    return changed
 
 
 def merge_records_into_jar(records) -> int:
@@ -472,12 +554,13 @@ def merge_records_into_jar(records) -> int:
 
     Public counterpart to ``_merge_records_into_jar`` for importers outside this
     module (e.g. ``core.chromium_cookies``). Existing entries for the same
-    (domain, path, name) are replaced; everything else is kept.
+    (domain, path, name) are replaced; everything else is kept. Returns the
+    number of records that were new or had changed since the last merge.
     """
     records = list(records or [])
-    if records:
-        _merge_records_into_jar(records)
-    return len(records)
+    if not records:
+        return 0
+    return _merge_records_into_jar(records)
 
 
 def merge_jar_file(src_path: str) -> int:
@@ -1090,7 +1173,9 @@ def auto_import_downloads(config_manager, *, search_dirs=None, now=None):
             if mtime <= cutoff:
                 continue
             ok, _msg = validate_jar_file(path)
-            if ok:
+            # Re-importing a jar BlindRSS wrote is a no-op that still bumps the
+            # file's mtime, which is how the import loop of issue #101 started.
+            if ok and not cookies_import.is_blindrss_managed_jar(_read_text(path) or ""):
                 candidates.append((mtime, path))
     if not candidates:
         return None
@@ -1165,12 +1250,23 @@ def merge_youtube_cookies(records, config_manager) -> int:
         with open(dest, "r", encoding="utf-8", errors="replace") as fh:
             text = fh.read()
         for fields in _iter_cookie_records(text):
-            merged[_record_key(tuple(fields[:7]))] = tuple(fields[:7])
+            record = tuple(fields[:7])
+            # yt-dlp's jar is for the YouTube/Google login only. Anything else
+            # in here is pollution from the auto-import loop that mistook the
+            # site jar for a fresh browser export (issue #101); drop it on the
+            # next write rather than keep handing every site's session to a
+            # video downloader.
+            if not _is_youtube_record(record[0]):
+                continue
+            merged[_record_key(record)] = record
     except OSError:
         pass
 
     for record in records or []:
-        merged[_record_key(tuple(record))] = tuple(record)
+        record = tuple(record)
+        if not _is_youtube_record(record[0]):
+            continue
+        merged[_record_key(record)] = record
 
     os.makedirs(data_dir, exist_ok=True)
     fd, tmp = tempfile.mkstemp(prefix="youtube-cookies-", suffix=".tmp", dir=data_dir)
@@ -1215,12 +1311,15 @@ def auto_import_installed_browser_cookies(
     Unchanged profiles are skipped via the persisted ``site_cookies_full_profile_mtimes``
     markers, so the watcher does not re-read every cookie DB every tick.
 
-    Runs on the CookieImportWatcher thread. Returns a stats dict.
+    Runs on the CookieImportWatcher thread. Returns a stats dict. ``stats["new"]``
+    counts cookies that were actually new or changed, which is what callers
+    should notify on.
     """
     stats = {
         "firefox": 0,
         "chromium": 0,
         "cookies": 0,
+        "new": 0,
         "youtube": 0,
         "elevated": 0,
         "vss": 0,
@@ -1231,6 +1330,24 @@ def auto_import_installed_browser_cookies(
             return stats
     except Exception:
         return stats
+
+    # A running browser rewrites its cookie DB constantly, so the mtime markers
+    # below never match and every tick re-ran the whole harvest -- including an
+    # elevated Volume Shadow Copy snapshot of the system drive for the locked
+    # Chromium databases, every 45 seconds (issue #101). Session cookies do not
+    # need minute-level freshness; a slow cadence keeps the feature useful
+    # without hammering the machine BlindRSS is trying to fetch feeds on.
+    now_ts = time.time()
+    try:
+        last_run = float(config_manager.get("site_cookies_full_import_last_run", 0) or 0)
+    except (TypeError, ValueError):
+        last_run = 0.0
+    if last_run and 0 <= (now_ts - last_run) < FULL_IMPORT_MIN_INTERVAL_S:
+        return stats
+    try:
+        config_manager.set("site_cookies_full_import_last_run", now_ts)
+    except Exception:
+        log.debug("Could not persist the full browser import timestamp", exc_info=True)
 
     try:
         seen = dict(config_manager.get("site_cookies_full_profile_mtimes", {}) or {})
@@ -1300,7 +1417,7 @@ def auto_import_installed_browser_cookies(
             if _is_harvestable(str(name or "")):
                 clearance_hosts.add(str(host or "").strip().lstrip(".").lower())
         if records:
-            _merge_records_into_jar(records)
+            stats["new"] += _merge_records_into_jar(records)
             stats["cookies"] += len(records)
         if clearance_hosts:
             if not clearance_ua:
@@ -1351,6 +1468,7 @@ def auto_import_installed_browser_cookies(
         cstats = {}
     stats["chromium"] = int(cstats.get("profiles", 0) or 0)
     stats["cookies"] += int(cstats.get("cookies", 0) or 0)
+    stats["new"] += int(cstats.get("new", 0) or 0)
     stats["elevated"] = int(cstats.get("elevated", 0) or 0)
     stats["youtube"] = int(cstats.get("youtube", 0) or 0)
     stats["vss"] = int(cstats.get("vss", 0) or 0)

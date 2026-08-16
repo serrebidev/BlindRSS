@@ -92,6 +92,25 @@ def test_find_latest_youtube_cookie_export_picks_newest_valid(tmp_path):
     assert found == new
 
 
+def test_find_latest_ignores_blindrss_managed_jars(tmp_path):
+    """The scan also watches the app data dir, so it must not mistake the site
+    jar BlindRSS writes itself for a fresh browser export (issue #101): doing so
+    copied every site's cookies over the yt-dlp jar and re-fired the "cookies
+    updated" notification on every watcher tick."""
+    d = str(tmp_path)
+    managed = _write(
+        tmp_path,
+        "site_cookies.txt",
+        "# Netscape HTTP Cookie File\n# Imported by BlindRSS (Import Site Cookies)\n\n"
+        + _YT_JAR.split("\n", 1)[1],
+    )
+    now = time.time()
+    os.utime(managed, (now - 10, now - 10))
+
+    assert cookies_import.is_blindrss_managed_jar(open(managed, encoding="utf-8").read())
+    assert cookies_import.find_latest_youtube_cookie_export([d], now=now) is None
+
+
 def test_find_latest_ignores_stale_files(tmp_path):
     d = str(tmp_path)
     stale = _write(tmp_path, "cookies.txt", _YT_JAR)

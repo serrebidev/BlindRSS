@@ -210,6 +210,12 @@ DEFAULT_CONFIG = {
     # Internal: {profile dir/cookie db: mtime} for the full-browser cookie
     # import, so unchanged profiles are not re-read every watcher tick.
     "site_cookies_full_profile_mtimes": {},
+    # Internal: when the full-browser harvest last ran. A browser that is open
+    # rewrites its cookie database continuously, so the mtime markers above
+    # never match and the harvest -- which shadow-copies locked Chromium
+    # databases through an elevated helper -- used to repeat every 45 seconds
+    # (issue #101). See core/site_cookies.FULL_IMPORT_MIN_INTERVAL_S.
+    "site_cookies_full_import_last_run": 0,
     # Internal: mtime of the last cookie export we auto-imported, so the watcher
     # only imports newer exports and never loops on the same file.
     "ytdlp_cookies_last_import_mtime": 0,

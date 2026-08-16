@@ -34,6 +34,23 @@ IMPORTED_COOKIE_FILENAME = "youtube_cookies.txt"
 # Domains that indicate the export actually carries a YouTube/Google login.
 _YOUTUBE_DOMAINS = ("youtube.com", "google.com")
 
+# Header comments BlindRSS writes into the jars it manages itself. The export
+# scan also watches the directory of the configured cookie file, which is the
+# app data dir by default -- so without this check it re-"discovered" its own
+# site_cookies.txt as a fresh browser export every time the browser harvest
+# rewrote it, copied all 490 sites' cookies over the yt-dlp jar, and fired a
+# "cookies updated" notification on every watcher tick (issue #101).
+_MANAGED_JAR_MARKERS = (
+    "# Imported by BlindRSS",
+    "# Harvested from installed browsers by BlindRSS",
+)
+
+
+def is_blindrss_managed_jar(text: str) -> bool:
+    """True when this cookies.txt is one BlindRSS wrote, not a browser export."""
+    head = str(text or "")[:512]
+    return any(marker in head for marker in _MANAGED_JAR_MARKERS)
+
 
 def _read_text(path: str) -> str | None:
     try:
@@ -108,6 +125,14 @@ def validate_cookie_file(path: str) -> tuple[bool, str]:
     return True, "Looks like a valid YouTube cookie export."
 
 
+def _is_importable_export(path: str) -> bool:
+    """True when `path` is a browser export we should import, not our own jar."""
+    text = _read_text(path)
+    if text is None or is_blindrss_managed_jar(text):
+        return False
+    return is_netscape_cookie_jar(text) and cookie_jar_has_youtube(text)
+
+
 def default_download_dirs(extra_dirs: list[str] | None = None) -> list[str]:
     """Likely locations of a freshly exported cookies.txt, newest-intent first."""
     dirs: list[str] = []
@@ -171,8 +196,7 @@ def find_latest_youtube_cookie_export(
                 continue
             if mtime < cutoff or mtime <= best_mtime:
                 continue
-            ok, _ = validate_cookie_file(path)
-            if ok:
+            if _is_importable_export(path):
                 best_path = path
                 best_mtime = mtime
     return best_path
@@ -361,11 +385,10 @@ class CookieImportWatcher:
             log.exception("Full browser cookie harvest tick failed")
         finally:
             self._full_harvest_inflight = False
-        if (
-            stats
-            and (stats.get("cookies") or stats.get("youtube"))
-            and self._on_browser_import
-        ):
+        # Notify only when the harvest actually brought something new in.
+        # Reporting every pass meant a "cookies updated" toast on every watcher
+        # tick for as long as a browser was open (issue #101).
+        if stats and stats.get("new") and self._on_browser_import:
             try:
                 self._on_browser_import(stats)
             except Exception:

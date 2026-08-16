@@ -1398,6 +1398,43 @@ def _retry_cloudflare_challenged_wordpress_feed(resp, url: str, *, headers: dict
     return resp, _effective_url(resp, url)
 
 
+def _retry_feed_without_site_cookies(resp, url: str, *, headers: dict, timeout, proxies=None):
+    """Retry without the imported cookie jar when the server rejects our headers.
+
+    A jar harvested from every installed browser can carry enough cookies for
+    one host that the request exceeds what the server accepts -- YouTube
+    answers 413 to a Cookie header past ~50 KB, which read as "no articles
+    available" on every YouTube feed (issue #101). The jar is trimmed before it
+    goes out now, but a site with a tighter limit must still be able to fall
+    back to an anonymous request rather than fail the feed.
+    """
+    try:
+        status_code = int(getattr(resp, "status_code", 0) or 0)
+    except Exception:
+        status_code = 0
+    if status_code not in (413, 431):
+        return resp
+
+    try:
+        retry_resp = utils.safe_requests_get(
+            url, headers=headers, timeout=timeout, proxies=proxies, site_cookies=False
+        )
+    except Exception:
+        log.debug("Cookie-free feed retry failed for %s", url, exc_info=True)
+        return resp
+
+    try:
+        retry_status = int(getattr(retry_resp, "status_code", 0) or 0)
+    except Exception:
+        retry_status = 0
+    if retry_status in (413, 431):
+        return resp
+    log.info(
+        "Retried feed without imported site cookies after HTTP %s: %s", status_code, url
+    )
+    return retry_resp
+
+
 def _retry_feed_not_acceptable(resp, url: str, *, headers: dict, timeout, proxies=None):
     try:
         status_code = int(getattr(resp, "status_code", 0) or 0)
@@ -3101,6 +3138,13 @@ class LocalProvider(RSSProvider):
                                 proxies=feed_proxies,
                                 verify=False,
                             )
+                        resp = _retry_feed_without_site_cookies(
+                            resp,
+                            feed_url,
+                            headers=headers,
+                            timeout=direct_fetch_timeout,
+                            proxies=feed_proxies,
+                        )
                         resp = _retry_feed_not_acceptable(
                             resp,
                             feed_url,
@@ -4879,6 +4923,7 @@ class LocalProvider(RSSProvider):
                 title = page_title or real_url
             else:
                 resp = utils.safe_requests_get(real_url, timeout=10)
+                resp = _retry_feed_without_site_cookies(resp, real_url, headers={}, timeout=10)
                 resp = _retry_feed_not_acceptable(resp, real_url, headers={}, timeout=10)
                 resp, effective_url = _retry_cloudflare_challenged_wordpress_feed(
                     resp,

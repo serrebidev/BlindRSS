@@ -4431,6 +4431,12 @@ def get_ytdlp_feed_url(url: str) -> str:
 
     # 1. YouTube specific logic (fastest)
     if _is_youtube_host(domain):
+        # Already the native feed. Without this, subscribing to a feed URL the
+        # user (or Find a Feed) had already resolved spent ~25s running yt-dlp
+        # against an XML document before falling back to the same URL.
+        if (parsed.path or "").rstrip("/").lower() == "/feeds/videos.xml":
+            return url
+
         playlist_id = _youtube_playlist_id_from_url(url)
         if playlist_id:
             return f"https://www.youtube.com/feeds/videos.xml?playlist_id={playlist_id}"

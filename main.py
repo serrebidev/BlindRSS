@@ -416,9 +416,9 @@ class RSSApp(wx.App):
         def _notify():
             try:
                 frame = getattr(self, "frame", None)
-                count = int((stats or {}).get("cookies", 0) or 0)
+                count = int((stats or {}).get("new", 0) or 0)
                 youtube = int((stats or {}).get("youtube", 0) or 0)
-                msg = f"Read {count} cookie(s) from your installed browsers."
+                msg = f"Read {count} new cookie(s) from your installed browsers."
                 if youtube:
                     msg += " YouTube login is now available."
                 if frame is not None and hasattr(frame, "_show_windows_notification"):

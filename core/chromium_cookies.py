@@ -2047,6 +2047,7 @@ def import_chromium_cookies(config_manager, *, profiles=None, elevate: bool = Tr
     stats = {
         "profiles": 0,
         "cookies": 0,
+        "new": 0,
         "elevated": 0,
         "youtube": 0,
         "vss": 0,
@@ -2139,7 +2140,7 @@ def import_chromium_cookies(config_manager, *, profiles=None, elevate: bool = Tr
 
     stats["elevated"] = elevated_count
     if all_records:
-        site_cookies.merge_records_into_jar(all_records)
+        stats["new"] = site_cookies.merge_records_into_jar(all_records)
         for domain, ua in clearance_ua.items():
             if ua:
                 try:
