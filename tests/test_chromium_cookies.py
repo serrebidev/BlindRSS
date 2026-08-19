@@ -6,6 +6,7 @@
 import os
 import struct
 import sys
+import types
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -197,3 +198,99 @@ def test_key_cache_roundtrip(tmp_path, monkeypatch):
     cc._store_cached_v20_key(fingerprint, key)
     assert cc._load_cached_v20_key(fingerprint) == key
     assert cc._load_cached_v20_key("missing") is None
+
+
+# --- native Windows VSS fallback ---------------------------------------------
+
+
+def test_vss_copy_uses_wmi_com_without_powershell(tmp_path, monkeypatch):
+    """Locked-cookie recovery keeps the snapshot behavior without spawning PS."""
+    device_root = tmp_path / "shadow"
+    cookie_dir = device_root / "Browser" / "Network"
+    cookie_dir.mkdir(parents=True)
+    (cookie_dir / "Cookies").write_bytes(b"cookie-db")
+    (cookie_dir / "Cookies-wal").write_bytes(b"wal")
+    (cookie_dir / "Cookies-shm").write_bytes(b"shm")
+
+    class FakeShadow:
+        DeviceObject = str(device_root)
+        deleted = False
+
+        def Delete_(self):
+            self.deleted = True
+
+    shadow = FakeShadow()
+
+    class FakeInput:
+        pass
+
+    class FakeMethod:
+        InParameters = types.SimpleNamespace(SpawnInstance_=FakeInput)
+
+    class FakeShadowClass:
+        Path_ = types.SimpleNamespace(Path="Win32_ShadowCopy")
+
+        def Methods_(self, name):
+            assert name == "Create"
+            return FakeMethod()
+
+    class FakeResult:
+        ReturnValue = 0
+        ShadowID = "{fake-shadow}"
+
+    class FakeService:
+        def __init__(self):
+            self.shadow_class = FakeShadowClass()
+            self.created = None
+
+        def Get(self, name):
+            if name == "Win32_ShadowCopy":
+                return self.shadow_class
+            assert name == "Win32_ShadowCopy.ID='{fake-shadow}'"
+            return shadow
+
+        def ExecMethod_(self, path, method, params):
+            assert path == "Win32_ShadowCopy"
+            assert method == "Create"
+            assert params.Volume == "C:\\"
+            assert params.Context == "ClientAccessible"
+            self.created = True
+            return FakeResult()
+
+    service = FakeService()
+    calls = []
+    fake_pythoncom = types.SimpleNamespace(
+        CoInitialize=lambda: calls.append("initialize"),
+        CoUninitialize=lambda: calls.append("uninitialize"),
+    )
+    fake_client = types.SimpleNamespace(
+        Dispatch=lambda name: types.SimpleNamespace(
+            ConnectServer=lambda computer, namespace: service
+        )
+    )
+    fake_win32com = types.ModuleType("win32com")
+    fake_win32com.client = fake_client
+    monkeypatch.setitem(sys.modules, "pythoncom", fake_pythoncom)
+    monkeypatch.setitem(sys.modules, "win32com", fake_win32com)
+    monkeypatch.setitem(sys.modules, "win32com.client", fake_client)
+
+    commands = []
+
+    def fake_run(command, **_kwargs):
+        commands.append(command)
+        return types.SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(cc.subprocess, "run", fake_run)
+    result = cc._vss_copy_files(
+        [r"C:\Browser\Network\Cookies"], str(tmp_path / "stage")
+    )
+
+    assert result == [str(tmp_path / "stage" / "0.cookies")]
+    assert (tmp_path / "stage" / "0.cookies").read_bytes() == b"cookie-db"
+    assert (tmp_path / "stage" / "0.cookies-wal").read_bytes() == b"wal"
+    assert (tmp_path / "stage" / "0.cookies-shm").read_bytes() == b"shm"
+    assert service.created is True
+    assert shadow.deleted is True
+    assert calls == ["initialize", "uninitialize"]
+    assert commands and commands[0][0] == "icacls"
+    assert all(str(part).lower() != "powershell" for part in commands[0])

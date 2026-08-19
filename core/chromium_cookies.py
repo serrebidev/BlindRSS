@@ -4,6 +4,11 @@
 
 """Harvest cookies from Chromium-family browsers, including App-Bound (v20).
 
+On Windows, the locked-cookie fallback uses the installed ``pywin32`` WMI
+COM API directly for Volume Shadow Copy creation. It deliberately does not
+spawn PowerShell: security products commonly flag a hidden PowerShell process
+that creates a shadow copy, even when the operation is legitimate.
+
 Chromium keeps cookies in a per-profile SQLite database (``Network/Cookies``)
 whose values are encrypted. There are two encryption generations:
 
@@ -1020,67 +1025,78 @@ def run_key_helper_cli(argv) -> int:
 def _vss_copy_files(source_paths, dest_dir):
     """Copy (possibly locked) files out via Volume Shadow Copy snapshots.
 
-    Runs elevated. Creates a ``ClientAccessible`` snapshot per source drive and
-    copies the files from it — all inside one PowerShell process, because a
-    ClientAccessible snapshot is only visible to the process that created it
-    and is deleted when that process exits (``Persistent`` shadows are often
-    unsupported when no shadow storage area is configured; ``vssadmin create
-    shadow`` was removed from modern Windows).
+    Runs elevated and uses the ``pywin32`` WMI COM API directly. A
+    ``ClientAccessible`` snapshot is created per source drive and kept alive
+    while this process copies the files; this is the same snapshot type the old
+    PowerShell implementation used, but avoids launching a hidden PowerShell
+    process that security software may report as suspicious. The snapshots are
+    explicitly deleted after the copy and are also cleaned up automatically
+    when the elevated helper exits.
 
-    The copies made by the elevated PowerShell carry the elevated token's
-    "protected administrator" DACL (owner = Administrators), which the
-    non-elevated app cannot read. ``icacls`` is therefore used to grant the
-    user's group full control on the staged files so the caller can read and
-    later delete them. Returns a list of staged file paths, one per source
-    (empty = not copied).
+    The copies made by the elevated helper can carry the protected-admin DACL,
+    so ``icacls`` grants the interactive user's group access before the
+    non-elevated caller consumes them. Returns a list of staged file paths, one
+    per source (empty = not copied).
     """
+    import ntpath
+
     os.makedirs(dest_dir, exist_ok=True)
     staged = [""] * len(source_paths)
     if not source_paths:
         return staged
 
-    fd, src_list = tempfile.mkstemp(prefix="blindrss-vss-list-", suffix=".txt")
-    with os.fdopen(fd, "w", encoding="utf-8") as fh:
-        fh.write("\n".join(source_paths))
     try:
-        ps = (
-            "$ErrorActionPreference = 'Stop'; "
-            f"$srcList = '{src_list}'; "
-            f"$destDir = '{dest_dir}'; "
-            "$class = Get-WmiObject -List Win32_ShadowCopy; "
-            "$shadows = @{}; "
-            "$idx = 0; "
-            "foreach ($src in (Get-Content -LiteralPath $srcList)) { "
-            "  $src = $src.Trim(); if (-not $src) { continue }; "
-            "  $root = [System.IO.Path]::GetPathRoot($src).TrimEnd('\\'); "
-            "  $rel = $src.Substring($root.Length).TrimStart('\\'); "
-            "  if (-not $shadows.ContainsKey($root)) { "
-            "    $r = $class.Create($root + '\\', 'ClientAccessible'); "
-            "    if ($r.ReturnValue -ne 0) { throw ('VSS Create returned ' + $r.ReturnValue) }; "
-            "    $s = Get-WmiObject Win32_ShadowCopy | Where-Object { $_.ID -eq $r.ShadowID }; "
-            "    if (-not $s) { throw 'shadow copy not found after create' }; "
-            "    $shadows[$root] = $s.DeviceObject; "
-            "  }; "
-            "  $shadowSrc = $shadows[$root].TrimEnd('\\') + '\\' + $rel; "
-            "  $dst = Join-Path $destDir ($idx.ToString() + '.cookies'); "
-            "  if (Test-Path -LiteralPath $shadowSrc) { Copy-Item -LiteralPath $shadowSrc -Destination $dst -Force }; "
-            "  foreach ($sfx in @('-wal','-shm')) { "
-            "    if (Test-Path -LiteralPath ($shadowSrc + $sfx)) { Copy-Item -LiteralPath ($shadowSrc + $sfx) -Destination ($dst + $sfx) -Force } "
-            "  }; "
-            "  $idx++ "
-            "}"
+        import pythoncom
+        import win32com.client
+    except ImportError as exc:
+        raise OSError("pywin32 is required for Chromium cookie recovery") from exc
+
+    pythoncom.CoInitialize()
+    shadows = {}
+    service = None
+    try:
+        service = win32com.client.Dispatch("WbemScripting.SWbemLocator").ConnectServer(
+            ".", r"root\cimv2"
         )
-        proc = subprocess.run(
-            ["powershell", "-NoProfile", "-NonInteractive", "-WindowStyle Hidden", "-Command", ps],
-            capture_output=True,
-            text=True,
-            timeout=300,
-            creationflags=_CREATE_NO_WINDOW,
-        )
-        if proc.returncode != 0:
-            detail = (proc.stderr or proc.stdout or "").strip()[-300:]
-            log.warning("VSS copy failed: %s", detail)
-            raise OSError(f"VSS copy failed: {detail}")
+        shadow_class = service.Get("Win32_ShadowCopy")
+        for index, source in enumerate(source_paths):
+            source = str(source).strip()
+            if not source:
+                continue
+            drive, tail = ntpath.splitdrive(source)
+            if not drive:
+                raise OSError(f"VSS source is not on a local volume: {source}")
+            root = drive + "\\"
+            relative = tail.lstrip("\\/")
+            shadow_key = root.casefold()
+            if shadow_key not in shadows:
+                method = shadow_class.Methods_("Create")
+                in_params = method.InParameters.SpawnInstance_()
+                in_params.Volume = root
+                in_params.Context = "ClientAccessible"
+                result = service.ExecMethod_(shadow_class.Path_.Path, "Create", in_params)
+                return_value = int(getattr(result, "ReturnValue", -1))
+                if return_value != 0:
+                    raise OSError(f"VSS Create returned {return_value}")
+                shadow_id = str(getattr(result, "ShadowID", "") or "")
+                if not shadow_id:
+                    raise OSError("VSS Create returned no shadow ID")
+                shadow = service.Get(
+                    "Win32_ShadowCopy.ID='" + shadow_id.replace("'", "''") + "'"
+                )
+                device = str(getattr(shadow, "DeviceObject", "") or "")
+                if not device:
+                    raise OSError("VSS shadow copy has no device object")
+                shadows[shadow_key] = (shadow_id, device)
+
+            _shadow_id, device = shadows[shadow_key]
+            shadow_source = device.rstrip("\\/") + "\\" + relative
+            destination = os.path.join(dest_dir, f"{index}.cookies")
+            for suffix in ("", "-wal", "-shm"):
+                candidate = shadow_source + suffix
+                if os.path.isfile(candidate):
+                    shutil.copyfile(candidate, destination + suffix)
+
         # Grant the user's group full control so the non-elevated caller can
         # read (and later delete) the staged files despite the elevated DACL.
         grant = subprocess.run(
@@ -1097,14 +1113,21 @@ def _vss_copy_files(source_paths, dest_dir):
                 (grant.stderr or grant.stdout or "").strip()[-200:],
             )
         for index in range(len(source_paths)):
-            dst = os.path.join(dest_dir, f"{index}.cookies")
-            if os.path.isfile(dst):
-                staged[index] = dst
+            destination = os.path.join(dest_dir, f"{index}.cookies")
+            if os.path.isfile(destination):
+                staged[index] = destination
     finally:
-        try:
-            os.remove(src_list)
-        except OSError:
-            pass
+        for shadow_id, _device in shadows.values():
+            try:
+                if service is None:
+                    continue
+                shadow = service.Get(
+                    "Win32_ShadowCopy.ID='" + shadow_id.replace("'", "''") + "'"
+                )
+                shadow.Delete_()
+            except Exception:
+                log.debug("Could not delete temporary VSS snapshot", exc_info=True)
+        pythoncom.CoUninitialize()
     return staged
 
 
