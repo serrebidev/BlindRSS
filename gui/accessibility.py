@@ -21,6 +21,7 @@ from core.i18n import _
 from core.categories import UNCATEGORIZED, category_display_name
 from .clipboard_utils import copy_text_to_clipboard, copy_textctrl_selection_to_clipboard
 from .reader_performance import replace_text_control_value, set_accessible_webview_content
+from . import rich_view_links
 
 log = logging.getLogger(__name__)
 
@@ -1572,7 +1573,10 @@ class AccessibleBrowserFrame(wx.Frame):
                 title=_("Article text"),
                 lang=article_lang.app_ui_language(),
                 live_region=False,
-                open_links_externally=True,
+                # Ours, not the library's: its option diverts every navigation,
+                # <iframe> loads included, which sent embeds to a browser window
+                # instead of rendering them inline (issue #102).
+                open_links_externally=False,
                 on_return=self._on_rich_view_return,
             )
         except Exception:
@@ -1588,6 +1592,7 @@ class AccessibleBrowserFrame(wx.Frame):
                 pass
             return None
         self._rich_view = rv
+        rich_view_links.attach(rv.view)
         self._reader_right_sizer.Add(rv.control, 1, wx.EXPAND)
         rv.control.Hide()
         try:

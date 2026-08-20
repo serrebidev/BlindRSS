@@ -72,6 +72,7 @@ from .reader_performance import (
     replace_text_control_value,
     set_accessible_webview_content,
 )
+from . import rich_view_links
 
 log = logging.getLogger(__name__)
 
@@ -5639,7 +5640,11 @@ class MainFrame(wx.Frame):
                 title=_("Article text"),
                 lang=article_lang.app_ui_language(),
                 live_region=False,
-                open_links_externally=True,
+                # Link handling is ours (rich_view_links): the library's own
+                # option diverts EVERY navigation, and since wxWidgets 3.3 that
+                # includes each <iframe> load, which sent YouTube/X embeds to a
+                # browser window instead of rendering them inline (issue #102).
+                open_links_externally=False,
                 on_return=self._on_rich_view_return,
                 on_message=self._on_rich_view_message,
             )
@@ -5656,6 +5661,7 @@ class MainFrame(wx.Frame):
                 pass
             return None
         self._rich_view = rv
+        rich_view_links.attach(rv.view)
         # Native WebView2 swallows ALT (and F6/Shift+F6/Shift+Tab) before wx sees
         # them, so the menu bar and pane navigation are unreachable while the rich
         # reader is focused. We bridge those keys out of the page through the
