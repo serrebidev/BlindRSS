@@ -106,6 +106,29 @@ def override_root() -> str:
     return os.path.join(get_data_dir(), "locale")
 
 
+def overrides_available() -> bool:
+    """False when the override tree would BE the bundled catalog tree.
+
+    The override root is derived from wherever ``config.json`` lives, and in a
+    source checkout that is the repository root -- so the "writable" override
+    tree resolves to the repo's own tracked ``locale/``. The version-change
+    reset then removes it, and one launch from source deletes every translation
+    in the working tree. Nothing about the override mechanism makes sense when
+    the two paths meet (a download would overwrite the shipped catalog it is
+    supposed to shadow), so it stands down instead.
+    """
+    try:
+        from core.i18n import locale_dir
+
+        def _key(path):
+            return os.path.normcase(os.path.abspath(path))
+
+        return _key(override_root()) != _key(locale_dir())
+    except Exception:
+        # A path we cannot resolve is not a path we should delete.
+        return False
+
+
 def _state_path() -> str:
     from core.config import get_data_dir
 
@@ -156,6 +179,8 @@ def prepare_overrides_for_app_version(app_version: str | None = None) -> bool:
         app_version = APP_VERSION
     current = str(app_version or "").strip()
     if not current or _prepared_app_version == current:
+        return False
+    if not overrides_available():
         return False
 
     state = load_state()
@@ -265,6 +290,9 @@ def check_and_update(languages, force: bool = False, timeout: int = 20) -> Updat
     raises: transport problems are reported through ``UpdateResult.error``.
     """
     result = UpdateResult()
+    if not overrides_available():
+        log.debug("Translation overrides stood down: they would be the bundled tree")
+        return result
     wanted = [str(code).strip() for code in (languages or []) if str(code or "").strip()]
     # English is the msgid source; there is no catalog to fetch for it.
     wanted = [code for code in dict.fromkeys(wanted) if code.lower() not in ("en", "c", "posix")]
@@ -333,6 +361,8 @@ def is_due(frequency: str, now: float | None = None) -> bool:
 
 def clear_overrides() -> None:
     """Remove every downloaded catalog (Settings' reset path)."""
+    if not overrides_available():
+        return
     try:
         shutil.rmtree(override_root(), ignore_errors=True)
     except Exception:

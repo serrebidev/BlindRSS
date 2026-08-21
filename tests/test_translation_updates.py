@@ -225,6 +225,43 @@ def test_new_app_version_removes_stale_override_before_gettext_loads(
         i18n.setup("en")
 
 
+def test_a_source_checkout_is_never_treated_as_an_override_tree(tmp_path, monkeypatch):
+    """The override reset must not be able to delete the shipped catalogs.
+
+    The override root is derived from wherever config.json lives, which in a
+    source checkout is the repository root -- so it resolves to the repo's own
+    tracked locale/. One launch from source used to wipe every translation in
+    the working tree, and a download would have overwritten the very catalog it
+    is supposed to shadow.
+    """
+    same = tmp_path / "locale"
+    shipped = same / "xx" / "LC_MESSAGES" / "blindrss.mo"
+    shipped.parent.mkdir(parents=True)
+    po_compile.write_mo({"All Articles": "shipped text"}, shipped)
+
+    monkeypatch.setattr(tu, "override_root", lambda: str(same))
+    monkeypatch.setattr(tu, "_state_path", lambda: str(tmp_path / "state.json"))
+    monkeypatch.setattr(tu, "_prepared_app_version", "")
+    monkeypatch.setattr(i18n, "locale_dir", lambda: str(same))
+    monkeypatch.setattr("core.version.APP_VERSION", "2.0.0")
+
+    assert tu.overrides_available() is False
+    assert tu.prepare_overrides_for_app_version() is False
+    tu.clear_overrides()
+    assert shipped.exists()
+
+    # And no download may write into it either.
+    def _never(*args, **kwargs):
+        raise AssertionError("a catalog was fetched into the bundled tree")
+
+    monkeypatch.setattr(tu, "_fetch_catalog", _never)
+    assert tu.check_and_update(["xx"]).checked == []
+
+    # i18n must not list it as an override dir; the bundled tree stands alone.
+    assert i18n.override_locale_dir() == ""
+    assert i18n.catalog_dirs() == [str(same)]
+
+
 def test_same_app_version_keeps_newer_downloaded_override(data_dir, tmp_path, monkeypatch):
     bundled = tmp_path / "bundled"
     bundled_mo = bundled / "xx" / "LC_MESSAGES" / "blindrss.mo"

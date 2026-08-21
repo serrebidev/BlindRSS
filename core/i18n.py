@@ -55,9 +55,14 @@ def override_locale_dir() -> str:
     try:
         from core.translation_updates import (
             override_root,
+            overrides_available,
             prepare_overrides_for_app_version,
         )
 
+        if not overrides_available():
+            # Running from a source checkout, this resolves to the repo's own
+            # tracked locale/ -- see translation_updates.overrides_available.
+            return ""
         prepare_overrides_for_app_version()
         return override_root()
     except Exception:
