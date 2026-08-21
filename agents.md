@@ -439,5 +439,6 @@ sync-claude-memory.py after writing one:
 - [cmd bare batch not found](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\cmd-bare-batch-not-found.md) — Claude-spawned shells set NoDefaultCurrentDirectoryInExePath=1; run repo batch files as `.\build.bat release`, never bare
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\MEMORY.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\cmd-bare-batch-not-found.md
+@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\release-must-run-detached.md
 @C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\rich-view-external-links.md
 <!-- claude-memory:end -->
