@@ -4,6 +4,11 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.130.7 - 2026-08-21
+
+- Refresh VoiceOver full text readers.
+- Verify packaged runtime and full text.
+
 ## v1.130.6 - 2026-08-20
 
 - Render iframe embeds inside the rich reader again.
