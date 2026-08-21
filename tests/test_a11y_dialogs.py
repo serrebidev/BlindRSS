@@ -126,6 +126,39 @@ def test_open_media_url_dialog_rejects_a_non_url(parent):
         dlg.Destroy()
 
 
+def test_open_article_dialog_controls_named(parent):
+    dlg = dialogs.OpenArticleDialog(parent, initial_url="https://example.com/story")
+    try:
+        assert dlg.url_ctrl.GetName() == "Article address"
+        # The checkbox is what chooses the reader, so it has to announce as
+        # something other than the sentence next to it.
+        assert dlg.rich_ctrl.GetName() == "Open in HTML view"
+        assert dlg.get_data() == {"url": "https://example.com/story", "rich": False}
+
+        dlg.rich_ctrl.SetValue(True)
+        assert dlg.get_rich() is True
+    finally:
+        dlg.Destroy()
+
+
+def test_open_article_dialog_starts_in_the_readers_current_mode(parent):
+    # Someone who reads every article in the rich view should not have to
+    # check the box every time they open a page.
+    dlg = dialogs.OpenArticleDialog(parent, rich_default=True)
+    try:
+        assert dlg.get_rich() is True
+    finally:
+        dlg.Destroy()
+
+
+def test_open_article_dialog_rejects_a_non_url(parent):
+    dlg = dialogs.OpenArticleDialog(parent, initial_url="how to bake bread")
+    try:
+        assert dlg.get_url() == ""
+    finally:
+        dlg.Destroy()
+
+
 def test_exclude_notification_feeds_list_named(parent):
     dlg = dialogs.ExcludeNotificationFeedsDialog(
         parent,

@@ -36,6 +36,7 @@ from core.groups_io import search_groups_io_feeds
 from core import article_columns
 from core import download_formats
 from core import media_url
+from core import open_article
 from core import utils
 from core import config as config_mod
 from core import equalizer as equalizer_mod
@@ -410,6 +411,71 @@ class OpenMediaUrlDialog(wx.Dialog):
             "action": self.get_action(),
             "download_format": self.get_format(),
         }
+
+
+class OpenArticleDialog(wx.Dialog):
+    """Ask for a web address and which of the two readers to open it in.
+
+    For the article nobody subscribes to: a link someone sends, or a page whose
+    own site is unreadable behind cookie banners, ad interstitials and infinite
+    scroll. The checkbox picks the reader, and it only picks the *starting*
+    one -- the article window's View menu switches without fetching again -- so
+    the wrong guess here costs nothing.
+    """
+
+    def __init__(self, parent, initial_url: str = "", rich_default: bool = False):
+        super().__init__(parent, title=_("Open Article"), size=(560, 300))
+
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(
+            wx.StaticText(self, label=_(
+                "Paste the address of an article or web page.\n"
+                "BlindRSS reads it the way it reads a feed article, without the\n"
+                "page's own layout, menus, or pop-ups."
+            )),
+            0, wx.ALL, 10,
+        )
+
+        sizer.Add(wx.StaticText(self, label=_("Article address:")), 0, wx.LEFT | wx.RIGHT | wx.TOP, 10)
+        self.url_ctrl = wx.TextCtrl(self, style=wx.TE_PROCESS_ENTER)
+        self.url_ctrl.SetName(_("Article address"))
+        self.url_ctrl.SetHint("https://example.com/story")
+        if initial_url:
+            self.url_ctrl.SetValue(str(initial_url))
+            self.url_ctrl.SetInsertionPointEnd()
+        sizer.Add(self.url_ctrl, 0, wx.EXPAND | wx.ALL, 10)
+
+        self.rich_ctrl = wx.CheckBox(self, label=_("Open in &HTML view"))
+        self.rich_ctrl.SetName(_("Open in HTML view"))
+        self.rich_ctrl.SetValue(bool(rich_default))
+        sizer.Add(self.rich_ctrl, 0, wx.LEFT | wx.RIGHT, 10)
+
+        sizer.Add(
+            wx.StaticText(self, label=_(
+                "Cleared, the article opens as plain full text. Checked, it keeps "
+                "headings, links, and embedded video."
+            )),
+            0, wx.EXPAND | wx.ALL, 10,
+        )
+
+        btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
+        if btn_sizer:
+            sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 10)
+
+        self.SetSizer(sizer)
+        self.Centre()
+
+        self.url_ctrl.Bind(wx.EVT_TEXT_ENTER, lambda e: self.EndModal(wx.ID_OK))
+        wx.CallAfter(self.url_ctrl.SetFocus)
+
+    def get_url(self) -> str:
+        return open_article.normalize_article_url(self.url_ctrl.GetValue())
+
+    def get_rich(self) -> bool:
+        return bool(self.rich_ctrl.GetValue())
+
+    def get_data(self) -> dict:
+        return {"url": self.get_url(), "rich": self.get_rich()}
 
 
 class AddShortcutsDialog(wx.Dialog):

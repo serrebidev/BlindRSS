@@ -55,6 +55,7 @@ COMMANDS: List[Command] = [
 
     Command("media.open_url", "Media", "Open Media URL", ""),
 
+    Command("article.open_url", "Articles", "Open Article", ""),
     Command("article.open_browser", "Articles", "Open in Browser", ""),
     Command("article.copy_link", "Articles", "Copy Link", ""),
     Command("article.copy_media_link", "Articles", "Copy Media Link", ""),

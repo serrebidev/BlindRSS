@@ -615,6 +615,7 @@ class AccessibleBrowserFrame(wx.Frame):
 
         file_menu = wx.Menu()
         self._menu_item(file_menu, _("&Add Feed...\tCtrl+N"), lambda e: self._delegate("on_add_feed"))
+        self._menu_item(file_menu, _("&Open Article..."), lambda e: self._delegate("on_open_article_url"))
         self._menu_item(file_menu, _("Detect Feeds on &Page..."), lambda e: self._delegate("on_detect_page_feeds"))
         self._menu_item(file_menu, _("Add &Category..."), lambda e: self._delegate("on_add_category"))
         self._menu_item(file_menu, _("New Smart F&older..."), lambda e: self._ctx_new_smart_folder())

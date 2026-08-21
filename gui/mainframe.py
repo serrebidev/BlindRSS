@@ -2263,6 +2263,9 @@ class MainFrame(wx.Frame):
         file_menu = wx.Menu()
         add_feed_item = self._append_shortcut_menu_item(
             file_menu, "feeds.add", _("&Add Feed"), _("Add a new RSS feed"))
+        open_article_item = self._append_shortcut_menu_item(
+            file_menu, "article.open_url", _("&Open Article..."),
+            _("Read any web page in the BlindRSS article reader"))
         open_media_url_item = self._append_shortcut_menu_item(
             file_menu, "media.open_url", _("Open Media &URL..."),
             _("Stream or download media from any supported link"))
@@ -2538,6 +2541,7 @@ class MainFrame(wx.Frame):
         apply_menubar_mnemonics(menubar)
         
         self.Bind(wx.EVT_MENU, self.on_add_feed, add_feed_item)
+        self.Bind(wx.EVT_MENU, self.on_open_article_url, open_article_item)
         self.Bind(wx.EVT_MENU, self.on_open_media_url, open_media_url_item)
         self.Bind(wx.EVT_MENU, self.on_detect_page_feeds, detect_feeds_item)
         self.Bind(wx.EVT_MENU, self.on_remove_feed, remove_feed_item)
@@ -3179,6 +3183,8 @@ class MainFrame(wx.Frame):
             "feeds.video_search": self.on_ytdlp_global_search,
 
             "media.open_url": self.on_open_media_url,
+
+            "article.open_url": self.on_open_article_url,
 
             "article.open_browser": self._cmd_open_in_browser,
             "article.copy_link": self._cmd_copy_link,
@@ -14570,6 +14576,60 @@ class MainFrame(wx.Frame):
         except Exception:
             log.debug("Could not read the clipboard for Open Media URL", exc_info=True)
         return media_url_mod.normalize_media_url(text)
+
+    def on_open_article_url(self, event=None):
+        """File > Open Article: read any web page in the article reader.
+
+        The reading half of Open Media URL. Feeds only carry what their
+        publisher chose to syndicate, and plenty of articles reach a user as a
+        bare link -- or sit on a site whose own page is unreadable behind
+        cookie banners, ad interstitials and infinite scroll. This puts that
+        page through the same extraction the reading pane uses.
+        """
+        from gui.dialogs import OpenArticleDialog
+
+        dlg = OpenArticleDialog(
+            self,
+            initial_url=self._clipboard_media_url(),
+            rich_default=self._rich_view_enabled(),
+        )
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            data = dlg.get_data()
+            typed = dlg.url_ctrl.GetValue()
+        finally:
+            dlg.Destroy()
+
+        if not data["url"]:
+            # Never fail silently: an empty or malformed box must say why.
+            wx.MessageBox(
+                _("That does not look like a web address. Enter a full address, "
+                  "for example https://example.com/story.")
+                if str(typed or "").strip()
+                else _("Enter the address of the article you want to open."),
+                _("Open Article"),
+                wx.ICON_INFORMATION,
+            )
+            return
+
+        self.open_article_url(data["url"], rich=data["rich"])
+
+    def open_article_url(self, url: str, rich: bool = False):
+        """Open one web page in its own article window; None if it is not a URL.
+
+        The window is a child of the main frame, so wx owns it and several can
+        be open at once without the app tracking them.
+        """
+        url = media_url_mod.normalize_media_url(url)
+        if not url:
+            return None
+        from gui.article_window import ArticleWindow
+
+        return ArticleWindow(
+            self, url, rich=bool(rich),
+            translate=self._translate_rendered_text_if_enabled,
+        )
 
     def on_open_media_url(self, event=None):
         """File > Open Media URL: stream or download any supported link."""
