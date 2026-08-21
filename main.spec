@@ -113,7 +113,7 @@ bin_path = os.path.join(os.getcwd(), 'bin')
 # entries that were never installed and never imported: readability,
 # xmltodict, langcodes, language_data.
 packages_to_collect = [
-    'pyatv', 'pychromecast', 'async_upnp_client', 'trafilatura', 'markdown',
+    'pyatv', 'pychromecast', 'async_upnp_client', 'trafilatura', 'tld', 'markdown',
     'yt_dlp', 'pytubefix', 'aiohttp', 'zeroconf', 'pydantic', 'lxml',
     'sgmllib', 'six', 'soupsieve',
     'defusedxml', 'didl_lite', 'ifaddr',

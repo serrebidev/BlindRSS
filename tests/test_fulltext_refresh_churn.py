@@ -95,6 +95,34 @@ def test_apply_result_renders_via_logical_selection_during_rebuild():
     assert d._fulltext_loading_url is None
 
 
+def test_apply_result_prefers_logical_selection_over_stale_physical_row():
+    wrong = _article("wrong", "https://example.com/wrong")
+    target = _article("a1", "https://example.com/a1")
+    d = _frame([wrong, target], selected=0, selected_id="a1")
+    key, _url, _aid = d._fulltext_cache_key_for_article(target, 1)
+
+    MF._fulltext_apply_result(d, key, "FULL TEXT", True, "web", 0)
+
+    assert d.applied == [(target, "FULL TEXT")]
+
+
+def test_rich_result_prefers_logical_selection_over_stale_physical_row():
+    wrong = _article("wrong", "https://example.com/wrong")
+    target = _article("a1", "https://example.com/a1")
+    d = _frame([wrong, target], selected=0, selected_id="a1")
+    key, _url, _aid = d._fulltext_cache_key_for_article(target, 1)
+    d._fulltext_html_cache = {}
+    d.rendered = []
+    d._render_rich_html = lambda html, **kwargs: d.rendered.append((html, kwargs))
+    d._announce_fulltext_loaded_macos = lambda: None
+
+    MF._apply_rich_result(d, key, "<article>FULL</article>", 0)
+
+    assert d.rendered == [
+        ("<article>FULL</article>", {"refresh_accessibility": True})
+    ]
+
+
 def test_apply_result_with_stale_token_still_caches_and_releases_guard():
     a = _article("a1", "https://example.com/a1")
     d = _frame([a], selected=0, selected_id="a1")

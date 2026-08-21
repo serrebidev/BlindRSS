@@ -74,8 +74,8 @@ class _Ctrl:
     def Hide(self):
         self.shown = False
 
-    def Show(self):
-        self.shown = True
+    def Show(self, shown=True):
+        self.shown = shown
 
     def Destroy(self):
         self.destroyed = True
@@ -238,3 +238,19 @@ def test_focus_cache_hit_preserves_reader_caret_and_selection(monkeypatch):
 
     assert d.content_ctrl.GetSelection() == (6, 17)
     assert d.content_ctrl.GetInsertionPoint() == 17
+
+
+def test_macos_async_result_replaces_reader_even_when_list_has_focus(monkeypatch):
+    monkeypatch.setattr(mainframe.sys, "platform", "darwin")
+    monkeypatch.setattr(mainframe, "notify_reader_content_changed", lambda *a, **k: True)
+    d = _frame(monkeypatch)
+    original = d.content_ctrl
+    d._focus["cur"] = object()
+
+    assert MF._replace_macos_async_reader(d, SMALL) is True
+
+    assert d.content_ctrl is not original
+    assert d.content_ctrl.value == SMALL
+    assert d.content_ctrl.GetInsertionPoint() == 0
+    assert d.content_ctrl.shown is True
+    assert original.shown is False

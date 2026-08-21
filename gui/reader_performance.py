@@ -12,6 +12,36 @@ import json
 LARGE_READER_TEXT_CHARS = 16_384
 
 
+def notify_reader_content_changed(control, *, tree_changed: bool = False) -> bool:
+    """Tell assistive technology that an asynchronous reader update finished.
+
+    wx normally emits accessibility events for direct user edits, but the
+    article readers are read-only controls updated after a worker completes.
+    VoiceOver can otherwise keep its earlier accessibility snapshot even
+    though the native control or WebView now contains the full article.
+    """
+    try:
+        import wx
+
+        if tree_changed:
+            parent = control.GetParent()
+            wx.Accessible.NotifyEvent(
+                wx.ACC_EVENT_OBJECT_REORDER,
+                parent or control,
+                wx.OBJID_CLIENT,
+                wx.ACC_SELF,
+            )
+        wx.Accessible.NotifyEvent(
+            wx.ACC_EVENT_OBJECT_VALUECHANGE,
+            control,
+            wx.OBJID_CLIENT,
+            wx.ACC_SELF,
+        )
+        return True
+    except Exception:
+        return False
+
+
 def replace_text_control_value(control, value: str) -> bool:
     """Replace a text control without copying or repainting huge values twice.
 

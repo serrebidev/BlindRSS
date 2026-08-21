@@ -157,6 +157,41 @@ def test_apply_rich_result_caches_and_ignores_stale_token(wxapp):
         _destroy(mf, frame)
 
 
+def test_macos_rich_result_reloads_accessible_document(monkeypatch):
+    """A final rich result must replace the AXWebArea, not only mutate its DOM."""
+    calls = []
+
+    class _RichView:
+        control = object()
+
+        def clear(self):
+            calls.append(("clear", None))
+
+        def set_content(self, body):
+            calls.append(("set", body))
+
+        def status(self, message):
+            calls.append(("status", message))
+
+    frame = AccessibleBrowserFrame.__new__(AccessibleBrowserFrame)
+    frame._ensure_rich_view = lambda: _RichView()
+    monkeypatch.setattr(accessibility.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        accessibility,
+        "notify_reader_content_changed",
+        lambda control, tree_changed=False: calls.append(("notify", tree_changed)),
+    )
+
+    frame._render_rich_html("<article><p>Full article</p></article>", refresh_accessibility=True)
+
+    assert calls == [
+        ("clear", None),
+        ("set", "<article><p>Full article</p></article>"),
+        ("status", "Full text loaded."),
+        ("notify", True),
+    ]
+
+
 def test_show_article_rich_uses_cache_without_network(wxapp, monkeypatch):
     mf, frame = _make(wxapp, rich=True)
     try:

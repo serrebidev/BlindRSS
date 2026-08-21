@@ -350,6 +350,26 @@ def test_full_text_replaces_snippet_and_caches(wxapp, monkeypatch):
         _destroy(mainframe, frame)
 
 
+def test_macos_full_text_replaces_native_reader_control(wxapp, monkeypatch):
+    """VoiceOver must receive a new AX object when async full text arrives."""
+    mainframe, frame = _make_browser()
+    try:
+        monkeypatch.setattr(accessibility.sys, "platform", "darwin")
+        _patch_sync(monkeypatch, "FULL ARTICLE BODY TEXT")
+        article = _article()
+        _select(frame, article)
+        frame._show_article_at_index(0)
+        snippet_control = frame.content_ctrl
+
+        frame._start_fulltext("a1", frame._content_token)
+
+        assert frame.content_ctrl is not snippet_control
+        assert "FULL ARTICLE BODY TEXT" in frame.content_ctrl.GetValue()
+        assert "feed snippet" not in frame.content_ctrl.GetValue()
+    finally:
+        _destroy(mainframe, frame)
+
+
 def test_chapter_formatter_exposes_count_titles_timestamps_and_hrefs():
     chapters = [
         {"start": 3723.9, "title": "Long discussion", "href": "https://example.com/long"},

@@ -26,6 +26,10 @@ from urllib.parse import urlsplit
 
 log = logging.getLogger(__name__)
 
+# wx.html2.WEBVIEW_NAV_ACTION_USER. Keep the small value local so this
+# GUI-free decision logic stays testable without importing wx.html2.
+_USER_NAVIGATION_ACTION = 1
+
 
 def external_url(href) -> str | None:
     """Return ``href`` when it is a plain HTTP(S) URL safe to hand to the OS."""
@@ -65,8 +69,21 @@ def targets_main_frame(event) -> bool:
         return True
 
 
+def user_initiated(event) -> bool:
+    """True only for an explicit link activation when wx reports the action."""
+    get_action = getattr(event, "GetNavigationAction", None)
+    if not callable(get_action):
+        return True
+    try:
+        return int(get_action()) == _USER_NAVIGATION_ACTION
+    except Exception:
+        return False
+
+
 def navigation_target(event) -> str | None:
     """The URL a NAVIGATING event should open externally, or None to let it be."""
+    if not user_initiated(event):
+        return None
     if not targets_main_frame(event):
         return None
     try:
@@ -108,6 +125,8 @@ def make_new_window_handler(opener=None):
     """
 
     def _on_new_window(event):
+        if not user_initiated(event):
+            return
         try:
             url = event.GetURL()
         except Exception:

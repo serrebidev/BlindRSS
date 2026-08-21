@@ -6,6 +6,7 @@ import html as html_stdlib
 import logging
 import math
 import subprocess
+import sys
 import threading
 import webbrowser
 from collections import deque
@@ -20,7 +21,11 @@ from core import article_lang
 from core.i18n import _
 from core.categories import UNCATEGORIZED, category_display_name
 from .clipboard_utils import copy_text_to_clipboard, copy_textctrl_selection_to_clipboard
-from .reader_performance import replace_text_control_value, set_accessible_webview_content
+from .reader_performance import (
+    notify_reader_content_changed,
+    replace_text_control_value,
+    set_accessible_webview_content,
+)
 from . import rich_view_links
 
 log = logging.getLogger(__name__)
@@ -526,6 +531,7 @@ class AccessibleBrowserFrame(wx.Frame):
 
         right = wx.BoxSizer(wx.VERTICAL)
         article_lbl = wx.StaticText(panel, label=_("Article Content"))
+        self._article_content_label = article_lbl
         right.Add(article_lbl, 0, wx.BOTTOM, 4)
         self.content_ctrl = wx.TextCtrl(
             panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_BESTWRAP
@@ -1520,7 +1526,76 @@ class AccessibleBrowserFrame(wx.Frame):
             text = text.rstrip() + "\n\n" + chapter_text + "\n"
         return text
 
-    def _set_article_content(self, article, art_id, body, *, preserve_position=False):
+    def _replace_macos_plain_reader(self, displayed, insertion_point, selection) -> bool:
+        """Install a fresh TextCtrl so VoiceOver sees the completed article."""
+        if sys.platform != "darwin":
+            return False
+        old = self.content_ctrl
+        new = None
+        swapped = False
+        try:
+            had_focus = wx.Window.FindFocus() is old
+            was_shown = old.IsShown()
+            new = wx.TextCtrl(
+                old.GetParent(),
+                style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_BESTWRAP,
+            )
+            new.SetName(_("Accessible Article Content"))
+            new.SetMinSize((620, 240))
+            new.Bind(wx.EVT_TEXT_COPY, self.on_content_copy)
+            new.Bind(wx.EVT_SET_FOCUS, self.on_content_focus)
+            new.Hide()
+            new.ChangeValue(displayed)
+            try:
+                new.MoveBeforeInTabOrder(old)
+            except Exception:
+                pass
+            end = len(displayed)
+            if selection is not None:
+                new.SetSelection(min(selection[0], end), min(selection[1], end))
+            elif insertion_point is not None:
+                new.SetInsertionPoint(min(insertion_point, end))
+            else:
+                new.SetInsertionPoint(0)
+            if not self._reader_right_sizer.Replace(old, new):
+                new.Destroy()
+                return False
+            swapped = True
+            self.content_ctrl = new
+            try:
+                self._article_content_label.SetLabelFor(new)
+            except Exception:
+                pass
+            new.Show(was_shown)
+            old.Hide()
+            self._reader_panel.Layout()
+            notify_reader_content_changed(new, tree_changed=True)
+            if had_focus:
+                wx.CallAfter(new.SetFocus)
+            wx.CallAfter(old.Destroy)
+            return True
+        except Exception:
+            log.debug("macOS reader control replacement failed", exc_info=True)
+            try:
+                if swapped and new is not None and self._reader_right_sizer.Replace(new, old):
+                    self.content_ctrl = old
+                    old.Show()
+                    self._reader_panel.Layout()
+                if new is not None and new is not self.content_ctrl:
+                    new.Destroy()
+            except Exception:
+                log.debug("macOS reader control rollback failed", exc_info=True)
+            return False
+
+    def _set_article_content(
+        self,
+        article,
+        art_id,
+        body,
+        *,
+        preserve_position=False,
+        refresh_accessibility=False,
+    ):
         insertion_point = None
         selection = None
         if preserve_position:
@@ -1531,10 +1606,13 @@ class AccessibleBrowserFrame(wx.Frame):
                 pass
         self._current_body_art_id = art_id
         self._current_body_text = str(body or "")
-        replace_text_control_value(
-            self.content_ctrl,
-            self._compose_article_content(article, art_id, body),
-        )
+        displayed = self._compose_article_content(article, art_id, body)
+        replaced = False
+        if refresh_accessibility:
+            replaced = self._replace_macos_plain_reader(
+                displayed, insertion_point, selection
+            )
+        changed = replaced or replace_text_control_value(self.content_ctrl, displayed)
         if preserve_position:
             try:
                 if selection is not None:
@@ -1543,6 +1621,8 @@ class AccessibleBrowserFrame(wx.Frame):
                     self.content_ctrl.SetInsertionPoint(insertion_point)
             except Exception:
                 pass
+        if refresh_accessibility and changed and not replaced:
+            notify_reader_content_changed(self.content_ctrl)
 
     # ---- Rich (HTML) reader surface ---------------------------------------
     # Mirrors MainFrame's opt-in "Rich Full-Text View": an AccessibleWebView
@@ -1635,12 +1715,22 @@ class AccessibleBrowserFrame(wx.Frame):
         except Exception:
             pass
 
-    def _render_rich_html(self, html_body) -> None:
+    def _render_rich_html(self, html_body, *, refresh_accessibility=False) -> None:
         rv = self._ensure_rich_view()
         if rv is None:
             return
         try:
-            set_accessible_webview_content(rv, html_body)
+            if refresh_accessibility and sys.platform == "darwin":
+                # A DOM mutation leaves VoiceOver on its cached pre-fetch AXWebArea.
+                # Reloading the document publishes a new accessibility subtree.
+                rv.clear()
+                rv.set_content(html_body)
+                rv.status(_("Full text loaded."))
+                notify_reader_content_changed(rv.control, tree_changed=True)
+            else:
+                set_accessible_webview_content(rv, html_body)
+                if refresh_accessibility:
+                    notify_reader_content_changed(rv.control, tree_changed=True)
         except Exception:
             log.exception("Failed to set rich reader content")
 
@@ -1750,7 +1840,12 @@ class AccessibleBrowserFrame(wx.Frame):
             return
         if not html_body or self._current_rich_art_id != art_id:
             return
-        self._render_rich_html(html_body)
+        self._render_rich_html(html_body, refresh_accessibility=True)
+        log.debug(
+            "Applied accessible rich full text for %s (%d characters)",
+            art_id,
+            len(html_body),
+        )
         self._announce_fulltext_loaded()
 
     def on_toggle_rich_view(self, event=None) -> None:
@@ -1989,7 +2084,13 @@ class AccessibleBrowserFrame(wx.Frame):
             # A late prefetch completion must not move VoiceOver's reader cursor back
             # to the beginning after the user has started reading the snippet.
             changed = str(body or "") != str(getattr(self, "_current_body_text", "") or "")
-            self._set_article_content(article, art_id, body, preserve_position=True)
+            self._set_article_content(
+                article,
+                art_id,
+                body,
+                preserve_position=True,
+                refresh_accessibility=changed,
+            )
             if changed:
                 self._announce_fulltext_loaded()
         except Exception:
@@ -2156,7 +2257,18 @@ class AccessibleBrowserFrame(wx.Frame):
             # to the beginning after the user has started reading the snippet
             # (same rule as _finish_prefetch).
             changed = str(body or "") != str(getattr(self, "_current_body_text", "") or "")
-            self._set_article_content(article, art_id, body, preserve_position=True)
+            self._set_article_content(
+                article,
+                art_id,
+                body,
+                preserve_position=True,
+                refresh_accessibility=changed,
+            )
+            log.debug(
+                "Applied accessible plain full text for %s (%d characters)",
+                art_id,
+                len(body),
+            )
             if changed or not cacheable:
                 self._announce_fulltext_loaded(authoritative=bool(cacheable))
         except Exception:

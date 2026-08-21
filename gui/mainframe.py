@@ -69,6 +69,7 @@ from .menu_mnemonics import apply_menu_mnemonics, apply_menubar_mnemonics
 from .widgets import force_ltr_reading
 from .reader_performance import (
     LARGE_READER_TEXT_CHARS,
+    notify_reader_content_changed,
     replace_text_control_value,
     set_accessible_webview_content,
 )
@@ -5547,6 +5548,52 @@ class MainFrame(wx.Frame):
         finally:
             self._reader_swap_active = False
 
+    def _replace_macos_async_reader(self, displayed: str) -> bool:
+        """Replace the native reader after an async load so VoiceOver refreshes."""
+        if sys.platform != "darwin":
+            return False
+        old = self.content_ctrl
+        new = None
+        swapped = False
+        try:
+            had_focus = wx.Window.FindFocus() is old
+            was_shown = old.IsShown()
+            new = self._create_article_text_control()
+            new.Hide()
+            new.ChangeValue(displayed)
+            new.SetInsertionPoint(0)
+            try:
+                new.MoveBeforeInTabOrder(old)
+            except Exception:
+                pass
+            if not self._reader_sizer.Replace(old, new):
+                new.Destroy()
+                return False
+            swapped = True
+            self.content_ctrl = new
+            self._update_search_tab_order()
+            new.Show(was_shown)
+            old.Hide()
+            self.reader_panel.Layout()
+            notify_reader_content_changed(new, tree_changed=True)
+            if had_focus:
+                wx.CallAfter(new.SetFocus)
+            wx.CallAfter(old.Destroy)
+            return True
+        except Exception:
+            log.debug("macOS async reader replacement failed", exc_info=True)
+            try:
+                if swapped and new is not None and self._reader_sizer.Replace(new, old):
+                    self.content_ctrl = old
+                    old.Show()
+                    self._update_search_tab_order()
+                    self.reader_panel.Layout()
+                if new is not None and new is not self.content_ctrl:
+                    new.Destroy()
+            except Exception:
+                log.debug("macOS async reader rollback failed", exc_info=True)
+            return False
+
     def _set_article_reader_text(self, article, base_text: str, *, reset_insertion: bool = False) -> str:
         """Set the main reader from chapter-free base text and return the displayed text."""
         displayed = self._compose_article_reader_text(base_text, article=article)
@@ -5922,12 +5969,20 @@ class MainFrame(wx.Frame):
             pass
         self._schedule_rich_load_for_index(idx, force=True)
 
-    def _render_rich_html(self, html_body: str) -> None:
+    def _render_rich_html(self, html_body: str, *, refresh_accessibility=False) -> None:
         rv = self._ensure_rich_view()
         if rv is None:
             return
         try:
-            set_accessible_webview_content(rv, html_body)
+            if refresh_accessibility and sys.platform == "darwin":
+                rv.clear()
+                rv.set_content(html_body)
+                rv.status(_("Full text loaded."))
+                notify_reader_content_changed(rv.control, tree_changed=True)
+            else:
+                set_accessible_webview_content(rv, html_body)
+                if refresh_accessibility:
+                    notify_reader_content_changed(rv.control, tree_changed=True)
         except Exception:
             log.exception("Failed to set rich reader content")
 
@@ -6055,19 +6110,24 @@ class MainFrame(wx.Frame):
             return
         if not html_body:
             return
-        try:
-            idx_now = self.list_ctrl.GetFirstSelected()
-        except Exception:
-            idx_now = -1
-        if idx_now is None or idx_now < 0 or idx_now >= len(self.current_articles):
-            idx_now = self._index_of_selected_article()
-            if idx_now is None:
+        idx_now = self._index_of_selected_article()
+        if idx_now is None:
+            try:
+                idx_now = self.list_ctrl.GetFirstSelected()
+            except Exception:
+                idx_now = -1
+            if idx_now is None or idx_now < 0 or idx_now >= len(self.current_articles):
                 return
         article_now = self.current_articles[idx_now]
         cur_key, _u, _a = self._fulltext_cache_key_for_article(article_now, idx_now)
         if cur_key != cache_key:
             return
-        self._render_rich_html(html_body)
+        self._render_rich_html(html_body, refresh_accessibility=True)
+        log.debug(
+            "Applied main rich full text for %s (%d characters)",
+            cache_key,
+            len(html_body),
+        )
         self._announce_fulltext_loaded_macos()
 
     def _announce_fulltext_loaded_macos(self, authoritative: bool = True) -> None:
@@ -11066,21 +11126,31 @@ class MainFrame(wx.Frame):
         # Apply to the reader only if the user is still on this article.
         if token_snapshot is not None and token_snapshot != int(getattr(self, "_fulltext_token", 0)):
             return
-        try:
-            idx_now = self.list_ctrl.GetFirstSelected()
-        except Exception:
-            idx_now = -1
-        if idx_now is None or idx_now < 0 or idx_now >= len(self.current_articles):
-            # Mid-rebuild vacancy: resolve by the logical selection instead.
-            idx_now = self._index_of_selected_article()
-            if idx_now is None:
+        idx_now = self._index_of_selected_article()
+        if idx_now is None:
+            try:
+                idx_now = self.list_ctrl.GetFirstSelected()
+            except Exception:
+                idx_now = -1
+            if idx_now is None or idx_now < 0 or idx_now >= len(self.current_articles):
                 return
         article_now = self.current_articles[idx_now]
         cur_key, _cur_url, _aid = self._fulltext_cache_key_for_article(article_now, idx_now)
         if cur_key != cache_key:
             return
         try:
-            self._set_article_reader_text(article_now, rendered, reset_insertion=True)
+            displayed = self._set_article_reader_text(
+                article_now, rendered, reset_insertion=True
+            )
+            replacer = getattr(self, "_replace_macos_async_reader", None)
+            replaced = bool(callable(replacer) and replacer(displayed))
+            if sys.platform == "darwin" and not replaced:
+                notify_reader_content_changed(self.content_ctrl)
+            log.debug(
+                "Applied main plain full text for %s (%d characters)",
+                cache_key,
+                len(rendered),
+            )
             self._announce_fulltext_loaded_macos(authoritative=bool(cacheable))
         except Exception:
             pass

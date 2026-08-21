@@ -17,10 +17,11 @@ from gui import rich_view_links
 class _Event:
     """Stand-in for wx.html2.WebViewEvent."""
 
-    def __init__(self, url, *, main_frame=True, target=""):
+    def __init__(self, url, *, main_frame=True, target="", action=None):
         self._url = url
         self._main_frame = main_frame
         self._target = target
+        self._action = action
         self.vetoed = False
 
     def GetURL(self):
@@ -32,6 +33,11 @@ class _Event:
     def GetTarget(self):
         return self._target
 
+    def GetNavigationAction(self):
+        if self._action is None:
+            raise AttributeError("navigation action unavailable")
+        return self._action
+
     def Veto(self):
         self.vetoed = True
 
@@ -40,7 +46,7 @@ class _OldEvent(_Event):
     """wxWidgets < 3.3: no IsTargetMainFrame(), only a target frame name."""
 
     def __getattribute__(self, name):
-        if name == "IsTargetMainFrame":
+        if name in {"IsTargetMainFrame", "GetNavigationAction"}:
             raise AttributeError(name)
         return super().__getattribute__(name)
 
@@ -58,13 +64,13 @@ def test_iframe_navigation_stays_in_the_webview():
 
 
 def test_link_click_opens_in_the_system_browser():
-    event = _Event("https://example.com/story")
+    event = _Event("https://example.com/story", action=1)
     assert _run(event) == ["https://example.com/story"]
     assert event.vetoed
 
 
 def test_initial_page_load_is_left_alone():
-    event = _Event("about:blank")
+    event = _Event("about:blank", action=0)
     assert _run(event) == []
     assert not event.vetoed
 
@@ -81,18 +87,31 @@ def test_old_wx_falls_back_to_the_target_name():
     assert _run(_OldEvent("https://example.com/embed", target="player")) == []
 
 
+def test_automatic_http_navigation_never_opens_a_browser_tab():
+    event = _Event("https://www.youtube.com/embed/abc123", action=2)
+    assert _run(event) == []
+    assert not event.vetoed
+
+
 def test_popups_open_externally_without_a_veto():
     opened = []
-    event = _Event("https://www.youtube.com/watch?v=abc123")
+    event = _Event("https://www.youtube.com/watch?v=abc123", action=1)
     rich_view_links.make_new_window_handler(opened.append)(event)
     assert opened == ["https://www.youtube.com/watch?v=abc123"]
     assert not event.vetoed
+
+
+def test_automatic_popup_never_opens_a_browser_tab():
+    opened = []
+    event = _Event("https://example.com/automatic", action=2)
+    rich_view_links.make_new_window_handler(opened.append)(event)
+    assert opened == []
 
 
 def test_a_failing_opener_does_not_escape():
     def _boom(url):
         raise RuntimeError(f"no browser for {url}")
 
-    event = _Event("https://example.com/story")
+    event = _Event("https://example.com/story", action=1)
     rich_view_links.make_navigating_handler(_boom)(event)
     assert event.vetoed

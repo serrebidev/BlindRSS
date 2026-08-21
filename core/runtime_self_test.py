@@ -12,6 +12,7 @@ import os
 import shutil
 import subprocess
 import sys
+import warnings
 
 
 _REQUIRED_MODULES = (
@@ -26,6 +27,7 @@ _REQUIRED_MODULES = (
     "markdown",
     "pydoll.browser.chromium",
     "seleniumbase",
+    "tld",
     "trafilatura",
     "wx.html2",
     "wx_accessible_webview",
@@ -41,6 +43,15 @@ _REQUIRED_TOOLS = {
 def _check_fulltext() -> list[str]:
     try:
         from core import article_extractor
+        from tld import get_tld
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore", DeprecationWarning)
+            suffix = get_tld(
+                "https://news.example.co.uk/runtime", fix_protocol=True
+            )
+        if suffix != "co.uk":
+            return ["public-suffix data returned an unexpected result"]
 
         paragraphs = [
             (

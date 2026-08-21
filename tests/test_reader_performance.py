@@ -4,6 +4,7 @@
 
 from gui.reader_performance import (
     LARGE_READER_TEXT_CHARS,
+    notify_reader_content_changed,
     replace_text_control_value,
     set_accessible_webview_content,
 )
@@ -94,3 +95,29 @@ def test_large_webview_update_is_async_complete_and_atomic():
     assert "aria-busy" in script
     assert "replaceChildren" in script
     assert "UNIQUE TAIL" in script
+
+
+def test_accessibility_notification_reports_replaced_reader_tree(monkeypatch):
+    import wx
+
+    calls = []
+    parent = object()
+
+    class _Accessible:
+        @staticmethod
+        def NotifyEvent(event_type, window, object_type, object_id):
+            calls.append((event_type, window, object_type, object_id))
+
+    class _Reader:
+        @staticmethod
+        def GetParent():
+            return parent
+
+    reader = _Reader()
+    monkeypatch.setattr(wx, "Accessible", _Accessible)
+
+    assert notify_reader_content_changed(reader, tree_changed=True) is True
+    assert calls == [
+        (wx.ACC_EVENT_OBJECT_REORDER, parent, wx.OBJID_CLIENT, wx.ACC_SELF),
+        (wx.ACC_EVENT_OBJECT_VALUECHANGE, reader, wx.OBJID_CLIENT, wx.ACC_SELF),
+    ]
