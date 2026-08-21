@@ -281,6 +281,22 @@ def test_vss_copy_uses_wmi_com_without_powershell(tmp_path, monkeypatch):
         return types.SimpleNamespace(returncode=0, stdout="", stderr="")
 
     monkeypatch.setattr(cc.subprocess, "run", fake_run)
+    real_isfile = cc.os.path.isfile
+    real_copyfile = cc.shutil.copyfile
+
+    def local_shadow_path(path):
+        prefix = str(device_root) + "\\"
+        if str(path).startswith(prefix):
+            relative = str(path)[len(prefix):].replace("\\", os.sep)
+            return str(device_root / relative)
+        return str(path)
+
+    monkeypatch.setattr(cc.os.path, "isfile", lambda path: real_isfile(local_shadow_path(path)))
+    monkeypatch.setattr(
+        cc.shutil,
+        "copyfile",
+        lambda source, destination: real_copyfile(local_shadow_path(source), destination),
+    )
     result = cc._vss_copy_files(
         [r"C:\Browser\Network\Cookies"], str(tmp_path / "stage")
     )

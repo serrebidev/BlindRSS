@@ -411,6 +411,10 @@ build_pyinstaller() {
   "$SCRIPT_DIR/.venv/bin/python" tools/compile_translations.py
   echo "[BlindRSS Build] Running PyInstaller (portable.spec)..."
   "$SCRIPT_DIR/.venv/bin/python" -m PyInstaller --clean --noconfirm portable.spec
+  if [[ "$PLATFORM_ID" == "macos" ]]; then
+    echo "[BlindRSS Build] Verifying frozen macOS runtime..."
+    "$SCRIPT_DIR/dist/BlindRSS.app/Contents/MacOS/BlindRSS" --blindrss-runtime-self-test
+  fi
 }
 
 package_macos() {

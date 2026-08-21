@@ -43,6 +43,11 @@ if "--blindrss-elevated-helper" in sys.argv[1:]:
 
     sys.exit(run_elevated_helper_cli(sys.argv[1:]))
 
+if "--blindrss-runtime-self-test" in sys.argv[1:]:
+    from core.runtime_self_test import run_runtime_self_test
+
+    sys.exit(run_runtime_self_test())
+
 
 def _configure_file_logging(config_manager):
     """Attach a persistent debug log after config has resolved the data directory."""

@@ -45,7 +45,7 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 - The GitHub release carries Windows first, then the locally controlled Linux tarball + `BlindRSS-update-linux.json`; the macOS ZIP + `BlindRSS-update-macos.json` are added by `cross-platform-release.yml`.
 
 ### macOS / Linux (`build.sh`, auto-detects platform)
-- `build` — LOCAL packaging only (compiles gettext `.po` catalogs to ignored `.mo` artifacts, bundles `yt-dlp`/`deno`/`ffmpeg`/VLC, runs `portable.spec`). macOS → ad-hoc-signed `dist/BlindRSS.app` + `dist/BlindRSS-macos-vX.Y.Z.zip`; Linux → `dist/BlindRSS/` + `dist/BlindRSS-linux-vX.Y.Z.tar.gz`. Never versions or releases.
+- `build` — LOCAL packaging only (compiles gettext `.po` catalogs to ignored `.mo` artifacts, bundles `yt-dlp`/`deno`/`ffmpeg`/VLC, runs `portable.spec`). macOS executes the frozen runtime self-test before signing; it must import both full-text readers and their browser fallbacks, run every bundled media tool, load bundled libVLC/plugins, and find the update helper. macOS → ad-hoc-signed `dist/BlindRSS.app` + `dist/BlindRSS-macos-vX.Y.Z.zip`; Linux → `dist/BlindRSS/` + `dist/BlindRSS-linux-vX.Y.Z.tar.gz`. Never versions or releases.
 - `release` (no tag) — rejected; official releases start on Windows. `release <tag>` — does NOT build; re-dispatches only the macOS CI asset for an EXISTING tag.
 - `dry-run` — prints the plan; changes nothing.
 
