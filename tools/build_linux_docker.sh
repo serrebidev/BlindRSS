@@ -31,15 +31,16 @@ echo "[BlindRSS Linux Build] Building the self-contained Linux package..."
 # uv warn before every otherwise-clean release build.
 #
 # PyAutoGUI 0.9.54 (an optional SeleniumBase dependency) contains a Linux-only
-# ``'\e'`` escape in _pyautogui_x11.py. Limit the filter to that upstream module
-# so project SyntaxWarnings and every other warning remain visible.
+# ``'\e'`` escape in _pyautogui_x11.py. Compile all project Python files with
+# SyntaxWarnings promoted to errors before suppressing that one warning class
+# during dependency collection. Python does not expose a usable module name for
+# this compile-time warning, so a module-qualified filter cannot match it.
 docker run --rm \
   --env UV_LINK_MODE=copy \
-  --env 'PYTHONWARNINGS=ignore:invalid escape sequence:SyntaxWarning:pyautogui._pyautogui_x11' \
   --volume "$REPO_DIR:/src" \
   --workdir /src \
   "$IMAGE_NAME" \
-  bash -lc "uv venv --python 3.12 --seed .venv; .venv/bin/python -m pip install --only-binary=:all: https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-22.04/wxpython-4.2.5-cp312-cp312-linux_x86_64.whl; printf 'wxPython==4.2.5\\n' > /tmp/blindrss-linux-constraints.txt; export PIP_CONSTRAINT=/tmp/blindrss-linux-constraints.txt; chmod +x build.sh; ./build.sh build"
+  bash -lc "uv venv --python 3.12 --seed .venv; .venv/bin/python -m pip install --only-binary=:all: https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-22.04/wxpython-4.2.5-cp312-cp312-linux_x86_64.whl; find . -path ./.venv -prune -o -path ./.git -prune -o -path ./build -prune -o -path ./dist -prune -o -name '*.py' -print0 | xargs -0 .venv/bin/python -W error::SyntaxWarning -m py_compile; printf 'wxPython==4.2.5\\n' > /tmp/blindrss-linux-constraints.txt; export PIP_CONSTRAINT=/tmp/blindrss-linux-constraints.txt; export PYTHONWARNINGS='ignore:invalid escape sequence:SyntaxWarning'; chmod +x build.sh; ./build.sh build"
 
 mapfile -t archives < <(
   find "$REPO_DIR/dist" -maxdepth 1 -type f -name 'BlindRSS-linux-v*.tar.gz' -print
