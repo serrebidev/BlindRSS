@@ -4,6 +4,13 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.132.0 - 2026-08-23
+
+- Read complete Invision and vBulletin forums.
+- Correct four Russian typos from PR #103.
+- Merge PR #103: Update Russian translation (@tseykovets).
+- Update Russian translation.
+
 ## v1.131.0 - 2026-08-21
 
 - Read any web page with File > Open Article.
