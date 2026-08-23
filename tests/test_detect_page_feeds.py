@@ -55,6 +55,37 @@ def test_no_feeds_returns_empty_list(monkeypatch):
     assert discovery.detect_page_feeds("https://example.com/") == []
 
 
+def test_vbulletin_index_exposes_all_and_every_visible_forum_feed(monkeypatch):
+    page = """<html><body>
+    <a href="/forums/9-Everything-Related-to-the-Board">Everything Related to the Board</a>
+    <a href="/external.php?type=RSS2&amp;forumids=9">View this forum's RSS feed</a>
+    <a href="/forums/10-Lounge">Lounge</a>
+    <a href="/external.php?type=RSS2&amp;forumids=10">View this forum's RSS feed</a>
+    <a href="/forums/55-The-Drawing-Room">The Drawing Room</a>
+    <a href="https://elsewhere.example/forums/88-Not-This-Site">Off-site forum</a>
+    </body></html>"""
+    monkeypatch.setattr(
+        utils,
+        "safe_requests_get",
+        lambda url, **kw: _resp(200, page, url="https://filesharingtalk.com/forum.php"),
+    )
+
+    feeds = discovery.detect_page_feeds("https://filesharingtalk.com/forum.php")
+
+    assert [(feed["title"], feed["url"]) for feed in feeds] == [
+        ("All forums", "https://filesharingtalk.com/external.php?type=RSS2"),
+        (
+            "Everything Related to the Board",
+            "https://filesharingtalk.com/external.php?type=RSS2&forumids=9",
+        ),
+        ("Lounge", "https://filesharingtalk.com/external.php?type=RSS2&forumids=10"),
+        (
+            "The Drawing Room",
+            "https://filesharingtalk.com/external.php?type=RSS2&forumids=55",
+        ),
+    ]
+
+
 def test_fetch_failure_raises_page_fetch_error(monkeypatch):
     def boom(url, **kw):
         raise OSError("connection refused")

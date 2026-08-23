@@ -2,13 +2,15 @@
 # This file is part of BlindRSS
 # SPDX-License-Identifier: MIT
 
-"""Forum-thread full-text and rich-view regressions (FluxBB and Drupal).
+"""Forum-thread full-text and rich-view regressions.
 
 A thread page is a flat list of sibling post/comment blocks with no single node
 holding the conversation, so generic extraction picked one block and discarded the
 rest: on audiogames.net a 20-reply topic came back as one short reply and the rich
 reader showed only the last poster's signature; on applevis.com the replies ran
-together with no way to tell who was speaking.
+together with no way to tell who was speaking; on nsaneforums.com only one of six
+Invision post articles survived generic extraction.
+FileSharingTalk's vBulletin postbits have the same sibling shape and may span pages.
 """
 
 from bs4 import BeautifulSoup
@@ -19,7 +21,15 @@ import core.utils as utils
 
 
 FORUM_URL = "https://forum.audiogames.net/topic/59794/what-apps-do-you-guys-use/new/posts/"
-APPLEVIS_URL = "https://www.applevis.com/forum/apple-beta-releases/iosipados-27-beta-4-megathread"
+APPLEVIS_URL = (
+    "https://www.applevis.com/forum/macos-mac-apps/"
+    "i-built-mac-browser-repairs-pages-voiceover-i-need-blind-testers-because-mine"
+)
+NSANE_URL = "https://nsaneforums.com/topic/488155-adguard-80/#comment-1908581"
+FST_INDEX_URL = "https://filesharingtalk.com/forum.php"
+FST_THREAD_URL = (
+    "https://filesharingtalk.com/threads/481617-Last-one-to-post-wins-the-internets"
+)
 
 
 def _post(num, byline, when, body, *, sig=""):
@@ -204,6 +214,43 @@ APPLEVIS_HTML = _applevis_page(
     _comment(3, "Silence when unlocking", "peter", "Tuesday, July 21, 2026 - 04:04", "VoiceOver is silent."),
 )
 
+# Snapshot of every comment visible on the user-reported live thread on
+# 2026-08-23. Bodies are short unique markers; the selectors, ordering, ids,
+# subjects, and bylines match the live Drupal page without making the offline
+# suite depend on the network or on the discussion never receiving a new reply.
+APPLEVIS_LIVE_COMMENTS = (
+    (213743, "will this come to iOS", "Dennis Long", "Will this come to iOS?"),
+    (213744, "iOS no, Windows yes today — with one caveat", "Dmytro Liesniak", "iOS: no, Windows: yes today."),
+    (213745, "Lost me on the AI", "João Santos", "Leave AI out of screen-reading."),
+    (213749, "Already optional — and you are right about WebKit", "Dmytro Liesniak", "Legato does not replace VoiceOver."),
+    (213762, "link for the windows one?", "Dennis Long", "Link for the windows one?"),
+    (213766, "Windows link — and why it will call me an unknown publisher", "Dmytro Liesniak", "Download page, Windows button is the first one."),
+    (213773, "bug on first site.", "Soren", "Get stuck in cloudflare."),
+    (213774, "personal distain for web controls.", "Soren", "Using web controls for your UI is a bad idea."),
+    (213786, "Reproduced, one fix already in — and the Pro tier is yours", "Dmytro Liesniak", "Cloudflare was reproduced."),
+    (213792, "Voices", "Michal Rada", "The Czech voice Jirka needs replacing."),
+    (213793, "You are right — and the model card says why", "Dmytro Liesniak", "There is a second Czech voice."),
+    (213794, "Update on getting stuck issue.", "Soren", "The browser controls are still accessible during setup."),
+    (213806, "0.3.60 is out — and updates now actually reach you", "Dmytro Liesniak", "Legato has had an update checker."),
+    (213811, "Hey, AI", "Johann", "Please kindly shut yourself down."),
+    (213812, "SHENANIGANS!", "Chris Smart", "It is an old South Park reference."),
+    (213813, "Yes, there is AI in my writing. Not in the browser.", "Dmytro Liesniak", "There is AI in these posts."),
+    (213814, "A question, not a pitch: could a blind person do QA?", "Dmytro Liesniak", "Could a blind person do QA?"),
+)
+
+APPLEVIS_LIVE_HTML = _applevis_page(
+    *(
+        _comment(
+            comment_id,
+            subject,
+            author,
+            "Sunday, August 23, 2026 - 07:25",
+            marker,
+        )
+        for comment_id, subject, author, marker in APPLEVIS_LIVE_COMMENTS
+    )
+)
+
 APPLEVIS_BLOG_HTML = _applevis_page()
 
 
@@ -222,6 +269,16 @@ def test_applevis_thread_keeps_the_topic_and_every_comment():
     ):
         assert f"#{n} {subject} — By {author} on " in text
         assert body in text
+
+
+def test_reported_applevis_thread_snapshot_keeps_all_seventeen_comments():
+    text = article_extractor._extract_site_specific_text(APPLEVIS_LIVE_HTML, APPLEVIS_URL)
+    headers = [line for line in text.splitlines() if line.startswith("#")]
+
+    assert len(headers) == 18  # opening post plus all 17 live comments
+    for index, (_, subject, author, marker) in enumerate(APPLEVIS_LIVE_COMMENTS, start=2):
+        assert headers[index - 1].startswith(f"#{index} {subject} — By {author} on ")
+        assert marker in text
 
 
 def test_applevis_comment_chrome_is_dropped():
@@ -252,6 +309,189 @@ def test_applevis_rich_view_renders_a_heading_per_comment():
     # the class-based chrome filter read as a comments widget and deleted, leaving
     # headings with no text under any of them.
     assert "It is definitely not fixed." in body
+
+
+# --- Invision Community threads (nsaneforums.com) --------------------------
+
+
+def _invision_post(comment_id, author, when, body):
+    return (
+        f'<article id="elComment_{comment_id}" class="cPost ipsBox ipsComment '
+        'ipsComment_parent ipsClearfix">'
+        '<aside class="ipsComment_author"><h3 class="ipsType_sectionHead '
+        f'cAuthorPane_author">{author}</h3></aside>'
+        '<div class="ipsComment_content"><div class="ipsComment_meta">'
+        f'<time datetime="2026-08-23T00:00:00Z">{when}</time></div>'
+        '<div data-role="commentContent" class="ipsType_richText">'
+        f'<p>{body}</p></div>'
+        '<ul class="ipsComment_controls"><li>Quote</li><li>Share</li></ul>'
+        '</div></article>'
+    )
+
+
+NSANE_POSTS = (
+    (1908581, "Matt", "Thursday at 02:55 PM", "Adguard is the world's most advanced Internet filter."),
+    (1908582, "Matt", "Thursday at 03:00 PM", "Windows 8 and 8.1 support ends."),
+    (1908721, "Matt", "Friday at 09:47 PM", "I wouldn't recommend updating just yet."),
+    (1908816, "mray88", "9 hours ago", "version 8 is pretty buggy and a lot of things are broken."),
+    (1908818, "Jojco83", "9 hours ago", "Any chance someone else has the download for version 7?"),
+    (1908819, "mray88", "9 hours ago", "I'd totally forgotten how much aggravation version 8 caused."),
+)
+
+NSANE_HTML = (
+    '<html><head><title>Adguard 8.0 - Nsane Forums</title></head><body>'
+    '<section class="ipsRecommendedComments"><h2>Recommended Posts</h2>'
+    '<div data-role="commentContent">This duplicated recommendation must not appear.</div></section>'
+    + "".join(_invision_post(*post) for post in NSANE_POSTS)
+    + '</body></html>'
+)
+
+
+def test_nsane_thread_keeps_all_six_live_posts_with_attribution():
+    text = article_extractor._extract_site_specific_text(NSANE_HTML, NSANE_URL)
+    headers = [line for line in text.splitlines() if line.startswith("#")]
+
+    assert len(headers) == len(NSANE_POSTS) == 6
+    for index, (_, author, when, body) in enumerate(NSANE_POSTS, start=1):
+        assert headers[index - 1] == f"#{index} {author} — {when}"
+        assert body in text
+    assert "duplicated recommendation" not in text
+    assert "Quote" not in text
+    assert "Share" not in text
+
+
+def test_nsane_rich_view_renders_every_post_under_its_own_heading():
+    body = article_html.clean_article_html(NSANE_HTML, NSANE_URL)
+    soup = BeautifulSoup(body, "html.parser")
+
+    headings = [heading.get_text(" ", strip=True) for heading in soup.find_all("h2")]
+    assert headings == [
+        f"#{index} {author} — {when}"
+        for index, (_, author, when, _) in enumerate(NSANE_POSTS, start=1)
+    ]
+    for *_, post_body in NSANE_POSTS:
+        assert post_body in body
+
+
+# --- vBulletin 4 threads (filesharingtalk.com) ------------------------------
+
+
+def _vbulletin_post(number, post_id, author, when, body, *, signature=""):
+    return (
+        f'<li id="post_{post_id}" class="postbitlegacy postcontainer old">'
+        '<div class="posthead"><span class="postdate">'
+        f'{when}</span><a class="postcounter">#{number}</a></div>'
+        f'<div class="userinfo"><a class="username">{author}</a></div>'
+        f'<div class="postbody"><div id="post_message_{post_id}">'
+        f'<blockquote class="postcontent restore"><p>{body}</p>'
+        + (f'<div class="signature">{signature}</div>' if signature else "")
+        + '</blockquote></div></div></li>'
+    )
+
+
+FST_PAGE_1 = (
+    '<html><head><title>Last one to post wins the internets</title></head><body>'
+    '<ol id="posts">'
+    + _vbulletin_post(1, 3894813, "tesco", "03-16-2008, 07:25 PM", "Last one to post gets twenty dollars.")
+    + _vbulletin_post(2, 3894193, "anon", "01-01-2025, 10:35 PM", "I see the familiar product design guidelines.")
+    + '</ol><a rel="next" href="/threads/481617-Last-one-to-post-wins-the-internets/page2">Next</a>'
+    '<li class="postbitlegacy"></li></body></html>'
+)
+FST_PAGE_2 = (
+    '<html><head><title>Last one to post wins the internets - Page 2</title></head><body>'
+    '<ol id="posts">'
+    + _vbulletin_post(3, 3894197, "megabyteme", "01-02-2025, 03:00 AM", "I remember when Apple was developing a car.")
+    + _vbulletin_post(
+        4,
+        3894199,
+        "IdolEyes787",
+        "01-02-2025, 08:27 AM",
+        "The next reply remains part of the same conversation.",
+        signature="A repeated signature that must be removed.",
+    )
+    + '</ol></body></html>'
+)
+
+
+def test_filesharingtalk_vbulletin_page_keeps_every_post():
+    text = article_extractor._extract_site_specific_text(FST_PAGE_1, FST_THREAD_URL)
+
+    assert "#1 tesco — 03-16-2008, 07:25 PM" in text
+    assert "#2 anon — 01-01-2025, 10:35 PM" in text
+    assert "Last one to post gets twenty dollars." in text
+    assert "product design guidelines" in text
+
+
+def test_filesharingtalk_follows_pagination_and_merges_every_post(monkeypatch):
+    page_2_url = FST_THREAD_URL + "/page2"
+    pages = {FST_THREAD_URL: FST_PAGE_1, page_2_url: FST_PAGE_2}
+    fetched = []
+
+    def fake_fetch(url, timeout=20):
+        fetched.append(url)
+        return article_extractor._FetchResult(html=pages[url])
+
+    monkeypatch.setattr(article_extractor, "_fetch_page", fake_fetch)
+    monkeypatch.setattr(article_extractor.time, "sleep", lambda _seconds: None)
+
+    article = article_extractor.extract_full_article(FST_THREAD_URL)
+
+    assert article is not None
+    assert fetched == [FST_THREAD_URL, page_2_url]
+    for number, body in (
+        (1, "Last one to post gets twenty dollars."),
+        (2, "I see the familiar product design guidelines."),
+        (3, "I remember when Apple was developing a car."),
+        (4, "The next reply remains part of the same conversation."),
+    ):
+        assert f"#{number}" in article.text
+        assert body in article.text
+    assert "repeated signature" not in article.text
+
+
+def test_filesharingtalk_rich_view_has_one_post_heading_per_post():
+    body = article_html.clean_article_html(FST_PAGE_1, FST_THREAD_URL)
+    soup = BeautifulSoup(body, "html.parser")
+
+    headings = [heading.get_text(" ", strip=True) for heading in soup.find_all("h2")]
+    assert headings == [
+        "#1 tesco — 03-16-2008, 07:25 PM",
+        "#2 anon — 01-01-2025, 10:35 PM",
+    ]
+
+
+def test_filesharingtalk_rich_view_follows_pagination(monkeypatch):
+    page_2_url = FST_THREAD_URL + "/page2"
+    pages = {FST_THREAD_URL: FST_PAGE_1, page_2_url: FST_PAGE_2}
+    fetched = []
+
+    def fake_fetch(url, timeout=20):
+        fetched.append(url)
+        return article_extractor._FetchResult(html=pages[url])
+
+    monkeypatch.setattr(article_extractor, "_fetch_page", fake_fetch)
+    monkeypatch.setattr(article_html.time, "sleep", lambda _seconds: None)
+
+    rendered = article_html.render_full_article_html(FST_THREAD_URL)
+    soup = BeautifulSoup(rendered, "html.parser")
+    post_headings = [
+        heading.get_text(" ", strip=True)
+        for heading in soup.find_all("h2")
+        if heading.get_text(" ", strip=True).startswith("#")
+    ]
+
+    assert fetched == [FST_THREAD_URL, page_2_url]
+    assert post_headings == [
+        "#1 tesco — 03-16-2008, 07:25 PM",
+        "#2 anon — 01-01-2025, 10:35 PM",
+        "#3 megabyteme — 01-02-2025, 03:00 AM",
+        "#4 IdolEyes787 — 01-02-2025, 08:27 AM",
+    ]
+
+
+def test_filesharingtalk_forum_index_is_not_misread_as_a_thread():
+    index_html = '<html><body><main><a href="/threads/1-example">Example</a></main></body></html>'
+    assert article_extractor._extract_forum_thread_text(index_html, FST_INDEX_URL) == ""
 
 
 # --- Feed author field ------------------------------------------------------

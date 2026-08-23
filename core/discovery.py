@@ -4894,6 +4894,7 @@ _DETECT_PAGE_FEED_TYPES = _ALTERNATE_FEED_TYPES | {
 
 # Channel URL shapes YouTube still serves besides /@handle.
 _YOUTUBE_CHANNEL_PATH_PREFIXES = ("/channel/", "/c/", "/user/")
+_VBULLETIN_FORUM_PATH_RE = re.compile(r"^/forums/(?P<forum_id>[0-9]+)(?:-|/|$)", re.I)
 
 
 def _native_channel_feed_for_page(page_url: str) -> dict | None:
@@ -4933,6 +4934,70 @@ def _native_channel_feed_for_page(page_url: str) -> dict | None:
     return {"title": "", "url": feed_url} if feed_url else None
 
 
+def _vbulletin_feed_candidates(soup: BeautifulSoup, page_url: str) -> list[dict]:
+    """Return public vBulletin RSS feeds exposed by a forum index/page.
+
+    vBulletin 4 commonly advertises feeds as ordinary ``external.php`` anchors
+    beside each forum rather than ``<link rel=alternate>`` elements in the page
+    head. Once at least one such same-origin RSS anchor proves the page shape,
+    derive feeds for every visible ``/forums/<id>-...`` link as well. This picks
+    up visible subforums (for example FileSharingTalk's Drawing Room) without a
+    brittle hard-coded forum-id table.
+    """
+    try:
+        parsed_page = urlparse(page_url)
+    except Exception:
+        return []
+    if (parsed_page.scheme or "").lower() not in ("http", "https") or not parsed_page.hostname:
+        return []
+
+    saw_external_rss = False
+    for anchor in soup.find_all("a", href=True):
+        try:
+            candidate = urlparse(urljoin(page_url, str(anchor.get("href") or "")))
+            if (candidate.hostname or "").lower() != (parsed_page.hostname or "").lower():
+                continue
+            if not (candidate.path or "").lower().endswith("/external.php"):
+                continue
+            query = parse_qs(candidate.query or "", keep_blank_values=True)
+            feed_type = str((query.get("type") or [""])[0] or "").upper()
+            if feed_type not in {"RSS", "RSS1", "RSS2", "XML"}:
+                continue
+            saw_external_rss = True
+        except Exception:
+            continue
+    if not saw_external_rss:
+        return []
+
+    origin = f"{parsed_page.scheme}://{parsed_page.netloc}"
+    results = [{"title": "All forums", "url": origin + "/external.php?type=RSS2"}]
+    seen_ids: set[str] = set()
+    for anchor in soup.find_all("a", href=True):
+        try:
+            forum_url = urlparse(urljoin(page_url, str(anchor.get("href") or "")))
+            if (forum_url.hostname or "").lower() != (parsed_page.hostname or "").lower():
+                continue
+            match = _VBULLETIN_FORUM_PATH_RE.match(forum_url.path or "")
+            if match is None:
+                continue
+            forum_id = match.group("forum_id")
+            if forum_id in seen_ids:
+                continue
+            title = re.sub(r"\s+", " ", anchor.get_text(" ", strip=True)).strip()
+            if not title:
+                continue
+            seen_ids.add(forum_id)
+            results.append(
+                {
+                    "title": title,
+                    "url": origin + f"/external.php?type=RSS2&forumids={forum_id}",
+                }
+            )
+        except Exception:
+            continue
+    return results
+
+
 def detect_page_feeds(
     url: str,
     timeout: float = 15.0,
@@ -4944,9 +5009,10 @@ def detect_page_feeds(
 
     Returns a list of ``{"title": str, "url": str}`` dicts, in document order,
     for every ``<link rel="alternate">`` whose ``type`` is a known feed MIME
-    type and whose ``href`` is non-empty. ``title`` falls back to "" (callers
-    display the URL then). If the URL itself serves a feed document, that URL
-    is returned as the single result.
+    type and whose ``href`` is non-empty. Public vBulletin pages also contribute
+    their ``external.php`` all-forums and visible per-forum RSS feeds. ``title``
+    falls back to "" (callers display the URL then). If the URL itself serves a
+    feed document, that URL is returned as the single result.
 
     Raises PageFetchError when the page cannot be retrieved.
     """
@@ -5073,6 +5139,12 @@ def detect_page_feeds(
             results.append({"title": str(link.get("title") or "").strip(), "url": feed_url})
         except Exception:
             continue
+    for feed in _vbulletin_feed_candidates(soup, effective_url):
+        feed_url = str(feed.get("url") or "")
+        if not feed_url or feed_url in seen:
+            continue
+        seen.add(feed_url)
+        results.append(feed)
     return results
 
 

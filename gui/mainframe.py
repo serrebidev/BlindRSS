@@ -5656,7 +5656,8 @@ class MainFrame(wx.Frame):
 
     def _is_forum_thread_article(self, article) -> bool:
         """True when the article is a discussion thread whose feed carries only
-        the opening post (audiogames / applevis), so the whole conversation is
+        the opening post (audiogames / AppleVis / FileSharingTalk / NSANE), so the
+        whole conversation is
         worth fetching on selection rather than waiting for reader focus."""
         url = str(getattr(article, "url", "") or "").strip()
         if not url:
@@ -10140,8 +10141,8 @@ class MainFrame(wx.Frame):
         # the feed snippet. Mirror the accessible browser: start the load on
         # selection (debounced + token-guarded, so fast arrowing is safe).
         #
-        # Forum threads get the same treatment on every platform: audiogames and
-        # applevis syndicate only the opening post, so the feed-content view is a
+        # Forum threads get the same treatment on every platform: forum feeds can
+        # syndicate only the opening post, so the feed-content view is a
         # single-post stub and the rest of the conversation appears only once the
         # reader is focused. Loading on selection means both the classic reader
         # and rich view show every post without a focus dance (issue: AppleVis

@@ -470,11 +470,12 @@ def _is_forum_thread_host(url: str) -> bool:
 
 
 def _forum_reconstruct(soup, url: str):
-    """Rebuild a FluxBB thread page as one node: a heading + body per post.
+    """Rebuild a supported forum thread as one node: a heading + body per post.
 
     A thread is a flat list of sibling ``div.post`` blocks, so the generic main-node
     pick lands on a single post and the rest of the conversation is lost — on a
     20-reply audiogames.net topic the reader showed only the last poster's signature.
+    Drupal and Invision likewise keep replies as sibling articles.
     Each post's number/byline/timestamp becomes an ``<h2>`` so a screen reader can
     move post to post with the heading key, which a flat wall of replies does not
     allow. Returns None when the page has no recognizable posts, so the generic path

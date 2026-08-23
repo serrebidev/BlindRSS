@@ -893,8 +893,10 @@ def _extract_gsmarena_text(html: str) -> str:
 # block that most resembles an article and throws the rest away. On audiogames.net a
 # 20-reply topic came back as one 322-character reply and the rich reader showed only
 # the last poster's signature; on applevis.com the replies ran together with no way to
-# tell who was speaking. Linearizing every post keeps the whole conversation, and the
-# per-post header is what makes it readable aloud.
+# tell who was speaking; on Invision Community (nsaneforums.com), generic extraction
+# likewise kept only one of the sibling ``article.ipsComment`` blocks. Linearizing every
+# post keeps the whole conversation, and the per-post header is what makes it readable
+# aloud.
 #
 # Each layout names the same parts, so one linearizer serves every platform and the
 # rich reader reuses it. `lead` is for engines (Drupal) where the opening post is a
@@ -987,6 +989,35 @@ _FORUM_LAYOUTS = (
         "post_time": "",
         "junk": (),
     },
+    {   # Invision Community 4 — nsaneforums.com
+        "name": "invision",
+        "lead": "",
+        "lead_body": "",
+        "lead_header": (),
+        # Invision renders the topic opener and every reply with the same post
+        # element. Recommended-post cards elsewhere on the page intentionally do
+        # not match this selector, so they are not duplicated in the reader.
+        "post": "article.ipsComment",
+        "post_body": "[data-role=commentContent]",
+        "post_number": "",
+        "post_header": ("h3.cAuthorPane_author",),
+        "post_time": "time",
+        "junk": (),
+    },
+    {   # vBulletin 4 — filesharingtalk.com
+        "name": "vbulletin4",
+        "lead": "",
+        "lead_body": "",
+        "lead_header": (),
+        # The empty template postbit at the bottom of vBulletin pages has no id;
+        # requiring one prevents it from becoming a blank phantom reply.
+        "post": "li.postbitlegacy[id]",
+        "post_body": "blockquote.postcontent",
+        "post_number": ".postcounter",
+        "post_header": (".username",),
+        "post_time": ".postdate",
+        "junk": (".signature",),
+    },
     {   # FluxBB / PunBB — audiogames.net
         "name": "fluxbb",
         "lead": "",
@@ -1025,7 +1056,12 @@ _FORUM_LAYOUTS = (
 _TRUNCATED_URL_TEXT_RE = re.compile(r"(?i)^https?://\S*\s*(?:…|\.\.\.)\s*\S*$")
 
 
-_FORUM_THREAD_HOSTS = ("audiogames.net", "applevis.com")
+_FORUM_THREAD_HOSTS = (
+    "audiogames.net",
+    "applevis.com",
+    "filesharingtalk.com",
+    "nsaneforums.com",
+)
 _REDDIT_THREAD_PATH_RE = re.compile(
     r"^/r/(?P<subreddit>[A-Za-z0-9_]{2,21})/comments/(?P<article>[A-Za-z0-9]+)(?:/[^/?#]*)?/?$",
     re.I,
