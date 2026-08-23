@@ -26,7 +26,16 @@ echo "[BlindRSS Linux Build] Preparing the Ubuntu 22.04 builder image..."
 docker build --pull --tag "$IMAGE_NAME" --file "$SCRIPT_DIR/linux-build.Dockerfile" "$SCRIPT_DIR"
 
 echo "[BlindRSS Linux Build] Building the self-contained Linux package..."
+# The source bind mount and uv cache are different filesystems on the release
+# host, so hardlinks cannot work. Select copy mode explicitly instead of making
+# uv warn before every otherwise-clean release build.
+#
+# PyAutoGUI 0.9.54 (an optional SeleniumBase dependency) contains a Linux-only
+# ``'\e'`` escape in _pyautogui_x11.py. Limit the filter to that upstream module
+# so project SyntaxWarnings and every other warning remain visible.
 docker run --rm \
+  --env UV_LINK_MODE=copy \
+  --env 'PYTHONWARNINGS=ignore:invalid escape sequence:SyntaxWarning:pyautogui._pyautogui_x11' \
   --volume "$REPO_DIR:/src" \
   --workdir /src \
   "$IMAGE_NAME" \
