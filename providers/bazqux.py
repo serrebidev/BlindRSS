@@ -8,13 +8,14 @@ import logging
 import time
 from typing import List, Dict, Any
 from .base import RSSProvider
+from .hosted_podcast_archive import HostedPodcastArchiveMixin
 from core.models import Feed, Article
 from core.categories import UNCATEGORIZED
 from core import utils
 
 log = logging.getLogger(__name__)
 
-class BazQuxProvider(RSSProvider):
+class BazQuxProvider(HostedPodcastArchiveMixin, RSSProvider):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.conf = config.get("providers", {}).get("bazqux", {})
@@ -28,6 +29,9 @@ class BazQuxProvider(RSSProvider):
 
     def get_name(self) -> str:
         return "BazQux"
+
+    def _podcast_archive_account_identity(self) -> str:
+        return f"{self.base_url.rstrip('/').lower()}|{str(self.email or '').strip().lower()}"
 
     def _chapter_cache_key(self, article_id: str) -> str | None:
         account = str(self.email or "").strip().lower()
@@ -329,8 +333,10 @@ class BazQuxProvider(RSSProvider):
                     category=cat,
                     icon_url=""
                 )
+                f.source_url = self.podcast_source_url(feed_id, feed_url)
                 f.unread_count = unread_map.get(feed_id, 0)
                 feeds.append(f)
+            self._queue_podcast_archive_scans(feeds)
             return feeds
         except Exception as e:
             log.error(f"BazQux Feeds Error: {e}")
@@ -465,10 +471,16 @@ class BazQuxProvider(RSSProvider):
             return []
 
     def get_articles(self, feed_id: str) -> List[Article]:
-        return self._fetch_articles(feed_id, count=50)
+        return self._merge_hosted_archive_articles(
+            feed_id, self._fetch_articles(feed_id, count=50)
+        )
 
     def get_articles_page(self, feed_id: str, offset: int = 0, limit: int = 200) -> tuple[List[Article], int | None]:
         count = offset + limit
+        if self._has_hosted_archive_entries(feed_id):
+            remote = self._fetch_articles(feed_id, count=max(10_000, count))
+            merged = self._merge_hosted_archive_articles(feed_id, remote)
+            return merged[offset:offset + limit], len(merged)
         articles = self._fetch_articles(feed_id, count=count)
         total = None
         if len(articles) < count:

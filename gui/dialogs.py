@@ -5148,9 +5148,13 @@ class PodcastArchiveDialog(wx.Dialog):
             self.status.SetLabel(_("Choose a subscribed podcast."))
             return
         try:
-            from core.db import get_podcast_archive_state
+            state_reader = getattr(self._host.provider, "get_podcast_archive_state", None)
+            if callable(state_reader):
+                state = state_reader(feed.id)
+            else:
+                from core.db import get_podcast_archive_state
 
-            state = get_podcast_archive_state(feed.id)
+                state = get_podcast_archive_state(feed.id)
         except Exception:
             state = {"status": "never", "snapshot_count": 0, "episode_count": 0, "error": ""}
         state_name = str(state.get("status") or "never")

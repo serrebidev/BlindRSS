@@ -9,7 +9,9 @@ import feedparser
 
 from core import db, podcast_archive
 from core import utils
+from core.models import Article
 from providers.local import LocalProvider
+from providers.miniflux import MinifluxProvider
 
 
 def _rss(items, *, title="Long Running Show", new_feed_url=""):
@@ -260,3 +262,135 @@ def test_local_podcast_refresh_inserts_recovered_history_automatically(tmp_path,
     # Only the genuinely current item is announced as new; recovering years of
     # history must not produce an alert storm.
     assert sum(int(state.get("new_items") or 0) for state in progress) == 1
+
+
+def test_existing_miniflux_podcast_recovers_into_normal_feed(tmp_path, monkeypatch):
+    """Hosted subscriptions must not be skipped just because Miniflux owns them."""
+    feed_id = "42"
+    feed_url = "https://example.com/podcast.xml"
+    current = _rss([
+        {"guid": "current", "title": "Current episode", "media": "https://cdn.example/current.mp3"},
+    ])
+    _title, current_episodes, _lineage = podcast_archive.parse_feed_document(current, feed_url)
+    archived = podcast_archive.ArchiveEpisode(
+        title="Recovered old episode",
+        guid="archived",
+        media_url="https://cdn.example/archived.mp3",
+        media_type="audio/mpeg",
+        published="2019-01-02 03:04:05",
+        source_feed_url=feed_url,
+    )
+    archived.identity_keys = podcast_archive._episode_identity_keys(archived)
+    archive_result = podcast_archive.PodcastArchiveResult(
+        feed_title="Long Running Show",
+        episodes=[*current_episodes, archived],
+        feed_urls=[feed_url],
+        snapshots_found=1,
+        snapshots_loaded=1,
+    )
+
+    monkeypatch.setattr(db, "DB_FILE", str(tmp_path / "hosted-archive.db"))
+    db.init_db()
+    provider = MinifluxProvider({
+        "providers": {
+            "miniflux": {
+                "url": "https://miniflux.example",
+                "api_key": "account-token",
+            },
+        },
+        "podcast_archive_enabled": True,
+        "podcast_archive_max_snapshots": 50,
+        "podcast_archive_rescan_days": 30,
+        "feed_timeout_seconds": 5,
+    })
+    raw_feed = {
+        "id": 42,
+        "title": "Long Running Show",
+        "site_url": "https://example.com/show",
+        "feed_url": feed_url,
+        "category": {"title": "Podcasts"},
+    }
+
+    def fake_req(method, endpoint, **_kwargs):
+        if method == "GET" and endpoint == "/v1/feeds":
+            return [raw_feed]
+        if method == "GET" and endpoint == "/v1/feeds/counters":
+            return {"unreads": {"42": 1}}
+        raise AssertionError((method, endpoint))
+
+    monkeypatch.setattr(provider, "_req", fake_req)
+    response = MagicMock()
+    response.content = current
+    response.url = feed_url
+    response.raise_for_status.return_value = None
+    monkeypatch.setattr(utils, "safe_requests_get", lambda *_args, **_kwargs: response)
+    monkeypatch.setattr(
+        podcast_archive,
+        "scan_podcast_archive",
+        lambda *_args, **_kwargs: archive_result,
+    )
+    queued_jobs = []
+    monkeypatch.setattr(podcast_archive, "enqueue_archive_job", queued_jobs.append)
+
+    feeds = provider.get_feeds()
+    assert feeds[0].url == "https://example.com/show"
+    assert feeds[0].source_url == feed_url
+    assert len(queued_jobs) == 1
+
+    # Existing hosted feeds are migrated by the ordinary feed-tree load. The
+    # serialized worker fills the sidecar without changing the Miniflux server.
+    queued_jobs[0]()
+    assert provider.get_podcast_archive_state(feed_id)["status"] == "complete"
+
+    live = Article(
+        id="9001",
+        feed_id=feed_id,
+        title="Current episode",
+        url="https://show.example/episodes/current",
+        content="Current notes",
+        date="2020-06-24 12:00:00",
+        author="",
+        media_url="https://cdn.example/current.mp3",
+        media_type="audio/mpeg",
+    )
+    monkeypatch.setattr(provider, "_get_remote_articles", lambda _feed_id: [live])
+
+    articles = provider.get_articles(feed_id)
+    assert {article.title for article in articles} == {
+        "Current episode",
+        "Recovered old episode",
+    }
+    recovered = next(article for article in articles if article.title == "Recovered old episode")
+    assert recovered.is_read is True
+    assert recovered.id.startswith("podcast-archive:")
+
+    page, total = provider.get_articles_page(feed_id, offset=0, limit=1)
+    assert total == 2
+    assert len(page) == 1
+
+
+def test_miniflux_non_podcast_probe_skips_wayback_index(tmp_path, monkeypatch):
+    feed_id = "7"
+    feed_url = "https://example.com/news.xml"
+    document = b"<rss><channel><title>News</title><item><title>Story</title></item></channel></rss>"
+    monkeypatch.setattr(db, "DB_FILE", str(tmp_path / "hosted-news.db"))
+    db.init_db()
+    provider = MinifluxProvider({
+        "providers": {"miniflux": {"url": "https://miniflux.example", "api_key": "token"}},
+        "podcast_archive_enabled": True,
+    })
+    scope = provider._podcast_archive_scope()
+    assert db.claim_hosted_podcast_archive_scan(scope, feed_id, feed_url)
+    response = MagicMock()
+    response.content = document
+    response.url = feed_url
+    response.raise_for_status.return_value = None
+    monkeypatch.setattr(utils, "safe_requests_get", lambda *_args, **_kwargs: response)
+    monkeypatch.setattr(
+        podcast_archive,
+        "scan_podcast_archive",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("Wayback should not be queried")),
+    )
+
+    assert provider._run_podcast_archive_scan(feed_id, feed_url)
+    assert provider.get_podcast_archive_state(feed_id)["status"] == "complete"

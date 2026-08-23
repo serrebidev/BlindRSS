@@ -19,7 +19,7 @@ from dateutil import parser as dateparser
 from .base import RSSProvider
 from core.models import Feed, Article
 from core.categories import UNCATEGORIZED
-from core import utils
+from core import db, podcast_archive, utils
 
 log = logging.getLogger(__name__)
 
@@ -118,6 +118,13 @@ class MinifluxProvider(RSSProvider):
         # batch fires and fails before any backoff applies. This stops the batch
         # mid-flight and parks the route for a cooldown.
         self._targeted_refresh_route_cooldown_until = 0.0
+        # Miniflux cannot accept client-created historical entries. Recovered
+        # podcast episodes therefore live in a local, account-scoped sidecar and
+        # are merged into normal feed reads. Keep queue bookkeeping in memory so
+        # repeated feed-tree loads do not enqueue the same pending probe.
+        self._podcast_archive_queued_ids: set[str] = set()
+        self._podcast_archive_queued_lock = threading.Lock()
+        self._podcast_feed_urls: dict[str, str] = {}
 
     @staticmethod
     def _blank_request_info() -> dict[str, Any]:
@@ -554,6 +561,254 @@ class MinifluxProvider(RSSProvider):
 
     def get_name(self) -> str:
         return "Miniflux"
+
+    def _podcast_archive_scope(self) -> str:
+        account = str(self.conf.get("api_key") or "").strip()
+        identity = f"{self.base_url.rstrip('/').lower()}|{account}"
+        digest = hashlib.sha256(identity.encode("utf-8")).hexdigest()[:20]
+        return f"miniflux:{digest}"
+
+    @staticmethod
+    def _podcast_archive_result_error(result) -> str:
+        if result.snapshots_loaded == 0:
+            if result.warnings:
+                return str(result.warnings[0])
+            if result.snapshots_found > 0:
+                return "The Wayback Machine snapshots could not be loaded."
+        return ""
+
+    @staticmethod
+    def _podcast_archive_episode_key(episode) -> str:
+        keys = sorted(episode.identity_keys or podcast_archive._episode_identity_keys(episode))
+        identity = "\n".join(keys) or "|".join(
+            (
+                str(episode.guid or ""), str(episode.media_url or ""),
+                str(episode.page_url or ""), str(episode.title or ""),
+                str(episode.published or ""),
+            )
+        )
+        return hashlib.sha256(identity.encode("utf-8", "replace")).hexdigest()
+
+    def _run_podcast_archive_scan(self, feed_id: str, feed_url: str) -> bool:
+        """Probe one hosted feed, recover history, and update its sidecar cache."""
+        scope = self._podcast_archive_scope()
+        fid = str(feed_id or "")
+        try:
+            public_feed_url = podcast_archive._public_http_url(feed_url)
+            timeout_s = max(5, int(self.config.get("feed_timeout_seconds", 15) or 15))
+            response = utils.safe_requests_get(
+                public_feed_url,
+                timeout=(self.CONNECT_TIMEOUT_SECONDS, timeout_s),
+                site_cookies=False,
+            )
+            response.raise_for_status()
+            current_document = bytes(getattr(response, "content", b"") or b"")
+            _title, current_episodes, _lineage = podcast_archive.parse_feed_document(
+                current_document,
+                str(getattr(response, "url", "") or public_feed_url),
+            )
+            # Every hosted subscription is probed once so existing profiles are
+            # migrated automatically, but only actual enclosure-bearing podcasts
+            # pay for a Wayback index walk.
+            if not any(episode.media_url for episode in current_episodes):
+                db.replace_hosted_podcast_archive_entries(scope, fid, [])
+                db.finish_hosted_podcast_archive_scan(scope, fid)
+                return True
+
+            try:
+                max_snapshots = int(
+                    self.config.get(
+                        "podcast_archive_max_snapshots",
+                        podcast_archive.DEFAULT_MAX_SNAPSHOTS,
+                    )
+                    or podcast_archive.DEFAULT_MAX_SNAPSHOTS
+                )
+            except (TypeError, ValueError):
+                max_snapshots = podcast_archive.DEFAULT_MAX_SNAPSHOTS
+
+            with podcast_archive.AUTOMATIC_SCAN_LOCK:
+                result = podcast_archive.scan_podcast_archive(
+                    public_feed_url,
+                    current_document=current_document,
+                    max_snapshots=max_snapshots,
+                    include_without_media=True,
+                )
+            if result.canceled:
+                db.reset_hosted_podcast_archive_scan(scope, fid)
+                return False
+
+            result_error = self._podcast_archive_result_error(result)
+            if result_error:
+                # A transient archive outage must not erase history recovered by
+                # an earlier successful monthly scan.
+                db.finish_hosted_podcast_archive_scan(scope, fid, error=result_error)
+                return False
+
+            recovered = podcast_archive.archive_only_episodes(result, current_document)
+            rows = [
+                {
+                    "episode_key": self._podcast_archive_episode_key(episode),
+                    "title": episode.title,
+                    "url": episode.page_url,
+                    "content": episode.description,
+                    "date": episode.published,
+                    "author": episode.author,
+                    "media_url": episode.media_url,
+                    "media_type": episode.media_type,
+                }
+                for episode in recovered
+                if episode.media_url
+            ]
+            db.replace_hosted_podcast_archive_entries(scope, fid, rows)
+            db.finish_hosted_podcast_archive_scan(
+                scope,
+                fid,
+                snapshot_count=result.snapshots_loaded,
+                episode_count=len(result.episodes),
+            )
+            return True
+        except Exception as exc:
+            log.warning("Miniflux podcast archive recovery failed for %s: %s", feed_url, exc)
+            try:
+                db.finish_hosted_podcast_archive_scan(scope, fid, error=str(exc))
+            except Exception:
+                log.debug("Could not persist hosted podcast archive failure", exc_info=True)
+            return False
+
+    def _queue_podcast_archive_scans(self, raw_feeds) -> None:
+        if not bool(self.config.get("podcast_archive_enabled", False)):
+            return
+        try:
+            rescan_seconds = max(
+                86400.0,
+                float(self.config.get("podcast_archive_rescan_days", 30) or 30) * 86400,
+            )
+        except (TypeError, ValueError):
+            rescan_seconds = 30 * 86400
+        scope = self._podcast_archive_scope()
+        states = db.get_hosted_podcast_archive_states(scope)
+        for raw_feed in raw_feeds or []:
+            fid = str((raw_feed or {}).get("id") or "").strip()
+            feed_url = str((raw_feed or {}).get("feed_url") or "").strip()
+            if not fid or not feed_url:
+                continue
+            self._podcast_feed_urls[fid] = feed_url
+            state = states.get(fid) or {"status": "never"}
+            now = time.time()
+            last_success = state.get("last_success")
+            last_attempt = state.get("last_attempt")
+            if last_success is not None and now - float(last_success) < rescan_seconds:
+                continue
+            if state.get("status") == "scanning" and last_attempt is not None and now - float(last_attempt) < 6 * 3600:
+                continue
+            if state.get("status") == "error" and last_attempt is not None and now - float(last_attempt) < min(rescan_seconds, 86400.0):
+                continue
+            with self._podcast_archive_queued_lock:
+                if fid in self._podcast_archive_queued_ids:
+                    continue
+                self._podcast_archive_queued_ids.add(fid)
+
+            def job(archive_feed_id=fid, archive_feed_url=feed_url):
+                try:
+                    if db.claim_hosted_podcast_archive_scan(
+                        scope,
+                        archive_feed_id,
+                        archive_feed_url,
+                        rescan_seconds=rescan_seconds,
+                    ):
+                        self._run_podcast_archive_scan(archive_feed_id, archive_feed_url)
+                finally:
+                    with self._podcast_archive_queued_lock:
+                        self._podcast_archive_queued_ids.discard(archive_feed_id)
+
+            podcast_archive.enqueue_archive_job(job)
+
+    def get_podcast_archive_state(self, feed_id: str) -> dict:
+        return db.get_hosted_podcast_archive_state(
+            self._podcast_archive_scope(),
+            str(feed_id or ""),
+        )
+
+    def refresh_podcast_archive(self, feed_id: str, progress_cb=None) -> bool:
+        """Synchronously rescan one Miniflux feed from the archive dialog worker."""
+        fid = str(feed_id or "").strip()
+        if not fid:
+            return False
+        feed_url = self._podcast_feed_urls.get(fid, "")
+        if not feed_url:
+            feeds = self._req("GET", "/v1/feeds") or []
+            for feed in feeds:
+                candidate_id = str((feed or {}).get("id") or "")
+                candidate_url = str((feed or {}).get("feed_url") or "").strip()
+                if candidate_id:
+                    self._podcast_feed_urls[candidate_id] = candidate_url
+                if candidate_id == fid:
+                    feed_url = candidate_url
+        if not feed_url:
+            return False
+        scope = self._podcast_archive_scope()
+        db.reset_hosted_podcast_archive_scan(scope, fid)
+        if not db.claim_hosted_podcast_archive_scan(scope, fid, feed_url, force=True):
+            return False
+        return self._run_podcast_archive_scan(fid, feed_url)
+
+    def _hosted_archive_articles(self, feed_id: str) -> list[Article]:
+        fid = str(feed_id or "")
+        rows = db.get_hosted_podcast_archive_entries(self._podcast_archive_scope(), fid)
+        articles = []
+        for row in rows:
+            episode_key = str(row.get("episode_key") or "")
+            articles.append(Article(
+                id=f"podcast-archive:{episode_key}",
+                feed_id=fid,
+                title=str(row.get("title") or "Untitled episode"),
+                url=str(row.get("url") or ""),
+                content=str(row.get("content") or ""),
+                description=str(row.get("content") or "") or None,
+                date=str(row.get("date") or ""),
+                author=str(row.get("author") or ""),
+                is_read=True,
+                media_url=str(row.get("media_url") or ""),
+                media_type=str(row.get("media_type") or ""),
+                cache_id=utils.build_cache_id(
+                    f"podcast-archive:{episode_key}", fid, self.get_name()
+                ),
+            ))
+        return articles
+
+    @staticmethod
+    def _podcast_article_identity_keys(article: Article) -> set[str]:
+        episode = podcast_archive.ArchiveEpisode(
+            title=str(article.title or ""),
+            page_url=str(article.url or ""),
+            media_url=str(article.media_url or ""),
+            media_type=str(article.media_type or ""),
+            published=str(article.date or ""),
+        )
+        return podcast_archive._episode_identity_keys(episode)
+
+    def _merge_hosted_archive_articles(self, feed_id: str, articles) -> list[Article]:
+        view_id = str(feed_id or "")
+        if view_id.startswith(("unread:", "favorites:", "fav:", "starred:")):
+            return list(articles or [])
+        fid = self._strip_view_prefixes(view_id)
+        if not fid or fid == "all" or fid.startswith("category:"):
+            return list(articles or [])
+        merged = list(articles or [])
+        live_keys = set()
+        for article in merged:
+            live_keys.update(self._podcast_article_identity_keys(article))
+        for article in self._hosted_archive_articles(fid):
+            keys = self._podcast_article_identity_keys(article)
+            if keys & live_keys:
+                continue
+            merged.append(article)
+            live_keys.update(keys)
+        merged.sort(
+            key=lambda article: (float(getattr(article, "timestamp", 0.0) or 0.0), str(article.title or "").casefold()),
+            reverse=True,
+        )
+        return merged
 
     def _chapter_cache_key(self, article_id: str) -> str | None:
         account = str(self.conf.get("api_key") or "").strip()
@@ -2052,12 +2307,19 @@ class MinifluxProvider(RSSProvider):
                 category=cat,
                 icon_url=(f.get("icon") or {}).get("data", "")
             )
+            # `Feed.url` remains the human-facing website URL used throughout
+            # the UI. Keep the actual subscription URL separately for archive
+            # recovery and other source-level operations.
+            feed.source_url = str(f.get("feed_url") or "")
+            if feed.source_url:
+                self._podcast_feed_urls[fid] = feed.source_url
             feed.unread_count = counts.get(fid, 0) or counts.get(f.get("id"), 0) or 0
             feeds.append(feed)
 
+        self._queue_podcast_archive_scans(data)
         return feeds
 
-    def get_articles(self, feed_id: str) -> List[Article]:
+    def _get_remote_articles(self, feed_id: str) -> List[Article]:
         # Always page through results so we can retrieve *all* stored entries.
         # - For a single feed: /v1/feeds/{feedID}/entries
         # - For categories/all: /v1/entries
@@ -2115,6 +2377,12 @@ class MinifluxProvider(RSSProvider):
         fallback_feed_id = self._strip_view_prefixes(feed_id)
         return self._entries_to_articles(entries, fallback_feed_id=fallback_feed_id)
 
+    def get_articles(self, feed_id: str) -> List[Article]:
+        return self._merge_hosted_archive_articles(
+            feed_id,
+            self._get_remote_articles(feed_id),
+        )
+
     def get_article_chapters(self, article_id: str) -> List[Dict]:
         cache_key = self._chapter_cache_key(article_id)
         cached_source_url = utils.get_chapter_source_url(article_id, cache_key=cache_key)
@@ -2152,6 +2420,27 @@ class MinifluxProvider(RSSProvider):
 
     def get_articles_page(self, feed_id: str, offset: int = 0, limit: int = 200):
         """Fetch a single page of articles quickly (used by the UI for fast-first loading)."""
+        # Once a hosted feed has recovered history, page the merged normal feed
+        # rather than returning Miniflux's server-only total. Archive scans are
+        # monthly and this path is limited to a directly selected podcast feed.
+        view_id = str(feed_id or "")
+        archive_feed_id = self._strip_view_prefixes(view_id)
+        archive_rows = []
+        if (
+            archive_feed_id
+            and archive_feed_id != "all"
+            and not archive_feed_id.startswith("category:")
+            and not view_id.startswith(("unread:", "favorites:", "fav:", "starred:"))
+        ):
+            archive_rows = db.get_hosted_podcast_archive_entries(
+                self._podcast_archive_scope(), archive_feed_id
+            )
+        if archive_rows:
+            merged = self.get_articles(feed_id)
+            start = int(max(0, offset))
+            stop = start + int(max(0, limit))
+            return merged[start:stop], len(merged)
+
         base_params: Dict[str, Any] = {
             "direction": "desc",
             "order": "published_at",

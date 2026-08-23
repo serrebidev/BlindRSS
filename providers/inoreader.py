@@ -11,6 +11,7 @@ import urllib.parse
 from email.utils import parsedate_to_datetime
 from typing import List, Dict, Any
 from .base import RSSProvider
+from .hosted_podcast_archive import HostedPodcastArchiveMixin
 from core.models import Feed, Article
 from core.categories import UNCATEGORIZED
 from core import utils
@@ -23,7 +24,7 @@ class RateLimitError(RuntimeError):
         super().__init__(message)
         self.retry_after = retry_after
 
-class InoreaderProvider(RSSProvider):
+class InoreaderProvider(HostedPodcastArchiveMixin, RSSProvider):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.config = config
@@ -50,6 +51,9 @@ class InoreaderProvider(RSSProvider):
 
     def get_name(self) -> str:
         return "Inoreader"
+
+    def _podcast_archive_account_identity(self) -> str:
+        return f"{self.base_url.rstrip('/').lower()}|{self.refresh_token or self.token or self.app_id}"
 
     def _chapter_cache_key(self, article_id: str) -> str | None:
         account = self.refresh_token or self.token or self.app_id
@@ -734,6 +738,7 @@ class InoreaderProvider(RSSProvider):
 
         cached = self._get_cached_feeds(allow_stale=False)
         if cached is not None:
+            self._queue_podcast_archive_scans(cached)
             return cached
 
         try:
@@ -746,14 +751,17 @@ class InoreaderProvider(RSSProvider):
                 if sub.get("categories"):
                     cat = sub["categories"][0]["label"]
 
-                feeds.append(Feed(
+                feed = Feed(
                     id=sub["id"],
                     title=sub["title"],
                     url=sub["url"],
                     category=cat,
                     icon_url=sub.get("iconUrl", "")
-                ))
+                )
+                feed.source_url = self.podcast_source_url(feed.id, sub.get("url", ""))
+                feeds.append(feed)
             self._set_feed_cache(feeds)
+            self._queue_podcast_archive_scans(feeds)
             return feeds
         except RateLimitError as e:
             cached = self._get_cached_feeds(allow_stale=True)
@@ -785,6 +793,14 @@ class InoreaderProvider(RSSProvider):
             lim = max(0, int(limit or 0))
             if lim <= 0:
                 return [], 0
+            if self._has_hosted_archive_entries(feed_id):
+                # Complete the direct-feed cache before merging so paging and
+                # totals include every server entry plus recovered history.
+                remote, _remote_total = self._get_articles_page_cached(
+                    feed_id, 0, 1_000_000
+                )
+                merged = self._merge_hosted_archive_articles(feed_id, remote)
+                return merged[off:off + lim], len(merged)
             return self._get_articles_page_cached(feed_id, off, lim)
         except RateLimitError:
             stale = self._get_article_view_state(feed_id, require_fresh=False)

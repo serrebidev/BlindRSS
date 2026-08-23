@@ -10,13 +10,14 @@ import logging
 from typing import List, Dict, Any
 from datetime import datetime, timezone
 from .base import RSSProvider
+from .hosted_podcast_archive import HostedPodcastArchiveMixin
 from core.models import Feed, Article
 from core.categories import UNCATEGORIZED
 from core import utils
 
 log = logging.getLogger(__name__)
 
-class TheOldReaderProvider(RSSProvider):
+class TheOldReaderProvider(HostedPodcastArchiveMixin, RSSProvider):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.conf = config.get("providers", {}).get("theoldreader", {})
@@ -27,6 +28,9 @@ class TheOldReaderProvider(RSSProvider):
 
     def get_name(self) -> str:
         return "TheOldReader"
+
+    def _podcast_archive_account_identity(self) -> str:
+        return f"{self.base_url.rstrip('/').lower()}|{str(self.email or '').strip().lower()}"
 
     def _chapter_cache_key(self, article_id: str) -> str | None:
         account = str(self.email or "").strip().lower()
@@ -312,21 +316,24 @@ class TheOldReaderProvider(RSSProvider):
                 if sub.get("categories"):
                     cat = sub["categories"][0]["label"]
                 
-                feeds.append(Feed(
+                feed = Feed(
                     id=feed_id,
                     title=sub["title"],
                     url=sub["url"],
                     category=cat,
                     icon_url=sub.get("iconUrl", "")
-                ))
-                feeds[-1].unread_count = counts.get(feed_id, 0)
+                )
+                feed.source_url = self.podcast_source_url(feed_id, sub.get("url", ""))
+                feed.unread_count = counts.get(feed_id, 0)
+                feeds.append(feed)
+            self._queue_podcast_archive_scans(feeds)
             log.info(f"TheOldReader: Found {len(feeds)} feeds.")
             return feeds
         except Exception as e:
             log.exception(f"TheOldReader Feeds Error: {e}")
             return []
 
-    def get_articles(self, feed_id: str) -> List[Article]:
+    def _get_remote_articles(self, feed_id: str) -> List[Article]:
         if not self._login(): 
             log.warning("TheOldReader: Login failed, cannot get articles.")
             return []
@@ -460,6 +467,11 @@ class TheOldReaderProvider(RSSProvider):
         except Exception as e:
             log.exception(f"TheOldReader Articles General Error: {e}")
             return []
+
+    def get_articles(self, feed_id: str) -> List[Article]:
+        return self._merge_hosted_archive_articles(
+            feed_id, self._get_remote_articles(feed_id)
+        )
 
     def get_article_chapters(self, article_id: str) -> List[Dict]:
         cache_key = self._chapter_cache_key(article_id)

@@ -691,15 +691,26 @@ def scan_podcast_archive(
     return result
 
 
-def archive_only_entries(result: PodcastArchiveResult, current_document: bytes | str) -> list:
-    """Convert episodes absent from the current document to feedparser entries."""
+def archive_only_episodes(
+    result: PodcastArchiveResult,
+    current_document: bytes | str,
+) -> list[ArchiveEpisode]:
+    """Return recovered episodes absent from the publisher's current document."""
     _title, current, _lineage = parse_feed_document(current_document, result.feed_urls[0] if result.feed_urls else "")
     current_keys = set()
     for episode in current:
         current_keys.update(episode.identity_keys)
-    entries = []
+    episodes = []
     for episode in result.episodes:
         if episode.identity_keys & current_keys:
             continue
-        entries.append(episode.as_feedparser_entry())
-    return entries
+        episodes.append(episode)
+    return episodes
+
+
+def archive_only_entries(result: PodcastArchiveResult, current_document: bytes | str) -> list:
+    """Convert episodes absent from the current document to feedparser entries."""
+    return [
+        episode.as_feedparser_entry()
+        for episode in archive_only_episodes(result, current_document)
+    ]

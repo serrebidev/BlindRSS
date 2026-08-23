@@ -358,6 +358,42 @@ def init_db():
             FOREIGN KEY(feed_id) REFERENCES feeds(id) ON DELETE CASCADE
         )''')
 
+        # Hosted services such as Miniflux do not expose an API for inserting
+        # historical entries recovered from Wayback.  Keep those recovered
+        # episodes in a provider/account-scoped sidecar and merge them into the
+        # provider's ordinary feed view.  This is deliberately separate from
+        # `articles`: hosted entry IDs are not globally unique and there is no
+        # matching local `feeds` row for its foreign key.
+        c.execute('''CREATE TABLE IF NOT EXISTS hosted_podcast_archive_entries (
+            provider_scope TEXT NOT NULL,
+            feed_id TEXT NOT NULL,
+            episode_key TEXT NOT NULL,
+            title TEXT,
+            url TEXT,
+            content TEXT,
+            date TEXT,
+            author TEXT,
+            media_url TEXT,
+            media_type TEXT,
+            PRIMARY KEY (provider_scope, feed_id, episode_key)
+        )''')
+        c.execute(
+            "CREATE INDEX IF NOT EXISTS idx_hosted_podcast_archive_feed_date "
+            "ON hosted_podcast_archive_entries (provider_scope, feed_id, date DESC)"
+        )
+        c.execute('''CREATE TABLE IF NOT EXISTS hosted_podcast_archive_state (
+            provider_scope TEXT NOT NULL,
+            feed_id TEXT NOT NULL,
+            feed_url TEXT,
+            status TEXT NOT NULL DEFAULT 'never',
+            last_attempt REAL,
+            last_success REAL,
+            snapshot_count INTEGER DEFAULT 0,
+            episode_count INTEGER DEFAULT 0,
+            error TEXT,
+            PRIMARY KEY (provider_scope, feed_id)
+        )''')
+
         # deleted_articles doubles as the tombstone list (so refresh never
         # recreates a user-deleted item) AND the backing store for the "Deleted
         # Articles" view: the snapshot columns preserve the full article so it can
@@ -889,6 +925,217 @@ def reset_podcast_archive_scan(feed_id: str) -> None:
         conn.commit()
     finally:
         conn.close()
+
+
+def get_hosted_podcast_archive_state(provider_scope: str, feed_id: str) -> dict:
+    """Return archive status for one feed owned by a hosted provider account."""
+    scope = str(provider_scope or "")
+    fid = str(feed_id or "")
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT feed_url, status, last_attempt, last_success, snapshot_count, "
+            "episode_count, error FROM hosted_podcast_archive_state "
+            "WHERE provider_scope = ? AND feed_id = ?",
+            (scope, fid),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return {
+            "feed_id": fid, "feed_url": "", "status": "never",
+            "last_attempt": None, "last_success": None,
+            "snapshot_count": 0, "episode_count": 0, "error": "",
+        }
+    return {
+        "feed_id": fid, "feed_url": str(row[0] or ""),
+        "status": str(row[1] or "never"), "last_attempt": row[2],
+        "last_success": row[3], "snapshot_count": int(row[4] or 0),
+        "episode_count": int(row[5] or 0), "error": str(row[6] or ""),
+    }
+
+
+def get_hosted_podcast_archive_states(provider_scope: str) -> dict[str, dict]:
+    """Return all hosted archive states for an account using one DB read."""
+    scope = str(provider_scope or "")
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT feed_id, feed_url, status, last_attempt, last_success, "
+            "snapshot_count, episode_count, error FROM hosted_podcast_archive_state "
+            "WHERE provider_scope = ?",
+            (scope,),
+        ).fetchall()
+    finally:
+        conn.close()
+    return {
+        str(row[0]): {
+            "feed_id": str(row[0]), "feed_url": str(row[1] or ""),
+            "status": str(row[2] or "never"), "last_attempt": row[3],
+            "last_success": row[4], "snapshot_count": int(row[5] or 0),
+            "episode_count": int(row[6] or 0), "error": str(row[7] or ""),
+        }
+        for row in rows
+    }
+
+
+def claim_hosted_podcast_archive_scan(
+    provider_scope: str,
+    feed_id: str,
+    feed_url: str,
+    *,
+    rescan_seconds: float = 30 * 86400,
+    force: bool = False,
+    now: float | None = None,
+) -> bool:
+    """Atomically claim one due hosted-feed scan."""
+    scope = str(provider_scope or "")
+    fid = str(feed_id or "")
+    timestamp = float(time.time() if now is None else now)
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT status, last_attempt, last_success "
+            "FROM hosted_podcast_archive_state WHERE provider_scope = ? AND feed_id = ?",
+            (scope, fid),
+        ).fetchone()
+        if row and not force:
+            status, last_attempt, last_success = row
+            if last_success is not None and timestamp - float(last_success) < max(0.0, float(rescan_seconds)):
+                conn.rollback()
+                return False
+            if status == "error" and last_attempt is not None and timestamp - float(last_attempt) < min(max(3600.0, float(rescan_seconds)), 86400.0):
+                conn.rollback()
+                return False
+            if status == "scanning" and last_attempt is not None and timestamp - float(last_attempt) < 6 * 3600:
+                conn.rollback()
+                return False
+        conn.execute(
+            "INSERT INTO hosted_podcast_archive_state "
+            "(provider_scope, feed_id, feed_url, status, last_attempt, error) "
+            "VALUES (?, ?, ?, 'scanning', ?, NULL) "
+            "ON CONFLICT(provider_scope, feed_id) DO UPDATE SET "
+            "feed_url=excluded.feed_url, status='scanning', "
+            "last_attempt=excluded.last_attempt, error=NULL",
+            (scope, fid, str(feed_url or ""), timestamp),
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def finish_hosted_podcast_archive_scan(
+    provider_scope: str,
+    feed_id: str,
+    *,
+    snapshot_count: int = 0,
+    episode_count: int = 0,
+    error: str = "",
+    now: float | None = None,
+) -> None:
+    scope = str(provider_scope or "")
+    fid = str(feed_id or "")
+    timestamp = float(time.time() if now is None else now)
+    message = str(error or "").strip()
+    conn = get_connection()
+    try:
+        if message:
+            conn.execute(
+                "UPDATE hosted_podcast_archive_state SET status='error', error=? "
+                "WHERE provider_scope=? AND feed_id=?",
+                (message, scope, fid),
+            )
+        else:
+            conn.execute(
+                "UPDATE hosted_podcast_archive_state SET status='complete', "
+                "last_success=?, snapshot_count=?, episode_count=?, error=NULL "
+                "WHERE provider_scope=? AND feed_id=?",
+                (
+                    timestamp, max(0, int(snapshot_count)),
+                    max(0, int(episode_count)), scope, fid,
+                ),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def reset_hosted_podcast_archive_scan(provider_scope: str, feed_id: str) -> None:
+    conn = get_connection()
+    try:
+        conn.execute(
+            "DELETE FROM hosted_podcast_archive_state "
+            "WHERE provider_scope = ? AND feed_id = ?",
+            (str(provider_scope or ""), str(feed_id or "")),
+        )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def replace_hosted_podcast_archive_entries(
+    provider_scope: str,
+    feed_id: str,
+    entries,
+) -> None:
+    """Atomically replace recovered sidecar episodes for one hosted feed."""
+    scope = str(provider_scope or "")
+    fid = str(feed_id or "")
+    rows = list(entries or [])
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        conn.execute(
+            "DELETE FROM hosted_podcast_archive_entries "
+            "WHERE provider_scope = ? AND feed_id = ?",
+            (scope, fid),
+        )
+        conn.executemany(
+            "INSERT INTO hosted_podcast_archive_entries "
+            "(provider_scope, feed_id, episode_key, title, url, content, date, "
+            "author, media_url, media_type) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [
+                (
+                    scope, fid, str(item.get("episode_key") or ""),
+                    str(item.get("title") or ""), str(item.get("url") or ""),
+                    str(item.get("content") or ""), str(item.get("date") or ""),
+                    str(item.get("author") or ""), str(item.get("media_url") or ""),
+                    str(item.get("media_type") or ""),
+                )
+                for item in rows
+                if str(item.get("episode_key") or "")
+            ],
+        )
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+
+
+def get_hosted_podcast_archive_entries(provider_scope: str, feed_id: str) -> list[dict]:
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT episode_key, title, url, content, date, author, media_url, media_type "
+            "FROM hosted_podcast_archive_entries "
+            "WHERE provider_scope = ? AND feed_id = ? ORDER BY date DESC, title COLLATE NOCASE",
+            (str(provider_scope or ""), str(feed_id or "")),
+        ).fetchall()
+    finally:
+        conn.close()
+    return [
+        {
+            "episode_key": row[0], "title": row[1] or "", "url": row[2] or "",
+            "content": row[3] or "", "date": row[4] or "",
+            "author": row[5] or "", "media_url": row[6] or "",
+            "media_type": row[7] or "",
+        }
+        for row in rows
+    ]
 
 
 def _bool_or_none(value):
