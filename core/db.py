@@ -342,6 +342,22 @@ def init_db():
         c.execute("CREATE INDEX IF NOT EXISTS idx_articles_date_id ON articles (date, id)")
         c.execute("CREATE INDEX IF NOT EXISTS idx_articles_feed_id_date_id ON articles (feed_id, date, id)")
 
+        # Wayback-backed podcast history is folded into the ordinary articles
+        # table.  This small state table keeps that expensive background scan
+        # out of routine feed refreshes while retaining status for the optional
+        # Podcast Archive window.
+        c.execute('''CREATE TABLE IF NOT EXISTS podcast_archive_state (
+            feed_id TEXT PRIMARY KEY,
+            feed_url TEXT,
+            status TEXT NOT NULL DEFAULT 'never',
+            last_attempt REAL,
+            last_success REAL,
+            snapshot_count INTEGER DEFAULT 0,
+            episode_count INTEGER DEFAULT 0,
+            error TEXT,
+            FOREIGN KEY(feed_id) REFERENCES feeds(id) ON DELETE CASCADE
+        )''')
+
         # deleted_articles doubles as the tombstone list (so refresh never
         # recreates a user-deleted item) AND the backing store for the "Deleted
         # Articles" view: the snapshot columns preserve the full article so it can
@@ -767,6 +783,112 @@ def get_connection():
     except Exception as e:
         log.warning(f"Failed to register py_lower on connection: {e}")
     return conn
+
+
+def get_podcast_archive_state(feed_id: str) -> dict:
+    """Return persistent archive-scan status for one local feed."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT feed_url, status, last_attempt, last_success, snapshot_count, "
+            "episode_count, error FROM podcast_archive_state WHERE feed_id = ?",
+            (str(feed_id),),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return {
+            "feed_id": str(feed_id), "feed_url": "", "status": "never",
+            "last_attempt": None, "last_success": None,
+            "snapshot_count": 0, "episode_count": 0, "error": "",
+        }
+    return {
+        "feed_id": str(feed_id), "feed_url": str(row[0] or ""),
+        "status": str(row[1] or "never"), "last_attempt": row[2],
+        "last_success": row[3], "snapshot_count": int(row[4] or 0),
+        "episode_count": int(row[5] or 0), "error": str(row[6] or ""),
+    }
+
+
+def claim_podcast_archive_scan(
+    feed_id: str,
+    feed_url: str,
+    *,
+    rescan_seconds: float = 30 * 86400,
+    force: bool = False,
+    now: float | None = None,
+) -> bool:
+    """Atomically claim a due scan, recovering stale interrupted claims."""
+    timestamp = float(time.time() if now is None else now)
+    conn = get_connection()
+    try:
+        conn.execute("BEGIN IMMEDIATE")
+        row = conn.execute(
+            "SELECT status, last_attempt, last_success FROM podcast_archive_state WHERE feed_id = ?",
+            (str(feed_id),),
+        ).fetchone()
+        if row and not force:
+            status, last_attempt, last_success = row
+            if last_success is not None and timestamp - float(last_success) < max(0.0, float(rescan_seconds)):
+                conn.rollback()
+                return False
+            if status == "error" and last_attempt is not None and timestamp - float(last_attempt) < min(max(3600.0, float(rescan_seconds)), 86400.0):
+                conn.rollback()
+                return False
+            # A killed process cannot clear "scanning".  Six hours is longer
+            # than a very large Wayback walk but still lets a later run recover.
+            if status == "scanning" and last_attempt is not None and timestamp - float(last_attempt) < 6 * 3600:
+                conn.rollback()
+                return False
+        conn.execute(
+            "INSERT INTO podcast_archive_state "
+            "(feed_id, feed_url, status, last_attempt, error) VALUES (?, ?, 'scanning', ?, NULL) "
+            "ON CONFLICT(feed_id) DO UPDATE SET feed_url=excluded.feed_url, "
+            "status='scanning', last_attempt=excluded.last_attempt, error=NULL",
+            (str(feed_id), str(feed_url or ""), timestamp),
+        )
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def finish_podcast_archive_scan(
+    feed_id: str,
+    *,
+    snapshot_count: int = 0,
+    episode_count: int = 0,
+    error: str = "",
+    now: float | None = None,
+) -> None:
+    timestamp = float(time.time() if now is None else now)
+    message = str(error or "").strip()
+    conn = get_connection()
+    try:
+        if message:
+            conn.execute(
+                "UPDATE podcast_archive_state SET status='error', error=? WHERE feed_id=?",
+                (message, str(feed_id)),
+            )
+        else:
+            conn.execute(
+                "UPDATE podcast_archive_state SET status='complete', last_success=?, "
+                "snapshot_count=?, episode_count=?, error=NULL WHERE feed_id=?",
+                (timestamp, max(0, int(snapshot_count)), max(0, int(episode_count)), str(feed_id)),
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def reset_podcast_archive_scan(feed_id: str) -> None:
+    """Make one feed due for an explicit user-requested archive retry."""
+    conn = get_connection()
+    try:
+        conn.execute("DELETE FROM podcast_archive_state WHERE feed_id = ?", (str(feed_id),))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def _bool_or_none(value):

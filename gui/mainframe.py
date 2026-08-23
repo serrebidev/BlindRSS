@@ -2494,6 +2494,10 @@ class MainFrame(wx.Frame):
             tools_menu, "feeds.find_podcast", _("Find a &Podcast or RSS Feed..."),
             _("Find and add a podcast or RSS feed"),
         )
+        podcast_archive_item = self._append_shortcut_menu_item(
+            tools_menu, "feeds.podcast_archive", _("Podcast &Archive..."),
+            _("Browse recovered podcast history and download episodes in batches"),
+        )
         ytdlp_global_search_item = self._append_shortcut_menu_item(
             tools_menu, "feeds.video_search", _("&Video Search..."),
             _("Search all yt-dlp query-search sites"),
@@ -2579,6 +2583,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_check_updates, check_updates_item)
         self.Bind(wx.EVT_MENU, self.on_exit, exit_item)
         self.Bind(wx.EVT_MENU, self.on_find_feed, find_feed_item)
+        self.Bind(wx.EVT_MENU, self.on_podcast_archive, podcast_archive_item)
         self.Bind(wx.EVT_MENU, self.on_ytdlp_global_search, ytdlp_global_search_item)
         self.Bind(wx.EVT_MENU, self.on_manage_filter_rules, filter_rules_item)
         self.Bind(wx.EVT_MENU, self.on_import_site_cookies, import_site_cookies_item)
@@ -3180,6 +3185,7 @@ class MainFrame(wx.Frame):
             "feeds.import_youtube_takeout": self.on_import_youtube_takeout,
             "feeds.export_opml": self.on_export_opml,
             "feeds.find_podcast": self.on_find_feed,
+            "feeds.podcast_archive": self.on_podcast_archive,
             "feeds.video_search": self.on_ytdlp_global_search,
 
             "media.open_url": self.on_open_media_url,
@@ -12974,7 +12980,7 @@ class MainFrame(wx.Frame):
         """Human-readable title for download activity-status text."""
         return str(getattr(article, "title", "") or "").strip() or "episode"
 
-    def _download_article_thread(self, article, download_format=None):
+    def _download_article_thread(self, article, download_format=None, *, show_messages=True):
         title = self._download_activity_title(article)
         self._post_activity_status(_("Downloading: {title}").format(title=title))
         try:
@@ -12983,7 +12989,7 @@ class MainFrame(wx.Frame):
                 # _download_article_via_ytdlp pairs its own terminal outcomes
                 # (success/failure) with activity-status updates.
                 self._download_article_via_ytdlp(article, ytdlp_url, download_format)
-                return
+                return None
 
             url = article.media_url
             resp = utils.safe_requests_get(url, stream=True, timeout=30)
@@ -13004,23 +13010,29 @@ class MainFrame(wx.Frame):
 
             self._record_article_download(article, target_path)
             self._apply_download_retention(target_dir)
-            wx.CallAfter(
-                lambda: wx.MessageBox(
-                    _("Downloaded to:\n{path}").format(path=target_path),
-                    _("Download complete"),
+            if show_messages:
+                wx.CallAfter(
+                    lambda: wx.MessageBox(
+                        _("Downloaded to:\n{path}").format(path=target_path),
+                        _("Download complete"),
+                    )
                 )
-            )
             self._post_activity_status(_("Download complete: {title}").format(title=title))
+            return target_path
         except Exception as e:
             error_message = str(e) or type(e).__name__
-            wx.CallAfter(
-                lambda message=error_message: wx.MessageBox(
-                    _("Download failed: {error}").format(error=message),
-                    _("Download error"),
-                    wx.ICON_ERROR,
+            if show_messages:
+                wx.CallAfter(
+                    lambda message=error_message: wx.MessageBox(
+                        _("Download failed: {error}").format(error=message),
+                        _("Download error"),
+                        wx.ICON_ERROR,
+                    )
                 )
-            )
+            else:
+                log.warning("Podcast archive download failed for %r: %s", title, error_message)
             self._post_activity_status(_("Download failed: {title}").format(title=title))
+            return None
 
     def _guess_extension(self, url, content_type=None):
         path = urlsplit(url).path if url else ""
@@ -13311,7 +13323,7 @@ class MainFrame(wx.Frame):
         if not acquired:
             return False
         try:
-            ok = bool(refresh_one(feed_id))
+            ok = bool(refresh_one(feed_id, progress_cb=self._on_feed_refresh_progress))
         except Exception:
             log.exception("Single-feed refresh after add failed for %s", feed_id)
             return False
@@ -14781,6 +14793,29 @@ class MainFrame(wx.Frame):
 
         if url:
             self.add_feed_from_url_prompt(url)
+
+    def on_podcast_archive(self, event=None):
+        """Open the optional history/status/batch-download surface.
+
+        Historical recovery itself is automatic during local podcast refresh.
+        """
+        existing = getattr(self, "_podcast_archive_dialog", None)
+        try:
+            if existing is not None and existing:
+                existing.Raise()
+                existing.SetFocus()
+                return
+        except Exception:
+            self._podcast_archive_dialog = None
+
+        from gui.dialogs import PodcastArchiveDialog
+
+        selected_feed_id = getattr(self, "current_feed_id", None)
+        if str(selected_feed_id or "").startswith(("category:", "unread:", "read:", "fav:", "favorites:")):
+            selected_feed_id = None
+        dlg = PodcastArchiveDialog(self, initial_feed_id=selected_feed_id)
+        self._podcast_archive_dialog = dlg
+        dlg.Show()
 
     def on_ytdlp_global_search(self, event):
         from gui.dialogs import YtdlpGlobalSearchDialog

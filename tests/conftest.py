@@ -38,6 +38,16 @@ def _no_real_browser_launch(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_automatic_podcast_archive_network(monkeypatch):
+    """Unit tests never enqueue live Archive.org background work."""
+    try:
+        from core import podcast_archive
+    except Exception:
+        return
+    monkeypatch.setattr(podcast_archive, "enqueue_archive_job", lambda _job: None)
+
+
+@pytest.fixture(autouse=True)
 def _isolated_site_cookie_jar(tmp_path_factory, monkeypatch):
     try:
         from core import site_cookies

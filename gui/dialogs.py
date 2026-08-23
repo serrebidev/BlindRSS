@@ -5027,6 +5027,388 @@ class FeedErrorsDialog(wx.Dialog):
         self.EndModal(wx.ID_OK)
 
 
+class PodcastArchiveDialog(wx.Dialog):
+    """Browse a podcast's normal (live + recovered) episode history.
+
+    Archive recovery itself is automatic.  This modeless window is the power
+    surface for status, a manual retry, and long-running batch downloads.
+    """
+
+    def __init__(self, parent, initial_feed_id=None):
+        super().__init__(parent, title=_("Podcast Archive"), size=(980, 680))
+        self._host = parent
+        self._feeds = list(getattr(parent.provider, "get_feeds", lambda: [])() or [])
+        self._all_articles = []
+        self._visible_articles = []
+        self._download_cancel = threading.Event()
+        self._download_running = False
+        self._scan_running = False
+        self._close_when_idle = False
+
+        outer = wx.BoxSizer(wx.VERTICAL)
+        feed_row = wx.BoxSizer(wx.HORIZONTAL)
+        feed_row.Add(wx.StaticText(self, label=_("Podcast:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        self.feed_combo = wx.ComboBox(
+            self,
+            choices=[str(getattr(feed, "title", "") or getattr(feed, "url", "")) for feed in self._feeds],
+            style=wx.CB_READONLY,
+        )
+        self.feed_combo.SetName(_("Podcast feed"))
+        feed_row.Add(self.feed_combo, 1, wx.EXPAND | wx.ALL, 5)
+        self.find_btn = wx.Button(self, label=_("Find or add podcast..."))
+        feed_row.Add(self.find_btn, 0, wx.ALL, 5)
+        self.retry_btn = wx.Button(self, label=_("Rescan archive"))
+        feed_row.Add(self.retry_btn, 0, wx.ALL, 5)
+        outer.Add(feed_row, 0, wx.EXPAND | wx.ALL, 5)
+
+        filter_row = wx.BoxSizer(wx.HORIZONTAL)
+        filter_row.Add(wx.StaticText(self, label=_("Filter episodes:")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        self.filter_ctrl = wx.SearchCtrl(self, style=wx.TE_PROCESS_ENTER)
+        self.filter_ctrl.ShowCancelButton(True)
+        self.filter_ctrl.SetName(_("Filter podcast episodes"))
+        filter_row.Add(self.filter_ctrl, 1, wx.EXPAND | wx.ALL, 5)
+        outer.Add(filter_row, 0, wx.EXPAND | wx.LEFT | wx.RIGHT, 5)
+
+        self.status = wx.StaticText(self, label=_("Choose a subscribed podcast."))
+        self.status.SetName(_("Podcast archive status"))
+        outer.Add(self.status, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 10)
+
+        self.episodes = wx.ListCtrl(self, style=wx.LC_REPORT)
+        self.episodes.SetName(_("Podcast episodes"))
+        self.episodes.InsertColumn(0, _("Title"), width=500)
+        self.episodes.InsertColumn(1, _("Date"), width=170)
+        self.episodes.InsertColumn(2, _("Media"), width=180)
+        outer.Add(self.episodes, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+
+        buttons = wx.BoxSizer(wx.HORIZONTAL)
+        self.play_btn = wx.Button(self, label=_("Play"))
+        self.download_selected_btn = wx.Button(self, label=_("Download selected"))
+        self.download_all_btn = wx.Button(self, label=_("Download all"))
+        self.cancel_btn = wx.Button(self, label=_("Cancel downloads"))
+        self.cancel_btn.Disable()
+        close_btn = wx.Button(self, wx.ID_CLOSE, _("Close"))
+        for button in (
+            self.play_btn,
+            self.download_selected_btn,
+            self.download_all_btn,
+            self.cancel_btn,
+            close_btn,
+        ):
+            buttons.Add(button, 0, wx.ALL, 5)
+        outer.Add(buttons, 0, wx.ALIGN_RIGHT | wx.ALL, 5)
+        self.SetSizer(outer)
+        self.CentreOnParent()
+
+        self.feed_combo.Bind(wx.EVT_COMBOBOX, self._on_feed_changed)
+        self.filter_ctrl.Bind(wx.EVT_TEXT, self._on_filter_changed)
+        self.episodes.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self._on_play)
+        self.play_btn.Bind(wx.EVT_BUTTON, self._on_play)
+        self.download_selected_btn.Bind(wx.EVT_BUTTON, self._on_download_selected)
+        self.download_all_btn.Bind(wx.EVT_BUTTON, self._on_download_all)
+        self.cancel_btn.Bind(wx.EVT_BUTTON, lambda _event: self._download_cancel.set())
+        self.retry_btn.Bind(wx.EVT_BUTTON, self._on_rescan)
+        self.find_btn.Bind(wx.EVT_BUTTON, self._on_find)
+        close_btn.Bind(wx.EVT_BUTTON, lambda _event: self.Close())
+        self.Bind(wx.EVT_CLOSE, self._on_close)
+
+        selected = 0
+        for index, feed in enumerate(self._feeds):
+            if str(getattr(feed, "id", "")) == str(initial_feed_id or ""):
+                selected = index
+                break
+        if self._feeds:
+            self.feed_combo.SetSelection(selected)
+            self._load_feed()
+        self._update_action_state()
+
+    def _selected_feed(self):
+        index = self.feed_combo.GetSelection()
+        if 0 <= index < len(self._feeds):
+            return self._feeds[index]
+        return None
+
+    def _load_feed(self):
+        feed = self._selected_feed()
+        if feed is None:
+            self._all_articles = []
+        else:
+            try:
+                articles = self._host.provider.get_articles(feed.id)
+            except Exception as exc:
+                log.exception("Could not load podcast archive articles")
+                articles = []
+                self.status.SetLabel(_("Could not load episodes: {error}").format(error=exc))
+            self._all_articles = [article for article in articles if getattr(article, "media_url", None)]
+        self._apply_filter()
+        self._show_archive_state()
+
+    def _show_archive_state(self):
+        feed = self._selected_feed()
+        if feed is None:
+            self.status.SetLabel(_("Choose a subscribed podcast."))
+            return
+        try:
+            from core.db import get_podcast_archive_state
+
+            state = get_podcast_archive_state(feed.id)
+        except Exception:
+            state = {"status": "never", "snapshot_count": 0, "episode_count": 0, "error": ""}
+        state_name = str(state.get("status") or "never")
+        if state_name == "complete":
+            text = _("{episodes} playable episodes; archive scanned {snapshots} snapshots.").format(
+                episodes=len(self._all_articles),
+                snapshots=int(state.get("snapshot_count") or 0),
+            )
+        elif state_name == "scanning":
+            text = _("Archive scan is running. {episodes} playable episodes are currently available.").format(
+                episodes=len(self._all_articles)
+            )
+        elif state_name == "error":
+            text = _("Archive scan needs retrying: {error}. {episodes} playable episodes are available.").format(
+                error=state.get("error") or _("unknown error"),
+                episodes=len(self._all_articles),
+            )
+        else:
+            text = _("Archive scan is pending. {episodes} playable episodes are currently available.").format(
+                episodes=len(self._all_articles)
+            )
+        self.status.SetLabel(text)
+
+    def _apply_filter(self):
+        needle = str(self.filter_ctrl.GetValue() or "").strip().casefold()
+        if needle:
+            self._visible_articles = [
+                article for article in self._all_articles
+                if needle in str(getattr(article, "title", "") or "").casefold()
+                or needle in str(getattr(article, "author", "") or "").casefold()
+                or needle in str(getattr(article, "date", "") or "").casefold()
+            ]
+        else:
+            self._visible_articles = list(self._all_articles)
+        self.episodes.Freeze()
+        try:
+            self.episodes.DeleteAllItems()
+            try:
+                download_index = self._host._download_index()
+            except Exception:
+                download_index = {}
+            for row, article in enumerate(self._visible_articles):
+                index = self.episodes.InsertItem(row, str(getattr(article, "title", "") or _("Untitled episode")))
+                self.episodes.SetItem(index, 1, str(getattr(article, "date", "") or ""))
+                downloaded = False
+                try:
+                    for key in self._host._download_index_keys(article):
+                        path = self._host._download_entry_path(download_index.get(key))
+                        if path:
+                            downloaded = True
+                            break
+                except Exception:
+                    downloaded = False
+                self.episodes.SetItem(index, 2, _("Downloaded") if downloaded else _("Available online"))
+        finally:
+            self.episodes.Thaw()
+        self._update_action_state()
+
+    def _selected_articles(self):
+        selected = []
+        index = self.episodes.GetFirstSelected()
+        while index != -1:
+            if 0 <= index < len(self._visible_articles):
+                selected.append(self._visible_articles[index])
+            index = self.episodes.GetNextSelected(index)
+        return selected
+
+    def _update_action_state(self):
+        busy = self._download_running or self._scan_running
+        has_rows = bool(self._visible_articles)
+        try:
+            self.play_btn.Enable(has_rows and not busy)
+            self.download_selected_btn.Enable(has_rows and not busy)
+            self.download_all_btn.Enable(bool(self._all_articles) and not busy)
+            self.cancel_btn.Enable(self._download_running)
+            self.retry_btn.Enable(self._selected_feed() is not None and not busy)
+            self.feed_combo.Enable(not busy)
+        except Exception:
+            pass
+
+    def _on_feed_changed(self, _event):
+        self._load_feed()
+
+    def _on_filter_changed(self, _event):
+        self._apply_filter()
+
+    def _on_play(self, _event):
+        selected = self._selected_articles()
+        if not selected and self._visible_articles:
+            selected = [self._visible_articles[0]]
+        if selected:
+            self._host._open_article(selected[0])
+
+    def _on_download_selected(self, _event):
+        selected = self._selected_articles()
+        if not selected:
+            wx.MessageBox(_("Select one or more episodes first."), _("Podcast Archive"), wx.ICON_INFORMATION)
+            return
+        self._start_batch_download(selected)
+
+    def _on_download_all(self, _event):
+        self._start_batch_download(self._all_articles)
+
+    def _start_batch_download(self, articles):
+        articles = list(articles or [])
+        if not articles or self._download_running:
+            return
+        if not self._host.config_manager.get("downloads_enabled", False):
+            wx.MessageBox(
+                _("Downloads are disabled. Enable them in Settings > Downloads."),
+                _("Downloads disabled"),
+                wx.ICON_INFORMATION,
+            )
+            return
+        answer = wx.MessageBox(
+            ngettext(
+                "Download {count} episode?",
+                "Download {count} episodes?",
+                len(articles),
+            ).format(count=len(articles)),
+            _("Podcast Archive"),
+            wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION,
+        )
+        if answer != wx.YES:
+            return
+        self._download_cancel.clear()
+        self._download_running = True
+        self._update_action_state()
+        threading.Thread(target=self._download_worker, args=(articles,), daemon=True).start()
+
+    def _download_worker(self, articles):
+        downloaded = skipped = failed = 0
+        feed = self._selected_feed()
+        folder_name = str(getattr(feed, "title", "") or _("Podcast Archive"))
+        total = len(articles)
+        for number, article in enumerate(articles, 1):
+            if self._download_cancel.is_set():
+                break
+            try:
+                article.download_folder = folder_name
+                if self._host._downloaded_media_path_for_article(article):
+                    skipped += 1
+                else:
+                    path = self._host._download_article_thread(article, show_messages=False)
+                    if path:
+                        downloaded += 1
+                    else:
+                        failed += 1
+            except Exception:
+                failed += 1
+                log.exception("Podcast archive batch download failed")
+            try:
+                wx.CallAfter(
+                    self.status.SetLabel,
+                    _("Downloading episode {number} of {total}: {title}").format(
+                        number=number,
+                        total=total,
+                        title=getattr(article, "title", "") or _("Untitled episode"),
+                    ),
+                )
+            except Exception:
+                pass
+        try:
+            wx.CallAfter(self._finish_batch_download, downloaded, skipped, failed, self._download_cancel.is_set())
+        except Exception:
+            pass
+
+    def _finish_batch_download(self, downloaded, skipped, failed, canceled):
+        self._download_running = False
+        self._update_action_state()
+        self._apply_filter()
+        summary = _("Downloaded: {downloaded}; already present: {skipped}; failed: {failed}.").format(
+            downloaded=downloaded,
+            skipped=skipped,
+            failed=failed,
+        )
+        if canceled:
+            summary = _("Canceled. ") + summary
+        self.status.SetLabel(summary)
+        if self._close_when_idle:
+            self.Close()
+            return
+        wx.MessageBox(summary, _("Podcast Archive"), wx.ICON_INFORMATION)
+
+    def _on_rescan(self, _event):
+        feed = self._selected_feed()
+        if feed is None or self._scan_running:
+            return
+        self._scan_running = True
+        self.status.SetLabel(_("Starting archive rescan..."))
+        self._update_action_state()
+
+        def worker():
+            ok = False
+            error = ""
+            try:
+                refresher = getattr(self._host.provider, "refresh_podcast_archive", None)
+                if callable(refresher):
+                    ok = bool(refresher(feed.id))
+                else:
+                    from core.db import reset_podcast_archive_scan
+
+                    reset_podcast_archive_scan(feed.id)
+                    ok = bool(self._host.provider.refresh_feed(feed.id))
+            except Exception as exc:
+                error = str(exc) or type(exc).__name__
+                log.exception("Podcast archive rescan failed")
+            wx.CallAfter(self._finish_rescan, ok, error)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _finish_rescan(self, ok, error):
+        self._scan_running = False
+        self._load_feed()
+        self._update_action_state()
+        if self._close_when_idle:
+            self.Close()
+            return
+        if not ok:
+            wx.MessageBox(
+                _("Archive rescan failed: {error}").format(error=error or _("unknown error")),
+                _("Podcast Archive"),
+                wx.ICON_ERROR,
+            )
+
+    def _on_find(self, _event):
+        dlg = FeedSearchDialog(self)
+        url = None
+        try:
+            if dlg.ShowModal() == wx.ID_OK:
+                url = dlg.get_selected_url()
+        finally:
+            dlg.Destroy()
+        if url:
+            self._host.add_feed_from_url_prompt(url)
+
+    def _on_close(self, event):
+        if self._download_running or self._scan_running:
+            answer = wx.MessageBox(
+                _("Stop the active work and close this window when it is safe?"),
+                _("Podcast Archive"),
+                wx.YES_NO | wx.NO_DEFAULT | wx.ICON_QUESTION,
+            )
+            if answer != wx.YES:
+                event.Veto()
+                return
+            self._download_cancel.set()
+            self._close_when_idle = True
+            self.status.SetLabel(_("Stopping; this window will close when the active work finishes."))
+            event.Veto()
+            return
+        try:
+            self._host._podcast_archive_dialog = None
+        except Exception:
+            pass
+        event.Skip()
+
+
 class FeedSearchDialog(wx.Dialog):
     _SEARCH_POLL_INTERVAL_S = 0.1
     _SEARCH_TOTAL_TIMEOUT_ALL_SOURCES_S = 60.0

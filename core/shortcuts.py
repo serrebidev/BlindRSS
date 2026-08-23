@@ -51,6 +51,7 @@ COMMANDS: List[Command] = [
     Command("feeds.import_youtube_takeout", "Feeds", "Import YouTube Takeout", ""),
     Command("feeds.export_opml", "Feeds", "Export OPML", ""),
     Command("feeds.find_podcast", "Feeds", "Find a Podcast or RSS Feed", "Ctrl+Shift+F"),
+    Command("feeds.podcast_archive", "Feeds", "Podcast Archive", ""),
     Command("feeds.video_search", "Feeds", "Video Search", ""),
 
     Command("media.open_url", "Media", "Open Media URL", ""),

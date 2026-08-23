@@ -142,6 +142,12 @@ DEFAULT_CONFIG = {
     "max_downloads": 32,
     "auto_download_podcasts": False,
     "auto_download_period": "unlimited",
+    # Podcast feeds are automatically expanded from deduplicated Wayback RSS
+    # snapshots. The ordinary feed list receives the recovered episodes; the
+    # archive dialog is only a status/retry/batch-download surface.
+    "podcast_archive_enabled": True,
+    "podcast_archive_max_snapshots": 5000,
+    "podcast_archive_rescan_days": 30,
     "refresh_interval": 300,  # seconds
     # How long Stop Refresh keeps the periodic refresh loop quiet. Without a
     # pause, a short refresh_interval starts another batch seconds after the

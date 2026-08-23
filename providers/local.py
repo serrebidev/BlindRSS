@@ -36,6 +36,10 @@ from core.db import (
     get_smart_folder,
     list_filter_rules,
     get_feed_delete_behavior,
+    get_podcast_archive_state,
+    claim_podcast_archive_scan,
+    finish_podcast_archive_scan,
+    reset_podcast_archive_scan,
 )
 from core import article_lang
 from core import smart_folders as smart_folders_mod
@@ -48,6 +52,7 @@ from core import npr as npr_mod
 from core import sky as sky_mod
 from core import text_encoding
 from core import browser_feed as browser_feed_mod
+from core import podcast_archive as podcast_archive_mod
 from bs4 import BeautifulSoup as BS, MarkupResemblesLocatorWarning, XMLParsedAsHTMLWarning
 import xml.etree.ElementTree as ET
 import logging
@@ -1343,6 +1348,23 @@ def _feed_has_stored_articles(feed_id: str) -> bool:
         return True
 
 
+def _feed_has_stored_podcast_media(feed_id: str) -> bool:
+    """Cheap hint used only to force the first archive-capable refresh body."""
+    try:
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT 1 FROM articles WHERE feed_id = ? AND media_url IS NOT NULL "
+                "AND media_url != '' LIMIT 1",
+                (feed_id,),
+            ).fetchone()
+            return row is not None
+        finally:
+            conn.close()
+    except Exception:
+        return False
+
+
 def _wordpress_feed_slash_variant(url: str) -> Optional[str]:
     raw = str(url or "").strip()
     if not raw:
@@ -1481,6 +1503,10 @@ class LocalProvider(RSSProvider):
         # only: after a restart every feed is due, which matches startup refresh.
         self._scheduled_refresh_last_attempt: Dict[str, float] = {}
         self._scheduled_refresh_last_attempt_lock = threading.Lock()
+        self._forced_podcast_archive_ids: set[str] = set()
+        self._forced_podcast_archive_lock = threading.Lock()
+        self._pending_podcast_archive_results = {}
+        self._pending_podcast_archive_lock = threading.Lock()
     def get_name(self) -> str:
         return "Local RSS"
 
@@ -1684,6 +1710,84 @@ class LocalProvider(RSSProvider):
             force=True,
             respect_failure_cooldown=False,
         )
+
+    def refresh_podcast_archive(self, feed_id: str, progress_cb=None) -> bool:
+        """Force one user-requested archive scan and ordinary feed refresh."""
+        key = str(feed_id or "").strip()
+        if not key:
+            return False
+        with self._forced_podcast_archive_lock:
+            self._forced_podcast_archive_ids.add(key)
+        try:
+            reset_podcast_archive_scan(key)
+            return self.refresh_feed(key, progress_cb=progress_cb)
+        finally:
+            with self._forced_podcast_archive_lock:
+                self._forced_podcast_archive_ids.discard(key)
+
+    @staticmethod
+    def _podcast_archive_result_error(result) -> str:
+        if result.snapshots_loaded == 0:
+            if result.warnings:
+                return str(result.warnings[0])
+            if result.snapshots_found > 0:
+                return "The Wayback Machine snapshots could not be loaded."
+        return ""
+
+    def _queue_podcast_archive_scan(
+        self,
+        feed_id,
+        feed_url,
+        xml_data,
+        max_snapshots,
+        cancel_event,
+        progress_cb,
+    ) -> None:
+        """Queue a serialized scan, then persist it through a normal refresh."""
+        feed_id = str(feed_id)
+        current_document = bytes(xml_data) if isinstance(xml_data, (bytes, bytearray)) else str(xml_data or "")
+
+        def job():
+            try:
+                with podcast_archive_mod.AUTOMATIC_SCAN_LOCK:
+                    result = podcast_archive_mod.scan_podcast_archive(
+                        feed_url,
+                        current_document=current_document,
+                        max_snapshots=max_snapshots,
+                        include_without_media=True,
+                        cancel_event=cancel_event,
+                    )
+                if result.canceled:
+                    reset_podcast_archive_scan(feed_id)
+                    return
+                recovered = podcast_archive_mod.archive_only_entries(result, current_document)
+                if not recovered:
+                    finish_podcast_archive_scan(
+                        feed_id,
+                        snapshot_count=result.snapshots_loaded,
+                        episode_count=len(result.episodes),
+                        error=self._podcast_archive_result_error(result),
+                    )
+                    return
+                with self._pending_podcast_archive_lock:
+                    self._pending_podcast_archive_results[feed_id] = result
+                if not self.refresh_feed(feed_id, progress_cb=progress_cb):
+                    with self._pending_podcast_archive_lock:
+                        self._pending_podcast_archive_results.pop(feed_id, None)
+                    finish_podcast_archive_scan(
+                        feed_id,
+                        error="The recovered podcast history could not be saved.",
+                    )
+            except Exception as exc:
+                log.warning("Podcast archive recovery failed for %s: %s", feed_url, exc)
+                with self._pending_podcast_archive_lock:
+                    self._pending_podcast_archive_results.pop(feed_id, None)
+                try:
+                    finish_podcast_archive_scan(feed_id, error=str(exc))
+                except Exception:
+                    log.debug("Could not persist podcast archive failure", exc_info=True)
+
+        podcast_archive_mod.enqueue_archive_job(job)
 
     def _refresh_feed_rows(
         self,
@@ -1900,6 +2004,8 @@ class LocalProvider(RSSProvider):
         started_at = time.monotonic()
         entry_count = None
         known_unread_count = None
+        deferred_podcast_archive_job = None
+        deferred_podcast_archive_completion = None
 
         if respect_failure_cooldown and not force:
             expires_at, cached_error = self._get_refresh_failure_cooldown(feed_id)
@@ -1954,6 +2060,7 @@ class LocalProvider(RSSProvider):
         def _apply_rules_to_new_article(
             article_id, title, content, description, author, url, tags,
             date, media_url, media_type, chapter_url,
+            *, counts_as_new=True,
         ):
             """Run the filter-rules pipeline against a just-inserted article.
 
@@ -2003,7 +2110,8 @@ class LocalProvider(RSSProvider):
             if removed or eff.get("skip_notification"):
                 if new_article_summaries and str(new_article_summaries[-1].get("id")) == str(article_id):
                     new_article_summaries.pop()
-                new_items = max(0, new_items - 1)
+                if counts_as_new:
+                    new_items = max(0, new_items - 1)
             if removed:
                 existing_articles.pop(article_id, None)
 
@@ -2122,6 +2230,18 @@ class LocalProvider(RSSProvider):
                 feed_url,
             )
             use_conditional = False
+        # A feed that predates automatic podcast-history recovery may otherwise
+        # answer 304 forever, leaving us with no XML body from which to identify
+        # it as a podcast.  Spend one unconditional request when stored media is
+        # present and no archive attempt has ever been recorded.
+        if use_conditional and bool(self.config.get("podcast_archive_enabled", False)):
+            try:
+                archive_state = get_podcast_archive_state(feed_id)
+            except Exception:
+                archive_state = {"status": "never"}
+            if archive_state.get("status") == "never" and _feed_has_stored_podcast_media(feed_id):
+                log.info("Fetching full podcast feed body for first archive scan id=%s", feed_id)
+                use_conditional = False
         if use_conditional:
             if etag:
                 headers['If-None-Match'] = etag
@@ -3427,6 +3547,106 @@ class LocalProvider(RSSProvider):
                         feed_url,
                     )
                     return
+
+            # A completed background archive walk is persisted through this
+            # ordinary refresh path, so all the established identity, tombstone,
+            # filter, and metadata rules remain authoritative.  The first/live
+            # refresh never waits for Wayback: it queues the expensive scan and
+            # saves the publisher's current episodes immediately.
+            with self._pending_podcast_archive_lock:
+                pending_archive_result = self._pending_podcast_archive_results.pop(
+                    str(feed_id), None
+                )
+            if pending_archive_result is not None:
+                recovered_entries = podcast_archive_mod.archive_only_entries(
+                    pending_archive_result,
+                    xml_data,
+                )
+                if recovered_entries:
+                    d.entries.extend(recovered_entries)
+                    entry_count = len(d.entries)
+                    log.info(
+                        "Podcast archive recovered %s historical episode(s) "
+                        "from %s snapshot(s) for id=%s title=%r",
+                        len(recovered_entries),
+                        pending_archive_result.snapshots_loaded,
+                        feed_id,
+                        final_title,
+                    )
+                deferred_podcast_archive_completion = pending_archive_result
+            elif (
+                bool(self.config.get("podcast_archive_enabled", False))
+                and podcast_archive_mod.feed_has_podcast_media(d)
+            ):
+                with self._forced_podcast_archive_lock:
+                    force_archive_scan = str(feed_id) in self._forced_podcast_archive_ids
+                try:
+                    rescan_days = max(
+                        1.0,
+                        float(self.config.get("podcast_archive_rescan_days", 30) or 30),
+                    )
+                except (TypeError, ValueError):
+                    rescan_days = 30.0
+                try:
+                    max_snapshots = int(
+                        self.config.get(
+                            "podcast_archive_max_snapshots",
+                            podcast_archive_mod.DEFAULT_MAX_SNAPSHOTS,
+                        )
+                        or podcast_archive_mod.DEFAULT_MAX_SNAPSHOTS
+                    )
+                except (TypeError, ValueError):
+                    max_snapshots = podcast_archive_mod.DEFAULT_MAX_SNAPSHOTS
+                if force_archive_scan:
+                    archive_claimed = claim_podcast_archive_scan(
+                        feed_id,
+                        canonical_feed_url or feed_url,
+                        rescan_seconds=rescan_days * 86400,
+                        force=True,
+                    )
+                    if archive_claimed:
+                        # Explicit Tools > Podcast Archive retry: its own worker
+                        # waits for completion so the dialog can report a result.
+                        try:
+                            with podcast_archive_mod.AUTOMATIC_SCAN_LOCK:
+                                archive_result = podcast_archive_mod.scan_podcast_archive(
+                                    canonical_feed_url or feed_url,
+                                    current_document=xml_data,
+                                    max_snapshots=max_snapshots,
+                                    include_without_media=True,
+                                    cancel_event=cancel_event,
+                                )
+                            if archive_result.canceled:
+                                reset_podcast_archive_scan(feed_id)
+                                return
+                            recovered_entries = podcast_archive_mod.archive_only_entries(
+                                archive_result,
+                                xml_data,
+                            )
+                            if recovered_entries:
+                                d.entries.extend(recovered_entries)
+                                entry_count = len(d.entries)
+                            deferred_podcast_archive_completion = archive_result
+                        except Exception as archive_exc:
+                            finish_podcast_archive_scan(feed_id, error=str(archive_exc))
+                            log.warning(
+                                "Podcast archive recovery failed for %s: %s",
+                                feed_url,
+                                archive_exc,
+                            )
+                else:
+                    # Claim and queue only after the live-feed transaction has
+                    # committed below.  This prevents a very fast archive job
+                    # from racing a new subscription's first save.
+                    deferred_podcast_archive_job = (
+                        feed_id,
+                        canonical_feed_url or feed_url,
+                        xml_data,
+                        max_snapshots,
+                        cancel_event,
+                        progress_cb,
+                        rescan_days * 86400,
+                    )
             
             # Parse only feeds that contain a local-name "chapters" element. Element
             # matching deliberately ignores namespace prefixes and namespace URIs.
@@ -3724,6 +3944,7 @@ class LocalProvider(RSSProvider):
                         "existing_stored_url": str((existing_metadata or {}).get("url") or ""),
                         "existing_stored_description": str((existing_metadata or {}).get("description") or ""),
                         "notify_preview": _preview_for_notification(content),
+                        "archive_recovered": bool(entry.get("blindrss_archive_recovered")),
                     })
 
                 # Phase 2: all row changes in one short write transaction. The
@@ -3774,6 +3995,7 @@ class LocalProvider(RSSProvider):
                     inline_chapters = prep["inline_chapters"]
                     existing_article_id = prep["existing_article_id"]
                     notify_preview = prep["notify_preview"]
+                    archive_recovered = prep["archive_recovered"]
 
                     if _article_matches_deleted_tombstone(
                         deleted_article_ids,
@@ -3845,21 +4067,23 @@ class LocalProvider(RSSProvider):
                             (article_id, feed_id, title, url, content, description, date, author, media_url, media_type, chapter_url, tags or None),
                         )
                         content_changed = True
-                        new_items += 1
+                        if not archive_recovered:
+                            new_items += 1
                         # Change history: seed the original version at first fetch.
                         try:
                             record_article_version(article_id, title, content, cursor=c)
                         except Exception:
                             pass
-                        _record_new_article(
-                            article_id,
-                            title,
-                            author,
-                            notify_preview,
-                            url=url,
-                            media_url=media_url,
-                            media_type=media_type,
-                        )
+                        if not archive_recovered:
+                            _record_new_article(
+                                article_id,
+                                title,
+                                author,
+                                notify_preview,
+                                url=url,
+                                media_url=media_url,
+                                media_type=media_type,
+                            )
                         if inline_chapters:
                             utils._replace_stored_chapters(article_id, inline_chapters, cursor=c)
                         existing_articles[article_id] = {
@@ -3873,6 +4097,7 @@ class LocalProvider(RSSProvider):
                         _apply_rules_to_new_article(
                             article_id, title, content, description, author, url, tags,
                             date, media_url, media_type, chapter_url,
+                            counts_as_new=not archive_recovered,
                         )
                     except sqlite3.IntegrityError as e:
                         if _rollback_and_abort_on_foreign_key(conn, e):
@@ -3919,16 +4144,17 @@ class LocalProvider(RSSProvider):
                                     )
                                     content_changed = True
                                     article_id = scoped_id
-                                    new_items += 1
-                                    _record_new_article(
-                                        article_id,
-                                        title,
-                                        author,
-                                        notify_preview,
-                                        url=url,
-                                        media_url=media_url,
-                                        media_type=media_type,
-                                    )
+                                    if not archive_recovered:
+                                        new_items += 1
+                                        _record_new_article(
+                                            article_id,
+                                            title,
+                                            author,
+                                            notify_preview,
+                                            url=url,
+                                            media_url=media_url,
+                                            media_type=media_type,
+                                        )
                                     if inline_chapters:
                                         utils._replace_stored_chapters(article_id, inline_chapters, cursor=c)
                                     existing_articles[article_id] = {
@@ -3942,6 +4168,7 @@ class LocalProvider(RSSProvider):
                                     _apply_rules_to_new_article(
                                         article_id, title, content, description, author, url, tags,
                                         date, media_url, media_type, chapter_url,
+                                        counts_as_new=not archive_recovered,
                                     )
                                 except sqlite3.IntegrityError:
                                     continue
@@ -3952,6 +4179,41 @@ class LocalProvider(RSSProvider):
 
                 # Commit once at the end
                 conn.commit()
+                if deferred_podcast_archive_completion is not None:
+                    finish_podcast_archive_scan(
+                        feed_id,
+                        snapshot_count=deferred_podcast_archive_completion.snapshots_loaded,
+                        episode_count=len(deferred_podcast_archive_completion.episodes),
+                        error=self._podcast_archive_result_error(
+                            deferred_podcast_archive_completion
+                        ),
+                    )
+                if deferred_podcast_archive_job is not None:
+                    (
+                        archive_feed_id,
+                        archive_feed_url,
+                        archive_xml_data,
+                        archive_max_snapshots,
+                        archive_cancel_event,
+                        archive_progress_cb,
+                        archive_rescan_seconds,
+                    ) = deferred_podcast_archive_job
+                    try:
+                        if claim_podcast_archive_scan(
+                            archive_feed_id,
+                            archive_feed_url,
+                            rescan_seconds=archive_rescan_seconds,
+                        ):
+                            self._queue_podcast_archive_scan(
+                                archive_feed_id,
+                                archive_feed_url,
+                                archive_xml_data,
+                                archive_max_snapshots,
+                                archive_cancel_event,
+                                archive_progress_cb,
+                            )
+                    except Exception:
+                        log.debug("Could not queue podcast archive scan", exc_info=True)
                 # Reuse this already-open worker connection for the progress
                 # count.  Opening a fresh SQLite connection (and its PRAGMAs)
                 # for every successfully refreshed feed was needless churn.

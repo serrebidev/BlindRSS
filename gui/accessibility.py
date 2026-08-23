@@ -663,6 +663,7 @@ class AccessibleBrowserFrame(wx.Frame):
         self._menu_item(tools_menu, _("&Persistent Search..."), lambda e: self._delegate("on_configure_persistent_search"))
         self._menu_item(tools_menu, _("&Filter Rules..."), lambda e: self._delegate("on_manage_filter_rules"))
         self._menu_item(tools_menu, _("Find a Podcast or &RSS..."), lambda e: self._delegate("on_find_feed"))
+        self._menu_item(tools_menu, _("Podcast &Archive..."), lambda e: self._delegate("on_podcast_archive"))
         self._menu_item(tools_menu, _("&Video Search..."), lambda e: self._delegate("on_ytdlp_global_search"))
         self._menu_item(tools_menu, _("Import Site &Cookies..."), lambda e: self._delegate("on_import_site_cookies"))
         mb.Append(tools_menu, _("&Tools"))
