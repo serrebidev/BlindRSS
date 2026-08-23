@@ -4,6 +4,11 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.133.0 - 2026-08-23
+
+- Add automatic podcast archive recovery.
+- Keep Linux release output warning-free.
+
 ## v1.132.0 - 2026-08-23
 
 - Read complete Invision and vBulletin forums.
