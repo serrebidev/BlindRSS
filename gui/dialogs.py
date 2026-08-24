@@ -5159,21 +5159,21 @@ class PodcastArchiveDialog(wx.Dialog):
             state = {"status": "never", "snapshot_count": 0, "episode_count": 0, "error": ""}
         state_name = str(state.get("status") or "never")
         if state_name == "complete":
-            text = _("{episodes} playable episodes; archive scanned {snapshots} snapshots.").format(
+            text = ngettext("{episodes} playable episode; archive scanned snapshots: {snapshots}.", "{episodes} playable episodes; archive scanned snapshots: {snapshots}.", len(self._all_articles)).format(
                 episodes=len(self._all_articles),
                 snapshots=int(state.get("snapshot_count") or 0),
             )
         elif state_name == "scanning":
-            text = _("Archive scan is running. {episodes} playable episodes are currently available.").format(
+            text = ngettext("Archive scan is running. {episodes} playable episode is currently available.", "Archive scan is running. {episodes} playable episodes are currently available.", len(self._all_articles)).format(
                 episodes=len(self._all_articles)
             )
         elif state_name == "error":
-            text = _("Archive scan needs retrying: {error}. {episodes} playable episodes are available.").format(
+            text = ngettext("Archive scan needs retrying: {error}. {episodes} playable episode is available.", "Archive scan needs retrying: {error}. {episodes} playable episodes are available.", len(self._all_articles)).format(
                 error=state.get("error") or _("unknown error"),
                 episodes=len(self._all_articles),
             )
         else:
-            text = _("Archive scan is pending. {episodes} playable episodes are currently available.").format(
+            text = ngettext("Archive scan is pending. {episodes} playable episode is currently available.", "Archive scan is pending. {episodes} playable episodes are currently available.", len(self._all_articles)).format(
                 episodes=len(self._all_articles)
             )
         self.status.SetLabel(text)
