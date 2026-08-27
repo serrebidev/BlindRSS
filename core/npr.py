@@ -42,10 +42,13 @@ from core import utils
 log = logging.getLogger(__name__)
 
 # NPR story IDs are either the current CMS form (nx-s1-5923944, sometimes with an
-# edition suffix: nx-s1-5921392-e1) or a legacy all-digit ID (1173000000). Matching
-# these shapes rather than "any path segment" keeps a slug from being mistaken for an
-# ID, which would send the reader to a text.npr.org page for a different story.
-_STORY_ID_RE = re.compile(r"(?:nx-[a-z0-9]+-[0-9]+(?:-[a-z0-9]+)*|\d{6,})\Z", re.I)
+# edition suffix: nx-s1-5921392-e1) or a legacy all-digit ID (1173000000). The CMS
+# prefix is not always "nx": newsletters and features ship as g-s1-140414, and those
+# stories are on text.npr.org too, so the prefix is matched by shape (letters, then a
+# letter-and-digits section code, then the number). Matching these shapes rather than
+# "any path segment" keeps a slug from being mistaken for an ID, which would send the
+# reader to a text.npr.org page for a different story.
+_STORY_ID_RE = re.compile(r"(?:[a-z]{1,3}-[a-z]\d+-\d+(?:-[a-z0-9]+)*|\d{6,})\Z", re.I)
 
 # text.npr.org renders NPR's inline "related story" insets as a bare label followed by
 # a link whose only text is the site name, fenced by a horizontal rule on each side:

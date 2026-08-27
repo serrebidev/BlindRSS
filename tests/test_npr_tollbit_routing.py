@@ -91,6 +91,9 @@ class StoryIdTests(unittest.TestCase):
             "https://www.npr.org/sections/health-shots/2026/08/12/nx-s1-5929189/x": "nx-s1-5929189",
             # Legacy all-digit IDs.
             "https://www.npr.org/2023/05/01/1173000000/some-slug": "1173000000",
+            # Newsletters and features ship under other CMS prefixes; text.npr.org
+            # serves them too, so they must not fall back to the gated story page.
+            "https://www.npr.org/2026/08/27/g-s1-140414/up-first-newsletter": "g-s1-140414",
             "https://www.npr.org/nx-s1-5923944": "nx-s1-5923944",
             "https://www.npr.org/transcripts/nx-s1-5923944": "nx-s1-5923944",
             "https://www.npr.org/templates/story/story.php?storyId=nx-s1-5923944": "nx-s1-5923944",
@@ -106,6 +109,8 @@ class StoryIdTests(unittest.TestCase):
             "https://www.npr.org/sections/politics/",
             "https://www.npr.org/",
             "https://example.com/2026/08/12/nx-s1-5923944/x",
+            # A slug sitting where the ID goes is not an ID.
+            "https://www.npr.org/2026/08/27/ratko-mladic-dead/full-story",
             "",
         ):
             self.assertEqual(npr.story_id_from_url(url), "", url)
