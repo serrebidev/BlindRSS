@@ -36,7 +36,7 @@ import html as html_module
 import json
 import logging
 from urllib.parse import urlsplit
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 from core import utils
 
 log = logging.getLogger(__name__)
@@ -46,6 +46,17 @@ log = logging.getLogger(__name__)
 # these shapes rather than "any path segment" keeps a slug from being mistaken for an
 # ID, which would send the reader to a text.npr.org page for a different story.
 _STORY_ID_RE = re.compile(r"(?:nx-[a-z0-9]+-[0-9]+(?:-[a-z0-9]+)*|\d{6,})\Z", re.I)
+
+# text.npr.org renders NPR's inline "related story" insets as a bare label followed by
+# a link whose only text is the site name, fenced by a horizontal rule on each side:
+#
+#     <hr> Related Story: <a href="/150009152">NPR</a> <hr>
+#
+# The full site puts the related headline in that link; the text edition never does
+# (checked against every inset across the current NPR feeds - the anchor text was
+# "NPR" every time). So the inset reaches the reader pane as a content-free
+# "Related Story: NPR" line interrupting the article one to five times. Drop it.
+_RELATED_STORY_LABEL_RE = re.compile(r"related\s+story\s*:\s*\Z", re.I)
 
 # The on-demand MP3 inside the embed player lives in a JSON blob, so its slashes may be
 # escaped (https:\/\/ondemand.npr.org\/...). Accept both forms and unescape after.
@@ -112,6 +123,49 @@ def text_only_url(url: str) -> str:
     return f"https://{_TEXT_HOST}/{story_id}" if story_id else ""
 
 
+def _visible_sibling(node, forward: bool):
+    """The nearest sibling of ``node`` that is not a whitespace-only text node."""
+    sibling = node.next_sibling if forward else node.previous_sibling
+    while isinstance(sibling, NavigableString) and not str(sibling).strip():
+        sibling = sibling.next_sibling if forward else sibling.previous_sibling
+    return sibling
+
+
+def strip_related_story_stubs(html: str) -> str:
+    """Remove text.npr.org's content-free "Related Story: NPR" insets (see above)."""
+    if not html or "Related Story" not in html:
+        return html
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+    except Exception:
+        return html
+    removed = False
+    for link in soup.find_all("a"):
+        if link.get_text(strip=True).upper() != "NPR":
+            continue
+        label = _visible_sibling(link, forward=False)
+        if not isinstance(label, NavigableString):
+            continue
+        text = str(label)
+        if not _RELATED_STORY_LABEL_RE.search(text):
+            continue
+        # The rules exist only to fence the inset off from the paragraphs around it,
+        # so they go with it rather than leaving two bare separators behind.
+        for rule in (_visible_sibling(label, forward=False), _visible_sibling(link, forward=True)):
+            if getattr(rule, "name", "") == "hr":
+                rule.extract()
+        # The label is its own text node on every page NPR serves; if it ever trails
+        # real prose, keep the prose and drop only the label.
+        kept = _RELATED_STORY_LABEL_RE.sub("", text)
+        if kept.strip():
+            label.replace_with(soup.new_string(kept))
+        else:
+            label.extract()
+        link.extract()
+        removed = True
+    return str(soup) if removed else html
+
+
 def download_text_only_html(url: str, timeout: int = 20) -> str:
     """Fetch an NPR story from the text-only edition. Returns "" when unavailable.
 
@@ -148,7 +202,7 @@ def download_text_only_html(url: str, timeout: int = 20) -> str:
     if "paragraphs-container" not in html:
         log.debug(f"NPR text-only page for {target} carried no story body")
         return ""
-    return html
+    return strip_related_story_stubs(html)
 
 
 def _audio_from_embed_player(story_id: str, timeout_s: float) -> str | None:

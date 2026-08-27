@@ -31,6 +31,12 @@ STORY_URL = (
     "budget-cuts-have-reduced-efforts-to-find-and-recover-vietnam-war-troops"
 )
 
+# The text edition's related-story inset as NPR serves it: a bare label and a link
+# whose only text is the site name, fenced by a horizontal rule on each side. The
+# indentation and newlines are part of the markup and are what the stripper has to
+# skip past to recognise the label.
+RELATED_STORY_STUB = '<hr>\n      Related Story: <a href="/150009152">NPR</a>\n      <hr>'
+
 TEXT_ONLY_HTML = (
     "<!DOCTYPE html><html lang=\"en\"><head>"
     "<title>Budget cuts have reduced efforts to find and recover Vietnam War troops</title>"
@@ -44,7 +50,10 @@ TEXT_ONLY_HTML = (
     "<p>JUANA SUMMERS, HOST: Budget cuts have sharply reduced the Defense Department's "
     "efforts to find and recover troops missing in previous conflicts, and the impact is "
     "hitting one group of families especially hard.<p>"
-    "<p>JAY PRICE, BYLINE: Raymond Echevarria Jr. of Roxboro, North Carolina, was four "
+    # The text edition's related-story inset, verbatim: a label and a link whose only
+    # text is the site name, fenced by a rule on each side.
+    + RELATED_STORY_STUB
+    + "<p>JAY PRICE, BYLINE: Raymond Echevarria Jr. of Roxboro, North Carolina, was four "
     "years old in 1966 when his father was reported missing in Laos.<p>"
     "</div></div></article></main></body></html>"
 )
@@ -151,6 +160,39 @@ class TextOnlyRoutingTests(unittest.TestCase):
         finally:
             utils.safe_requests_get = original
         self.assertIn("Live page body.", result.html or "")
+
+    def test_related_story_stubs_are_dropped_from_the_body(self):
+        # text.npr.org renders NPR's inline related-story insets without the headline
+        # the full site shows, so each one reaches the reader pane as a content-free
+        # "Related Story: NPR" line between paragraphs -- up to five per article.
+        def fake_get(url, **kwargs):
+            return _Response(200, TEXT_ONLY_HTML)
+
+        original = utils.safe_requests_get
+        utils.safe_requests_get = fake_get
+        try:
+            html = npr.download_text_only_html(STORY_URL, timeout=5)
+        finally:
+            utils.safe_requests_get = original
+
+        self.assertNotIn("Related Story", html)
+        self.assertNotIn("/150009152", html)
+        # The fencing rules go with the inset rather than leaving bare separators,
+        # and the story around it is untouched.
+        self.assertNotIn("<hr", html)
+        self.assertIn("JUANA SUMMERS", html)
+        self.assertIn("Raymond Echevarria Jr.", html)
+        self.assertNotIn("Related Story", utils.html_to_text(html))
+
+    def test_pages_without_a_stub_are_returned_unchanged(self):
+        clean = TEXT_ONLY_HTML.replace(RELATED_STORY_STUB, "")
+        self.assertEqual(npr.strip_related_story_stubs(clean), clean)
+
+    def test_a_real_npr_link_labelled_npr_survives(self):
+        # Only the "Related Story:" label marks the stub; an ordinary link whose text
+        # happens to be "NPR" is part of the article.
+        body = '<p>Reported by <a href="https://www.npr.org/">NPR</a> staff.</p>'
+        self.assertEqual(npr.strip_related_story_stubs(body), body)
 
     def test_non_npr_urls_are_untouched(self):
         def fake_get(url, **kwargs):
