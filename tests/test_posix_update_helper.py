@@ -71,6 +71,28 @@ def test_linux_restores_user_data_from_backup():
     assert "restore_file \"podcasts\"" in text
 
 
+def test_linux_restores_install_local_runtime_state():
+    """Browser profiles, cookie jars and the driver runtime live in the install.
+
+    get_data_dir() resolves to the install dir on a default Linux layout, so
+    without these the swap silently discarded the user's browser profiles and
+    saved cookies and re-downloaded the whole Chromium runtime.
+    """
+    text = _helper_text()
+    for name in (
+        "feed_browser_profile",
+        "feed_browser_pydoll_profile",
+        "youtube_browser_profile",
+        "feed_browser_runtime",
+        "ytplay_cache",
+        "site_cookies.txt",
+        "site_cookies_ua.txt",
+        "site_cookies_ua_hosts.json",
+        "chromium_v20_keys.json",
+    ):
+        assert name in text
+
+
 # --------------------------------------------------------------------------- #
 # Behavioral tests (real execution on POSIX)
 # --------------------------------------------------------------------------- #
@@ -142,6 +164,9 @@ def test_linux_swap_preserves_user_data(tmp_path):
     (install / "config.json").write_text("USER_CONFIG")
     (install / "rss.db").write_text("USER_DB")
     (install / "old_lib.txt").write_text("OLD")
+    (install / "feed_browser_profile" / "Default").mkdir(parents=True)
+    (install / "feed_browser_profile" / "Default" / "Cookies").write_text("JAR")
+    (install / "site_cookies.txt").write_text("USER_COOKIES")
 
     staging = tmp_path / "staging"
     staging.mkdir()
@@ -161,6 +186,8 @@ def test_linux_swap_preserves_user_data(tmp_path):
     # ...but in-dir user data restored from the backup.
     assert (install / "config.json").read_text() == "USER_CONFIG"
     assert (install / "rss.db").read_text() == "USER_DB"
+    assert (install / "feed_browser_profile" / "Default" / "Cookies").read_text() == "JAR"
+    assert (install / "site_cookies.txt").read_text() == "USER_COOKIES"
 
     # Relaunch fires in the background; give it a moment.
     for _ in range(40):

@@ -107,6 +107,15 @@ restore_user_data_linux() {
   done
   restore_file "podcasts"
   restore_file "sounds"
+  # Runtime state get_data_dir() puts inside the install dir. None of it ships
+  # with the build, so without this every update silently discarded the user's
+  # browser profiles, saved cookies and Chromium key material, and threw away
+  # the downloaded driver/Chrome-for-Testing runtime. See core/browser_feed.py,
+  # core/youtube_browser_session.py, core/play_cache.py, core/site_cookies.py
+  # and core/chromium_cookies.py.
+  for f in feed_browser_profile feed_browser_pydoll_profile            youtube_browser_profile feed_browser_runtime ytplay_cache            site_cookies.txt site_cookies_ua.txt site_cookies_ua_hosts.json            chromium_v20_keys.json; do
+    restore_file "$f"
+  done
 }
 
 if ! wait_for_exit; then

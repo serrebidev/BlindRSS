@@ -31,6 +31,19 @@ if /I "%~1"=="--installer" (
     set "SHOW_LOG=%~6"
 )
 set "BACKUP_DIR="
+set "APPLY_STARTED=0"
+
+rem Runtime state that lives INSIDE the install dir on portable/AppData installs,
+rem where core.config.get_data_dir() resolves to the install dir itself. None of
+rem it belongs to the shipped build, some of it is gigabytes (the Chromium feed
+rem profiles), and a live or orphaned browser holds it locked -- one locked
+rem profile file used to fail the whole backup move and roll the update back. So
+rem it is never moved out and never restored: it stays where it is while the
+rem build swaps around it. See core/browser_feed.py,
+rem core/youtube_browser_session.py, core/play_cache.py, core/site_cookies.py
+rem and core/chromium_cookies.py.
+set "SKIP_DIRS=.git .venv __pycache__ feed_browser_profile feed_browser_pydoll_profile youtube_browser_profile feed_browser_runtime ytplay_cache podcasts"
+set "SKIP_FILES=site_cookies.txt site_cookies_ua.txt site_cookies_ua_hosts.json chromium_v20_keys.json blindrss.log"
 
 call :main >> "%LOG_FILE%" 2>&1
 set "RC=%ERRORLEVEL%"
@@ -134,7 +147,7 @@ rem before treating leftover files as a hard failure.
 set "BACKUP_ATTEMPTS=0"
 :backup_move_attempt
 set /a BACKUP_ATTEMPTS+=1
-robocopy "%INSTALL_DIR%" "%BACKUP_DIR%" /E /MOVE /R:10 /W:3 /NFL /NDL /XD .git .venv __pycache__
+robocopy "%INSTALL_DIR%" "%BACKUP_DIR%" /E /MOVE /R:10 /W:3 /NFL /NDL /XD %SKIP_DIRS% /XF %SKIP_FILES%
 set RC=%ERRORLEVEL%
 if %RC% geq 8 (
     echo [X] Backup failed with robocopy code %RC%.
@@ -152,6 +165,11 @@ goto :backup_move_attempt
 :backup_drained
 
 echo [BlindRSS Update] Applying update...
+rem Past this point the install dir can hold a mix of new and old files, so a
+rem rollback has to purge as well as restore. Before it, the backup may be the
+rem incomplete thing we are rolling back from, and purging against it could
+rem delete an install that was never fully backed up.
+set "APPLY_STARTED=1"
 robocopy "%STAGING_DIR%" "%INSTALL_DIR%" /E /MOVE /R:10 /W:3 /NFL /NDL
 set RC=%ERRORLEVEL%
 if %RC% geq 8 (
@@ -219,7 +237,13 @@ if not "%SHOW_LOG%"=="" if /I not "%SHOW_LOG%"=="0" (
 if not "%BACKUP_DIR%"=="" if exist "%BACKUP_DIR%" (
     rem Copy rather than move during recovery. A lock or duplicate that caused
     rem the original failure must not be allowed to consume the only backup.
-    robocopy "%BACKUP_DIR%" "%INSTALL_DIR%" /E /COPY:DAT /R:10 /W:3 /NFL /NDL
+    rem Once the staged build has started landing, restoring without /PURGE
+    rem leaves new files the old build never had (a new exe beside old _internal
+    rem DLLs). /PURGE is only safe there: past :backup_drained the backup is
+    rem known complete. The same exclusions keep it off preserved user state.
+    set "ROLLBACK_PURGE="
+    if "%APPLY_STARTED%"=="1" set "ROLLBACK_PURGE=/PURGE"
+    robocopy "%BACKUP_DIR%" "%INSTALL_DIR%" /E /COPY:DAT !ROLLBACK_PURGE! /R:10 /W:3 /NFL /NDL /XD %SKIP_DIRS% /XF %SKIP_FILES%
     set "ROLLBACK_RC=!ERRORLEVEL!"
     if !ROLLBACK_RC! geq 8 (
         echo [X] Backup restore failed with robocopy code !ROLLBACK_RC!. Backup kept at "%BACKUP_DIR%".
@@ -237,7 +261,7 @@ exit /b 1
 
 :ensure_app_stopped
 echo [BlindRSS Update] Waiting for process %PID%, app instances, and install-owned helpers to exit...
-powershell -NoProfile -InputFormat None -Command "$ErrorActionPreference='SilentlyContinue'; $exe=[IO.Path]::GetFileNameWithoutExtension([string]$env:EXE_NAME); $install=([IO.Path]::GetFullPath([string]$env:INSTALL_DIR)).TrimEnd('\') + '\'; function In-Install($p) { try { $path=[IO.Path]::GetFullPath([string]$p.Path); return $path.StartsWith($install, [StringComparison]::OrdinalIgnoreCase) } catch { return $false } }; function Get-AppProc { $items=@(); if ($exe) { $items += @(Get-Process -Name $exe -ErrorAction SilentlyContinue) }; $target=0; if ([int]::TryParse([string]$env:PID, [ref]$target)) { $p=Get-Process -Id $target -ErrorAction SilentlyContinue; if ($p) { $items += $p } }; @($items | Sort-Object Id -Unique | Where-Object { In-Install $_ }) }; function Get-InstallProc { @(Get-Process -ErrorAction SilentlyContinue | Where-Object { In-Install $_ }) }; function Wait-AppGone([int]$seconds) { $deadline=(Get-Date).AddSeconds($seconds); while ((Get-Date) -lt $deadline) { if (@(Get-AppProc).Count -eq 0) { return $true }; Start-Sleep -Milliseconds 500 }; return (@(Get-AppProc).Count -eq 0) }; function Wait-InstallGone([int]$seconds) { $deadline=(Get-Date).AddSeconds($seconds); while ((Get-Date) -lt $deadline) { if (@(Get-InstallProc).Count -eq 0) { return $true }; Start-Sleep -Milliseconds 250 }; return (@(Get-InstallProc).Count -eq 0) }; if (-not (Wait-AppGone 20)) { $procs=@(Get-AppProc); if ($procs.Count -gt 0) { Write-Host ('[BlindRSS Update] Asking remaining app instance(s) to close: ' + (($procs | ForEach-Object Id) -join ', ')); foreach ($p in $procs) { try { $null=$p.CloseMainWindow() } catch { } } } }; if (-not (Wait-AppGone 10)) { $procs=@(Get-AppProc); if ($procs.Count -gt 0) { Write-Host ('[BlindRSS Update] Forcing remaining app instance(s) to exit: ' + (($procs | ForEach-Object Id) -join ', ')); foreach ($p in $procs) { try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { } } } }; if (-not (Wait-AppGone 10)) { $procs=@(Get-AppProc); Write-Host ('[X] BlindRSS is still running from the install folder: ' + (($procs | ForEach-Object Id) -join ', ')); exit 1 }; $helpers=@(Get-InstallProc); if ($helpers.Count -gt 0) { Write-Host ('[BlindRSS Update] Stopping install-owned helper process(es): ' + (($helpers | ForEach-Object { $_.ProcessName + ' (' + $_.Id + ')' }) -join ', ')); foreach ($p in $helpers) { try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { } } }; if (-not (Wait-InstallGone 10)) { $procs=@(Get-InstallProc); Write-Host ('[X] Install-owned processes are still running: ' + (($procs | ForEach-Object { $_.ProcessName + ' (' + $_.Id + ')' }) -join ', ')); exit 1 }; Start-Sleep -Milliseconds 1500; exit 0"
+powershell -NoProfile -InputFormat None -Command "$ErrorActionPreference='SilentlyContinue'; $exe=[IO.Path]::GetFileNameWithoutExtension([string]$env:EXE_NAME); $install=([IO.Path]::GetFullPath([string]$env:INSTALL_DIR)).TrimEnd('\') + '\'; function In-Install($p) { try { $path=[IO.Path]::GetFullPath([string]$p.Path); return $path.StartsWith($install, [StringComparison]::OrdinalIgnoreCase) } catch { return $false } }; function Get-AppProc { $items=@(); if ($exe) { $items += @(Get-Process -Name $exe -ErrorAction SilentlyContinue) }; $target=0; if ([int]::TryParse([string]$env:PID, [ref]$target)) { $p=Get-Process -Id $target -ErrorAction SilentlyContinue; if ($p) { $items += $p } }; @($items | Sort-Object Id -Unique | Where-Object { In-Install $_ }) }; function Get-InstallProc { @(Get-Process -ErrorAction SilentlyContinue | Where-Object { In-Install $_ }) }; function Get-ProfileProc { $root=$install.TrimEnd('\'); $out=@(); foreach ($row in @(Get-CimInstance -ClassName Win32_Process -ErrorAction SilentlyContinue)) { $line=[string]$row.CommandLine; if (-not $line) { continue }; if ($line.IndexOf('--user-data-dir', [StringComparison]::OrdinalIgnoreCase) -lt 0) { continue }; if ($line.IndexOf($root, [StringComparison]::OrdinalIgnoreCase) -lt 0) { continue }; $proc=Get-Process -Id ([int]$row.ProcessId) -ErrorAction SilentlyContinue; if ($proc) { $out += $proc } }; @($out | Sort-Object Id -Unique) }; function Wait-ProfileGone([int]$seconds) { $deadline=(Get-Date).AddSeconds($seconds); while ((Get-Date) -lt $deadline) { if (@(Get-ProfileProc).Count -eq 0) { return $true }; Start-Sleep -Milliseconds 250 }; return (@(Get-ProfileProc).Count -eq 0) }; function Wait-AppGone([int]$seconds) { $deadline=(Get-Date).AddSeconds($seconds); while ((Get-Date) -lt $deadline) { if (@(Get-AppProc).Count -eq 0) { return $true }; Start-Sleep -Milliseconds 500 }; return (@(Get-AppProc).Count -eq 0) }; function Wait-InstallGone([int]$seconds) { $deadline=(Get-Date).AddSeconds($seconds); while ((Get-Date) -lt $deadline) { if (@(Get-InstallProc).Count -eq 0) { return $true }; Start-Sleep -Milliseconds 250 }; return (@(Get-InstallProc).Count -eq 0) }; if (-not (Wait-AppGone 20)) { $procs=@(Get-AppProc); if ($procs.Count -gt 0) { Write-Host ('[BlindRSS Update] Asking remaining app instance(s) to close: ' + (($procs | ForEach-Object Id) -join ', ')); foreach ($p in $procs) { try { $null=$p.CloseMainWindow() } catch { } } } }; if (-not (Wait-AppGone 10)) { $procs=@(Get-AppProc); if ($procs.Count -gt 0) { Write-Host ('[BlindRSS Update] Forcing remaining app instance(s) to exit: ' + (($procs | ForEach-Object Id) -join ', ')); foreach ($p in $procs) { try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { } } } }; if (-not (Wait-AppGone 10)) { $procs=@(Get-AppProc); Write-Host ('[X] BlindRSS is still running from the install folder: ' + (($procs | ForEach-Object Id) -join ', ')); exit 1 }; $browsers=@(Get-ProfileProc); if ($browsers.Count -gt 0) { Write-Host ('[BlindRSS Update] Stopping browser process(es) holding an install-owned profile: ' + (($browsers | ForEach-Object { $_.ProcessName + ' (' + $_.Id + ')' }) -join ', ')); foreach ($p in $browsers) { try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { } }; if (-not (Wait-ProfileGone 10)) { Write-Host ('[WARN] Browser process(es) still hold an install-owned profile: ' + ((@(Get-ProfileProc) | ForEach-Object { $_.ProcessName + ' (' + $_.Id + ')' }) -join ', ')) } }; $helpers=@(Get-InstallProc); if ($helpers.Count -gt 0) { Write-Host ('[BlindRSS Update] Stopping install-owned helper process(es): ' + (($helpers | ForEach-Object { $_.ProcessName + ' (' + $_.Id + ')' }) -join ', ')); foreach ($p in $helpers) { try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { } } }; if (-not (Wait-InstallGone 10)) { $procs=@(Get-InstallProc); Write-Host ('[X] Install-owned processes are still running: ' + (($procs | ForEach-Object { $_.ProcessName + ' (' + $_.Id + ')' }) -join ', ')); exit 1 }; Start-Sleep -Milliseconds 1500; exit 0"
 exit /b %ERRORLEVEL%
 
 :verify_install_unlocked
@@ -246,9 +270,8 @@ powershell -NoProfile -InputFormat None -Command "$ErrorActionPreference='Silent
 exit /b %ERRORLEVEL%
 
 :verify_install_drained
-powershell -NoProfile -InputFormat None -Command "$ErrorActionPreference='SilentlyContinue'; $install=([IO.Path]::GetFullPath([string]$env:INSTALL_DIR)).TrimEnd('\') + '\'; $excluded=@('.git','.venv','__pycache__'); $remaining=@(Get-ChildItem -LiteralPath $install -File -Recurse -Force | Where-Object { $rel=$_.FullName.Substring($install.Length).TrimStart('\'); $parts=$rel -split '\\'; -not @($parts | Where-Object { $excluded -contains $_ }) } | Select-Object -First 10); if ($remaining.Count -gt 0) { Write-Host '[X] Files remained in the install folder after backup:'; $remaining | ForEach-Object { Write-Host ('    ' + $_.FullName) }; exit 1 }; exit 0"
+powershell -NoProfile -InputFormat None -Command "$ErrorActionPreference='SilentlyContinue'; $install=([IO.Path]::GetFullPath([string]$env:INSTALL_DIR)).TrimEnd('\') + '\'; $excluded=@(([string]$env:SKIP_DIRS) -split ' +' | Where-Object { $_ }); $excludedFiles=@(([string]$env:SKIP_FILES) -split ' +' | Where-Object { $_ }); $files=@(); foreach ($entry in @(Get-ChildItem -LiteralPath $install -Force | Where-Object { $excluded -notcontains $_.Name })) { if ($entry.PSIsContainer) { $files += @(Get-ChildItem -LiteralPath $entry.FullName -File -Recurse -Force) } else { $files += $entry } }; $remaining=@($files | Where-Object { $rel=$_.FullName.Substring($install.Length).TrimStart('\'); $parts=$rel -split '\\'; (-not @($parts | Where-Object { $excluded -contains $_ })) -and ($excludedFiles -notcontains $_.Name) } | Select-Object -First 10); if ($remaining.Count -gt 0) { Write-Host '[X] Files remained in the install folder after backup:'; $remaining | ForEach-Object { Write-Host ('    ' + $_.FullName) }; exit 1 }; exit 0"
 exit /b %ERRORLEVEL%
-
 :restore_user_data
 setlocal
 set "OLD_DIR=%~1"
