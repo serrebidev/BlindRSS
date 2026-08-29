@@ -189,7 +189,7 @@ def _table_cell_text(cell) -> str:
     return " ".join(cell.get_text(" ", strip=True).split())
 
 
-def format_table_text(table) -> str:
+def format_table_text(table, *, max_rows: int | None = _TABLE_MAX_ROWS) -> str:
     """Linearize a BeautifulSoup ``<table>`` into screen-reader-friendly text.
 
     Plain-text reader panes have no real table semantics, so each data row
@@ -201,9 +201,11 @@ def format_table_text(table) -> str:
         End of table.
 
     Returns "" for layout tables (block content or very long prose inside
-    cells) so callers keep their existing behavior for those. Markers stay
-    English on purpose, like the ``[Image: alt]`` marker: downstream merge
-    heuristics in the extractor recognize them by pattern.
+    cells) so callers keep their existing behavior for those. ``max_rows`` is
+    overridable (or ``None``) for a caller that has positively identified a
+    large data table.
+    Markers stay English on purpose, like the ``[Image: alt]`` marker:
+    downstream merge heuristics in the extractor recognize them by pattern.
     """
     try:
         if table.find(_TABLE_LAYOUT_TAGS) is not None:
@@ -224,7 +226,7 @@ def format_table_text(table) -> str:
                 header_row = texts
                 continue
             grid.append(texts)
-            if len(grid) > _TABLE_MAX_ROWS:
+            if max_rows is not None and len(grid) > max_rows:
                 return ""
         if not grid and not header_row:
             return ""
@@ -255,21 +257,24 @@ def format_table_text(table) -> str:
         return ""
 
 
-def replace_tables_with_text(soup, as_paragraphs: bool = False) -> list[str]:
+def replace_tables_with_text(
+    soup, as_paragraphs: bool = False, *, max_rows: int | None = _TABLE_MAX_ROWS
+) -> list[str]:
     """Replace each data ``<table>`` in ``soup`` with its linearized text.
 
     Innermost tables are processed first so a nested data table inside a
     layout table still gets formatted. Layout tables are left untouched.
     ``as_paragraphs`` emits one ``<p>`` per line (for HTML re-extraction,
     where a raw text node's newlines would be collapsed); otherwise a plain
-    text node is inserted (for direct ``get_text`` conversion). Returns the
-    formatted text blocks (used by the extractor to patch JSON-LD results
-    that dropped tables).
+    text node is inserted (for direct ``get_text`` conversion). ``max_rows``
+    is forwarded to :func:`format_table_text`. Returns the formatted text
+    blocks (used by the extractor to patch JSON-LD results that dropped
+    tables).
     """
     blocks: list[str] = []
     try:
         for tbl in reversed(soup.find_all("table")):
-            text = format_table_text(tbl)
+            text = format_table_text(tbl, max_rows=max_rows)
             if not text:
                 continue
             if text in blocks:

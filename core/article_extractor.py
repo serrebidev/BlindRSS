@@ -859,6 +859,67 @@ def _extract_toptechtidbits_text(html: str, url: str) -> str:
 _GSMARENA_MIN_TEXT_LEN = 300
 
 
+def _is_gsmarena_battery_test_url(url: str) -> bool:
+    """True only for GSMArena's JavaScript-sorted Battery Test v2 table."""
+    if not _host_matches(url, "gsmarena.com"):
+        return False
+    try:
+        return urlsplit(url).path.rstrip("/") == "/battery-test-v2.php3"
+    except Exception:
+        return False
+
+
+def _gsmarena_duration_minutes(text: str) -> Optional[int]:
+    """Parse the ``25:35h`` values used by GSMArena's table sorter."""
+    match = re.search(r"\b(\d+):(\d{2})h\b", str(text or ""), re.I)
+    if not match:
+        return None
+    return int(match.group(1)) * 60 + int(match.group(2))
+
+
+def _sort_gsmarena_battery_table(soup: BeautifulSoup, url: str) -> bool:
+    """Apply the Battery Test page's default browser order to its source HTML.
+
+    The server sends newest phones first. ``battery-table.js`` immediately
+    sorts the final "Your score" column descending after calculating the
+    default mix, but BlindRSS deliberately does not execute publisher scripts.
+    Reproduce that one safe DOM operation so both readers match the visible
+    browser table. Returns True only when the expected table was found.
+    """
+    if not _is_gsmarena_battery_test_url(url):
+        return False
+    table = soup.select_one("table#battery-table")
+    tbody = table.find("tbody", recursive=False) if table is not None else None
+    if tbody is None:
+        return False
+    rows = tbody.find_all("tr", recursive=False)
+    scored_rows = []
+    for position, row in enumerate(rows):
+        cells = row.find_all(["th", "td"], recursive=False)
+        score = _gsmarena_duration_minutes(cells[-1].get_text(" ", strip=True)) if cells else None
+        scored_rows.append((score, position, row))
+    if not any(score is not None for score, _position, _row in scored_rows):
+        return False
+    # Python's sort is stable, matching modern JavaScript Array.sort for ties.
+    scored_rows.sort(
+        key=lambda item: (item[0] is not None, item[0] if item[0] is not None else -1),
+        reverse=True,
+    )
+    for _score, _position, row in scored_rows:
+        tbody.append(row)
+    return True
+
+
+def _normalize_gsmarena_battery_table_html(html: str, url: str) -> str:
+    """Return page HTML with GSMArena's default client-side order applied."""
+    if not html or not _is_gsmarena_battery_test_url(url):
+        return html
+    soup = _parse_html_soup(html, context="gsmarena battery table")
+    if soup is None or not _sort_gsmarena_battery_table(soup, url):
+        return html
+    return str(soup)
+
+
 def _extract_gsmarena_text(html: str) -> str:
     """Extract GSMArena article/review bodies with their headings intact.
 
@@ -4253,8 +4314,16 @@ def _linearize_tables_html(html: str, url: str = "") -> Tuple[str, List[str]]:
         return html, []
     blocks: List[str] = []
     try:
+        gsmarena_battery_table = _sort_gsmarena_battery_table(soup, url)
         if want_tables:
-            blocks = utils.replace_tables_with_text(soup, as_paragraphs=True)
+            if gsmarena_battery_table:
+                blocks = utils.replace_tables_with_text(
+                    soup,
+                    as_paragraphs=True,
+                    max_rows=None,
+                )
+            else:
+                blocks = utils.replace_tables_with_text(soup, as_paragraphs=True)
         utils.linearize_structure(
             soup, headings=want_headings, lists=want_lists, quotes=want_quotes, links=want_links
         )

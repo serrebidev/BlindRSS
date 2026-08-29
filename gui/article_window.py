@@ -10,8 +10,8 @@ mean either inventing a fake article row or throwing away whatever the user
 was reading. A window of its own also lets several pages stay open at once.
 
 It carries both readers the app has -- the plain full-text control and the
-rich HTML WebView -- and can switch between them without fetching the page
-again, because the dialog's checkbox is a starting choice, not a commitment.
+rich HTML WebView -- and can switch between them without closing and reopening
+the window. Each rendered mode is cached after its first load.
 """
 
 from __future__ import annotations
@@ -49,8 +49,8 @@ class ArticleWindow(wx.Frame):
         self._translate = translate
         self._rich_view = None
         self._rich_view_unavailable = False
-        # Rendered content per reader, so switching views is instant and does
-        # not fetch the page a second time.
+        # Rendered content per reader, so switching back to a reader that has
+        # already loaded is instant.
         self._loaded = {}
         self._title = ""
         # Bumped on every load so a slow fetch the user has already switched
@@ -59,6 +59,11 @@ class ArticleWindow(wx.Frame):
 
         self._panel = wx.Panel(self)
         self._sizer = wx.BoxSizer(wx.VERTICAL)
+        self.rich_ctrl = wx.CheckBox(self._panel, label=_("Show in &HTML view"))
+        self.rich_ctrl.SetName(_("HTML view"))
+        self.rich_ctrl.SetValue(bool(self._want_rich))
+        self.rich_ctrl.Bind(wx.EVT_CHECKBOX, self.on_rich_checkbox)
+        self._sizer.Add(self.rich_ctrl, 0, wx.ALL, 8)
         self.content_ctrl = wx.TextCtrl(
             self._panel, style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2
         )
@@ -139,6 +144,12 @@ class ArticleWindow(wx.Frame):
         if item is not None:
             try:
                 item.Check(use_rich)
+            except Exception:
+                pass
+        ctrl = getattr(self, "rich_ctrl", None)
+        if ctrl is not None:
+            try:
+                ctrl.SetValue(use_rich)
             except Exception:
                 pass
         if self._want_rich and not use_rich:
@@ -305,6 +316,12 @@ class ArticleWindow(wx.Frame):
     def on_toggle_rich_view(self, _event=None) -> None:
         """View > HTML View: swap readers, reusing whatever is already loaded."""
         self._want_rich = not self._want_rich
+        self._apply_reader_mode()
+        self.start_load()
+
+    def on_rich_checkbox(self, _event=None) -> None:
+        """Result-window checkbox: switch readers without closing the page."""
+        self._want_rich = bool(self.rich_ctrl.GetValue())
         self._apply_reader_mode()
         self.start_load()
 

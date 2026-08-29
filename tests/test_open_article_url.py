@@ -317,6 +317,8 @@ def test_the_article_window_shows_what_the_loader_returned(parent, canned):
         # reader reads when the window takes focus.
         assert window.GetTitle() == "A Story"
         assert window.GetStatusBar().GetStatusText() == "Article loaded."
+        assert window.rich_ctrl.GetName() == "HTML view"
+        assert window.rich_ctrl.GetValue() is False
     finally:
         window.Destroy()
 
@@ -377,6 +379,32 @@ def test_switching_back_to_a_loaded_reader_does_not_fetch_again(parent, canned):
         assert canned["calls"] == 1
     finally:
         window.Destroy()
+
+
+def test_result_window_checkbox_switches_reader_mode():
+    class _Checkbox:
+        @staticmethod
+        def GetValue():
+            return True
+
+    class _Window:
+        _want_rich = False
+        rich_ctrl = _Checkbox()
+        calls = []
+
+        def _apply_reader_mode(self):
+            self.calls.append("apply")
+
+        def start_load(self):
+            self.calls.append("load")
+
+    window = _Window()
+    from gui.article_window import ArticleWindow
+
+    ArticleWindow.on_rich_checkbox(window)
+
+    assert window._want_rich is True
+    assert window.calls == ["apply", "load"]
 
 
 def test_reload_fetches_the_page_again(parent, canned):

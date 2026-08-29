@@ -1059,6 +1059,9 @@ def render_full_article_html(
                     page_lang = article_lang.lang_from_page_html(page_html)
                     metered_preview = ae._looks_like_metered_preview(page_html)
                 expanded_html = ae._expand_sky_flourish_tables(page_html, current, timeout)
+                expanded_html = ae._normalize_gsmarena_battery_table_html(
+                    expanded_html, current
+                )
                 page_body = clean_article_html(expanded_html, current)
                 if page_body:
                     # De-dupe whole pages by normalized text: some sites' "next"
