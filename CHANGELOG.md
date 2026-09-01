@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.135.3 - 2026-09-01
+
+- Stop read articles reappearing as new after refresh.
+
 ## v1.135.2 - 2026-08-29
 
 - Preserve GSMArena battery table in Open Article.
