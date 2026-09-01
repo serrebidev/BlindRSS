@@ -434,3 +434,17 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 9. Release publication: a release MUST end up published and Latest or the updater never sees it. Do not remove the `build.bat release` guards (`--draft=false --latest`, no-drafts check, `/releases/latest` verify) or auto-delete releases. See **Build & Release** > Updater visibility.
 10. Tests: add/extend tests in `tests/` for behavior changes and regressions.
 11. Secrets: never print, log, commit, or include API keys/cookies/Authorization headers in tests or diagnostics.
+
+<!-- claude-memory:begin (managed by sync-claude-memory.py; canonical files live in C:\Users\admin\.claude - edit there, not here) -->
+## Memories (shared from ~/.claude - project: BlindRSS)
+Only the memories scoped to this project. The full bank lives in
+C:\Users\admin\.claude\projects\c--\memory and is indexed in the home AGENTS.md;
+a memory joins this list by naming the project in its `projects:`
+frontmatter. Re-run sync-claude-memory.py after writing one:
+- [portable-folder-is-synced](C:\Users\admin\.claude\projects\c--\memory\portable-folder-is-synced.md) - C:\Users\admin\Portable is a Seafile-synced library, so anything installed there has its folders held open by seaf-daemon
+- [release-must-run-detached](C:\Users\admin\.claude\projects\c--\memory\release-must-run-detached.md) - A BlindRSS release outlives an agent background task (killed ~10 min in, mid-installer); launch build.bat release with Start-Process so it is not a child of the shell
+- [rich-view-external-links](C:\Users\admin\.claude\projects\c--\memory\rich-view-external-links.md) - Issue #102 — wx 3.3 fires EVT_WEBVIEW_NAVIGATING per iframe, so the webview library's open_links_externally sent embeds to the browser; BlindRSS binds its own main-frame-only handler
+@C:\Users\admin\.claude\projects\c--\memory\portable-folder-is-synced.md
+@C:\Users\admin\.claude\projects\c--\memory\release-must-run-detached.md
+@C:\Users\admin\.claude\projects\c--\memory\rich-view-external-links.md
+<!-- claude-memory:end -->
