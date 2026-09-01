@@ -99,8 +99,8 @@ msgstr "Только брайль"
 msgid "Speech and Braille"
 msgstr "Речь и брайль"
 
-#: core/article_columns.py:68 gui/dialogs.py:5125 gui/dialogs.py:6082
-#: gui/dialogs.py:6106
+#: core/article_columns.py:68 gui/dialogs.py:5078 gui/dialogs.py:5511
+#: gui/dialogs.py:6468
 msgid "Title"
 msgstr "Заголовок"
 
@@ -108,11 +108,12 @@ msgstr "Заголовок"
 msgid "Author"
 msgstr "Автор"
 
-#: core/article_columns.py:70 core/shortcuts.py:144 gui/mainframe.py:1869
+#: core/article_columns.py:70 core/shortcuts.py:145 gui/dialogs.py:5080
+#: gui/mainframe.py:1869
 msgid "Media"
 msgstr "Мультимедиа"
 
-#: core/article_columns.py:71
+#: core/article_columns.py:71 gui/dialogs.py:5079
 msgid "Date"
 msgstr "Дата"
 
@@ -168,7 +169,7 @@ msgstr ""
 "статьи — для остального требуется подписка. Откройте исходную ссылку в вашем "
 "браузере, чтобы это прочитать."
 
-#: core/article_extractor.py:2891
+#: core/article_extractor.py:2927
 msgid ""
 "Google News could not resolve the original publisher link. Open the original "
 "link in your browser to read it."
@@ -176,28 +177,28 @@ msgstr ""
 "Google News не смог найти исходную ссылку на издателя. Откройте исходную "
 "ссылку в вашем браузере, чтобы прочитать её."
 
-#: core/article_extractor.py:4713 core/open_article.py:89 gui/dialogs.py:4864
+#: core/article_extractor.py:4749 core/open_article.py:89 gui/dialogs.py:4864
 msgid "(unknown)"
 msgstr "(неизвестно)"
 
-#: core/article_extractor.py:4785
+#: core/article_extractor.py:4821
 msgid "Could not extract full text from the webpage or from feed content."
 msgstr ""
 "Не удалось извлечь полный текст с веб-страницы или из содержимого канала."
 
-#: core/article_extractor.py:4541
+#: core/article_extractor.py:4577
 msgid ""
 "trafilatura is not installed or failed to import. Reinstall requirements."
 msgstr ""
 "trafilatura не установлена или её не удалось импортировать. Переустановите "
 "требуемые компоненты."
 
-#: core/article_extractor.py:4635
+#: core/article_extractor.py:4671
 msgid "Download failed (site blocked, offline, or connection problem)."
 msgstr ""
 "Ошибка загрузки (сайт заблокирован, отключён или проблема с подключением)."
 
-#: core/article_extractor.py:4659
+#: core/article_extractor.py:4695
 msgid "Downloaded page, but could not extract readable text (empty result)."
 msgstr ""
 "Страница загружена, но не удалось извлечь удобочитаемый текст (пустой "
@@ -216,20 +217,20 @@ msgstr ""
 "Откройте страницу в {browser}, и BlindRSS автоматически восстановит доступ в "
 "течение минуты."
 
-#: core/article_extractor.py:4714 core/open_article.py:85 gui/dialogs.py:4233
+#: core/article_extractor.py:4750 core/open_article.py:85 gui/dialogs.py:4233
 msgid "Title:"
 msgstr "Заголовок:"
 
-#: core/article_extractor.py:4715 gui/accessibility.py:1508
-#: gui/mainframe.py:6188 gui/mainframe.py:10098
+#: core/article_extractor.py:4751 gui/accessibility.py:1509
+#: gui/mainframe.py:6195 gui/mainframe.py:10105
 msgid "Author:"
 msgstr "Автор:"
 
-#: core/article_extractor.py:4527 core/article_extractor.py:4538
+#: core/article_extractor.py:4563 core/article_extractor.py:4574
 msgid "Could not retrieve YouTube video details."
 msgstr "Не удалось получить подробную информацию о видео с YouTube."
 
-#: core/article_extractor.py:4776
+#: core/article_extractor.py:4812
 msgid "Unknown extraction error"
 msgstr "Неизвестная ошибка извлечения"
 
@@ -237,20 +238,20 @@ msgstr "Неизвестная ошибка извлечения"
 msgid "Uncategorized"
 msgstr "Без категории"
 
-#: core/config.py:795
+#: core/config.py:801
 msgid "Installed Windows builds store data in the User Data Folder."
 msgstr ""
 "Установленные сборки Windows хранят данные в папке пользовательских данных."
 
-#: core/config.py:797
+#: core/config.py:803
 msgid "No change."
 msgstr "Без изменений."
 
-#: core/config.py:823
+#: core/config.py:829
 msgid "Config moved to {path}."
 msgstr "Конфигурация перемещена в {path}."
 
-#: core/config.py:810
+#: core/config.py:816
 msgid "Could not write config at new location: {error}"
 msgstr "Не удалось записать конфигурацию в новое местоположение: {error}"
 
@@ -369,7 +370,7 @@ msgstr ""
 "сайта в \"Сервис\" > \"Импортировать cookie-файлы сайта\", если это "
 "ограничено проверкой."
 
-#: core/open_article.py:167 gui/mainframe.py:14607
+#: core/open_article.py:167 gui/mainframe.py:14620
 msgid ""
 "That does not look like a web address. Enter a full address, for example "
 "https://example.com/story."
@@ -437,302 +438,302 @@ msgstr "5 лет"
 msgid "Unlimited"
 msgstr "Неограничено"
 
-#: core/shortcuts.py:142
+#: core/shortcuts.py:143
 msgid "Feeds"
 msgstr "Каналы"
 
-#: core/shortcuts.py:143 gui/accessibility.py:518 gui/mainframe.py:695
+#: core/shortcuts.py:144 gui/accessibility.py:518 gui/mainframe.py:695
 msgid "Articles"
 msgstr "Статьи"
 
-#: core/shortcuts.py:145
+#: core/shortcuts.py:146
 msgid "View"
 msgstr "Вид"
 
-#: core/shortcuts.py:146
+#: core/shortcuts.py:147
 msgid "Article Filter"
 msgstr "Фильтр статей"
 
-#: core/shortcuts.py:147
+#: core/shortcuts.py:148
 msgid "Sorting"
 msgstr "Сортировка"
 
-#: core/shortcuts.py:148
+#: core/shortcuts.py:149
 msgid "Player"
 msgstr "Проигрыватель"
 
-#: core/shortcuts.py:149 gui/dialogs.py:7667
+#: core/shortcuts.py:150 gui/dialogs.py:8053
 msgid "Play Queue"
 msgstr "Очередь воспроизведения"
 
-#: core/shortcuts.py:150 gui/player.py:2126
+#: core/shortcuts.py:151 gui/player.py:2126
 msgid "Playback Speed"
 msgstr "Скорость воспроизведения"
 
-#: core/shortcuts.py:151
+#: core/shortcuts.py:152
 msgid "Tools"
 msgstr "Сервис"
 
-#: core/shortcuts.py:153 gui/dialogs.py:211 gui/mainframe.py:14525
+#: core/shortcuts.py:154 gui/dialogs.py:211 gui/mainframe.py:14538
 msgid "Add Feed"
 msgstr "Добавить канал"
 
-#: core/shortcuts.py:154 gui/mainframe.py:13126 gui/mainframe.py:13180
-#: gui/mainframe.py:13165
+#: core/shortcuts.py:155 gui/mainframe.py:13139 gui/mainframe.py:13193
+#: gui/mainframe.py:13178
 msgid "Detect Feeds on Page"
 msgstr "Обнаружение каналов на странице"
 
-#: core/shortcuts.py:155 gui/mainframe.py:4873
+#: core/shortcuts.py:156 gui/mainframe.py:4879
 msgid "Remove Feed"
 msgstr "Удалить канал"
 
-#: core/shortcuts.py:156 gui/accessibility.py:450 gui/accessibility.py:449
-#: gui/mainframe.py:3251
+#: core/shortcuts.py:157 gui/accessibility.py:450 gui/accessibility.py:449
+#: gui/mainframe.py:3257
 msgid "Refresh Feeds"
 msgstr "Обновить каналы"
 
-#: core/shortcuts.py:157 gui/mainframe.py:3258
+#: core/shortcuts.py:158 gui/mainframe.py:3264
 msgid "Stop Refresh"
 msgstr "Остановить обновление"
 
-#: core/shortcuts.py:158 gui/mainframe.py:4822
+#: core/shortcuts.py:159 gui/mainframe.py:4828
 msgid "Refresh Feed"
 msgstr "Обновить канал"
 
-#: core/shortcuts.py:159
+#: core/shortcuts.py:160
 msgid "Edit Feed or Category"
 msgstr "Редактировать канал или категорию"
 
-#: core/shortcuts.py:160 gui/mainframe.py:4789 gui/mainframe.py:4830
+#: core/shortcuts.py:161 gui/mainframe.py:4795 gui/mainframe.py:4836
 msgid "Mark All Items as Read"
 msgstr "По&метить все элементы как прочитанные"
 
-#: core/shortcuts.py:161
+#: core/shortcuts.py:162
 msgid "View Feed Errors"
 msgstr "Просмотреть каналы с ошибками"
 
-#: core/shortcuts.py:162 gui/mainframe.py:4848
+#: core/shortcuts.py:163 gui/mainframe.py:4854
 msgid "Copy Feed URL"
 msgstr "Скопировать URL-адрес канала"
 
-#: core/shortcuts.py:163 gui/mainframe.py:7602
+#: core/shortcuts.py:164 gui/mainframe.py:7609
 msgid "Add Category"
 msgstr "Добавить категорию"
 
-#: core/shortcuts.py:164 gui/mainframe.py:4807
+#: core/shortcuts.py:165 gui/mainframe.py:4813
 msgid "Remove Category"
 msgstr "Удалить категорию"
 
-#: core/shortcuts.py:165 gui/mainframe.py:13596
+#: core/shortcuts.py:166 gui/mainframe.py:13609
 msgid "Import OPML"
 msgstr "Импорт OPML"
 
-#: core/shortcuts.py:166 gui/dialogs.py:536 gui/mainframe.py:13607
-#: gui/mainframe.py:13686
+#: core/shortcuts.py:167 gui/dialogs.py:536 gui/mainframe.py:13620
+#: gui/mainframe.py:13699
 msgid "Import YouTube Takeout"
 msgstr "Импорт архива YouTube"
 
-#: core/shortcuts.py:167 gui/mainframe.py:13954
+#: core/shortcuts.py:168 gui/mainframe.py:13967
 msgid "Export OPML"
 msgstr "Экспорт OPML"
 
-#: core/shortcuts.py:168 gui/dialogs.py:5087
+#: core/shortcuts.py:169 gui/dialogs.py:5473
 msgid "Find a Podcast or RSS Feed"
 msgstr "Найти подкаст или RSS-канал"
 
-#: core/shortcuts.py:169 gui/dialogs.py:4005 gui/dialogs.py:6003
+#: core/shortcuts.py:170 gui/dialogs.py:4005 gui/dialogs.py:6389
 msgid "Video Search"
 msgstr "Поиск видео"
 
-#: core/shortcuts.py:170 gui/dialogs.py:318 gui/mainframe.py:14664
-#: gui/mainframe.py:14688
+#: core/shortcuts.py:171 gui/dialogs.py:318 gui/mainframe.py:14677
+#: gui/mainframe.py:14701
 msgid "Open Media URL"
 msgstr "Открыть URL-адрес мультимедиа"
 
-#: core/shortcuts.py:171
+#: core/shortcuts.py:172
 msgid "Open in Browser"
 msgstr "Открыть в браузере"
 
-#: core/shortcuts.py:172 gui/mainframe.py:5133
+#: core/shortcuts.py:173 gui/mainframe.py:5139
 msgid "Copy Link"
 msgstr "Копировать ссылку"
 
-#: core/shortcuts.py:173 gui/mainframe.py:5154
+#: core/shortcuts.py:174 gui/mainframe.py:5160
 msgid "Copy Media Link"
 msgstr "Скопировать ссылку на мультимедиа"
 
-#: core/shortcuts.py:174 gui/mainframe.py:5140
+#: core/shortcuts.py:175 gui/mainframe.py:5146
 msgid "Copy Text"
 msgstr "Копировать текст"
 
-#: core/shortcuts.py:175
+#: core/shortcuts.py:176
 msgid "Toggle Read/Unread"
 msgstr "Переключить прочитано/не прочитано"
 
-#: core/shortcuts.py:176
+#: core/shortcuts.py:177
 msgid "Add to or Remove from Favorites"
 msgstr "Добавить в избранное или удалить из него"
 
-#: core/shortcuts.py:177 gui/accessibility.py:775
+#: core/shortcuts.py:178 gui/accessibility.py:776
 msgid "Delete Article"
 msgstr "Удалить статью"
 
-#: core/shortcuts.py:178 gui/accessibility.py:470 gui/mainframe.py:12565
-#: gui/mainframe.py:12584
+#: core/shortcuts.py:179 gui/accessibility.py:470 gui/mainframe.py:12572
+#: gui/mainframe.py:12591
 msgid "Download"
 msgstr "Загрузить"
 
-#: core/shortcuts.py:179 gui/mainframe.py:12606 gui/mainframe.py:12592
+#: core/shortcuts.py:180 gui/mainframe.py:12613 gui/mainframe.py:12599
 msgid "Download As"
 msgstr "Загрузить как"
 
-#: core/shortcuts.py:180
+#: core/shortcuts.py:181
 msgid "Add to or Remove from Play Queue"
 msgstr "Добавить в очередь воспроизведения или удалить из неё"
 
-#: core/shortcuts.py:181
+#: core/shortcuts.py:182
 msgid "View Feed Description"
 msgstr "Просмотреть описание канала"
 
-#: core/shortcuts.py:182
+#: core/shortcuts.py:183
 msgid "Focus Search Field"
 msgstr "Сфокусировать поле поиска"
 
-#: core/shortcuts.py:183
+#: core/shortcuts.py:184
 msgid "Show or Hide Search Field"
 msgstr "Показать или скрыть поле поиска"
 
-#: core/shortcuts.py:184 gui/accessibility.py:475
+#: core/shortcuts.py:185 gui/accessibility.py:475
 msgid "Rich Full-Text View"
 msgstr "Расширенный полнотекстовый просмотр"
 
-#: core/shortcuts.py:185
+#: core/shortcuts.py:186
 msgid "Open Accessible Browser"
 msgstr "Открыть доступный браузер"
 
-#: core/shortcuts.py:186 gui/accessibility.py:258 gui/mainframe.py:8789
+#: core/shortcuts.py:187 gui/accessibility.py:258 gui/mainframe.py:8796
 msgid "All Articles"
 msgstr "Все статьи"
 
-#: core/shortcuts.py:187
+#: core/shortcuts.py:188
 msgid "Unread Only"
 msgstr "Только непрочитанные"
 
-#: core/shortcuts.py:188
+#: core/shortcuts.py:189
 msgid "Read Only"
 msgstr "Только прочитанные"
 
-#: core/shortcuts.py:189
+#: core/shortcuts.py:190
 msgid "Media and Non-media"
 msgstr "С мультимедиа и без мультимедиа"
 
-#: core/shortcuts.py:190
+#: core/shortcuts.py:191
 msgid "With Media Only"
 msgstr "Только с мультимедиа"
 
-#: core/shortcuts.py:191
+#: core/shortcuts.py:192
 msgid "Without Media Only"
 msgstr "Только без мультимедиа"
 
-#: core/shortcuts.py:192
+#: core/shortcuts.py:193
 msgid "Sort by Date"
 msgstr "Сортировать по дате"
 
-#: core/shortcuts.py:193
+#: core/shortcuts.py:194
 msgid "Sort by Name"
 msgstr "Сортировать по названию"
 
-#: core/shortcuts.py:194
+#: core/shortcuts.py:195
 msgid "Sort by Author"
 msgstr "Сортировать по автору"
 
-#: core/shortcuts.py:195
+#: core/shortcuts.py:196
 msgid "Sort by Description"
 msgstr "Сортировать по описанию"
 
-#: core/shortcuts.py:196
+#: core/shortcuts.py:197
 msgid "Sort by Feed"
 msgstr "Сортировать по каналу"
 
-#: core/shortcuts.py:197
+#: core/shortcuts.py:198
 msgid "Sort by Status"
 msgstr "Сортировать по статусу"
 
-#: core/shortcuts.py:198
+#: core/shortcuts.py:199
 msgid "Toggle Ascending Sort"
 msgstr "Переключить сортировку по возрастанию"
 
-#: core/shortcuts.py:199 gui/mainframe.py:2422 gui/tray.py:109
+#: core/shortcuts.py:200 gui/mainframe.py:2422 gui/tray.py:109
 msgid "Play/Pause"
 msgstr "Воспроизведение/пауза"
 
-#: core/shortcuts.py:200 gui/mainframe.py:2425 gui/player.py:2113
+#: core/shortcuts.py:201 gui/mainframe.py:2425 gui/player.py:2113
 #: gui/tray.py:110
 msgid "Stop"
 msgstr "Стоп"
 
-#: core/shortcuts.py:201 gui/mainframe.py:2417 gui/tray.py:102
+#: core/shortcuts.py:202 gui/mainframe.py:2417 gui/tray.py:102
 msgid "Show/Hide Player"
 msgstr "Показать/скрыть проигрыватель"
 
-#: core/shortcuts.py:202
+#: core/shortcuts.py:203
 msgid "Open Equalizer"
 msgstr "Открыть эквалайзер"
 
-#: core/shortcuts.py:203
+#: core/shortcuts.py:204
 msgid "Show Chapters"
 msgstr "Показать тайм-коды"
 
-#: core/shortcuts.py:204
+#: core/shortcuts.py:205
 msgid "Open Play Queue"
 msgstr "Открыть очередь воспроизведения"
 
-#: core/shortcuts.py:205 gui/mainframe.py:2433
+#: core/shortcuts.py:206 gui/mainframe.py:2433
 msgid "Play Next in Queue"
 msgstr "Воспроизвести следующее в очереди"
 
-#: core/shortcuts.py:206 gui/mainframe.py:2437
+#: core/shortcuts.py:207 gui/mainframe.py:2437
 msgid "Play Previous in Queue"
 msgstr "Воспроизвести предыдущее в очереди"
 
-#: core/shortcuts.py:207
+#: core/shortcuts.py:208
 msgid "Increase Playback Speed"
 msgstr "Увеличить скорость воспроизведения"
 
-#: core/shortcuts.py:208
+#: core/shortcuts.py:209
 msgid "Decrease Playback Speed"
 msgstr "Уменьшить скорость воспроизведения"
 
-#: core/shortcuts.py:209
+#: core/shortcuts.py:210
 msgid "Reset Playback Speed (1x)"
 msgstr "Сбросить скорость воспроизведения (1x)"
 
-#: core/shortcuts.py:210 gui/mainframe.py:15137
+#: core/shortcuts.py:211 gui/mainframe.py:15173
 msgid "Filter Rules"
 msgstr "Правила фильтрации"
 
-#: core/shortcuts.py:211 gui/dialogs.py:888 gui/dialogs.py:723
+#: core/shortcuts.py:212 gui/dialogs.py:888 gui/dialogs.py:723
 #: gui/dialogs.py:841
 msgid "Import Site Cookies"
 msgstr "Импортировать cookie-файлы сайта"
 
-#: core/shortcuts.py:212 gui/dialogs.py:7540
+#: core/shortcuts.py:213 gui/dialogs.py:7926
 msgid "Configure Persistent Search"
 msgstr "Настройка постоянного поиска"
 
-#: core/shortcuts.py:213 gui/dialogs.py:7971
+#: core/shortcuts.py:214 gui/dialogs.py:8357
 msgid "Keyboard Shortcuts"
 msgstr "Сочетания клавиш"
 
-#: core/shortcuts.py:214 gui/dialogs.py:914 gui/mainframe.py:14172
+#: core/shortcuts.py:215 gui/dialogs.py:914 gui/mainframe.py:14185
 msgid "Settings"
 msgstr "Настройки"
 
-#: core/shortcuts.py:215 gui/dialogs.py:1949
+#: core/shortcuts.py:216 gui/dialogs.py:1949
 msgid "Check for Updates"
 msgstr "Проверить наличие обновлений"
 
-#: core/shortcuts.py:216
+#: core/shortcuts.py:217
 msgid "Announce Version"
 msgstr "Объявить версию"
 
@@ -1101,7 +1102,7 @@ msgstr "развёрнуто"
 msgid "collapsed"
 msgstr "свёрнуто"
 
-#: gui/accessibility.py:60 gui/mainframe.py:3622 gui/mainframe.py:11537
+#: gui/accessibility.py:60 gui/mainframe.py:3628 gui/mainframe.py:11544
 msgid "Untitled chapter"
 msgstr "Тайм-код без названия"
 
@@ -1153,7 +1154,7 @@ msgstr "Доступные представления"
 msgid "Accessible Articles"
 msgstr "Доступные статьи"
 
-#: gui/accessibility.py:539 gui/accessibility.py:1544
+#: gui/accessibility.py:539 gui/accessibility.py:1545
 msgid "Accessible Article Content"
 msgstr "Доступное содержимое статьи"
 
@@ -1201,7 +1202,7 @@ msgstr "О&становить обновление"
 msgid "Mark All in Current View as R&ead"
 msgstr "По&метить всё в текущем представлении как прочитанное"
 
-#: gui/accessibility.py:630 gui/mainframe.py:2516
+#: gui/accessibility.py:630 gui/mainframe.py:2520
 msgid "&Settings..."
 msgstr "&Настройки..."
 
@@ -1209,27 +1210,27 @@ msgstr "&Настройки..."
 msgid "Close &Window\tCtrl+W"
 msgstr "&Закрыть окно\tCtrl+W"
 
-#: gui/accessibility.py:632 gui/article_window.py:279 gui/mainframe.py:2531
+#: gui/accessibility.py:632 gui/article_window.py:279 gui/mainframe.py:2535
 msgid "&File"
 msgstr "&Файл"
 
-#: gui/accessibility.py:635 gui/accessibility.py:868
+#: gui/accessibility.py:635 gui/accessibility.py:869
 msgid "&Open or Play"
 msgstr "&Открыть или воспроизвести"
 
-#: gui/accessibility.py:636 gui/accessibility.py:869 gui/article_window.py:268
+#: gui/accessibility.py:636 gui/accessibility.py:870 gui/article_window.py:268
 msgid "Open in &Browser"
 msgstr "Открыть в &браузере"
 
-#: gui/accessibility.py:638 gui/accessibility.py:871 gui/article_window.py:287
+#: gui/accessibility.py:638 gui/accessibility.py:872 gui/article_window.py:287
 msgid "Copy &Link"
 msgstr "Копировать &ссылку"
 
-#: gui/accessibility.py:639 gui/accessibility.py:872
+#: gui/accessibility.py:639 gui/accessibility.py:873
 msgid "Copy &Text"
 msgstr "Копировать &текст"
 
-#: gui/accessibility.py:640 gui/accessibility.py:873
+#: gui/accessibility.py:640 gui/accessibility.py:874
 msgid "Copy &Media Link"
 msgstr "Скопировать ссылку на &мультимедиа"
 
@@ -1237,23 +1238,23 @@ msgstr "Скопировать ссылку на &мультимедиа"
 msgid "Toggle &Favorite\tCtrl+D"
 msgstr "Переключатель избранного\tCtrl+D"
 
-#: gui/accessibility.py:643 gui/accessibility.py:877
+#: gui/accessibility.py:643 gui/accessibility.py:878
 msgid "Mark &Read"
 msgstr "Отметить &прочитанным"
 
-#: gui/accessibility.py:644 gui/accessibility.py:878
+#: gui/accessibility.py:644 gui/accessibility.py:879
 msgid "Mark &Unread"
 msgstr "Отметить &непрочитанным"
 
-#: gui/accessibility.py:645 gui/mainframe.py:15157
+#: gui/accessibility.py:645 gui/mainframe.py:15193
 msgid "De&lete"
 msgstr "&Удалить"
 
-#: gui/accessibility.py:647 gui/accessibility.py:884
+#: gui/accessibility.py:647 gui/accessibility.py:885
 msgid "&Download"
 msgstr "&Загрузить"
 
-#: gui/accessibility.py:648 gui/accessibility.py:885
+#: gui/accessibility.py:648 gui/accessibility.py:886
 msgid "Detect &Audio"
 msgstr "Обнаружить &аудио"
 
@@ -1261,11 +1262,11 @@ msgstr "Обнаружить &аудио"
 msgid "&Find in Article...\tCtrl+F"
 msgstr "&Найти в статье...\tCtrl+F"
 
-#: gui/accessibility.py:650 gui/accessibility.py:887
+#: gui/accessibility.py:650 gui/accessibility.py:888
 msgid "View &History..."
 msgstr "Просмотреть исто&рию..."
 
-#: gui/accessibility.py:651 gui/accessibility.py:888
+#: gui/accessibility.py:651 gui/accessibility.py:889
 msgid "View Feed De&scription..."
 msgstr "Просмотреть описание &канала..."
 
@@ -1293,7 +1294,7 @@ msgstr "Воспроизвести &предыдущее в очереди"
 msgid "&Equalizer..."
 msgstr "&Эквалайзер..."
 
-#: gui/accessibility.py:660 gui/mainframe.py:2534
+#: gui/accessibility.py:660 gui/mainframe.py:2538
 msgid "&Player"
 msgstr "Про&игрыватель"
 
@@ -1310,95 +1311,99 @@ msgid "Find a Podcast or &RSS..."
 msgstr "&Найти подкаст или RSS-канал..."
 
 #: gui/accessibility.py:666 gui/mainframe.py:2498
+msgid "Podcast &Archive..."
+msgstr "&Архив подкастов..."
+
+#: gui/accessibility.py:667 gui/mainframe.py:2502
 msgid "&Video Search..."
 msgstr "Поиск &видео..."
 
-#: gui/accessibility.py:667 gui/mainframe.py:2507
+#: gui/accessibility.py:668 gui/mainframe.py:2511
 msgid "Import Site &Cookies..."
 msgstr "&Импортировать cookie-файлы сайта..."
 
-#: gui/accessibility.py:668 gui/mainframe.py:2535
+#: gui/accessibility.py:669 gui/mainframe.py:2539
 msgid "&Tools"
 msgstr "Се&рвис"
 
-#: gui/accessibility.py:671 gui/mainframe.py:2512
+#: gui/accessibility.py:672 gui/mainframe.py:2516
 msgid "&Keyboard Shortcuts..."
 msgstr "Сочетания &клавиш..."
 
-#: gui/accessibility.py:672 gui/mainframe.py:2287
+#: gui/accessibility.py:673 gui/mainframe.py:2287
 msgid "View Feed &Errors..."
 msgstr "Просмотреть каналы с о&шибками..."
 
-#: gui/accessibility.py:673 gui/mainframe.py:2522
+#: gui/accessibility.py:674 gui/mainframe.py:2526
 msgid "Check for &Updates..."
 msgstr "Проверить наличие &обновлений..."
 
-#: gui/accessibility.py:674 gui/mainframe.py:2529
+#: gui/accessibility.py:675 gui/mainframe.py:2533
 msgid "&About"
 msgstr "О &программе"
 
-#: gui/accessibility.py:675 gui/mainframe.py:2536
+#: gui/accessibility.py:676 gui/mainframe.py:2540
 msgid "&Help"
 msgstr "&Справка"
 
-#: gui/accessibility.py:816 gui/mainframe.py:5418
+#: gui/accessibility.py:817 gui/mainframe.py:5424
 msgid "No feed description is available for this item."
 msgstr "Описание канала для этого элемента недоступно."
 
-#: gui/accessibility.py:831 gui/mainframe.py:10503
+#: gui/accessibility.py:832 gui/mainframe.py:10510
 msgid "Find in article:"
 msgstr "Найти в статье:"
 
-#: gui/accessibility.py:831 gui/mainframe.py:10503
+#: gui/accessibility.py:832 gui/mainframe.py:10510
 msgid "Find"
 msgstr "Найти"
 
-#: gui/accessibility.py:875
+#: gui/accessibility.py:876
 msgid "Remove from &Favorites"
 msgstr "Удалить из &избранного"
 
-#: gui/accessibility.py:875
+#: gui/accessibility.py:876
 msgid "Add to &Favorites"
 msgstr "Добавить в &избранное"
 
-#: gui/accessibility.py:886
+#: gui/accessibility.py:887
 msgid "&Find in Article..."
 msgstr "На&йти в статье..."
 
-#: gui/accessibility.py:963
+#: gui/accessibility.py:964
 msgid "&Add Feed..."
 msgstr "&Добавить канал..."
 
-#: gui/accessibility.py:964
+#: gui/accessibility.py:965
 msgid "Add Cate&gory..."
 msgstr "Добавить &категорию..."
 
-#: gui/accessibility.py:965
+#: gui/accessibility.py:966
 msgid "New Smart &Folder..."
 msgstr "Новая смарт-&папка..."
 
-#: gui/accessibility.py:1204 gui/mainframe.py:8035
+#: gui/accessibility.py:1205 gui/mainframe.py:8042
 msgid "Refreshing feeds..."
 msgstr "Обновление каналов..."
 
-#: gui/accessibility.py:1372 gui/accessibility.py:1370
+#: gui/accessibility.py:1373 gui/accessibility.py:1371
 msgid "Loading articles..."
 msgstr "Загрузка статей..."
 
-#: gui/accessibility.py:1520
+#: gui/accessibility.py:1521
 msgid "Chapter availability: Loading."
 msgstr "Доступен тайм-код: Загрузка."
 
-#: gui/accessibility.py:2114 gui/accessibility.py:1729 gui/mainframe.py:6152
-#: gui/mainframe.py:5986
+#: gui/accessibility.py:2115 gui/accessibility.py:1730 gui/mainframe.py:6159
+#: gui/mainframe.py:5993
 msgid "Full text loaded."
 msgstr "Загружен полный текст."
 
-#: gui/accessibility.py:2116 gui/mainframe.py:6154
+#: gui/accessibility.py:2117 gui/mainframe.py:6161
 msgid "Full text unavailable. Showing feed content."
 msgstr "Полный текст недоступен. Показывается содержимое канала."
 
-#: gui/accessibility.py:2341
+#: gui/accessibility.py:2342
 msgid "Loading more articles..."
 msgstr "Загрузка следующих статей..."
 
@@ -1410,7 +1415,7 @@ msgstr "Доступно тайм-кодов: {count}."
 msgid "Chapter {index}: {timestamp}, {title}."
 msgstr "Тайм-код {index}: {timestamp}, {title}."
 
-#: gui/accessibility.py:263 gui/mainframe.py:8798
+#: gui/accessibility.py:263 gui/mainframe.py:8805
 msgid "Favorites"
 msgstr "Избранное"
 
@@ -1456,92 +1461,92 @@ msgstr "Выберите представление для загрузки ст
 msgid "Article Content"
 msgstr "Содержимое статьи"
 
-#: gui/accessibility.py:725 gui/accessibility.py:985
+#: gui/accessibility.py:726 gui/accessibility.py:986
 msgid "Mark all items in this view as read?"
 msgstr "Отметить все элементы в этом представлении как прочитанные?"
 
-#: gui/accessibility.py:748
+#: gui/accessibility.py:749
 msgid "Added to favorites."
 msgstr "Добавлено в избранное."
 
-#: gui/accessibility.py:748
+#: gui/accessibility.py:749
 msgid "Removed from favorites."
 msgstr "Удалено из избранного."
 
-#: gui/accessibility.py:798
+#: gui/accessibility.py:799
 msgid "Article deleted."
 msgstr "Статья удалена."
 
-#: gui/accessibility.py:818 gui/mainframe.py:5420
+#: gui/accessibility.py:819 gui/mainframe.py:5426
 msgid "Feed Description"
 msgstr "Описание канала"
 
-#: gui/accessibility.py:880
+#: gui/accessibility.py:881
 msgid "&Restore"
 msgstr "&Восстановить"
 
-#: gui/accessibility.py:882
+#: gui/accessibility.py:883
 msgid "&Delete"
 msgstr "&Удалить"
 
-#: gui/accessibility.py:924
+#: gui/accessibility.py:925
 msgid "Article restored."
 msgstr "Статья восстановлена."
 
-#: gui/accessibility.py:938
+#: gui/accessibility.py:939
 msgid "&Refresh Feed"
 msgstr "&Обновить канал"
 
-#: gui/accessibility.py:939 gui/accessibility.py:957
+#: gui/accessibility.py:940 gui/accessibility.py:958
 msgid "Mark All as &Read"
 msgstr "Отметить всё как &прочитанное"
 
-#: gui/accessibility.py:940
+#: gui/accessibility.py:941
 msgid "&Copy Feed URL"
 msgstr "&Скопировать URL-адрес канала"
 
-#: gui/accessibility.py:941
+#: gui/accessibility.py:942
 msgid "&Notifications for This Feed"
 msgstr "У&ведомления для этого канала"
 
-#: gui/accessibility.py:948 gui/mainframe.py:4862
+#: gui/accessibility.py:949 gui/mainframe.py:4868
 msgid "Use default setting"
 msgstr "Использовать настройки &по умолчанию"
 
-#: gui/accessibility.py:949 gui/mainframe.py:4863
+#: gui/accessibility.py:950 gui/mainframe.py:4869
 msgid "Always show image alt text"
 msgstr "Всегда показывать альтернативный текст изображения"
 
-#: gui/accessibility.py:950 gui/mainframe.py:4864
+#: gui/accessibility.py:951 gui/mainframe.py:4870
 msgid "Never show image alt text"
 msgstr "Никогда не показывать альтернативный текст изображения"
 
-#: gui/accessibility.py:951 gui/mainframe.py:4871
+#: gui/accessibility.py:952 gui/mainframe.py:4877
 msgid "Image Alt Text"
 msgstr "Альтернативный текст изображения"
 
-#: gui/accessibility.py:953
+#: gui/accessibility.py:954
 msgid "Remove &Feed"
 msgstr "&Удалить канал"
 
-#: gui/accessibility.py:1038 gui/mainframe.py:7702 gui/mainframe.py:7674
+#: gui/accessibility.py:1039 gui/mainframe.py:7709 gui/mainframe.py:7681
 msgid "The Uncategorized folder cannot be removed."
 msgstr "Папка \"Без категории\" не может быть удалена."
 
-#: gui/accessibility.py:1038 gui/mainframe.py:7540 gui/mainframe.py:7697
-#: gui/mainframe.py:7702
+#: gui/accessibility.py:1039 gui/mainframe.py:7547 gui/mainframe.py:7704
+#: gui/mainframe.py:7709
 msgid "Info"
 msgstr "Информация"
 
-#: gui/accessibility.py:1401
+#: gui/accessibility.py:1402
 msgid "Failed to load articles."
 msgstr "Не удалось загрузить статьи."
 
-#: gui/accessibility.py:1507 gui/mainframe.py:6187 gui/mainframe.py:10097
+#: gui/accessibility.py:1508 gui/mainframe.py:6194 gui/mainframe.py:10104
 msgid "Date:"
 msgstr "Дата:"
 
-#: gui/accessibility.py:1509 gui/mainframe.py:6189 gui/mainframe.py:10099
+#: gui/accessibility.py:1510 gui/mainframe.py:6196 gui/mainframe.py:10106
 msgid "Link:"
 msgstr "Ссылка:"
 
@@ -1553,69 +1558,69 @@ msgstr " Ссылка: {url}"
 msgid "Feed:"
 msgstr "Канал:"
 
-#: gui/accessibility.py:956
+#: gui/accessibility.py:957
 msgid "&Refresh Category"
 msgstr "&Обновить категорию"
 
-#: gui/accessibility.py:958
+#: gui/accessibility.py:959
 msgid "&Edit Category"
 msgstr "&Редактировать категорию"
 
-#: gui/accessibility.py:959
+#: gui/accessibility.py:960
 msgid "Add &Subcategory"
 msgstr "Добавить &подкатегорию"
 
-#: gui/accessibility.py:961
+#: gui/accessibility.py:962
 msgid "Remove &Category"
 msgstr "&Удалить категорию"
 
-#: gui/accessibility.py:1015
+#: gui/accessibility.py:1016
 msgid "Remove this feed?"
 msgstr "Удалить этот канал?"
 
-#: gui/accessibility.py:1015 gui/accessibility.py:1045 gui/mainframe.py:7725
-#: gui/mainframe.py:7680
+#: gui/accessibility.py:1016 gui/accessibility.py:1046 gui/mainframe.py:7732
+#: gui/mainframe.py:7687
 msgid "Confirm"
 msgstr "Подтвердить"
 
-#: gui/accessibility.py:1044
+#: gui/accessibility.py:1045
 msgid "Remove this category? Feeds will be moved to Uncategorized."
 msgstr ""
 "Удалить эту категорию? Каналы будут перемещены в папку \"Без категории\"."
 
-#: gui/accessibility.py:1055 gui/mainframe.py:7687
+#: gui/accessibility.py:1056 gui/mainframe.py:7694
 msgid "Could not remove category."
 msgstr "Не удалось удалить категорию."
 
-#: gui/accessibility.py:1055 gui/dialogs.py:4757 gui/mainframe.py:13542
-#: gui/mainframe.py:13593
+#: gui/accessibility.py:1056 gui/dialogs.py:4757 gui/mainframe.py:13555
+#: gui/mainframe.py:13606
 msgid "Error"
 msgstr "Ошибка"
 
-#: gui/accessibility.py:1326 gui/accessibility.py:303 gui/dialogs.py:237
+#: gui/accessibility.py:1327 gui/accessibility.py:303 gui/dialogs.py:237
 #: gui/dialogs.py:4251
 msgid "Category:"
 msgstr "Категория:"
 
-#: gui/accessibility.py:1328
+#: gui/accessibility.py:1329
 msgid "Expanded category: {label}"
 msgstr "Развёрнутая категория: {label}"
 
-#: gui/accessibility.py:1330
+#: gui/accessibility.py:1331
 msgid "Collapsed category: {label}"
 msgstr "Свёрнутая категория: {label}"
 
-#: gui/accessibility.py:1402
+#: gui/accessibility.py:1403
 msgid "Failed to load articles: {error}"
 msgstr "Не удалось загрузить статьи: {error}"
 
-#: gui/accessibility.py:1447 gui/mainframe.py:1282 gui/mainframe.py:1682
+#: gui/accessibility.py:1448 gui/mainframe.py:1282 gui/mainframe.py:1682
 #: gui/mainframe.py:1726
 msgid "No articles found."
 msgstr "Статей не найдено."
 
-#: gui/accessibility.py:1654 gui/article_window.py:65 gui/article_window.py:96
-#: gui/mainframe.py:5486
+#: gui/accessibility.py:1655 gui/article_window.py:65 gui/article_window.py:96
+#: gui/mainframe.py:5492
 msgid "Article text"
 msgstr "Текст статьи"
 
@@ -1623,27 +1628,27 @@ msgstr "Текст статьи"
 msgid ", unread: {unread}"
 msgstr ", непрочитано: {unread}"
 
-#: gui/accessibility.py:775
+#: gui/accessibility.py:776
 msgid "Delete this article?"
 msgstr "Удалить эту статью?"
 
-#: gui/accessibility.py:1424
+#: gui/accessibility.py:1425
 msgid "Articles loaded: {count}."
 msgstr "Загружено статей: {count}."
 
-#: gui/accessibility.py:1427
+#: gui/accessibility.py:1428
 msgid "Articles loaded: {count} of {total}."
 msgstr "Загружено статей: {count} из {total}."
 
-#: gui/accessibility.py:1765 gui/mainframe.py:6016
+#: gui/accessibility.py:1766 gui/mainframe.py:6023
 msgid "Loading full text..."
 msgstr "Загрузка полного текста..."
 
-#: gui/accessibility.py:854 gui/mainframe.py:10293
+#: gui/accessibility.py:855 gui/mainframe.py:10300
 msgid "\"{term}\" was not found."
 msgstr "\"{term}\" не найдено."
 
-#: gui/accessibility.py:1169 gui/mainframe.py:8806
+#: gui/accessibility.py:1170 gui/mainframe.py:8813
 msgid "Deleted Articles"
 msgstr "Удалённые статьи"
 
@@ -1687,7 +1692,7 @@ msgstr "Скопировать всю статью целиком в буфер 
 msgid "Copy this article's address to the clipboard"
 msgstr "Скопировать адрес этой статьи в буфер обмена"
 
-#: gui/article_window.py:290 gui/mainframe.py:2532
+#: gui/article_window.py:290 gui/mainframe.py:2536
 msgid "&Edit"
 msgstr "&Правка"
 
@@ -1695,7 +1700,7 @@ msgstr "&Правка"
 msgid "Show the page as formatted HTML instead of plain text"
 msgstr "Показать страницу в формате HTML вместо обычного текста"
 
-#: gui/article_window.py:299 gui/mainframe.py:2533
+#: gui/article_window.py:299 gui/mainframe.py:2537
 msgid "&View"
 msgstr "&Вид"
 
@@ -1728,8 +1733,8 @@ msgstr "Загрузка: {url}"
 msgid "The link could not be opened in your browser."
 msgstr "Не удаётся открыть ссылку в вашем браузере."
 
-#: gui/article_window.py:324 gui/dialogs.py:427 gui/mainframe.py:5092
-#: gui/mainframe.py:14611
+#: gui/article_window.py:324 gui/dialogs.py:427 gui/mainframe.py:5098
+#: gui/mainframe.py:14624
 msgid "Open Article"
 msgstr "Открыть статью"
 
@@ -1839,7 +1844,7 @@ msgstr "Канал или URL-адрес мультимедиа"
 msgid "https://example.com/feed or a YouTube/podcast URL"
 msgstr "https://example.com/feed или URL-адрес YouTube/подкаста"
 
-#: gui/dialogs.py:239 gui/dialogs.py:4253 gui/dialogs.py:7989
+#: gui/dialogs.py:239 gui/dialogs.py:4253 gui/dialogs.py:8375
 #: gui/dialogs.py:4690
 msgid "Category"
 msgstr "Категория"
@@ -2084,12 +2089,12 @@ msgstr "YouTube"
 msgid "Media Player"
 msgstr "Медиапроигрыватель"
 
-#: gui/dialogs.py:1772 gui/dialogs.py:5126
+#: gui/dialogs.py:1772 gui/dialogs.py:5512
 msgid "Provider"
 msgstr "Поставщик"
 
 #: gui/dialogs.py:1777 gui/dialogs.py:2196 gui/dialogs.py:2233
-#: gui/mainframe.py:14188
+#: gui/mainframe.py:14201
 msgid "Notifications"
 msgstr "Уведомления"
 
@@ -2357,7 +2362,7 @@ msgstr "Кодировка извлечения полного текста"
 msgid "Delete behavior for this feed"
 msgstr "Поведение при удалении для этого канала"
 
-#: gui/dialogs.py:4670 gui/mainframe.py:7607
+#: gui/dialogs.py:4670 gui/mainframe.py:7614
 msgid "Category name"
 msgstr "Название категории"
 
@@ -2398,7 +2403,7 @@ msgid "No successful update recorded."
 msgstr "Не зафиксировано ни одного успешного обновления."
 
 #: gui/dialogs.py:4869 gui/dialogs.py:2054 gui/mainframe.py:640
-#: gui/mainframe.py:11873
+#: gui/mainframe.py:11880
 msgid "Unknown error"
 msgstr "Неизвестная ошибка"
 
@@ -2406,156 +2411,182 @@ msgstr "Неизвестная ошибка"
 msgid "this feed"
 msgstr "этот канал"
 
-#: gui/dialogs.py:5101
-msgid "Search for a podcast or RSS feed"
-msgstr "Найти подкаст или RSS-канал"
+#: gui/dialogs.py:5056
+msgid "Podcast feed"
+msgstr "Канал подкаста"
 
-#: gui/dialogs.py:5102
-msgid "Podcast name, topic, or site URL"
-msgstr "Название подкаста, тема или URL-адрес сайта"
+#: gui/dialogs.py:5068
+msgid "Filter podcast episodes"
+msgstr "Фильтровать эпизоды подкаста"
 
-#: gui/dialogs.py:5109
-msgid "Search source"
-msgstr "Источник поиска"
+#: gui/dialogs.py:5073
+msgid "Podcast archive status"
+msgstr "Статус архива подкаста"
 
-#: gui/dialogs.py:5124 gui/dialogs.py:6103
-msgid "Search results"
-msgstr "Результаты поиска"
+#: gui/dialogs.py:5077
+msgid "Podcast episodes"
+msgstr "Эпизоды подкаста"
 
-#: gui/dialogs.py:5127 gui/dialogs.py:6110
-msgid "Details"
-msgstr "Подробности"
-
-#: gui/dialogs.py:5128 gui/dialogs.py:6111
-msgid "URL"
-msgstr "URL-адрес"
-
-#: gui/dialogs.py:6057
-msgid "Video search"
-msgstr "Поиск видео"
-
-#: gui/dialogs.py:6058
-msgid "Search videos across sites"
-msgstr "Поиск видео на разных сайтах"
-
-#: gui/dialogs.py:6070
-msgid "Search sites"
-msgstr "Поиск по сайтам"
-
-#: gui/dialogs.py:6074
-msgid "Filter results by site"
-msgstr "Фильтровать результаты по сайтам"
-
-#: gui/dialogs.py:6081
-msgid "Sort results"
-msgstr "Сортировка результатов"
-
-#: gui/dialogs.py:6082
-msgid "Relevance"
-msgstr "Релевантность"
-
-#: gui/dialogs.py:6082 gui/dialogs.py:6107
-msgid "Site"
-msgstr "Сайт"
-
-#: gui/dialogs.py:6082 gui/dialogs.py:6109
-msgid "Plays"
-msgstr "Прослушиваний"
-
-#: gui/dialogs.py:6108
-msgid "Kind"
-msgstr "Тип"
-
-#: gui/dialogs.py:6115 gui/dialogs.py:7635 gui/mainframe.py:6597
-#: gui/mainframe.py:5448
+#: gui/dialogs.py:5089 gui/dialogs.py:6501 gui/dialogs.py:8021
+#: gui/mainframe.py:6604
 msgid "Close"
 msgstr "Закрыть"
 
-#: gui/dialogs.py:7086
+#: gui/dialogs.py:5278 gui/dialogs.py:5340 gui/dialogs.py:5038
+#: gui/dialogs.py:5254
+msgid "Podcast Archive"
+msgstr "Архив подкастов"
+
+#: gui/dialogs.py:5347
+msgid "Starting archive rescan..."
+msgstr "Запуск повторного сканирования архива..."
+
+#: gui/dialogs.py:5487
+msgid "Search for a podcast or RSS feed"
+msgstr "Найти подкаст или RSS-канал"
+
+#: gui/dialogs.py:5488
+msgid "Podcast name, topic, or site URL"
+msgstr "Название подкаста, тема или URL-адрес сайта"
+
+#: gui/dialogs.py:5495
+msgid "Search source"
+msgstr "Источник поиска"
+
+#: gui/dialogs.py:5510 gui/dialogs.py:6489
+msgid "Search results"
+msgstr "Результаты поиска"
+
+#: gui/dialogs.py:5513 gui/dialogs.py:6496
+msgid "Details"
+msgstr "Подробности"
+
+#: gui/dialogs.py:5514 gui/dialogs.py:6497
+msgid "URL"
+msgstr "URL-адрес"
+
+#: gui/dialogs.py:6443
+msgid "Video search"
+msgstr "Поиск видео"
+
+#: gui/dialogs.py:6444
+msgid "Search videos across sites"
+msgstr "Поиск видео на разных сайтах"
+
+#: gui/dialogs.py:6456
+msgid "Search sites"
+msgstr "Поиск по сайтам"
+
+#: gui/dialogs.py:6460
+msgid "Filter results by site"
+msgstr "Фильтровать результаты по сайтам"
+
+#: gui/dialogs.py:6467
+msgid "Sort results"
+msgstr "Сортировка результатов"
+
+#: gui/dialogs.py:6468
+msgid "Relevance"
+msgstr "Релевантность"
+
+#: gui/dialogs.py:6468 gui/dialogs.py:6493
+msgid "Site"
+msgstr "Сайт"
+
+#: gui/dialogs.py:6468 gui/dialogs.py:6495
+msgid "Plays"
+msgstr "Прослушиваний"
+
+#: gui/dialogs.py:6494
+msgid "Kind"
+msgstr "Тип"
+
+#: gui/dialogs.py:7472
 msgid "Searching"
 msgstr "Поиск"
 
-#: gui/dialogs.py:7086
+#: gui/dialogs.py:7472
 msgid "Loading more"
 msgstr "Загрузка ещё"
 
-#: gui/dialogs.py:7309 gui/player.py:2108 gui/player.py:5948
+#: gui/dialogs.py:7695 gui/dialogs.py:5084 gui/player.py:2108
+#: gui/player.py:5948
 msgid "Play"
 msgstr "Воспроизведение"
 
-#: gui/dialogs.py:7310 gui/dialogs.py:7487
+#: gui/dialogs.py:7696 gui/dialogs.py:7873
 msgid "Subscribe"
 msgstr "Подписаться"
 
-#: gui/dialogs.py:7311
+#: gui/dialogs.py:7697
 msgid "Copy URL"
 msgstr "Скопировать URL-адрес"
 
-#: gui/dialogs.py:7516
+#: gui/dialogs.py:7902
 msgid "Subscribed (native)"
 msgstr "Подписанный (родной)"
 
-#: gui/dialogs.py:7519
+#: gui/dialogs.py:7905
 msgid "Subscribed (source)"
 msgstr "Подписанный (исходный)"
 
-#: gui/dialogs.py:7549
+#: gui/dialogs.py:7935
 msgid "Saved searches"
 msgstr "Сохранённые поиски"
 
-#: gui/dialogs.py:7581
+#: gui/dialogs.py:7967
 msgid "Search query:"
 msgstr "Поисковый запрос:"
 
-#: gui/dialogs.py:7581
+#: gui/dialogs.py:7967
 msgid "Add Search"
 msgstr "Добавить поиск"
 
-#: gui/dialogs.py:7678
+#: gui/dialogs.py:8064
 msgid "Queued media"
 msgstr "Мультимедиа в очереди"
 
-#: gui/dialogs.py:7806
+#: gui/dialogs.py:8192
 msgid "&Pause"
 msgstr "&Пауза"
 
-#: gui/dialogs.py:7806 gui/dialogs.py:7689
+#: gui/dialogs.py:8192 gui/dialogs.py:8075
 msgid "&Play"
 msgstr "&Воспроизвести"
 
-#: gui/dialogs.py:7911
+#: gui/dialogs.py:8297
 msgid "Captured keyboard shortcut"
 msgstr "Захваченное сочетание клавиш"
 
-#: gui/dialogs.py:7988
+#: gui/dialogs.py:8374
 msgid "Keyboard shortcuts"
 msgstr "Сочетания клавиш"
 
-#: gui/dialogs.py:7990
+#: gui/dialogs.py:8376
 msgid "Command"
 msgstr "Команда"
 
-#: gui/dialogs.py:7991
+#: gui/dialogs.py:8377
 msgid "Shortcut"
 msgstr "Сочетание клавиш"
 
-#: gui/dialogs.py:8236
+#: gui/dialogs.py:8622
 msgid "Preset"
 msgstr "Предустановка"
 
-#: gui/dialogs.py:8245
+#: gui/dialogs.py:8631
 msgid "Preamp"
 msgstr "Предусилитель"
 
-#: gui/dialogs.py:8328
+#: gui/dialogs.py:8714
 msgid "Custom"
 msgstr "Пользовательский"
 
-#: gui/dialogs.py:8415
+#: gui/dialogs.py:8801
 msgid "Name for this equalizer preset:"
 msgstr "Название этой предустановки эквалайзера:"
 
-#: gui/dialogs.py:8415 gui/dialogs.py:8441 gui/dialogs.py:8427
+#: gui/dialogs.py:8801 gui/dialogs.py:8827 gui/dialogs.py:8813
 msgid "Save Preset"
 msgstr "Сохранить предустановку"
 
@@ -2563,15 +2594,15 @@ msgstr "Сохранить предустановку"
 msgid "Use the global column layout"
 msgstr "Использовать глобальную компановку столбцов"
 
-#: gui/dialogs.py:130 gui/dialogs.py:7693 gui/mainframe.py:15158
+#: gui/dialogs.py:130 gui/dialogs.py:8079 gui/mainframe.py:15194
 msgid "Move &Up"
 msgstr "Переместить &вверх"
 
-#: gui/dialogs.py:131 gui/dialogs.py:7697 gui/mainframe.py:15159
+#: gui/dialogs.py:131 gui/dialogs.py:8083 gui/mainframe.py:15195
 msgid "Move &Down"
 msgstr "Переместить в&низ"
 
-#: gui/dialogs.py:132 gui/dialogs.py:8006
+#: gui/dialogs.py:132 gui/dialogs.py:8392
 msgid "Reset All to &Defaults"
 msgstr "Сбросить все к значениям по &умолчанию"
 
@@ -2583,8 +2614,8 @@ msgstr "Хорошо: распознано как источник YouTube"
 msgid "OK: Supported by yt-dlp"
 msgstr "Хорошо: Поддерживается yt-dlp"
 
-#: gui/dialogs.py:387 gui/mainframe.py:12568 gui/mainframe.py:12587
-#: gui/mainframe.py:14713
+#: gui/dialogs.py:387 gui/dialogs.py:5267 gui/mainframe.py:12575
+#: gui/mainframe.py:12594
 msgid "Downloads are disabled. Enable them in Settings > Downloads."
 msgstr "Загрузки отключены. Включите их в \"Настройки\" > \"Загрузки\"."
 
@@ -3817,7 +3848,7 @@ msgstr ""
 "обновлении приложения,\n"
 "особенно на macOS, где заменяется установленный пакет приложения."
 
-#: gui/dialogs.py:3922 gui/mainframe.py:14441 gui/mainframe.py:14409
+#: gui/dialogs.py:3922 gui/mainframe.py:14454 gui/mainframe.py:14422
 msgid "Updates"
 msgstr "Обновления"
 
@@ -3931,257 +3962,307 @@ msgstr "Недоступен"
 msgid "Confirm Remove"
 msgstr "Подтвердите удаление"
 
-#: gui/dialogs.py:5113 gui/dialogs.py:6060
+#: gui/dialogs.py:5058
+msgid "Find or add podcast..."
+msgstr "Найти или добавить подкаст..."
+
+#: gui/dialogs.py:5060
+msgid "Rescan archive"
+msgstr "Повторно просканировать архив"
+
+#: gui/dialogs.py:5072 gui/dialogs.py:5148
+msgid "Choose a subscribed podcast."
+msgstr "Выберите подкаст, на который вы подписаны."
+
+#: gui/dialogs.py:5085
+msgid "Download selected"
+msgstr "Загрузить выбранное"
+
+#: gui/dialogs.py:5086
+msgid "Download all"
+msgstr "Скачать все"
+
+#: gui/dialogs.py:5087
+msgid "Cancel downloads"
+msgstr "Отменить загрузки"
+
+#: gui/dialogs.py:5254
+msgid "Select one or more episodes first."
+msgstr "Сначала выберите один или несколько эпизодов."
+
+#: gui/dialogs.py:5268 gui/mainframe.py:12575 gui/mainframe.py:12594
+#: gui/mainframe.py:14727
+msgid "Downloads disabled"
+msgstr "Загрузка отключена"
+
+#: gui/dialogs.py:5329
+msgid "Downloaded: {downloaded}; already present: {skipped}; failed: {failed}."
+msgstr "Загружено: {downloaded}; уже есть: {skipped}; с ошибками: {failed}."
+
+#: gui/dialogs.py:5335
+msgid "Canceled. "
+msgstr "Отменено. "
+
+#: gui/dialogs.py:5397
+msgid "Stop the active work and close this window when it is safe?"
+msgstr ""
+"Остановить активную работу и закрыть это окно, когда это будет безопасно?"
+
+#: gui/dialogs.py:5406
+msgid "Stopping; this window will close when the active work finishes."
+msgstr "Остановка; это окно закроется, когда активная работа завершится."
+
+#: gui/dialogs.py:5499 gui/dialogs.py:6446
 msgid "Search"
 msgstr "Поиск"
 
-#: gui/dialogs.py:5119 gui/dialogs.py:6090 gui/dialogs.py:7415
+#: gui/dialogs.py:5505 gui/dialogs.py:6476 gui/dialogs.py:7801
 msgid "Ready."
 msgstr "Готово."
 
-#: gui/dialogs.py:5279
+#: gui/dialogs.py:5665
 msgid "Searching all sources..."
 msgstr "Поиск по всем источникам..."
 
-#: gui/dialogs.py:6062
+#: gui/dialogs.py:6448
 msgid "Load More Results (+80/site)"
 msgstr "Загрузить больше результатов (+80/сайт)"
 
-#: gui/dialogs.py:6717
+#: gui/dialogs.py:7103
 msgid "All searchable sites"
 msgstr "Все сайты с возможностью поиска"
 
-#: gui/dialogs.py:6720
+#: gui/dialogs.py:7106
 msgid "Adult sites (all)"
 msgstr "Сайты для взрослых (все)"
 
-#: gui/dialogs.py:6730
+#: gui/dialogs.py:7116
 msgid "All sites"
 msgstr "Все сайты"
 
-#: gui/dialogs.py:7022
+#: gui/dialogs.py:7408
 msgid "No searchable sites."
 msgstr "Нет сайтов для поиска."
 
-#: gui/dialogs.py:7219
+#: gui/dialogs.py:7605
 msgid "{completed}/{total} site"
 msgid_plural "{completed}/{total} sites"
 msgstr[0] "{completed}/{total} сайт"
 msgstr[1] "{completed}/{total} сайта"
 msgstr[2] "{completed}/{total} сайтов"
 
-#: gui/dialogs.py:7222
+#: gui/dialogs.py:7608
 msgid "{count} result"
 msgid_plural "{count} results"
 msgstr[0] "{count} результат"
 msgstr[1] "{count} результата"
 msgstr[2] "{count} результатов"
 
-#: gui/dialogs.py:7487
+#: gui/dialogs.py:7873
 msgid "Parent window does not support subscribing from this dialog."
 msgstr "Родительское окно не поддерживает подписку из этого диалога."
 
-#: gui/dialogs.py:7553
+#: gui/dialogs.py:7939
 msgid "Add..."
 msgstr "Добавить..."
 
-#: gui/dialogs.py:7554
+#: gui/dialogs.py:7940
 msgid "Remove"
 msgstr "Удалить"
 
-#: gui/dialogs.py:7608 gui/mainframe.py:2529
+#: gui/dialogs.py:7994 gui/mainframe.py:2533
 msgid "About BlindRSS"
 msgstr "О BlindRSS"
 
-#: gui/dialogs.py:7619
+#: gui/dialogs.py:8005
 msgid "Copyright (c) 2024-2026 serrebidev and contributors"
 msgstr "Copyright (c) 2024-2026 serrebidev и участники проекта"
 
-#: gui/dialogs.py:7625
+#: gui/dialogs.py:8011
 msgid "Follow me on GitHub (@serrebidev)"
 msgstr "Подписаться на меня на GitHub (@serrebidev)"
 
-#: gui/dialogs.py:7626
+#: gui/dialogs.py:8012
 msgid "Visit Repository"
 msgstr "Посетить репозиторий"
 
-#: gui/dialogs.py:7627
+#: gui/dialogs.py:8013
 msgid "View Changelog"
 msgstr "Просмотреть журнал изменений"
 
-#: gui/dialogs.py:7701
+#: gui/dialogs.py:8087
 msgid "&Remove"
 msgstr "&Удалить"
 
-#: gui/dialogs.py:7705
+#: gui/dialogs.py:8091
 msgid "&Clear All"
 msgstr "&Очистить все"
 
-#: gui/dialogs.py:7772
+#: gui/dialogs.py:8158
 msgid "Untitled"
 msgstr "Без названия"
 
-#: gui/dialogs.py:7793
+#: gui/dialogs.py:8179
 msgid "The play queue is empty."
 msgstr "Очередь воспроизведения пуста."
 
-#: gui/dialogs.py:7854
+#: gui/dialogs.py:8240
 msgid "Remove all items from the play queue?"
 msgstr "Удалить все элементы из очереди воспроизведения?"
 
-#: gui/dialogs.py:7855
+#: gui/dialogs.py:8241
 msgid "Clear Play Queue"
 msgstr "Очистить очередь воспроизведения"
 
-#: gui/dialogs.py:7897
+#: gui/dialogs.py:8283
 msgid "Press Shortcut"
 msgstr "Нажмите сочетание"
 
-#: gui/dialogs.py:7910
+#: gui/dialogs.py:8296
 msgid "Waiting for a key…"
 msgstr "Ожидание нажатия клавиши…"
 
-#: gui/dialogs.py:7983
+#: gui/dialogs.py:8369
 msgid "Select a command and choose Change to set its shortcut."
 msgstr "Выберите команду и нажмите \"Изменить\", чтобы настроить её сочетание."
 
-#: gui/dialogs.py:7998
+#: gui/dialogs.py:8384
 msgid "&Change Shortcut..."
 msgstr "&Изменить сочетание..."
 
-#: gui/dialogs.py:8002
+#: gui/dialogs.py:8388
 msgid "&Remove Shortcut"
 msgstr "&Удалить сочетание"
 
-#: gui/dialogs.py:8031
+#: gui/dialogs.py:8417
 msgid "Enter"
 msgstr "Enter"
 
-#: gui/dialogs.py:8031
+#: gui/dialogs.py:8417
 msgid "Open or play the selected article"
 msgstr "Открыть или воспроизвести выбранную статью"
 
-#: gui/dialogs.py:8032
+#: gui/dialogs.py:8418
 msgid "Del"
 msgstr "Del"
 
-#: gui/dialogs.py:8032
+#: gui/dialogs.py:8418
 msgid "Delete the selected article"
 msgstr "Удалить выбранную статью"
 
-#: gui/dialogs.py:8033
+#: gui/dialogs.py:8419
 msgid "Shift+Del"
 msgstr "Shift+Del"
 
-#: gui/dialogs.py:8033
+#: gui/dialogs.py:8419
 msgid "Delete the selected article without confirmation"
 msgstr "Удалить выбранную статью без подтверждения"
 
-#: gui/dialogs.py:8034
+#: gui/dialogs.py:8420
 msgid "Backspace"
 msgstr "Backspace"
 
-#: gui/dialogs.py:8034
+#: gui/dialogs.py:8420
 msgid "Toggle read/unread in the article list"
 msgstr "Переключить прочитано/не прочитано в списке статей"
 
-#: gui/dialogs.py:8035
+#: gui/dialogs.py:8421
 msgid "Refresh feeds (fixed alias)"
 msgstr "Обновить каналы (фиксированный псевдоним)"
 
-#: gui/dialogs.py:8036
+#: gui/dialogs.py:8422
 msgid "Ctrl+Left / Ctrl+Right"
 msgstr "Ctrl+Влево / Ctrl+Вправо"
 
-#: gui/dialogs.py:8036
+#: gui/dialogs.py:8422
 msgid "Rewind / fast forward playback"
 msgstr "Перемотка назад / вперёд"
 
-#: gui/dialogs.py:8037
+#: gui/dialogs.py:8423
 msgid "Ctrl+Up / Ctrl+Down"
 msgstr "Ctrl+Вверх / Ctrl+Вниз"
 
-#: gui/dialogs.py:8037
+#: gui/dialogs.py:8423
 msgid "Volume up / volume down"
 msgstr "Громче / тише"
 
-#: gui/dialogs.py:8038
+#: gui/dialogs.py:8424
 msgid "Ctrl+Shift+Left / Ctrl+Shift+Right"
 msgstr "Ctrl+Shift+Влево / Ctrl+Shift+Вправо"
 
-#: gui/dialogs.py:8038
+#: gui/dialogs.py:8424
 msgid "Previous / next chapter"
 msgstr "Предыдущий / следующий тайм-код"
 
-#: gui/dialogs.py:8039
+#: gui/dialogs.py:8425
 msgid "Ctrl+F"
 msgstr "Ctrl+F"
 
-#: gui/dialogs.py:8039
+#: gui/dialogs.py:8425
 msgid "Find in the article reader"
 msgstr "Найти в читалке статьи"
 
-#: gui/dialogs.py:8040
+#: gui/dialogs.py:8426
 msgid "F3 / Shift+F3"
 msgstr "F3 / Shift+F3"
 
-#: gui/dialogs.py:8040
+#: gui/dialogs.py:8426
 msgid "Next / previous match in the article reader"
 msgstr "Следующее / предыдущее совпадение в читталке статьи"
 
-#: gui/dialogs.py:8041
+#: gui/dialogs.py:8427
 msgid "F6 / Shift+F6"
 msgstr "F6 / Shift+F6"
 
-#: gui/dialogs.py:8041
+#: gui/dialogs.py:8427
 msgid "Move between panes in the rich view"
 msgstr "Переход между панелями в расширенном просмотре"
 
-#: gui/dialogs.py:8042
+#: gui/dialogs.py:8428
 msgid "Ctrl+X / Ctrl+C / Ctrl+V / Ctrl+A"
 msgstr "Ctrl+X / Ctrl+C / Ctrl+V / Ctrl+A"
 
-#: gui/dialogs.py:8042
+#: gui/dialogs.py:8428
 msgid "Cut / Copy / Paste / Select All in text fields"
 msgstr "Вырезать / копировать / вставить / выделить всё в текстовых полях"
 
-#: gui/dialogs.py:8056
+#: gui/dialogs.py:8442
 msgid "Fixed keys"
 msgstr "Фиксированные клавиши"
 
-#: gui/dialogs.py:8148
+#: gui/dialogs.py:8534
 msgid "Reset all keyboard shortcuts to their defaults?"
 msgstr "Сбросить все сочетания клавиш до значений по умолчанию?"
 
-#: gui/dialogs.py:8149
+#: gui/dialogs.py:8535
 msgid "Reset Shortcuts"
 msgstr "Сбросить сочетания клавиш"
 
-#: gui/dialogs.py:8202
+#: gui/dialogs.py:8588
 msgid "Equalizer"
 msgstr "Эквалайзер"
 
-#: gui/dialogs.py:8227
+#: gui/dialogs.py:8613
 msgid "&Enable equalizer"
 msgstr "&Включить эквалайзер"
 
-#: gui/dialogs.py:8264
+#: gui/dialogs.py:8650
 msgid "&Save as Preset..."
 msgstr "&Сохранить как предустановку..."
 
-#: gui/dialogs.py:8267
+#: gui/dialogs.py:8653
 msgid "&Delete Preset"
 msgstr "&Удалить предустановку"
 
-#: gui/dialogs.py:8270
+#: gui/dialogs.py:8656
 msgid "&Reset (Flat)"
 msgstr "С&бросить (Ровный)"
 
-#: gui/dialogs.py:8441
+#: gui/dialogs.py:8827
 msgid "Could not save the preset."
 msgstr "Не удалось сохранить предустановку."
 
-#: gui/dialogs.py:8453
+#: gui/dialogs.py:8839
 msgid "Delete Preset"
 msgstr "Удалить предустановку"
 
@@ -4264,8 +4345,8 @@ msgid ""
 "Cleared, the article opens as plain full text. Checked, it keeps headings, "
 "links, and embedded video."
 msgstr ""
-"Если не отмечено, статья открывается как простой полный текст. Если отмечено, "
-"в ней сохраняются заголовки, ссылки и встроенное видео."
+"Если не отмечено, статья открывается как простой полный текст. Если "
+"отмечено, в ней сохраняются заголовки, ссылки и встроенное видео."
 
 #: gui/dialogs.py:583
 msgid ""
@@ -4770,7 +4851,7 @@ msgstr ""
 "Этот поставщик хранит категории в одном плоском списке, поэтому эту "
 "категорию нельзя переместить."
 
-#: gui/dialogs.py:4686 gui/mainframe.py:7614
+#: gui/dialogs.py:4686 gui/mainframe.py:7621
 msgid "(None - Top Level)"
 msgstr "(Нет - верхний уровень)"
 
@@ -4788,15 +4869,44 @@ msgstr[2] ""
 msgid "Refreshing '{title}'..."
 msgstr "Обновление '{title}'..."
 
-#: gui/dialogs.py:5097 gui/dialogs.py:6054
+#: gui/dialogs.py:5050
+msgid "Podcast:"
+msgstr "Подкаст:"
+
+#: gui/dialogs.py:5065
+msgid "Filter episodes:"
+msgstr "Фильтровать эпизоды:"
+
+#: gui/dialogs.py:5162
+msgid "{episodes} playable episode; archive scanned snapshots: {snapshots}."
+msgid_plural ""
+"{episodes} playable episodes; archive scanned snapshots: {snapshots}."
+msgstr[0] ""
+"{episodes} воспроизводимый эпизод; просканировано снапшотов в архиве: "
+"{snapshots}."
+msgstr[1] ""
+"{episodes} воспроизводимых эпизода; просканировано снапшотов в архиве: "
+"{snapshots}."
+msgstr[2] ""
+"{episodes} воспроизводимых эпизодов; просканировано снапшотов в архиве: "
+"{snapshots}."
+
+#: gui/dialogs.py:5273
+msgid "Download {count} episode?"
+msgid_plural "Download {count} episodes?"
+msgstr[0] "Загрузить {count} эпизод?"
+msgstr[1] "Загрузить {count} эпизода?"
+msgstr[2] "Загрузить {count} эпизодов?"
+
+#: gui/dialogs.py:5483 gui/dialogs.py:6440
 msgid "Search:"
 msgstr "Поиск:"
 
-#: gui/dialogs.py:5106
+#: gui/dialogs.py:5492
 msgid "Source:"
 msgstr "Источник:"
 
-#: gui/dialogs.py:5134
+#: gui/dialogs.py:5520
 msgid ""
 "Sources: NewsBlur, iTunes, gPodder, fyyd, Podverse, YouTube, Feedspot, "
 "Google News, Bing News, Feedsearch, Website scan, Reddit, Fediverse (Lemmy/"
@@ -4806,54 +4916,54 @@ msgstr ""
 "Google News, Bing News, Feedsearch, сканирование сайта, Reddit, Fediverse "
 "(Lemmy/Kbin/Mastodon/Bluesky/PieFed). Feedly доступен как отдельный источник."
 
-#: gui/dialogs.py:5540 gui/dialogs.py:5565
+#: gui/dialogs.py:5926 gui/dialogs.py:5951
 msgid "News search feed"
 msgstr "Канал поиска новостей"
 
-#: gui/dialogs.py:6068
+#: gui/dialogs.py:6454
 msgid "Search Sites:"
 msgstr "Поиск по сайтам:"
 
-#: gui/dialogs.py:6072
+#: gui/dialogs.py:6458
 msgid "Filter Results:"
 msgstr "Результаты фильтрации:"
 
-#: gui/dialogs.py:6076
+#: gui/dialogs.py:6462
 msgid "Sort by:"
 msgstr "Сортировка по:"
 
-#: gui/dialogs.py:7087
+#: gui/dialogs.py:7473
 msgid "{action} {n} site..."
 msgid_plural "{action} {n} sites..."
 msgstr[0] "{action} {n} сайта..."
 msgstr[1] "{action} {n} сайта..."
 msgstr[2] "{action} {n} сайтов..."
 
-#: gui/dialogs.py:7234
+#: gui/dialogs.py:7620
 msgid "{sites}, {results}. {label} +{added}"
 msgstr "{sites}, {results}. {label} +{added}"
 
-#: gui/dialogs.py:7495
+#: gui/dialogs.py:7881
 msgid "Subscribe Error"
 msgstr "Ошибка подписки"
 
-#: gui/dialogs.py:7533
+#: gui/dialogs.py:7919
 msgid "Copied URL."
 msgstr "URL-адрес скопирован."
 
-#: gui/dialogs.py:7546
+#: gui/dialogs.py:7932
 msgid "Saved searches:"
 msgstr "Сохранённые поиски:"
 
-#: gui/dialogs.py:8053
+#: gui/dialogs.py:8439
 msgid "(none)"
 msgstr "(нет)"
 
-#: gui/dialogs.py:8188
+#: gui/dialogs.py:8574
 msgid "{sign}{v} dB"
 msgstr "{sign}{v} дБ"
 
-#: gui/dialogs.py:8234
+#: gui/dialogs.py:8620
 msgid "&Preset:"
 msgstr "&Предустановка:"
 
@@ -4987,64 +5097,92 @@ msgstr ""
 "\n"
 "Это удалит канал и все его статьи."
 
-#: gui/dialogs.py:5281
+#: gui/dialogs.py:5167
+msgid ""
+"Archive scan is running. {episodes} playable episode is currently available."
+msgid_plural ""
+"Archive scan is running. {episodes} playable episodes are currently "
+"available."
+msgstr[0] ""
+"Запущено сканирование архива. В настоящее время доступен {episodes} "
+"воспроизводимый эпизод."
+msgstr[1] ""
+"Запущено сканирование архива. В настоящее время доступно {episodes} "
+"воспроизводимых эпизода."
+msgstr[2] ""
+"Запущено сканирование архива. В настоящее время доступно {episodes} "
+"воспроизводимых эпизодов."
+
+#: gui/dialogs.py:5211
+msgid "Downloaded"
+msgstr "Загружено"
+
+#: gui/dialogs.py:5211
+msgid "Available online"
+msgstr "Доступно онлайн"
+
+#: gui/dialogs.py:5378
+msgid "Archive rescan failed: {error}"
+msgstr "Не удалось выполнить повторное сканирование архива: {error}"
+
+#: gui/dialogs.py:5667
 msgid "Searching {label}..."
 msgstr "Поиск {label}..."
 
-#: gui/dialogs.py:5548
+#: gui/dialogs.py:5934
 msgid "News topic feed"
 msgstr "Тематический новостной канал"
 
-#: gui/dialogs.py:5915
+#: gui/dialogs.py:6301
 msgid "Website scan"
 msgstr "Сканирование веб-сайта"
 
-#: gui/dialogs.py:5935
+#: gui/dialogs.py:6321
 msgid "Found {n} result."
 msgid_plural "Found {n} results."
 msgstr[0] "Найден {n} результат."
 msgstr[1] "Найдено {n} результата."
 msgstr[2] "Найдено {n} результатов."
 
-#: gui/dialogs.py:6094
+#: gui/dialogs.py:6480
 msgid "yt-dlp global search (max {count} concurrent)"
 msgstr "Глобальный поиск yt-dlp (одновременно максимально {count})"
 
-#: gui/dialogs.py:7227
+#: gui/dialogs.py:7613
 msgid "{sites}, {results}. {label}: error"
 msgstr "{sites}, {results}. {label}: ошибка"
 
-#: gui/dialogs.py:7267
+#: gui/dialogs.py:7653
 msgid "Stopped. {n} result."
 msgid_plural "Stopped. {n} results."
 msgstr[0] "Остановлено. {n} результат."
 msgstr[1] "Остановлено. {n} результата."
 msgstr[2] "Остановлено. {n} результатов."
 
-#: gui/dialogs.py:7469
+#: gui/dialogs.py:7855
 msgid "Playback Error"
 msgstr "Ошибка воспроизведения"
 
-#: gui/dialogs.py:7473 gui/dialogs.py:7411
+#: gui/dialogs.py:7859 gui/dialogs.py:7797
 msgid "Playing: {title}"
 msgstr "Воспроизведение: {title}"
 
-#: gui/dialogs.py:7775
+#: gui/dialogs.py:8161
 msgid "{index}. {title}, from {source}"
 msgstr "{index}. {title} из {source}"
 
-#: gui/dialogs.py:7779
+#: gui/dialogs.py:8165
 msgid "{index}. {title}"
 msgstr "{index}. {title}"
 
-#: gui/dialogs.py:7786
+#: gui/dialogs.py:8172
 msgid "{n} item in queue."
 msgid_plural "{n} items in queue."
 msgstr[0] "{n} элемент в очереди."
 msgstr[1] "{n} элемента в очереди."
 msgstr[2] "{n} элементов в очереди."
 
-#: gui/dialogs.py:7903
+#: gui/dialogs.py:8289
 msgid ""
 "Press the new shortcut for “{command}”.\n"
 "It must include Ctrl, Alt or Shift. Press Escape to cancel."
@@ -5052,15 +5190,15 @@ msgstr ""
 "Нажмите новое сочетание для «{command}».\n"
 "Оно должно включать Ctrl, Alt или Shift. Нажмите Escape для отмены."
 
-#: gui/dialogs.py:8120
+#: gui/dialogs.py:8506
 msgid "Shortcut Conflict"
 msgstr "Конфликт сочетаний"
 
-#: gui/dialogs.py:8334
+#: gui/dialogs.py:8720
 msgid "{name} (my preset)"
 msgstr "{name} (моя предустановка)"
 
-#: gui/dialogs.py:8452
+#: gui/dialogs.py:8838
 msgid "Delete the preset \"{name}\"?"
 msgstr "Удалить предустановку \"{name}\"?"
 
@@ -5142,33 +5280,78 @@ msgstr ""
 "Путь к папке установки приложения:\n"
 "  {path}"
 
-#: gui/dialogs.py:5539
+#: gui/dialogs.py:5171
+msgid ""
+"Archive scan needs retrying: {error}. {episodes} playable episode is "
+"available."
+msgid_plural ""
+"Archive scan needs retrying: {error}. {episodes} playable episodes are "
+"available."
+msgstr[0] ""
+"Необходимо повторить сканирование архива: {error}. Доступен {episodes} "
+"воспроизводимый эпизод."
+msgstr[1] ""
+"Необходимо повторить сканирование архива: {error}. Доступно {episodes} "
+"воспроизводимых эпизода."
+msgstr[2] ""
+"Необходимо повторить сканирование архива: {error}. Доступно {episodes} "
+"воспроизводимых эпизодов."
+
+#: gui/dialogs.py:5176
+msgid ""
+"Archive scan is pending. {episodes} playable episode is currently available."
+msgid_plural ""
+"Archive scan is pending. {episodes} playable episodes are currently "
+"available."
+msgstr[0] ""
+"Ожидается сканирование архива. В настоящее время доступен {episodes} "
+"воспроизводимый эпизод."
+msgstr[1] ""
+"Ожидается сканирование архива. В настоящее время доступно {episodes} "
+"воспроизводимых эпизода."
+msgstr[2] ""
+"Ожидается сканирование архива. В настоящее время доступно {episodes} "
+"воспроизводимых эпизодов."
+
+#: gui/dialogs.py:5200 gui/dialogs.py:5315
+msgid "Untitled episode"
+msgstr "Эпизод без названия"
+
+#: gui/dialogs.py:5312
+msgid "Downloading episode {number} of {total}: {title}"
+msgstr "Загрузка эпизода {number} из {total}: {title}"
+
+#: gui/dialogs.py:5378 gui/dialogs.py:5172
+msgid "unknown error"
+msgstr "неизвестная ошибка"
+
+#: gui/dialogs.py:5925
 msgid "Google News: {term}"
 msgstr "Google Новости: {term}"
 
-#: gui/dialogs.py:6724
+#: gui/dialogs.py:7110
 msgid "Adult: {site}"
 msgstr "Для взрослых: {site}"
 
-#: gui/dialogs.py:7270
+#: gui/dialogs.py:7656
 msgid "Loaded more. {n} result."
 msgid_plural "Loaded more. {n} results."
 msgstr[0] "Загружено больше. {n} результат."
 msgstr[1] "Загружено больше. {n} результата."
 msgstr[2] "Загружено больше. {n} результатов."
 
-#: gui/dialogs.py:7272
+#: gui/dialogs.py:7658
 msgid "{n} result."
 msgid_plural "{n} results."
 msgstr[0] "{n} результат."
 msgstr[1] "{n} результата."
 msgstr[2] "{n} результатов."
 
-#: gui/dialogs.py:7494
+#: gui/dialogs.py:7880
 msgid "Could not subscribe: {error}"
 msgstr "Не удалось подписаться: {error}"
 
-#: gui/dialogs.py:8426
+#: gui/dialogs.py:8812
 msgid "A preset named \"{name}\" already exists. Overwrite it?"
 msgstr "Предустановка с названием \"{name}\" уже существует. Перезаписать её?"
 
@@ -5184,20 +5367,24 @@ msgstr "Путь к {tool}:"
 msgid "WAV files"
 msgstr "WAV файлы"
 
-#: gui/dialogs.py:5547
+#: gui/dialogs.py:5140
+msgid "Could not load episodes: {error}"
+msgstr "Не удалось загрузить эпизоды: {error}"
+
+#: gui/dialogs.py:5933
 msgid "Google News: {topic} headlines"
 msgstr "Google Новости: заголовки {topic}"
 
-#: gui/dialogs.py:7411 gui/mainframe.py:1882 gui/player.py:4305
+#: gui/dialogs.py:7797 gui/mainframe.py:1882 gui/player.py:4305
 #: gui/player.py:6913
 msgid "Playing"
 msgstr "Воспроизводимое"
 
-#: gui/dialogs.py:7468
+#: gui/dialogs.py:7854
 msgid "Could not start playback: {error}"
 msgstr "Не удалось запустить воспроизведение: {error}"
 
-#: gui/dialogs.py:8116
+#: gui/dialogs.py:8502
 msgid ""
 "{accel} is already assigned to “{other}”.\n"
 "Reassign it to “{this}”?"
@@ -5205,32 +5392,32 @@ msgstr ""
 "{accel} уже назначено на «{other}».\n"
 "Переназначить его на «{this}»?"
 
-#: gui/dialogs.py:5564
+#: gui/dialogs.py:5950
 msgid "Bing News: {term}"
 msgstr "Bing Новости: {term}"
 
-#: gui/dialogs.py:7413 gui/mainframe.py:1882 gui/player.py:6969
+#: gui/dialogs.py:7799 gui/mainframe.py:1882 gui/player.py:6969
 #: gui/player.py:6986
 msgid "Paused"
 msgstr "Приостановлено"
 
-#: gui/dialogs.py:7413
+#: gui/dialogs.py:7799
 msgid "Paused: {title}"
 msgstr "Приостановлен: {title}"
 
-#: gui/dialogs.py:7417 gui/player.py:4366 gui/player.py:4913
+#: gui/dialogs.py:7803 gui/player.py:4366 gui/player.py:4913
 msgid "Buffering..."
 msgstr "Буферизация..."
 
-#: gui/dialogs.py:7419 gui/player.py:4508
+#: gui/dialogs.py:7805 gui/player.py:4508
 msgid "Connecting..."
 msgstr "Подключение..."
 
-#: gui/dialogs.py:7417
+#: gui/dialogs.py:7803
 msgid "Buffering: {title}"
 msgstr "Буферизация: {title}"
 
-#: gui/dialogs.py:7419
+#: gui/dialogs.py:7805
 msgid "Connecting: {title}"
 msgstr "Подключение: {title}"
 
@@ -5294,24 +5481,24 @@ msgstr "Загрузить больше элементов (Enter)"
 msgid "Loading more..."
 msgstr "Загрузка ещё..."
 
-#: gui/mainframe.py:4230 gui/mainframe.py:4362
+#: gui/mainframe.py:4236 gui/mainframe.py:4368
 msgid "New article available."
 msgstr "Доступна новая статья."
 
-#: gui/mainframe.py:11833 gui/mainframe.py:1447 gui/mainframe.py:11799
-#: gui/mainframe.py:12012
+#: gui/mainframe.py:11840 gui/mainframe.py:1447 gui/mainframe.py:11806
+#: gui/mainframe.py:12019
 msgid "Read"
 msgstr "Прочитано"
 
-#: gui/mainframe.py:12758
+#: gui/mainframe.py:12765
 msgid "yt-dlp download failed"
 msgstr "Ошибка загрузки yt-dlp"
 
-#: gui/mainframe.py:13539
+#: gui/mainframe.py:13552
 msgid "Could not update feed."
 msgstr "Не удалось обновить канал."
 
-#: gui/mainframe.py:13590
+#: gui/mainframe.py:13603
 msgid "Could not reset feed title."
 msgstr "Не удалось сбросить заголовок канала."
 
@@ -5335,8 +5522,8 @@ msgstr "Поиск статей"
 msgid "Configure Persistent Search..."
 msgstr "&Настройка постоянного поиска..."
 
-#: gui/mainframe.py:1682 gui/mainframe.py:1726 gui/mainframe.py:9363
-#: gui/mainframe.py:9492
+#: gui/mainframe.py:1682 gui/mainframe.py:1726 gui/mainframe.py:9370
+#: gui/mainframe.py:9499
 msgid "No matches."
 msgstr "Нет соответствий."
 
@@ -5623,192 +5810,197 @@ msgid "Find and add a podcast or RSS feed"
 msgstr "Найти и добавить подкаст или RSS-канал"
 
 #: gui/mainframe.py:2499
+msgid "Browse recovered podcast history and download episodes in batches"
+msgstr ""
+"Просматривать восстановленную историю подкастов и загружать эпизоды пакетно"
+
+#: gui/mainframe.py:2503
 msgid "Search all yt-dlp query-search sites"
 msgstr "Поиск по всем сайтам для запросов yt-dlp"
 
-#: gui/mainframe.py:2503
+#: gui/mainframe.py:2507
 msgid "Filter &Rules..."
 msgstr "Правила &фильтрации..."
 
-#: gui/mainframe.py:2504
+#: gui/mainframe.py:2508
 msgid "Create rules that categorize, label, or delete articles as they arrive"
 msgstr ""
 "Создать правила, которые категоризируют, ставят метку или удаляют статьи по "
 "мере их поступления"
 
-#: gui/mainframe.py:2508
+#: gui/mainframe.py:2512
 msgid "Import browser cookies so challenge-protected sites can be read"
 msgstr ""
 "Импортируйте cookie-файлы браузера, чтобы читать сайты, защищённые проверкой"
 
-#: gui/mainframe.py:2513
+#: gui/mainframe.py:2517
 msgid "View and customize keyboard shortcuts"
 msgstr "Просмотреть и настроить сочетания клавиш"
 
-#: gui/mainframe.py:2516
+#: gui/mainframe.py:2520
 msgid "Configure application"
 msgstr "Настроить приложение"
 
-#: gui/mainframe.py:2523
+#: gui/mainframe.py:2527
 msgid "Check for new versions"
 msgstr "Проверить наличие новых версий"
 
-#: gui/mainframe.py:2526
+#: gui/mainframe.py:2530
 msgid "Announce &Version"
 msgstr "Объявить &версию"
 
-#: gui/mainframe.py:2527
+#: gui/mainframe.py:2531
 msgid "Speak the running BlindRSS version"
 msgstr "Произносить текущую версию BlindRSS"
 
-#: gui/mainframe.py:4131 gui/mainframe.py:4243 gui/mainframe.py:4277
-#: gui/mainframe.py:4381
+#: gui/mainframe.py:4137 gui/mainframe.py:4249 gui/mainframe.py:4283
+#: gui/mainframe.py:4387
 msgid "New article"
 msgstr "Новая статья"
 
-#: gui/mainframe.py:5022
+#: gui/mainframe.py:5028
 msgid "this Smart Folder"
 msgstr "эта смарт-папка"
 
-#: gui/mainframe.py:6324
+#: gui/mainframe.py:6331
 msgid "Scanning for audio... This may take a few seconds."
 msgstr "Поиск аудио... Это может занять несколько секунд."
 
-#: gui/mainframe.py:6324 gui/mainframe.py:5163
+#: gui/mainframe.py:6331 gui/mainframe.py:5169
 msgid "Detect Audio"
 msgstr "Обнаружение аудио"
 
-#: gui/mainframe.py:6583
+#: gui/mainframe.py:6590
 msgid "Versions"
 msgstr "Версии"
 
-#: gui/mainframe.py:6593
+#: gui/mainframe.py:6600
 msgid "Version content"
 msgstr "Содержимое версии"
 
-#: gui/mainframe.py:7648 gui/mainframe.py:4800
+#: gui/mainframe.py:7655 gui/mainframe.py:4806
 msgid "Add Subcategory"
 msgstr "Добавить подкатегорию"
 
-#: gui/mainframe.py:7719
+#: gui/mainframe.py:7726
 msgid " (including subcategories)"
 msgstr " (включая подкатегории)"
 
-#: gui/mainframe.py:7723
+#: gui/mainframe.py:7730
 msgid "This will remove the feeds and their articles."
 msgstr "Это приведёт к удалению каналов и их статей."
 
-#: gui/mainframe.py:7990 gui/mainframe.py:8100
+#: gui/mainframe.py:7997 gui/mainframe.py:8107
 msgid "Refresh complete"
 msgstr "Обновление завершено"
 
-#: gui/mainframe.py:10297
+#: gui/mainframe.py:10304
 msgid "No more occurrences of \"{term}\"."
 msgstr "Больше никаких вхождений \"{term}\"."
 
-#: gui/mainframe.py:10299
+#: gui/mainframe.py:10306
 msgid "No previous occurrences of \"{term}\"."
 msgstr "Ранее \"{term}\" не встречался."
 
-#: gui/mainframe.py:11831 gui/mainframe.py:1447 gui/mainframe.py:11810
+#: gui/mainframe.py:11838 gui/mainframe.py:1447 gui/mainframe.py:11817
 msgid "Unread"
 msgstr "Непрочитано"
 
-#: gui/mainframe.py:11838
+#: gui/mainframe.py:11845
 msgid "Mark all items in all feeds as read?"
 msgstr "Отметить все элементы во всех каналах как прочитанные?"
 
-#: gui/mainframe.py:11992
+#: gui/mainframe.py:11999
 msgid "Failed to mark all items as read."
 msgstr "Не удалось пометить все элементы как прочитанные."
 
-#: gui/mainframe.py:12605
+#: gui/mainframe.py:12612
 msgid "Choose the format to download this item in:"
 msgstr "Выберите формат для загрузки этого элемента:"
 
-#: gui/mainframe.py:13125
+#: gui/mainframe.py:13138
 msgid "Enter the address of a webpage to scan for feeds:"
 msgstr "Введите адрес веб-страницы для сканирования на предмет каналов:"
 
-#: gui/mainframe.py:13195
+#: gui/mainframe.py:13208
 msgid "Select a feed to subscribe to:"
 msgstr "Выберите канал для подписки:"
 
-#: gui/mainframe.py:13196
+#: gui/mainframe.py:13209
 msgid "Detected Feeds"
 msgstr "Обнаруженные каналы"
 
-#: gui/mainframe.py:13618
+#: gui/mainframe.py:13631
 msgid "BlindRSS - Reading YouTube Takeout..."
 msgstr "BlindRSS - Чтение архива YouTube..."
 
-#: gui/mainframe.py:13640 gui/mainframe.py:13739
+#: gui/mainframe.py:13653 gui/mainframe.py:13752
 msgid "YouTube Takeout import failed."
 msgstr "Не удалось импортировать архив YouTube."
 
-#: gui/mainframe.py:13685
+#: gui/mainframe.py:13698
 msgid "Choose the category for imported YouTube subscriptions:"
 msgstr "Выберите категорию для импортированных подписок на YouTube:"
 
-#: gui/mainframe.py:13699
+#: gui/mainframe.py:13712
 msgid "BlindRSS - Importing YouTube Takeout..."
 msgstr "BlindRSS - Импортирование архива YouTube..."
 
-#: gui/mainframe.py:13896
+#: gui/mainframe.py:13909
 msgid "Refreshing imported feeds..."
 msgstr "Обновление импортированных каналов..."
 
-#: gui/mainframe.py:14423
+#: gui/mainframe.py:14436
 msgid "Release notes are available on GitHub."
 msgstr "Примечания к релизу доступны на GitHub."
 
-#: gui/mainframe.py:14450
+#: gui/mainframe.py:14463
 msgid "Updating BlindRSS"
 msgstr "Обновление BlindRSS"
 
-#: gui/mainframe.py:14451
+#: gui/mainframe.py:14464
 msgid "Starting update..."
 msgstr "Запуск обновления..."
 
-#: gui/mainframe.py:14525
+#: gui/mainframe.py:14538
 msgid "Choose category:"
 msgstr "Выберите категорию:"
 
-#: gui/mainframe.py:14847
+#: gui/mainframe.py:14883
 msgid "Folder name"
 msgstr "Название папки"
 
-#: gui/mainframe.py:14930 gui/mainframe.py:14839 gui/mainframe.py:8823
+#: gui/mainframe.py:14966 gui/mainframe.py:14875 gui/mainframe.py:8830
 msgid "Smart Folder"
 msgstr "Смарт-папка"
 
-#: gui/mainframe.py:14978
+#: gui/mainframe.py:15014
 msgid "Rule name"
 msgstr "Название правила"
 
-#: gui/mainframe.py:15017
+#: gui/mainframe.py:15053
 msgid "Then do this"
 msgstr "Тогда сделать это"
 
-#: gui/mainframe.py:15025
+#: gui/mainframe.py:15061
 msgid "Move to category (full path, blank for none)"
 msgstr ""
 "Переместить в категорию  (полный путь, пусто для отказа от этого действия)"
 
-#: gui/mainframe.py:15036
+#: gui/mainframe.py:15072
 msgid "Also show under category (label, blank for none)"
 msgstr ""
 "Также показывать под категорией (метка, пусто для отказа от этого действия)"
 
-#: gui/mainframe.py:15150
+#: gui/mainframe.py:15186
 msgid "Filter rules"
 msgstr "Правила фильтрации"
 
-#: gui/mainframe.py:15208
+#: gui/mainframe.py:15244
 msgid " [stop]"
 msgstr " [остановка]"
 
-#: gui/mainframe.py:15266
+#: gui/mainframe.py:15302
 msgid "this rule"
 msgstr "это правило"
 
@@ -5832,7 +6024,7 @@ msgstr "Отфильтровать текущее представление (En
 msgid "(No saved searches)"
 msgstr "(Нет сохранённых поисковых запросов)"
 
-#: gui/mainframe.py:1931 gui/mainframe.py:12252
+#: gui/mainframe.py:1931 gui/mainframe.py:12259
 msgid "Contains audio"
 msgstr "Содержит аудио"
 
@@ -5848,7 +6040,7 @@ msgstr "Создание ярлыков на рабочем столе, пане
 msgid "Cu&t"
 msgstr "&Вырезать"
 
-#: gui/mainframe.py:2319 gui/mainframe.py:10216
+#: gui/mainframe.py:2319 gui/mainframe.py:10223
 msgid "&Copy"
 msgstr "&Копировать"
 
@@ -5856,7 +6048,7 @@ msgstr "&Копировать"
 msgid "&Paste"
 msgstr "В&ставить"
 
-#: gui/mainframe.py:2321 gui/mainframe.py:10218
+#: gui/mainframe.py:2321 gui/mainframe.py:10225
 msgid "Select &All"
 msgstr "В&ыделить всё"
 
@@ -5956,153 +6148,153 @@ msgstr "&Статус"
 msgid "Sort articles by status"
 msgstr "Сортировать статьи по статусу"
 
-#: gui/mainframe.py:3043
+#: gui/mainframe.py:3048
 msgid "Play queue is empty."
 msgstr "Очередь воспроизведения пуста."
 
-#: gui/mainframe.py:3531 gui/mainframe.py:3120
+#: gui/mainframe.py:3537 gui/mainframe.py:3125
 msgid "Playback speed {speed}x"
 msgstr "Скорость воспроизведения {speed}x"
 
-#: gui/mainframe.py:3687
+#: gui/mainframe.py:3693
 msgid "Show chapter list"
 msgstr "Показать список тайм-кодов"
 
-#: gui/mainframe.py:3697
+#: gui/mainframe.py:3703
 msgid "Previous Chapter (Ctrl+Shift+Left)"
 msgstr "Предыдущий тайм-код (Ctrl+Shift+Влево)"
 
-#: gui/mainframe.py:3698
+#: gui/mainframe.py:3704
 msgid "Jump to previous chapter"
 msgstr "Перейти к предыдущему тайм-коду"
 
-#: gui/mainframe.py:3708
+#: gui/mainframe.py:3714
 msgid "Next Chapter (Ctrl+Shift+Right)"
 msgstr "Следующий тайм-код (Ctrl+Shift+Вправо)"
 
-#: gui/mainframe.py:3709
+#: gui/mainframe.py:3715
 msgid "Jump to next chapter"
 msgstr "Перейти к следующему тайм-коду"
 
-#: gui/mainframe.py:3821
+#: gui/mainframe.py:3827
 msgid "Automatic refresh paused for {minutes} minute."
 msgid_plural "Automatic refresh paused for {minutes} minutes."
 msgstr[0] "Автоматическое обновление приостановлено на {minutes} минуту."
 msgstr[1] "Автоматическое обновление приостановлено на {minutes} минуты."
 msgstr[2] "Автоматическое обновление приостановлено на {minutes} минут."
 
-#: gui/mainframe.py:3876
+#: gui/mainframe.py:3882
 msgid "Stopping refresh..."
 msgstr "Остановка обновления..."
 
-#: gui/mainframe.py:4786
+#: gui/mainframe.py:4792
 msgid "Refresh Category"
 msgstr "Обновить категорию"
 
-#: gui/mainframe.py:4813
+#: gui/mainframe.py:4819
 msgid "Import OPML Here..."
 msgstr "Импортировать OPML сюда..."
 
-#: gui/mainframe.py:4816
+#: gui/mainframe.py:4822
 msgid "Export Category to OPML..."
 msgstr "Экспортировать категорию в OPML..."
 
-#: gui/mainframe.py:4956
+#: gui/mainframe.py:4962
 msgid "The current provider does not support filter rules."
 msgstr "Текущий поставщик не поддерживает правила фильтрации."
 
-#: gui/mainframe.py:4957 gui/mainframe.py:7166 gui/mainframe.py:7228
+#: gui/mainframe.py:4963 gui/mainframe.py:7173 gui/mainframe.py:7235
 msgid "Not Supported"
 msgstr "Не поддерживается"
 
-#: gui/mainframe.py:5025 gui/mainframe.py:4884
+#: gui/mainframe.py:5031 gui/mainframe.py:4890
 msgid "Delete Smart Folder"
 msgstr "Удалить смарт-папку"
 
-#: gui/mainframe.py:5094
+#: gui/mainframe.py:5100
 msgid "Open in Default Browser"
 msgstr "Открыть в браузере по умолчанию"
 
-#: gui/mainframe.py:5100
+#: gui/mainframe.py:5106
 msgid "Mark as &Read"
 msgstr "Отметить как &прочитанное"
 
-#: gui/mainframe.py:5101
+#: gui/mainframe.py:5107
 msgid "Mark as &Unread"
 msgstr "Отметить как &непрочитанное"
 
-#: gui/mainframe.py:5111
+#: gui/mainframe.py:5117
 msgid "Delete Article\tDel"
 msgstr "Удалить статью\tDel"
 
-#: gui/mainframe.py:5126
+#: gui/mainframe.py:5132
 msgid "Restore Article"
 msgstr "Восстановить статью"
 
-#: gui/mainframe.py:5132
+#: gui/mainframe.py:5138
 msgid "Copy Links"
 msgstr "Копировать ссылки"
 
-#: gui/mainframe.py:5144
+#: gui/mainframe.py:5150
 msgid "View Feed Description..."
 msgstr "Просмотреть описание канала..."
 
-#: gui/mainframe.py:5218
+#: gui/mainframe.py:5224
 msgid "Open Play Queue..."
 msgstr "Открыть очередь воспроизведения..."
 
-#: gui/mainframe.py:5443 gui/mainframe.py:5434
+#: gui/mainframe.py:5449 gui/mainframe.py:5440
 msgid "Feed description"
 msgstr "Описание канала"
 
-#: gui/mainframe.py:6307
+#: gui/mainframe.py:6314
 msgid "Opening link."
 msgstr "Открытие ссылки."
 
-#: gui/mainframe.py:6566
+#: gui/mainframe.py:6573
 msgid "No change history for this article."
 msgstr "Для этой статьи нет истории изменений."
 
-#: gui/mainframe.py:6566 gui/mainframe.py:6571
+#: gui/mainframe.py:6573 gui/mainframe.py:6578
 msgid "Article History"
 msgstr "История статьи"
 
-#: gui/mainframe.py:6587
+#: gui/mainframe.py:6594
 msgid "unknown time"
 msgstr "неизвестное время"
 
-#: gui/mainframe.py:6588
+#: gui/mainframe.py:6595
 msgid " (current)"
 msgstr " (текущий)"
 
-#: gui/mainframe.py:6642
+#: gui/mainframe.py:6649
 msgid "Chapters available"
 msgstr "Доступны тайм-коды"
 
-#: gui/mainframe.py:6698
+#: gui/mainframe.py:6705
 msgid ", played"
 msgstr ", воспроизведённое"
 
-#: gui/mainframe.py:6730
+#: gui/mainframe.py:6737
 msgid "played"
 msgstr "воспроизведено"
 
-#: gui/mainframe.py:6844
+#: gui/mainframe.py:6851
 msgid "Already in play queue."
 msgstr "Уже в очереди воспроизведения."
 
-#: gui/mainframe.py:7165
+#: gui/mainframe.py:7172
 msgid "This provider does not support deleting articles."
 msgstr "Этот поставщик не поддерживает удаление статей."
 
-#: gui/mainframe.py:7214
+#: gui/mainframe.py:7221
 msgid "this article"
 msgid_plural "{n} articles"
 msgstr[0] "эта статья"
 msgstr[1] "{n} статьи"
 msgstr[2] "{n} статей"
 
-#: gui/mainframe.py:7221
+#: gui/mainframe.py:7228
 msgid ""
 "Delete {subject}? Deleted articles can be restored from the Deleted Articles "
 "view."
@@ -6110,51 +6302,47 @@ msgstr ""
 "Удалить {subject}? Удалённые статьи можно восстановить из представления "
 "\"Удалённые статьи\"."
 
-#: gui/mainframe.py:7227
+#: gui/mainframe.py:7234
 msgid "This provider does not support permanently deleting articles."
 msgstr "Этот поставщик не поддерживает безвозвратное удаление статей."
 
-#: gui/mainframe.py:7241
+#: gui/mainframe.py:7248
 msgid "Permanently delete this article? It cannot be restored."
 msgstr "Безвозвратно удалить эту статью? Её нельзя будет восстановить."
 
-#: gui/mainframe.py:7471
+#: gui/mainframe.py:7478
 msgid "Added to favorites"
 msgstr "Добавлено в избранное"
 
-#: gui/mainframe.py:7471
+#: gui/mainframe.py:7478
 msgid "Removed from favorites"
 msgstr "Удалено из избранного"
 
-#: gui/mainframe.py:7539
+#: gui/mainframe.py:7546
 msgid "The Uncategorized folder cannot be renamed or moved."
 msgstr "Папка \"Без категории\" не может быть переименована или перемещена."
 
-#: gui/mainframe.py:7697 gui/mainframe.py:7689
+#: gui/mainframe.py:7704 gui/mainframe.py:7696
 msgid "Please select a category to remove."
 msgstr "Пожалуйста, выберите категорию для удаления."
 
-#: gui/mainframe.py:7795
+#: gui/mainframe.py:7802
 msgid "Warning"
 msgstr "Предупреждение"
 
-#: gui/mainframe.py:9197 gui/mainframe.py:10078
+#: gui/mainframe.py:9204 gui/mainframe.py:10085
 msgid "Loading..."
 msgstr "Загрузка..."
 
-#: gui/mainframe.py:12252 gui/mainframe.py:12259
+#: gui/mainframe.py:12259 gui/mainframe.py:12266
 msgid "No audio"
 msgstr "Нет аудио"
 
-#: gui/mainframe.py:12565 gui/mainframe.py:12584
+#: gui/mainframe.py:12572 gui/mainframe.py:12591
 msgid "No downloadable media found for this item."
 msgstr "Загружаемое мультимедиа для этого элемента не найдено."
 
-#: gui/mainframe.py:12568 gui/mainframe.py:12587 gui/mainframe.py:14714
-msgid "Downloads disabled"
-msgstr "Загрузка отключена"
-
-#: gui/mainframe.py:12591
+#: gui/mainframe.py:12598
 msgid ""
 "This item is a direct media file, so it can only be downloaded in its "
 "original format."
@@ -6162,23 +6350,23 @@ msgstr ""
 "Этот элемент является непосредственным медиафайлом, поэтому его можно "
 "загрузить только в исходном формате."
 
-#: gui/mainframe.py:13179
+#: gui/mainframe.py:13192
 msgid "No feeds detected on this page."
 msgstr "На этой странице каналы не обнаружены."
 
-#: gui/mainframe.py:13333
+#: gui/mainframe.py:13346
 msgid "Failed to add feed."
 msgstr "Не удалось добавить канал."
 
-#: gui/mainframe.py:13363
+#: gui/mainframe.py:13376
 msgid "BlindRSS - Removing feed..."
 msgstr "BlindRSS - Удаление канала..."
 
-#: gui/mainframe.py:13411
+#: gui/mainframe.py:13424
 msgid "Please try again."
 msgstr "Пожалуйста, попробуйте снова."
 
-#: gui/mainframe.py:13505
+#: gui/mainframe.py:13518
 msgid ""
 "This provider does not support changing the feed URL.\n"
 "The title and category will be updated, but the URL will stay the same."
@@ -6186,43 +6374,43 @@ msgstr ""
 "Этот поставщик не поддерживает изменение URL-адреса канала.\n"
 "Заголовок и категория будут обновлены, но URL-адрес останется прежним."
 
-#: gui/mainframe.py:13509
+#: gui/mainframe.py:13522
 msgid "Feed URL not supported"
 msgstr "URL-адрес канала не поддерживается"
 
-#: gui/mainframe.py:13599
+#: gui/mainframe.py:13612
 msgid "BlindRSS - Importing OPML..."
 msgstr "BlindRSS - Импортирование OPML..."
 
-#: gui/mainframe.py:13647
+#: gui/mainframe.py:13660
 msgid "Subscribed channels ({count})"
 msgstr "Подписки на каналы ({count})"
 
-#: gui/mainframe.py:13648
+#: gui/mainframe.py:13661
 msgid "Channels from watch history ({count})"
 msgstr "Каналы из истории просмотров ({count})"
 
-#: gui/mainframe.py:13649
+#: gui/mainframe.py:13662
 msgid "Owned channels ({count})"
 msgstr "Собственные каналы ({count})"
 
-#: gui/mainframe.py:13650
+#: gui/mainframe.py:13663
 msgid "Playlists ({count})"
 msgstr "Плейлисты ({count})"
 
-#: gui/mainframe.py:13667
+#: gui/mainframe.py:13680
 msgid "Select at least one item type to import."
 msgstr "Выберите хотя бы один тип элемента для импорта."
 
-#: gui/mainframe.py:13673
+#: gui/mainframe.py:13686
 msgid "No subscribable items were selected."
 msgstr "Не выбрано элементов, доступных для подписки."
 
-#: gui/mainframe.py:13949
+#: gui/mainframe.py:13962
 msgid "Import successful."
 msgstr "Импорт выполнен успешно."
 
-#: gui/mainframe.py:13951
+#: gui/mainframe.py:13964
 msgid ""
 "Import failed. Please check the latest opml_debug_*.log in the temporary "
 "directory."
@@ -6230,7 +6418,7 @@ msgstr ""
 "Не удалось выполнить импорт. Пожалуйста, проверьте последнюю версию "
 "opml_debug_*.log в директории временных файлов."
 
-#: gui/mainframe.py:14424
+#: gui/mainframe.py:14437
 msgid ""
 "A new version of BlindRSS is available ({version}).\n"
 "\n"
@@ -6244,11 +6432,11 @@ msgstr ""
 "\n"
 "Скачать и установить это обновление прямо сейчас?"
 
-#: gui/mainframe.py:14429
+#: gui/mainframe.py:14442
 msgid "Update Available"
 msgstr "Доступно обновление"
 
-#: gui/mainframe.py:14437
+#: gui/mainframe.py:14450
 msgid ""
 "Auto-update is only available in the packaged app build.\n"
 "Download the latest release from GitHub."
@@ -6256,55 +6444,55 @@ msgstr ""
 "Автоматическое обновление доступно только в пакетной сборке приложения.\n"
 "Загрузите последнюю версию с GitHub."
 
-#: gui/mainframe.py:14506
+#: gui/mainframe.py:14519
 msgid "Update Failed"
 msgstr "Не удалось выполнить обновление"
 
-#: gui/mainframe.py:14687
+#: gui/mainframe.py:14700
 msgid "The media player could not be opened, so this link cannot be streamed."
 msgstr ""
 "Не удалось открыть медиапроигрыватель, поэтому эту ссылку невозможно "
 "воспроизвести онлайн."
 
-#: gui/mainframe.py:14852
+#: gui/mainframe.py:14888
 msgid "Show articles that match"
 msgstr "Показать статьи, которые соответствуют"
 
-#: gui/mainframe.py:14961
+#: gui/mainframe.py:14997
 msgid "Filter Rule"
 msgstr "Правило фильтрации"
 
-#: gui/mainframe.py:14983
+#: gui/mainframe.py:15019
 msgid "Apply this rule to articles that match"
 msgstr "Применить это правило к статьям, которые соответствуют"
 
-#: gui/mainframe.py:15040
+#: gui/mainframe.py:15076
 msgid "Mark as &read"
 msgstr "Отметить как &прочитанное"
 
-#: gui/mainframe.py:15042
+#: gui/mainframe.py:15078
 msgid "Mark as &favorite"
 msgstr "Отметить как &избранное"
 
-#: gui/mainframe.py:15044
+#: gui/mainframe.py:15080
 msgid "&Delete (uses the configured delete behavior)"
 msgstr "&Удалить (использует настроенный режим удаления)"
 
-#: gui/mainframe.py:15046
+#: gui/mainframe.py:15082
 msgid "Skip &notification"
 msgstr "Пропустить &уведомление"
 
-#: gui/mainframe.py:15052
+#: gui/mainframe.py:15088
 msgid "&Stop processing later rules when this rule matches"
 msgstr ""
 "&Прекратить обработку последующих правил, когда это правило будет "
 "соответствовать"
 
-#: gui/mainframe.py:15055
+#: gui/mainframe.py:15091
 msgid "Rule &enabled"
 msgstr "Правило &включено"
 
-#: gui/mainframe.py:15114
+#: gui/mainframe.py:15150
 msgid ""
 "Choose at least one action for this rule (move, label, mark, delete, or skip "
 "notification)."
@@ -6312,35 +6500,35 @@ msgstr ""
 "Выберите хотя бы одно действие для этого правила (переместить, поставить "
 "метку, отметить, удалить или пропустить уведомление)."
 
-#: gui/mainframe.py:15115
+#: gui/mainframe.py:15151
 msgid "No Actions"
 msgstr "Нет действий"
 
-#: gui/mainframe.py:15155
+#: gui/mainframe.py:15191
 msgid "&Add..."
 msgstr "&Добавить..."
 
-#: gui/mainframe.py:15156
+#: gui/mainframe.py:15192
 msgid "&Edit..."
 msgstr "&Редактировать..."
 
-#: gui/mainframe.py:15160
+#: gui/mainframe.py:15196
 msgid "En&able/Disable"
 msgstr "&Включить/выключить"
 
-#: gui/mainframe.py:15161
+#: gui/mainframe.py:15197
 msgid "Apply to E&xisting Articles"
 msgstr "Применить к уже &существующим статьям"
 
-#: gui/mainframe.py:15204
+#: gui/mainframe.py:15240
 msgid "{name}: if {condition} then {actions}"
 msgstr "{name}: если {condition}, то {actions}"
 
-#: gui/mainframe.py:15269
+#: gui/mainframe.py:15305
 msgid "Delete Rule"
 msgstr "Удалить правило"
 
-#: gui/mainframe.py:15308
+#: gui/mainframe.py:15344
 msgid ""
 "Run all enabled rules against every existing article now? This may move, "
 "label, or delete articles."
@@ -6349,11 +6537,11 @@ msgstr ""
 "сейчас? Это может привести к перемещению, установке метки или удалению "
 "статей."
 
-#: gui/mainframe.py:15312
+#: gui/mainframe.py:15348
 msgid "Apply to Existing Articles"
 msgstr "Применить к существующим статьям"
 
-#: gui/mainframe.py:15345
+#: gui/mainframe.py:15381
 msgid "Filter Rules Applied"
 msgstr "Применяемые правила фильтрации"
 
@@ -6370,144 +6558,144 @@ msgid "Dependencies installed and PATH updated. A restart is recommended."
 msgstr ""
 "Зависимости установлены, а PATH обновлена. Рекомендуется перезагрузиться."
 
-#: gui/mainframe.py:595 gui/mainframe.py:6341
+#: gui/mainframe.py:595 gui/mainframe.py:6348
 msgid "Success"
 msgstr "Успешно"
 
-#: gui/mainframe.py:3053
+#: gui/mainframe.py:3058
 msgid "End of play queue."
 msgstr "Конец очереди воспроизведения."
 
-#: gui/mainframe.py:3053
+#: gui/mainframe.py:3058
 msgid "Start of play queue."
 msgstr "Начало очереди воспроизведения."
 
-#: gui/mainframe.py:3270
+#: gui/mainframe.py:3276
 msgid "BlindRSS version {version}"
 msgstr "BlindRSS версия {version}"
 
-#: gui/mainframe.py:3655 gui/player.py:2354
+#: gui/mainframe.py:3661 gui/player.py:2354
 msgid "No chapters available"
 msgstr "Нет доступных тайм-кодов"
 
-#: gui/mainframe.py:3686
+#: gui/mainframe.py:3692
 msgid "Show Chapters..."
 msgstr "Показать тайм-коды..."
 
-#: gui/mainframe.py:3880
+#: gui/mainframe.py:3886
 msgid "No refresh in progress"
 msgstr "Обновление не выполняется"
 
-#: gui/mainframe.py:4446
+#: gui/mainframe.py:4452
 msgid "Refreshing feed..."
 msgstr "Обновление канала..."
 
-#: gui/mainframe.py:4804
+#: gui/mainframe.py:4810
 msgid "Edit Category"
 msgstr "Редактировать категорию"
 
-#: gui/mainframe.py:4810
+#: gui/mainframe.py:4816
 msgid "Delete Category and Feeds"
 msgstr "Удалить категорию и каналы"
 
-#: gui/mainframe.py:4828
+#: gui/mainframe.py:4834
 msgid "Mark all items in this feed as read?"
 msgstr "Отметить все элементы в этом канале как прочитанные?"
 
-#: gui/mainframe.py:4851
+#: gui/mainframe.py:4857
 msgid "Notifications for This Feed"
 msgstr "У&ведомления для этого канала"
 
-#: gui/mainframe.py:5118
+#: gui/mainframe.py:5124
 msgid "Delete Article Permanently\tDel"
 msgstr "Удалить статью окончательно\tDel"
 
-#: gui/mainframe.py:5238
+#: gui/mainframe.py:5244
 msgid "Chapter Links"
 msgstr "Ссылки на тайм-коды"
 
-#: gui/mainframe.py:5447
+#: gui/mainframe.py:5453
 msgid "Copy"
 msgstr "Копировать"
 
-#: gui/mainframe.py:6588
+#: gui/mainframe.py:6595
 msgid " (original)"
 msgstr " (оригинал)"
 
-#: gui/mainframe.py:6734
+#: gui/mainframe.py:6741
 msgid "not played"
 msgstr "не воспроизведённое"
 
-#: gui/mainframe.py:7180
+#: gui/mainframe.py:7187
 msgid "Confirm Delete"
 msgstr "Подтвердить удаление"
 
-#: gui/mainframe.py:7218
+#: gui/mainframe.py:7225
 msgid "Move {subject} to the '{category}' category?"
 msgstr "Переместить {subject} в категорию '{category}'?"
 
-#: gui/mainframe.py:7220
+#: gui/mainframe.py:7227
 msgid "Permanently delete {subject}? This cannot be undone."
 msgstr "Безвозвратно удалить {subject}? Это нельзя будет отменить."
 
-#: gui/mainframe.py:7246
+#: gui/mainframe.py:7253
 msgid "Confirm Permanent Delete"
 msgstr "Подтвердить окончательное удаление"
 
-#: gui/mainframe.py:7326
+#: gui/mainframe.py:7333
 msgid "Could not delete article."
 msgid_plural "Could not delete {n} articles."
 msgstr[0] "Не удалось удалить статью."
 msgstr[1] "Не удалось удалить {n} статьи."
 msgstr[2] "Не удалось удалить {n} статей."
 
-#: gui/mainframe.py:7588
+#: gui/mainframe.py:7595
 msgid "Could not move category."
 msgstr "Не удалось переместить категорию."
 
-#: gui/mainframe.py:7593
+#: gui/mainframe.py:7600
 msgid "Could not rename category."
 msgstr "Не удалось переименовать категорию."
 
-#: gui/mainframe.py:7605
+#: gui/mainframe.py:7612
 msgid "Category name:"
 msgstr "Название категории:"
 
-#: gui/mainframe.py:7647
+#: gui/mainframe.py:7654
 msgid "Enter subcategory name (under '{category}'):"
 msgstr "Введите название подкатегории (в поле \"{category}\"):"
 
-#: gui/mainframe.py:8097
+#: gui/mainframe.py:8104
 msgid "Refresh stopped"
 msgstr "Обновление остановлено"
 
-#: gui/mainframe.py:10837 gui/mainframe.py:11376
+#: gui/mainframe.py:10844 gui/mainframe.py:11383
 msgid "Full-text extraction failed. Showing feed content."
 msgstr "Не удалось извлечь полный текст. Показывается содержимое канала."
 
-#: gui/mainframe.py:10838 gui/mainframe.py:11374
+#: gui/mainframe.py:10845 gui/mainframe.py:11381
 msgid "No webpage URL for this item. Showing feed content."
 msgstr ""
 "Для этого элемента нет URL-адреса веб-страницы. Показывается содержимое "
 "канала."
 
-#: gui/mainframe.py:11534
+#: gui/mainframe.py:11541
 msgid "Chapters ({count}):"
 msgstr "Тайм-коды ({count}):"
 
-#: gui/mainframe.py:11845 gui/mainframe.py:12000
+#: gui/mainframe.py:11852 gui/mainframe.py:12007
 msgid "Mark All as Read"
 msgstr "Отметить всё как прочитанное"
 
-#: gui/mainframe.py:12000
+#: gui/mainframe.py:12007
 msgid "All items are already marked as read."
 msgstr "Все элементы уже помечены как прочитанные."
 
-#: gui/mainframe.py:12168
+#: gui/mainframe.py:12175
 msgid "Custom command failed"
 msgstr "Не удалось выполнить пользовательскую команду"
 
-#: gui/mainframe.py:12940
+#: gui/mainframe.py:12947
 msgid ""
 "{error}\n"
 "\n"
@@ -6522,35 +6710,35 @@ msgstr ""
 "требуется вход в систему, экспортируйте файл cookies.txt из вашего браузера "
 "и задайте это в настройках."
 
-#: gui/mainframe.py:12949 gui/mainframe.py:13018 gui/mainframe.py:12889
+#: gui/mainframe.py:12956 gui/mainframe.py:13028 gui/mainframe.py:12896
 msgid "Download error"
 msgstr "Ошибка загрузки"
 
-#: gui/mainframe.py:12953 gui/mainframe.py:13022 gui/mainframe.py:12890
+#: gui/mainframe.py:12960 gui/mainframe.py:13034 gui/mainframe.py:12897
 msgid "Download failed: {title}"
 msgstr "Ошибка загрузки: {title}"
 
-#: gui/mainframe.py:12978 gui/mainframe.py:14762
+#: gui/mainframe.py:12985 gui/mainframe.py:14775
 msgid "Downloading: {title}"
 msgstr "Загрузка: {title}"
 
-#: gui/mainframe.py:13402
+#: gui/mainframe.py:13415
 msgid "Could not remove feed."
 msgstr "Не удалось удалить канал."
 
-#: gui/mainframe.py:13459
+#: gui/mainframe.py:13472
 msgid "This provider does not support editing feeds."
 msgstr "Этот поставщик не поддерживает редактирование каналов."
 
-#: gui/mainframe.py:13459 gui/mainframe.py:13559
+#: gui/mainframe.py:13472 gui/mainframe.py:13572
 msgid "Not supported"
 msgstr "Не поддерживается"
 
-#: gui/mainframe.py:13558
+#: gui/mainframe.py:13571
 msgid "This provider does not support resetting feed titles."
 msgstr "Этот поставщик не поддерживает сброс заголовков каналов."
 
-#: gui/mainframe.py:13748
+#: gui/mainframe.py:13761
 msgid ""
 "YouTube Takeout import complete.\n"
 "\n"
@@ -6572,39 +6760,39 @@ msgstr ""
 "\n"
 "Импортированные каналы будут обновляться во время обычных фоновых обновлений."
 
-#: gui/mainframe.py:13818
+#: gui/mainframe.py:13831
 msgid "Refreshing category: {title}..."
 msgstr "Обновление категории: {title}..."
 
-#: gui/mainframe.py:13994
+#: gui/mainframe.py:14007
 msgid "Export failed for category \"{category}\"."
 msgstr "Не удалось выполнить экспорт категории \"{category}\"."
 
-#: gui/mainframe.py:14002
+#: gui/mainframe.py:14015
 msgid "Export \"{category}\" Category OPML"
 msgstr "Экспорт категории \"{category}\" в OPML"
 
-#: gui/mainframe.py:14399
+#: gui/mainframe.py:14412
 msgid "Update Check Failed"
 msgstr "Не удалось выполнить проверку обновления"
 
-#: gui/mainframe.py:14404
+#: gui/mainframe.py:14417
 msgid "No Updates"
 msgstr "Обновлений нет"
 
-#: gui/mainframe.py:14409
+#: gui/mainframe.py:14422
 msgid "Unable to determine update status."
 msgstr "Не удаётся определить статус обновления."
 
-#: gui/mainframe.py:14531 gui/mainframe.py:13117
+#: gui/mainframe.py:14544 gui/mainframe.py:13130
 msgid "BlindRSS - Adding feed {url}..."
 msgstr "BlindRSS - Добавление канала {url}..."
 
-#: gui/mainframe.py:14610
+#: gui/mainframe.py:14623
 msgid "Enter the address of the article you want to open."
 msgstr "Введите адрес статьи, которую хотите открыть."
 
-#: gui/mainframe.py:14660
+#: gui/mainframe.py:14673
 msgid ""
 "That does not look like a media link. Enter a full web address, for example "
 "https://www.youtube.com/watch?v=..."
@@ -6612,51 +6800,51 @@ msgstr ""
 "Это не похоже на ссылку на мультимедиа. Введите полный веб-адрес, например "
 "https://www.youtube.com/watch?v=..."
 
-#: gui/mainframe.py:14663
+#: gui/mainframe.py:14676
 msgid "Enter the address of the media you want to open."
 msgstr "Введите адрес мультимедиа, которое хотите открыть."
 
-#: gui/mainframe.py:14698 gui/mainframe.py:14753
+#: gui/mainframe.py:14711 gui/mainframe.py:14766
 msgid "Opening: {title}"
 msgstr "Открытие: {title}"
 
-#: gui/mainframe.py:14844
+#: gui/mainframe.py:14880
 msgid "Folder &name:"
 msgstr "&Название папки:"
 
-#: gui/mainframe.py:14853 gui/mainframe.py:14984
+#: gui/mainframe.py:14889 gui/mainframe.py:15020
 msgid "All conditions (AND)"
 msgstr "Все условия (И)"
 
-#: gui/mainframe.py:14853 gui/mainframe.py:14984
+#: gui/mainframe.py:14889 gui/mainframe.py:15020
 msgid "Any condition (OR)"
 msgstr "Любое условие (ИЛИ)"
 
-#: gui/mainframe.py:14861 gui/mainframe.py:14993
+#: gui/mainframe.py:14897 gui/mainframe.py:15029
 msgid "Field"
 msgstr "Поле"
 
-#: gui/mainframe.py:14862 gui/mainframe.py:14994
+#: gui/mainframe.py:14898 gui/mainframe.py:15030
 msgid "Condition"
 msgstr "Условие"
 
-#: gui/mainframe.py:14863 gui/mainframe.py:14995
+#: gui/mainframe.py:14899 gui/mainframe.py:15031
 msgid "Value"
 msgstr "Значение"
 
-#: gui/mainframe.py:14975
+#: gui/mainframe.py:15011
 msgid "Rule &name:"
 msgstr "&Название правила:"
 
-#: gui/mainframe.py:15019
+#: gui/mainframe.py:15055
 msgid "&Move to category:"
 msgstr "&Переместить в категорию:"
 
-#: gui/mainframe.py:15030
+#: gui/mainframe.py:15066
 msgid "Also &label with category:"
 msgstr "Также поставить &метку с категорией:"
 
-#: gui/mainframe.py:15144
+#: gui/mainframe.py:15180
 msgid "Rules run top to bottom for each incoming article, like email filters."
 msgstr ""
 "Правила применяются сверху вниз для каждой поступающей статьи, как фильтры "
@@ -6685,169 +6873,165 @@ msgstr "{elapsed} / {total} (осталось {remaining})"
 msgid "{speed}x"
 msgstr "{speed}x"
 
-#: gui/mainframe.py:4838
+#: gui/mainframe.py:4844
 msgid "Edit Feed..."
 msgstr "Редактировать канал..."
 
-#: gui/mainframe.py:4877 gui/mainframe.py:4886
+#: gui/mainframe.py:4883 gui/mainframe.py:4892
 msgid "New Smart Folder..."
 msgstr "Новая смарт-папка..."
 
-#: gui/mainframe.py:5024
+#: gui/mainframe.py:5030
 msgid "Delete Smart Folder \"{name}\"? Your articles are not affected."
 msgstr "Удалить смарт-папку \"{name}\"? Это не повлияет на ваши статьи."
 
-#: gui/mainframe.py:5097
+#: gui/mainframe.py:5103
 msgid "Mark {count} as &Read"
 msgstr "Отметить {count} как &прочитанные"
 
-#: gui/mainframe.py:5098
+#: gui/mainframe.py:5104
 msgid "Mark {count} as &Unread"
 msgstr "Отметить {count} как &непрочитанные"
 
-#: gui/mainframe.py:5109
+#: gui/mainframe.py:5115
 msgid "Delete {count} Articles\tDel"
 msgstr "Удалить {count} статей\tDel"
 
-#: gui/mainframe.py:5124
+#: gui/mainframe.py:5130
 msgid "Restore {count} Articles"
 msgstr "Восстановить {count} статей"
 
-#: gui/mainframe.py:5138
+#: gui/mainframe.py:5144
 msgid "Copy Text ({count} articles)"
 msgstr "Копировать текст ({count} статей)"
 
-#: gui/mainframe.py:5160
+#: gui/mainframe.py:5166
 msgid "Download As..."
 msgstr "Загрузить как..."
 
-#: gui/mainframe.py:5167
+#: gui/mainframe.py:5173
 msgid "Copy Image Link"
 msgstr "Скопировать ссылку на изображение"
 
-#: gui/mainframe.py:5243
+#: gui/mainframe.py:5249
 msgid "Remove from Favorites"
 msgstr "Удалить из избранного"
 
-#: gui/mainframe.py:5245
+#: gui/mainframe.py:5251
 msgid "Add to Favorites"
 msgstr "Добавить в избранное"
 
-#: gui/mainframe.py:5256
+#: gui/mainframe.py:5262
 msgid "View History..."
 msgstr "Просмотреть историю..."
 
-#: gui/mainframe.py:6347
+#: gui/mainframe.py:6354
 msgid "No audio found."
 msgstr "Аудио не найдено."
 
-#: gui/mainframe.py:6347
+#: gui/mainframe.py:6354
 msgid "Result"
 msgstr "Результат"
 
-#: gui/mainframe.py:6577
+#: gui/mainframe.py:6584
 msgid "{total} versions of: {title}"
 msgstr "{total} версий: {title}"
 
-#: gui/mainframe.py:6589
+#: gui/mainframe.py:6596
 msgid "Version {num} - {when}{suffix}"
 msgstr "Версия {num} - {when}{suffix}"
 
-#: gui/mainframe.py:6700
+#: gui/mainframe.py:6707
 msgid ", {position} of {total}"
 msgstr ", {position} из {total}"
 
-#: gui/mainframe.py:6704
+#: gui/mainframe.py:6711
 msgid ", {total}"
 msgstr ", {total}"
 
-#: gui/mainframe.py:6706
+#: gui/mainframe.py:6713
 msgid ", {position} played"
 msgstr ", {position} воспроизведённых"
 
-#: gui/mainframe.py:6841
+#: gui/mainframe.py:6848
 msgid "Added {count} to play queue ({total} queued)."
 msgstr "Добавлено {count} в очередь воспроизведения (в очереди {total})."
 
-#: gui/mainframe.py:6862
+#: gui/mainframe.py:6869
 msgid "Removed {count} from play queue ({total} queued)."
 msgstr "Удалено {count} из очереди воспроизведения (в очереди {total})."
 
-#: gui/mainframe.py:7243
+#: gui/mainframe.py:7250
 msgid "Permanently delete {count} articles? They cannot be restored."
 msgstr "Безвозвратно удалить {count} статей? Их нельзя будет восстановить."
 
-#: gui/mainframe.py:7411
+#: gui/mainframe.py:7418
 msgid "Could not restore article."
 msgstr "Не удалось восстановить статью."
 
-#: gui/mainframe.py:7617
+#: gui/mainframe.py:7624
 msgid "Parent category:"
 msgstr "Родительская категория:"
 
-#: gui/mainframe.py:7638
+#: gui/mainframe.py:7645
 msgid "Could not add category."
 msgstr "Не удалось добавить категорию."
 
-#: gui/mainframe.py:7656
+#: gui/mainframe.py:7663
 msgid "Could not add subcategory."
 msgstr "Не удалось добавить подкатегорию."
 
-#: gui/mainframe.py:7721
+#: gui/mainframe.py:7728
 msgid "Delete category '{title}'{note} and its {count} feed?"
 msgid_plural "Delete category '{title}'{note} and its {count} feeds?"
 msgstr[0] "Удалить категорию '{title}'{note} и {count} её канал?"
 msgstr[1] "Удалить категорию '{title}'{note} и {count} её канала?"
 msgstr[2] "Удалить категорию '{title}'{note} и {count} её каналов?"
 
-#: gui/mainframe.py:7787
+#: gui/mainframe.py:7794
 msgid "Category '{title}' could not be deleted."
 msgstr "Не удалось удалить категорию '{title}'."
 
-#: gui/mainframe.py:7792
+#: gui/mainframe.py:7799
 msgid "{n} feed could not be removed."
 msgid_plural "{n} feeds could not be removed."
 msgstr[0] "Не удалось удалить {n} канал."
 msgstr[1] "Не удалось удалить {n} канала."
 msgstr[2] "Не удалось удалить {n} каналов."
 
-#: gui/mainframe.py:8114
+#: gui/mainframe.py:8121
 msgid "Error checking: {title} ({done} out of {total})"
 msgstr "Ошибка при проверке: {title} ({done} из {total})"
 
-#: gui/mainframe.py:8118
+#: gui/mainframe.py:8125
 msgid "Checked {done} out of {total}"
 msgstr "Проверено {done} из {total}"
 
-#: gui/mainframe.py:8130
+#: gui/mainframe.py:8137
 msgid "Error checking: {title}"
 msgstr "Ошибка при проверке: {title}"
 
-#: gui/mainframe.py:8132
+#: gui/mainframe.py:8139
 msgid "Checked: {title}"
 msgstr "Проверен: {title}"
 
-#: gui/mainframe.py:8818
+#: gui/mainframe.py:8825
 msgid "Smart Folders"
 msgstr "Смарт-папки"
 
-#: gui/mainframe.py:11400
+#: gui/mainframe.py:11407
 msgid "No text available.\n"
 msgstr "Текст недоступен.\n"
 
-#: gui/mainframe.py:11541
+#: gui/mainframe.py:11548
 msgid ". Link: {url}"
 msgstr ". Ссылка: {url}"
 
-#: gui/mainframe.py:13009 gui/mainframe.py:12909
-msgid "Download complete"
-msgstr "Загрузка завершена"
-
-#: gui/mainframe.py:13012 gui/mainframe.py:12912
+#: gui/mainframe.py:13020 gui/mainframe.py:12919
 msgid "Download complete: {title}"
 msgstr "Завершена загрузка: {title}"
 
-#: gui/mainframe.py:13154
+#: gui/mainframe.py:13167
 msgid ""
 "BlindRSS could not complete this site's browser verification page "
 "automatically.\n"
@@ -6862,47 +7046,47 @@ msgstr ""
 "файлы расширением cookies.txt, а заттем воспользоваться пунктом \"Сервис\" > "
 "\"Импортировать cookie-файлы сайта\"."
 
-#: gui/mainframe.py:13161
+#: gui/mainframe.py:13174
 msgid "Unable to retrieve the page."
 msgstr "Не удалось получить страницу."
 
-#: gui/mainframe.py:13340
+#: gui/mainframe.py:13353
 msgid "Are you sure you want to remove this feed?"
 msgstr "Вы действительно хотите удалить этот канал?"
 
-#: gui/mainframe.py:13361
+#: gui/mainframe.py:13374
 msgid "BlindRSS - Removing feed {title}..."
 msgstr "BlindRSS - Удаление канала {title}..."
 
-#: gui/mainframe.py:13407
+#: gui/mainframe.py:13420
 msgid "It may be busy due to another operation."
 msgstr "Возможно, он занят из-за другой операции."
 
-#: gui/mainframe.py:13596 gui/mainframe.py:13954 gui/mainframe.py:14003
+#: gui/mainframe.py:13609 gui/mainframe.py:13967 gui/mainframe.py:14016
 msgid "OPML files"
 msgstr "OPML файлы"
 
-#: gui/mainframe.py:13608
+#: gui/mainframe.py:13621
 msgid "ZIP archives"
 msgstr "ZIP-архивы"
 
-#: gui/mainframe.py:13960 gui/mainframe.py:14013
+#: gui/mainframe.py:13973 gui/mainframe.py:14026
 msgid "Export successful."
 msgstr "Экспорт выполнен успешно."
 
-#: gui/mainframe.py:13962 gui/mainframe.py:14015
+#: gui/mainframe.py:13975 gui/mainframe.py:14028
 msgid "Export failed."
 msgstr "Не удалось выполнить экспорт."
 
-#: gui/mainframe.py:13990
+#: gui/mainframe.py:14003
 msgid "No feeds found in category \"{category}\"."
 msgstr "Не найдено каналов в категории \"{category}\"."
 
-#: gui/mainframe.py:14078
+#: gui/mainframe.py:14091
 msgid "Storage Location"
 msgstr "Местоположение хранилища"
 
-#: gui/mainframe.py:14083
+#: gui/mainframe.py:14096
 msgid ""
 "Config has been moved. The feed database will be migrated to the new "
 "location the next time BlindRSS starts."
@@ -6910,30 +7094,30 @@ msgstr ""
 "Конфигурация была изменена. База данных каналов будет перенесена в новое "
 "местоположение при следующем запуске BlindRSS."
 
-#: gui/mainframe.py:14087
+#: gui/mainframe.py:14100
 msgid "Storage Location Changed"
 msgstr "Местоположение хранилища изменено"
 
-#: gui/mainframe.py:14868 gui/mainframe.py:15000
+#: gui/mainframe.py:14904 gui/mainframe.py:15036
 msgid "Condition {n} field"
 msgstr "Поле условия {n}"
 
-#: gui/mainframe.py:14871 gui/mainframe.py:15003
+#: gui/mainframe.py:14907 gui/mainframe.py:15039
 msgid "Condition {n} operator"
 msgstr "Оператор условия {n}"
 
-#: gui/mainframe.py:14874 gui/mainframe.py:15006
+#: gui/mainframe.py:14910 gui/mainframe.py:15042
 msgid "Condition {n} value"
 msgstr "Значение условия {n}"
 
-#: gui/mainframe.py:15268
+#: gui/mainframe.py:15304
 msgid ""
 "Delete filter rule \"{name}\"? Articles it already filed are not changed."
 msgstr ""
 "Удалить правило фильтрации \"{name}\"? Статьи, которые уже были "
 "распределены, не изменятся."
 
-#: gui/mainframe.py:15338
+#: gui/mainframe.py:15374
 msgid "Scanned {scanned} article; {changed} matched a rule."
 msgid_plural "Scanned {scanned} articles; {changed} matched a rule."
 msgstr[0] "Просканирована {scanned} статья; соответствий правилу: {changed}."
@@ -6997,23 +7181,23 @@ msgstr ""
 "Не удалось добавить ярлыки:\n"
 "{error}"
 
-#: gui/mainframe.py:3063
+#: gui/mainframe.py:3068
 msgid "Playing {position} of {total}: {title}"
 msgstr "Воспроизводится {position} из {total}: {title}"
 
-#: gui/mainframe.py:3067
+#: gui/mainframe.py:3072
 msgid "Playing {position} of {total}"
 msgstr "Воспроизводится {position} из {total}"
 
-#: gui/mainframe.py:4444
+#: gui/mainframe.py:4450
 msgid "Refreshing feed: {title}..."
 msgstr "Обновление канала: {title}..."
 
-#: gui/mainframe.py:4472
+#: gui/mainframe.py:4478
 msgid "{hidden} new article notification(s) were suppressed by your cap."
 msgstr "{hidden} уведомлений о новых статьях были скрыты вашим ограничением."
 
-#: gui/mainframe.py:4644
+#: gui/mainframe.py:4650
 msgid "{count} new article notification was suppressed by your cap."
 msgid_plural "{count} new article notifications were suppressed by your cap."
 msgstr[0] ""
@@ -7023,75 +7207,75 @@ msgstr[1] ""
 msgstr[2] ""
 "{count} уведомлений о новых статьях были спрятаны вашим ограничением."
 
-#: gui/mainframe.py:4827
+#: gui/mainframe.py:4833
 msgid "Mark all items in \"{feed}\" as read?"
 msgstr "Отметить все элементы в \"{feed}\" как прочитанные?"
 
-#: gui/mainframe.py:4843
+#: gui/mainframe.py:4849
 msgid "Reset Title to Feed Default"
 msgstr "Сбросить &заголовок канала к значению по умолчанию"
 
-#: gui/mainframe.py:4882
+#: gui/mainframe.py:4888
 msgid "Edit Smart Folder..."
 msgstr "Редактировать смарт-папку..."
 
-#: gui/mainframe.py:4984
+#: gui/mainframe.py:4990
 msgid "Could not create the Smart Folder."
 msgstr "Не удалось создать смарт-папку."
 
-#: gui/mainframe.py:5008
+#: gui/mainframe.py:5014
 msgid "Could not update the Smart Folder."
 msgstr "Не удалось обновить смарт-папку."
 
-#: gui/mainframe.py:5116
+#: gui/mainframe.py:5122
 msgid "Delete {count} Articles Permanently\tDel"
 msgstr "Удалить {count} статей навсегда\tDel"
 
-#: gui/mainframe.py:5205
+#: gui/mainframe.py:5211
 msgid "Remove from Play Queue"
 msgstr "Удалить из очереди воспроизведения"
 
-#: gui/mainframe.py:5212
+#: gui/mainframe.py:5218
 msgid "Add to Play Queue"
 msgstr "Добавить в очередь воспроизведения"
 
-#: gui/mainframe.py:5229
+#: gui/mainframe.py:5235
 msgid "Open {chapter}"
 msgstr "Открыть {chapter}"
 
-#: gui/mainframe.py:6340
+#: gui/mainframe.py:6347
 msgid "Audio detected and added!"
 msgstr "Аудио обнаружено и добавлено!"
 
-#: gui/mainframe.py:6345
+#: gui/mainframe.py:6352
 msgid "Provider does not support updating media."
 msgstr "Поставщик не поддерживает обновление мультимедиа."
 
-#: gui/mainframe.py:6697
+#: gui/mainframe.py:6704
 msgid ", played, {total}"
 msgstr ", воспроизведено, {total}"
 
-#: gui/mainframe.py:6732
+#: gui/mainframe.py:6739
 msgid "played {position}"
 msgstr "воспроизведено {position}"
 
-#: gui/mainframe.py:7789 gui/mainframe.py:13409
+#: gui/mainframe.py:7796 gui/mainframe.py:13422
 msgid "Error: {error}"
 msgstr "Ошибка: {error}"
 
-#: gui/mainframe.py:7895
+#: gui/mainframe.py:7902
 msgid "Error fetching feeds: {error}"
 msgstr "Ошибка при выборке каналов: {error}"
 
-#: gui/mainframe.py:8126
+#: gui/mainframe.py:8133
 msgid "Refreshing: {done} out of {total}"
 msgstr "Обновление: {done} из {total}"
 
-#: gui/mainframe.py:9368 gui/mainframe.py:9497 gui/mainframe.py:9999
+#: gui/mainframe.py:9375 gui/mainframe.py:9504 gui/mainframe.py:10006
 msgid "Filter: {shown} of {total}"
 msgstr "Фильтр: {shown} из {total}"
 
-#: gui/mainframe.py:12163
+#: gui/mainframe.py:12170
 msgid ""
 "Could not open the article with your custom command:\n"
 "\n"
@@ -7107,47 +7291,51 @@ msgstr ""
 "Вместо этого она откроется в браузере по умолчанию. Вы можете изменить это в "
 "\"Настройки\" > \"Общие\" > \"Способ открытия статей\"."
 
-#: gui/mainframe.py:12799
+#: gui/mainframe.py:12806
 msgid "Trying pytubefix: {title}"
 msgstr "Попытка через pytubefix: {title}"
 
-#: gui/mainframe.py:12822
+#: gui/mainframe.py:12829
 msgid "Preparing YouTube browser session: {title}"
 msgstr "Подготовка браузерной сессии YouTube: {title}"
 
-#: gui/mainframe.py:12893
+#: gui/mainframe.py:12900
 msgid "yt-dlp download timed out"
 msgstr "Время ожидания загрузки yt-dlp истекло"
 
-#: gui/mainframe.py:12948 gui/mainframe.py:13017
+#: gui/mainframe.py:12955 gui/mainframe.py:13027
 msgid "Download failed: {error}"
 msgstr "Ошибка загрузки. {error}"
 
-#: gui/mainframe.py:13400
+#: gui/mainframe.py:13017 gui/mainframe.py:12916
+msgid "Download complete"
+msgstr "Загрузка завершена"
+
+#: gui/mainframe.py:13413
 msgid "Could not remove feed '{title}'."
 msgstr "Не удалось удалить канал \"{title}\"."
 
-#: gui/mainframe.py:14077
+#: gui/mainframe.py:14090
 msgid "Could not move config file."
 msgstr "Не удалось переместить конфигурационный файл."
 
-#: gui/mainframe.py:14171
+#: gui/mainframe.py:14184
 msgid "Could not update startup registration."
 msgstr "Не удалось обновить регистрацию автозапуска."
 
-#: gui/mainframe.py:14390
+#: gui/mainframe.py:14403
 msgid "Update check failed: {error}"
 msgstr "Не удалось выполнить проверку обновления: {error}"
 
-#: gui/mainframe.py:15226
+#: gui/mainframe.py:15262
 msgid "Could not create the rule."
 msgstr "Не удалось создать правило."
 
-#: gui/mainframe.py:15255
+#: gui/mainframe.py:15291
 msgid "Could not update the rule."
 msgstr "Не удалось обновить правило."
 
-#: gui/mainframe.py:15331
+#: gui/mainframe.py:15367
 msgid ""
 "Could not apply rules.\n"
 "\n"
@@ -7157,56 +7345,56 @@ msgstr ""
 "\n"
 "{error}"
 
-#: gui/mainframe.py:3670
+#: gui/mainframe.py:3676
 msgid "Current chapter, {label}"
 msgstr "Текущий тайм-код, {label}"
 
-#: gui/mainframe.py:4794
+#: gui/mainframe.py:4800
 msgid "Mark all items in category \"{category}\" as read?"
 msgstr "Отметить все элементы в категории \"{category}\" как прочитанные?"
 
-#: gui/mainframe.py:5188
+#: gui/mainframe.py:5194
 msgid "Add {count} to Play Queue"
 msgstr "Добавить {count} в очередь воспроизведения"
 
-#: gui/mainframe.py:5196
+#: gui/mainframe.py:5202
 msgid "Remove {count} from Play Queue"
 msgstr "Удалить {count} из очереди воспроизведения"
 
-#: gui/mainframe.py:6349
+#: gui/mainframe.py:6356
 msgid "Error detecting audio: {error}"
 msgstr "Ошибка при обнаружении аудио: {error}"
 
-#: gui/mainframe.py:7412
+#: gui/mainframe.py:7419
 msgid "Could not restore {count} articles."
 msgstr "Не удалось восстановить {count} статей."
 
-#: gui/mainframe.py:7677
+#: gui/mainframe.py:7684
 msgid "Remove category '{category}'? Feeds will be moved to Uncategorized."
 msgstr ""
 "Удалить категорию \"{category}\"? Каналы будут перемещены в папку \"Без "
 "категории\"."
 
-#: gui/mainframe.py:13008 gui/mainframe.py:12908
+#: gui/mainframe.py:14030
+msgid "Export failed: {error}"
+msgstr "Не удалось выполнить экспорт: {error}"
+
+#: gui/mainframe.py:14200
+msgid "Windows notification prerequisites could not be fully configured."
+msgstr ""
+"Не удалось полностью настроить необходимые компоненты уведомлений Windows."
+
+#: gui/mainframe.py:10768
+msgid "Translation failed: {error}"
+msgstr "Ошибка перевода: {error}"
+
+#: gui/mainframe.py:13016 gui/mainframe.py:12915
 msgid ""
 "Downloaded to:\n"
 "{path}"
 msgstr ""
 "Загружено в:\n"
 "{path}"
-
-#: gui/mainframe.py:14017
-msgid "Export failed: {error}"
-msgstr "Не удалось выполнить экспорт: {error}"
-
-#: gui/mainframe.py:14187
-msgid "Windows notification prerequisites could not be fully configured."
-msgstr ""
-"Не удалось полностью настроить необходимые компоненты уведомлений Windows."
-
-#: gui/mainframe.py:10761
-msgid "Translation failed: {error}"
-msgstr "Ошибка перевода: {error}"
 
 #: gui/mainframe.py:561
 msgid ""
@@ -7243,7 +7431,7 @@ msgstr ""
 "\n"
 "Совет: вы можете отключить этот запрос в \"Настройки\" > \"YouTube\"."
 
-#: gui/mainframe.py:12888
+#: gui/mainframe.py:12895
 msgid ""
 "yt-dlp is not installed. Install it via Settings to download YouTube items."
 msgstr ""
