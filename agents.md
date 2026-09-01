@@ -434,19 +434,3 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 9. Release publication: a release MUST end up published and Latest or the updater never sees it. Do not remove the `build.bat release` guards (`--draft=false --latest`, no-drafts check, `/releases/latest` verify) or auto-delete releases. See **Build & Release** > Updater visibility.
 10. Tests: add/extend tests in `tests/` for behavior changes and regressions.
 11. Secrets: never print, log, commit, or include API keys/cookies/Authorization headers in tests or diagnostics.
-
-<!-- claude-memory:begin (managed by sync-claude-memory.py; canonical files live in C:\Users\admin\.claude - edit there, not here) -->
-## Memories (shared from ~/.claude - project: C--Users-admin-git-BlindRSS)
-Index of memory files - read one on demand when a task touches its
-topic (agents that expand @imports get every file via the @ lines below).
-New memories for this project go in C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory - see the memory protocol in
-the global AGENTS.md for the required format, and re-run
-sync-claude-memory.py after writing one:
-- [Rich view external links](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\rich-view-external-links.md) — issue #102: wx 3.3 fires NAVIGATING per iframe, so open_links_externally sent embeds to the browser; use gui/rich_view_links (main-frame only)
-- [cmd bare batch not found](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\cmd-bare-batch-not-found.md) — Claude-spawned shells set NoDefaultCurrentDirectoryInExePath=1; run repo batch files as `.\build.bat release`, never bare
-- [Release must run detached](C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\release-must-run-detached.md) — build.bat release outlives an agent background task; launch with Start-Process or it dies mid-installer with nothing published
-@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\MEMORY.md
-@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\cmd-bare-batch-not-found.md
-@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\release-must-run-detached.md
-@C:\Users\admin\.claude\projects\C--Users-admin-git-BlindRSS\memory\rich-view-external-links.md
-<!-- claude-memory:end -->
