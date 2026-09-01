@@ -40,6 +40,8 @@ from core.db import (
     claim_podcast_archive_scan,
     finish_podcast_archive_scan,
     reset_podcast_archive_scan,
+    article_is_outside_retention,
+    retention_cutoff_date,
 )
 from core import article_lang
 from core import smart_folders as smart_folders_mod
@@ -440,6 +442,13 @@ def _entry_raw_date(entry) -> str:
     return ""
 
 
+# Prefix of the identity we synthesize for entries that carry no <guid>, <id>
+# or <link> of their own. Such an identity hashes the entry body, so it changes
+# whenever the publisher edits the text; refresh recognizes the prefix and falls
+# back to matching the stored row by (title, date) instead (issue #106).
+_SYNTHESIZED_ENTRY_ID_PREFIX = "blindrss:entry:"
+
+
 def _entry_base_id(entry, feed_id: str, feed_url: str, content: Optional[str] = None) -> str:
     identity = _entry_text(entry, "id") or _entry_text(entry, "guid") or _entry_primary_link(entry)
     if identity:
@@ -453,7 +462,7 @@ def _entry_base_id(entry, feed_id: str, feed_url: str, content: Optional[str] = 
         return ""
 
     seed = "|".join([str(feed_id or ""), str(feed_url or ""), title, raw_date, body])
-    return f"blindrss:entry:{uuid.uuid5(uuid.NAMESPACE_URL, seed)}"
+    return f"{_SYNTHESIZED_ENTRY_ID_PREFIX}{uuid.uuid5(uuid.NAMESPACE_URL, seed)}"
 
 
 def _decode_feed_text(data, fallback_text: Optional[str] = None) -> str:
@@ -1507,6 +1516,24 @@ class LocalProvider(RSSProvider):
         self._forced_podcast_archive_lock = threading.Lock()
         self._pending_podcast_archive_results = {}
         self._pending_podcast_archive_lock = threading.Lock()
+    def _retention_cutoff(self) -> Optional[str]:
+        """The retention boundary refresh must not insert past (issue #106).
+
+        Retention cleanup deletes anything older than the window, but feeds keep
+        serving those same entries, so without this the next refresh re-inserted
+        every purged item as unread -- read articles resurfaced as new on
+        practically every update cycle. ``None`` (unlimited, the default) keeps
+        the previous behavior of importing everything a feed offers.
+        """
+        try:
+            from core.retention import RETENTION_DEFAULT, retention_days
+
+            return retention_cutoff_date(
+                retention_days(self.config.get("article_retention", RETENTION_DEFAULT))
+            )
+        except Exception:
+            return None
+
     def get_name(self) -> str:
         return "Local RSS"
 
@@ -2006,6 +2033,13 @@ class LocalProvider(RSSProvider):
         known_unread_count = None
         deferred_podcast_archive_job = None
         deferred_podcast_archive_completion = None
+        # Issue #106: anything already older than this boundary is deleted by the
+        # very next retention sweep, so inserting it would only resurrect it as
+        # unread. Computed once per feed so every insert path below agrees.
+        retention_cutoff = self._retention_cutoff()
+
+        def _retention_purged(date_value) -> bool:
+            return article_is_outside_retention(date_value, retention_cutoff)
 
         if respect_failure_cooldown and not force:
             expires_at, cached_error = self._get_refresh_failure_cooldown(feed_id)
@@ -2397,6 +2431,8 @@ class LocalProvider(RSSProvider):
                                         conn.commit()
                                 continue
 
+                            if _retention_purged(date):
+                                continue
                             c.execute(
                                 "INSERT INTO articles (id, feed_id, title, url, content, date, author, is_read, media_url, media_type) "
                                 "VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
@@ -2555,6 +2591,8 @@ class LocalProvider(RSSProvider):
                                         conn.commit()
                                 continue
 
+                            if _retention_purged(date):
+                                continue
                             c.execute(
                                 "INSERT INTO articles (id, feed_id, title, url, content, date, author, is_read, media_url, media_type) "
                                 "VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
@@ -2695,6 +2733,8 @@ class LocalProvider(RSSProvider):
                                 if existing_date != date or i % 5 == 0 or i == total_entries - 1:
                                     conn.commit()
                                 continue
+                            if _retention_purged(date):
+                                continue
                             c.execute(
                                 "INSERT INTO articles "
                                 "(id, feed_id, title, url, content, date, author, is_read) "
@@ -2815,6 +2855,8 @@ class LocalProvider(RSSProvider):
                                 )
                                 if existing_date != date or i % 5 == 0 or i == total_entries - 1:
                                     conn.commit()
+                                continue
+                            if _retention_purged(date):
                                 continue
                             c.execute(
                                 "INSERT INTO articles (id, feed_id, title, url, content, date, author, is_read) "
@@ -2947,6 +2989,8 @@ class LocalProvider(RSSProvider):
                                     conn.commit()
                                 continue
 
+                            if _retention_purged(date):
+                                continue
                             c.execute(
                                 "INSERT INTO articles (id, feed_id, title, url, content, date, author, is_read, media_url, media_type) "
                                 "VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
@@ -3113,6 +3157,8 @@ class LocalProvider(RSSProvider):
                                         conn.commit()
                                 continue
 
+                            if _retention_purged(date):
+                                continue
                             c.execute(
                                 "INSERT INTO articles (id, feed_id, title, url, content, date, author, is_read, media_url, media_type) "
                                 "VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
@@ -3808,6 +3854,37 @@ class LocalProvider(RSSProvider):
                         if existing_metadata is not None:
                             existing_article_id = scoped_id
 
+                    if (
+                        existing_article_id is None
+                        and base_id.startswith(_SYNTHESIZED_ENTRY_ID_PREFIX)
+                        and title
+                        and date
+                    ):
+                        # This entry has no <guid>, <id> or <link>, so its identity
+                        # is a hash that includes the body. Publishers edit bodies
+                        # (typo fixes, added disclaimers, rotating ad copy), and
+                        # every such edit minted a fresh id -- the article the user
+                        # had already read came back as a new unread duplicate
+                        # (issue #106). The feed-scoped (title, date) pair survives
+                        # body edits, so use it to recognize the stored row.
+                        c.execute(
+                            "SELECT id, date, chapter_url, media_url, media_type, url, description "
+                            "FROM articles WHERE feed_id = ? AND title = ? AND date = ? LIMIT 1",
+                            (feed_id, title, date),
+                        )
+                        stored_row = c.fetchone()
+                        if stored_row:
+                            existing_article_id = stored_row[0]
+                            existing_metadata = {
+                                "date": stored_row[1] or "",
+                                "chapter_url": stored_row[2],
+                                "media_url": stored_row[3],
+                                "media_type": stored_row[4],
+                                "url": stored_row[5] or "",
+                                "description": stored_row[6] or "",
+                            }
+                            existing_articles[existing_article_id] = existing_metadata
+
                     media_url = None
                     media_type = None
                     
@@ -4059,6 +4136,11 @@ class LocalProvider(RSSProvider):
                             "url": url_to_store,
                             "description": description,
                         }
+                        continue
+
+                    # A feed keeps listing entries retention has already purged;
+                    # re-inserting one resurrects it as unread (issue #106).
+                    if _retention_purged(date):
                         continue
 
                     try:

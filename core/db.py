@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 import sqlite3
+import datetime
 import os
 import logging
 import time
@@ -730,6 +731,48 @@ def init_db():
         conn.close()
 
 
+# Articles whose date could not be parsed carry the sentinel
+# "0001-01-01 00:00:00" (or an empty string). Those sort below every real
+# cutoff, so retention must treat them as undated rather than as ancient.
+UNDATED_ARTICLE_FLOOR = "0002"
+
+
+def retention_cutoff_date(days) -> str | None:
+    """The ``YYYY-MM-DD`` boundary retention compares article dates against.
+
+    ``None`` means "keep forever". This is the single definition shared by the
+    cleanup sweep and by refresh (issue #106): a feed keeps serving entries that
+    retention has already purged, so refresh must recognize the same boundary or
+    it re-inserts them as unread on every update cycle.
+    """
+    if days is None:
+        return None
+    try:
+        days = int(days)
+    except (TypeError, ValueError):
+        return None
+    if days < 0:
+        return None
+    return (
+        datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=days)
+    ).strftime("%Y-%m-%d")
+
+
+def article_is_outside_retention(date_value, cutoff: str | None) -> bool:
+    """True when an article's date puts it beyond the retention window.
+
+    Mirrors the WHERE clause of :func:`cleanup_old_articles` exactly, including
+    its undated-article guard, so refresh never inserts a row that the very next
+    cleanup sweep would delete again.
+    """
+    if not cutoff:
+        return False
+    stored = str(date_value or "").strip()
+    if not stored or stored < UNDATED_ARTICLE_FLOOR:
+        return False
+    return stored < cutoff
+
+
 def cleanup_old_articles(days: int, keep_favorites: bool = True):
     """
     Delete articles older than 'days' days.
@@ -755,11 +798,10 @@ def cleanup_old_articles(days: int, keep_favorites: bool = True):
         
         params = []
         where_clauses = [f"date < date('now', '-{int(days)} days')"]
-        # Articles whose date could not be parsed carry the sentinel
-        # "0001-01-01 00:00:00" (or an empty string). Those compare below any
-        # real cutoff, so without this guard every undated article would be
-        # deleted on each sweep no matter how recently it was fetched.
-        where_clauses.append("date >= '0002'")
+        # Undated articles carry a sentinel that compares below any real cutoff,
+        # so without this guard every undated article would be deleted on each
+        # sweep no matter how recently it was fetched.
+        where_clauses.append(f"date >= '{UNDATED_ARTICLE_FLOOR}'")
 
         if keep_favorites:
             where_clauses.append("is_favorite = 0")
