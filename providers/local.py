@@ -1500,6 +1500,8 @@ def _retry_feed_not_acceptable(resp, url: str, *, headers: dict, timeout, proxie
 
 
 class LocalProvider(RSSProvider):
+    refresh_reports_feed_changes = True
+
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         init_db()

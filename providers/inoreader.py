@@ -644,8 +644,10 @@ class InoreaderProvider(HostedPodcastArchiveMixin, RSSProvider):
             # Inoreader is already server-synced; avoid triggering subscription/category fetches on
             # every client refresh tick when metadata is still cached.
             if self._get_cached_feeds(allow_stale=False) is not None:
-                log.info("Inoreader refresh skipped because feed metadata cache is fresh")
-                return False
+                # Subscription metadata has an hour-long TTL; article pages
+                # have a separate short TTL and must still be checked by the UI.
+                log.info("Inoreader refresh reusing metadata; article reload allowed")
+                return True
             log.info("Inoreader refresh allowed because feed metadata cache is stale")
             return True
         finally:

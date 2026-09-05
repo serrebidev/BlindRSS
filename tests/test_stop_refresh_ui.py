@@ -65,6 +65,33 @@ class _FakeProvider:
         return []
 
 
+def test_successful_provider_without_progress_requests_new_tree_and_articles():
+    host = _Host()
+    host.provider.release.set()
+    assert host._run_refresh(block=False, scheduled=True)
+    assert host._refresh_ui_batch_dirty is True
+    assert host._article_refresh_dirty is True
+
+
+@pytest.mark.parametrize("change_key", ["new_items", "content_changed", "feed_metadata_changed"])
+def test_scheduled_refresh_keeps_changes_when_unread_count_is_unchanged(change_key):
+    from types import SimpleNamespace
+
+    host = _Host()
+    host.feed_map = {"1": SimpleNamespace(title="Feed", category="News", unread_count=2)}
+    state = {"id": "1", "title": "Feed", "category": "News", "unread_count": 2, change_key: 1}
+    queued = []
+    host._on_feed_refresh_progress = lambda value, **kwargs: queued.append(value)
+
+    def refresh(progress_cb, **kwargs):
+        progress_cb(state)
+        return True
+
+    host.provider.refresh = refresh
+    assert host._run_refresh(block=False, scheduled=True)
+    assert queued == [state]
+
+
 class _Host:
     on_stop_refresh = mainframe.MainFrame.on_stop_refresh
     _cmd_stop_refresh = mainframe.MainFrame._cmd_stop_refresh

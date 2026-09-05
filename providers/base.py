@@ -14,7 +14,11 @@ log = logging.getLogger(__name__)
 
 class RSSProvider(abc.ABC):
     """Abstract base class for RSS providers (Local, Feedly, etc.)"""
-    
+
+    # Only providers that report every changed feed may suppress the final
+    # metadata reload on a successful refresh with no changed progress states.
+    refresh_reports_feed_changes = False
+
     def __init__(self, config: Dict[str, Any]):
         self.config = config
         self._active_refresh_cancel: Optional[threading.Event] = None
@@ -32,7 +36,7 @@ class RSSProvider(abc.ABC):
         force: if True, providers should ignore cache headers (ETag/Last-Modified) and force fetch.
         scheduled: True when invoked by the periodic refresh loop. Providers with
             per-feed refresh intervals (the local provider) then skip feeds that
-            are not yet due; other providers ignore it.
+            are not yet due; hosted providers may use bounded recovery/polling.
         """
         pass
 

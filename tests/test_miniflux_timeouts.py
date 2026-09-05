@@ -196,7 +196,7 @@ def test_miniflux_refresh_force_refreshes_each_feed(monkeypatch):
     assert states[0]["status"] == "ok"
 
 
-def test_miniflux_scheduled_refresh_only_polls_server_metadata(monkeypatch):
+def test_miniflux_scheduled_refresh_only_polls_chronically_broken_feed(monkeypatch):
     p = _provider(feed_timeout_seconds=10)
     calls = []
     targeted_calls = []
@@ -233,6 +233,56 @@ def test_miniflux_scheduled_refresh_only_polls_server_metadata(monkeypatch):
         ("GET", "/v1/feeds/counters"),
     ]
     assert targeted_calls == []
+
+
+def test_scheduled_recovers_overdue_feeds_fairly_and_reloads_metadata(monkeypatch):
+    p = _provider(feed_timeout_seconds=10)
+    old = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
+    feeds = [{"id": i, "title": f"Feed {i}", "checked_at": old} for i in range(1, 21)]
+    calls, batches, states = [], [], []
+    unread = {}
+
+    def request(method, endpoint, **kwargs):
+        calls.append((method, endpoint))
+        if endpoint == "/v1/feeds":
+            return feeds
+        if endpoint == "/v1/feeds/counters":
+            return {"unreads": dict(unread)}
+        raise AssertionError((method, endpoint))
+
+    def retry(ids, **kwargs):
+        batches.append(list(ids))
+        unread.update({fid: 1 for fid in ids})
+
+    monkeypatch.setattr(p, "_req", request)
+    monkeypatch.setattr(p, "_refresh_targeted_feeds", retry)
+    monkeypatch.setattr(p, "_queue_browser_feed_recovery", lambda: None)
+    assert p.refresh(progress_cb=states.append, scheduled=True)
+    assert len(batches[0]) == 15
+    assert sum(s["unread_count"] for s in states) == 15
+    assert calls.count(("GET", "/v1/feeds")) == 2
+    assert p.refresh(scheduled=True)
+    assert len(batches[1]) == 5
+    assert set(batches[0]).isdisjoint(batches[1])
+    assert p.refresh(scheduled=True)
+    assert len(batches) == 2
+
+
+def test_scheduled_skips_recent_and_backed_off_feeds(monkeypatch):
+    p = _provider(feed_timeout_seconds=10)
+    feeds = [
+        {"id": 1, "checked_at": datetime.now(timezone.utc).isoformat()},
+        {"id": 2, "checked_at": None},
+    ]
+    monkeypatch.setattr(p, "_req", lambda method, endpoint, **kw: feeds if endpoint == "/v1/feeds" else {})
+    monkeypatch.setattr(p, "_should_attempt_targeted_refresh", lambda fid: False)
+    monkeypatch.setattr(p, "_queue_browser_feed_recovery", lambda: None)
+
+    def unexpected(*args, **kwargs):
+        raise AssertionError("No feed is eligible for recovery")
+
+    monkeypatch.setattr(p, "_refresh_targeted_feeds", unexpected)
+    assert p.refresh(scheduled=True)
 
 
 def test_miniflux_refresh_feeds_by_ids_refreshes_subset_and_emits_progress(monkeypatch):

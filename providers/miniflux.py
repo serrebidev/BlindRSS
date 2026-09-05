@@ -48,6 +48,8 @@ class _SystemTrustHTTPAdapter(HTTPAdapter):
 
 
 class MinifluxProvider(RSSProvider):
+    refresh_reports_feed_changes = True
+
     # Short connect timeout so an unreachable address (e.g. a dead IPv6 AAAA whose
     # gateway is down) fails over to the next address in seconds instead of stalling
     # the UI for the full read timeout. This does NOT pin IPv4: the OS still orders
@@ -1857,8 +1859,7 @@ class MinifluxProvider(RSSProvider):
             # via per-feed PUT .../refresh. The global background refresh would then
             # just make the server compete with itself for the same upstream
             # bandwidth, so skip it on force and let the targeted pass do the work.
-            # Scheduled (non-force) refreshes still kick off the cheap global
-            # background refresh and only retry stale/errored feeds individually.
+            # Scheduled refreshes only retry a bounded set of overdue feeds.
             if force:
                 global_refresh_ok = True
             elif scheduled:
@@ -1867,7 +1868,7 @@ class MinifluxProvider(RSSProvider):
                 # resulting metadata, not repeatedly enqueue all feeds on the
                 # server (which becomes very expensive for large accounts).
                 global_refresh_ok = True
-                log.info("Miniflux scheduled refresh using server poller; global trigger skipped")
+                log.info("Miniflux scheduled refresh polling metadata with bounded overdue recovery")
             else:
                 # Kick off a global refresh on the Miniflux server.
                 self._req("PUT", "/v1/feeds/refresh")
@@ -1902,6 +1903,11 @@ class MinifluxProvider(RSSProvider):
                 feeds_from_cache = bool(feeds_info.get("used_cache", False))
             now = datetime.now(timezone.utc)
             stale_cutoff = now - timedelta(hours=3)
+            try:
+                poll_interval = max(300, int(self.config.get("refresh_interval", 300) or 300))
+            except (TypeError, ValueError):
+                poll_interval = 300
+            scheduled_cutoff = now - timedelta(seconds=poll_interval)
             retry_budget = len(feeds) if force else 15
             per_feed_retry_ids = []
             chronic_skipped = 0
@@ -1939,6 +1945,16 @@ class MinifluxProvider(RSSProvider):
                         chronic_skipped += 1
                         continue
                     per_feed_retry_ids.append(feed_id)
+                elif scheduled:
+                    # Server scheduling can postpone quiet podcasts for hours.
+                    # Honor the client's interval without enqueueing the account.
+                    if force_skip_threshold > 0 and parse_errors >= force_skip_threshold:
+                        continue
+                    if checked_dt is None or checked_dt <= scheduled_cutoff:
+                        last_attempt = getattr(self, "_scheduled_retry_last_attempt", {}).get(feed_id)
+                        attempt_due = last_attempt is None or time.monotonic() - last_attempt >= poll_interval
+                        if attempt_due and self._should_attempt_targeted_refresh(feed_id):
+                            per_feed_retry_ids.append(feed_id)
                 elif status in ("error", "stale"):
                     per_feed_retry_ids.append(feed_id)
 
@@ -1951,12 +1967,9 @@ class MinifluxProvider(RSSProvider):
             allow_targeted_refresh = bool(
                 global_refresh_ok
                 and (not feeds_from_cache)
-                and not scheduled
                 and not route_parked
             )
-            if scheduled:
-                targeted_skip_reason = "server poller owns scheduled refreshes"
-            elif route_parked:
+            if route_parked:
                 targeted_skip_reason = "per-feed refresh route is in cooldown"
             elif feeds_from_cache:
                 targeted_skip_reason = "feed list came from cache"
@@ -1981,7 +1994,18 @@ class MinifluxProvider(RSSProvider):
                     targeted_skip_reason or "not applicable this cycle",
                 )
 
-            if retry_budget > 0 and allow_targeted_refresh:
+            if retry_budget > 0 and allow_targeted_refresh and per_feed_retry_ids:
+                if scheduled:
+                    # Rotate the bounded batch even when a server leaves checked_at
+                    # unchanged, so the first slow feeds cannot starve the rest.
+                    previous = getattr(self, "_scheduled_retry_last_attempt", {})
+                    per_feed_retry_ids.sort(key=lambda fid: previous.get(fid, 0.0))
+                    current_ids = {str(feed.get("id")) for feed in feeds}
+                    self._scheduled_retry_last_attempt = {
+                        fid: stamp for fid, stamp in previous.items() if fid in current_ids
+                    }
+                    for fid in per_feed_retry_ids[:retry_budget]:
+                        self._scheduled_retry_last_attempt[fid] = time.monotonic()
                 progress_states = None
                 if progress_cb is not None and per_feed_retry_ids:
                     counters_for_progress = self._req("GET", "/v1/feeds/counters") or {}
@@ -2077,12 +2101,9 @@ class MinifluxProvider(RSSProvider):
                     if self._refresh_cancelled(cancel_event):
                         return _stopped(len(feeds or []))
 
-            # A scheduled UI poll has not changed server state, so reuse the
-            # metadata already fetched above instead of downloading and
-            # decoding thousands of feeds twice every interval.  Startup and
-            # manual refreshes retain the second read because they may have
-            # issued refresh requests immediately above.
-            if not scheduled:
+            # Reuse the first metadata read unless this pass requested server
+            # refreshes; retries must expose their new counts in the same tick.
+            if not scheduled or (allow_targeted_refresh and per_feed_retry_ids):
                 feeds = self._req("GET", "/v1/feeds") or feeds
             if self._refresh_cancelled(cancel_event):
                 return _stopped(len(feeds or []))

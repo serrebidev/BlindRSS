@@ -74,10 +74,12 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
     ALT+Tab before the window first appears. Do not gate this on `IsShown()`:
     tray-only launches still need their background refresh.
   - Scheduled hosted-provider ticks must remain lightweight at large account
-    sizes. Miniflux already polls feeds server-side, so scheduled BlindRSS
-    ticks read metadata/counters without issuing a global refresh or targeted
-    retries; startup and explicit manual refreshes retain their active refresh
-    behavior. Suppress unchanged per-feed GUI progress states, and run local
+    sizes. Miniflux scheduled ticks read metadata/counters and retry at most 15
+    overdue feeds in rotating batches (client interval, minimum five minutes),
+    respecting failure backoff and route protection without a global refresh.
+    Providers without complete feed-change progress must still reload their
+    tree and selected articles after a successful sync. Suppress unchanged
+    per-feed GUI progress states, and run local
     retention/chapter-cache maintenance no more than hourly on scheduled ticks.
   - The start_in_system_tray setting suppresses the initial main-window show
     while leaving the tray icon and background refresh active. It applies to

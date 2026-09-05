@@ -14,7 +14,7 @@ from core.models import Feed
 from providers.inoreader import InoreaderProvider
 
 
-def test_inoreader_refresh_skips_when_metadata_cache_is_fresh():
+def test_inoreader_refresh_reloads_articles_without_invalidating_fresh_metadata():
     provider = InoreaderProvider(
         {
             "providers": {
@@ -31,7 +31,8 @@ def test_inoreader_refresh_skips_when_metadata_cache_is_fresh():
     provider._set_feed_cache([Feed(id="feed/http://example.com/rss", title="Example", url="http://example.com/rss")])
 
     # Auto refresh should not trigger a feed/category re-fetch when metadata cache is still fresh.
-    assert provider.refresh(force=False) is False
+    assert provider.refresh(force=False, scheduled=True) is True
+    assert provider._get_cached_feeds(allow_stale=False) is not None
 
     # Manual refresh should still invalidate caches and force a UI reload.
     assert provider.refresh(force=True) is True

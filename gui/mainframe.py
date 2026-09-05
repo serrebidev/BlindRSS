@@ -4615,7 +4615,10 @@ class MainFrame(wx.Frame):
                 # native ListView/TreeCtrl update (and accessibility event) if
                 # the visible title/category/count is identical.
                 queue_ui_state = True
-                if scheduled:
+                if scheduled and not any(
+                    (state or {}).get(key)
+                    for key in ("new_items", "content_changed", "feed_metadata_changed")
+                ):
                     feed_id = str((state or {}).get("id") or "")
                     cached_feed = (getattr(self, "feed_map", {}) or {}).get(feed_id)
                     if cached_feed is not None:
@@ -4631,6 +4634,11 @@ class MainFrame(wx.Frame):
                     self._on_feed_refresh_progress(state, batch_token=refresh_ui_batch_token)
 
             provider_result = self.provider.refresh(progress_cb, force=force, scheduled=scheduled)
+            if provider_result and not getattr(self.provider, "refresh_reports_feed_changes", False):
+                # Google Reader-style providers invalidate/poll caches without
+                # emitting feed progress. Success must still load their new data.
+                self._refresh_ui_batch_dirty = True
+                self._article_refresh_dirty = True
             log.info(
                 "Provider refresh returned provider=%s result=%s force=%s duration_s=%.2f new_items=%s",
                 provider_name,
