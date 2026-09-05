@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.135.5 - 2026-09-05
+
+- Recover overdue feeds and propagate automatic provider refreshes.
+
 ## v1.135.4 - 2026-09-01
 
 - Merge PR #105: Add multilingual installation for Windows (@tseykovets).
