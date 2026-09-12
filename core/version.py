@@ -2,4 +2,4 @@
 # This file is part of BlindRSS
 # SPDX-License-Identifier: MIT
 
-APP_VERSION = "1.135.7"
+APP_VERSION = "1.136.0"

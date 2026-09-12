@@ -4,6 +4,12 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.136.0 - 2026-09-12
+
+- Translate offline user guide.
+- Add an offline user guide with context-sensitive F1 help.
+- Let the shortcut capture dialog keep F1.
+
 ## v1.135.7 - 2026-09-12
 
 - Stop the menu bar wedging at either end.
