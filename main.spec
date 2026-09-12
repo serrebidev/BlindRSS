@@ -279,6 +279,14 @@ if os.path.isdir('locale'):
         if os.path.isfile(mo_path):
             datas.append((mo_path, os.path.join('locale', lang_dir, 'LC_MESSAGES')))
 
+# Offline user guide (Help > User Guide / F1): docs/help/<lang>.md. Plain
+# Markdown, one file per language, with English as the fallback.
+_help_dir = os.path.join('docs', 'help')
+if os.path.isdir(_help_dir):
+    for _name in os.listdir(_help_dir):
+        if _name.lower().endswith('.md'):
+            datas.append((os.path.join(_help_dir, _name), _help_dir))
+
 # Add VLC assets (locales, Lua scripts, HRTF data)
 for asset_dir in ('lua', 'locale', 'hrtfs'):
     asset_path = os.path.join(vlc_path, asset_dir)

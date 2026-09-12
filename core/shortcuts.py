@@ -121,6 +121,10 @@ COMMANDS: List[Command] = [
     # question, and it works from a source checkout too, where the process is
     # python.exe and the screen reader would report Python's version instead.
     Command("tools.announce_version", "Tools", "Announce Version", "Ctrl+Shift+A"),
+
+    # F1 is the platform help key, and gui.help_context honours it even when
+    # this command is rebound — unless F1 itself is given to another command.
+    Command("help.user_guide", "Help", "User Guide", "F1"),
 ]
 
 _COMMANDS_BY_ID: "OrderedDict[str, Command]" = OrderedDict((c.id, c) for c in COMMANDS)
@@ -150,6 +154,7 @@ _POT_ANCHORS = (
     _("Play Queue"),
     _("Playback Speed"),
     _("Tools"),
+    _("Help"),
     # Command labels
     _("Add Feed"),
     _("Detect Feeds on Page"),
@@ -215,6 +220,7 @@ _POT_ANCHORS = (
     _("Settings"),
     _("Check for Updates"),
     _("Announce Version"),
+    _("User Guide"),
 )
 
 

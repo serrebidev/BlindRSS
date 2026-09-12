@@ -28,9 +28,23 @@ A vibe-coded, screen-reader-friendly desktop RSS and podcast client for Windows,
 - Casts to Chromecast, DLNA/UPnP, and AirPlay.
 - Tray controls, media-key support, and startup restore of your last feed and folder.
 - Windows notifications for new articles, with per-feed exclusions and per-refresh limits.
-- 61 remappable keyboard commands, grouped by feeds, articles, view, player, and playback speed.
+- 67 remappable keyboard commands, grouped by feeds, articles, view, player, and playback speed.
+- An offline user guide under Help, with context-sensitive F1: pressing it on a control, a dialog, or a highlighted menu item opens the guide at that section.
 - Translated into 15 languages, with catalog updates delivered between app releases.
 - Built-in updater that verifies SHA-256 and Authenticode before applying an update.
+
+## Help
+
+This README is a mix of user and contributor material. The end-user manual
+lives inside the application: **Help > User Guide**, or press **F1** anywhere.
+F1 is context-sensitive — pressing it on a control, in a dialog, or with a menu
+item highlighted opens the guide at the section that explains it, and falls
+back to the front of the guide when there is nothing more specific.
+
+The guide works offline, is fully keyboard-accessible, has searchable and
+selectable text, and follows the interface language when a translation of it
+exists (English otherwise). Its source is [`docs/help/en.md`](docs/help/en.md);
+see [`docs/help/README.md`](docs/help/README.md) to translate it or add a topic.
 
 ## Download and install
 

@@ -43,6 +43,8 @@ from core import equalizer as equalizer_mod
 from core import shortcuts as shortcuts_mod
 from core import user_agents
 from core import announcements as announcements_mod
+from core import help_topics
+from . import help_context
 from .shortcut_keys import event_to_accel
 from .menu_mnemonics import apply_menu_mnemonics
 from .widgets import CheckListCtrl
@@ -78,6 +80,18 @@ _SOURCE_LABEL_POT_ANCHORS = (
 )
 
 log = logging.getLogger(__name__)
+
+
+def _tag_notebook_page(dialog, panel, english_title):
+    """Give one notebook page its own F1 topic.
+
+    Tab titles reach AddPage already translated, so the English msgid is passed
+    separately -- it is the key core.help_topics.NOTEBOOK_PAGE_TOPICS is written
+    in, and it stays stable when a translation is reworded.
+    """
+    topic = help_topics.topic_for_notebook_page(type(dialog).__name__, english_title)
+    if topic:
+        help_context.set_help_topic(panel, topic)
 
 
 class ColumnLayoutPanel(wx.Panel):
@@ -1754,10 +1768,13 @@ class SettingsDialog(wx.Dialog):
 
         general_panel.SetSizer(general_sizer)
         notebook.AddPage(general_panel, _("General"))
+        _tag_notebook_page(self, general_panel, "General")
         feeds_panel.SetSizer(feeds_sizer)
         notebook.AddPage(feeds_panel, _("Feeds && Articles"))
+        _tag_notebook_page(self, feeds_panel, "Feeds && Articles")
         youtube_panel.SetSizer(youtube_sizer)
         notebook.AddPage(youtube_panel, _("YouTube"))
+        _tag_notebook_page(self, youtube_panel, "YouTube")
 
         # Built in the eager block above but shown inside Media Player, which is
         # built lazily; _build_media_page reparents it once that page exists.
@@ -1766,20 +1783,36 @@ class SettingsDialog(wx.Dialog):
         self._downloads_panel = downloads_panel
 
         # Media Player Tab (absorbs Downloads and Sounds)
-        self._register_lazy_page(notebook, _("Media Player"), self._build_media_page)
+        _tag_notebook_page(
+            self,
+            self._register_lazy_page(notebook, _("Media Player"), self._build_media_page),
+            "Media Player",
+        )
 
         # Provider Tab (absorbs Groups.io)
-        self._register_lazy_page(notebook, _("Provider"), self._build_provider_page)
+        _tag_notebook_page(
+            self,
+            self._register_lazy_page(notebook, _("Provider"), self._build_provider_page),
+            "Provider",
+        )
 
         # Notifications Tab (absorbs Announcements, issue #67). A ScrolledWindow
         # because the announcements group is a long list of per-event choices.
-        self._register_lazy_page(
-            notebook, _("Notifications"), self._build_notifications_page,
-            widget=wx.ScrolledWindow,
+        _tag_notebook_page(
+            self,
+            self._register_lazy_page(
+                notebook, _("Notifications"), self._build_notifications_page,
+                widget=wx.ScrolledWindow,
+            ),
+            "Notifications",
         )
 
         # Translate Tab (automatic article translation via Grok/Groq/OpenAI/OpenRouter/Gemini/Qwen)
-        self._register_lazy_page(notebook, _("Translate"), self._build_translate_page)
+        _tag_notebook_page(
+            self,
+            self._register_lazy_page(notebook, _("Translate"), self._build_translate_page),
+            "Translate",
+        )
 
         # Global article-list column layout (article list columns); individual feeds can
         # override it from their Feed Properties dialog. Appended near the end
@@ -1790,15 +1823,26 @@ class SettingsDialog(wx.Dialog):
             notebook, layout=config.get("article_columns", None)
         )
         notebook.AddPage(self.columns_panel, _("List Headers"))
+        _tag_notebook_page(self, self.columns_panel, "List Headers")
 
         # Advanced Tab
-        self._register_lazy_page(notebook, _("Advanced"), self._build_advanced_page)
+        _tag_notebook_page(
+            self,
+            self._register_lazy_page(notebook, _("Advanced"), self._build_advanced_page),
+            "Advanced",
+        )
 
         # CAPTCHA Solving Tab (opt-in paid solver for last-resort challenge
         # escalation). Appended last: inserting a page mid-notebook renumbers
         # every tab after it, and Ctrl+Tab positions are muscle memory for
         # screen-reader users.
-        self._register_lazy_page(notebook, _("CAPTCHA Solving"), self._build_captcha_solver_page)
+        _tag_notebook_page(
+            self,
+            self._register_lazy_page(
+                notebook, _("CAPTCHA Solving"), self._build_captcha_solver_page
+            ),
+            "CAPTCHA Solving",
+        )
 
         # Main Sizer
         main_sizer = wx.BoxSizer(wx.VERTICAL)
@@ -4431,6 +4475,7 @@ class FeedPropertiesDialog(wx.Dialog):
 
         general_panel.SetSizer(sizer)
         notebook.AddPage(general_panel, _("General"))
+        _tag_notebook_page(self, general_panel, "General")
 
         # Per-feed column override (article list columns): None = follow the global layout.
         self.columns_panel = ColumnLayoutPanel(
@@ -4439,6 +4484,7 @@ class FeedPropertiesDialog(wx.Dialog):
             allow_inherit=True,
         )
         notebook.AddPage(self.columns_panel, _("List Headers"))
+        _tag_notebook_page(self, self.columns_panel, "List Headers")
 
         outer.Add(notebook, 1, wx.EXPAND | wx.ALL, 5)
         btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
@@ -5527,6 +5573,11 @@ class FeedSearchDialog(wx.Dialog):
         self.SetSizer(sizer)
         self.Centre()
         
+        # F1 on the source picker explains the directories; F1 on a result
+        # explains how subscribing works.
+        help_context.set_help_topic(self.source_combo, "podcast-directories")
+        help_context.set_help_topic(self.results_list, "subscribing")
+
         # Bindings
         self.search_btn.Bind(wx.EVT_BUTTON, self.on_search)
         self.search_ctrl.Bind(wx.EVT_TEXT_ENTER, self.on_search)

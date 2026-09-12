@@ -374,6 +374,16 @@ class RSSApp(wx.App):
             wx.EvtHandler.AddFilter(self._media_filter)
         except Exception as e:
             log.error(f"Failed to install global media filter: {e}")
+
+        # Context-sensitive F1 everywhere: dialogs, the player, and open menus,
+        # which deliver no key events at all and are reachable only through
+        # Windows' own WM_HELP (see gui.help_context).
+        try:
+            from gui import help_context
+
+            help_context.install(self.frame)
+        except Exception as e:
+            log.error(f"Failed to install the F1 help filter: {e}")
         return True
 
     def _on_cookies_auto_imported(self, dest_path):

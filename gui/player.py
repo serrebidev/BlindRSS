@@ -25,6 +25,7 @@ from core.i18n import _
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 from core.range_cache_proxy import get_range_cache_proxy
+from . import help_context
 from core.stream_proxy import get_proxy as get_stream_proxy
 from core.audio_silence import merge_ranges, merge_ranges_with_gap, scan_audio_for_silence
 from core.dependency_check import _log
@@ -2169,6 +2170,25 @@ class PlayerFrame(wx.Frame):
         sizer.Add(self.chapter_choice, 0, wx.EXPAND | wx.ALL, 5)
         
         panel.SetSizer(sizer)
+
+        # Context-sensitive F1: the transport controls answer with Player
+        # Controls, while speed, chapters, and casting have sections of their
+        # own. Anything untagged falls through to the frame's own topic.
+        for control, topic in (
+            (panel, "player"),
+            (self.slider, "player-controls"),
+            (self.time_info_ctrl, "player-controls"),
+            (self.volume_slider, "player-controls"),
+            (self.speed_combo, "playback-speed"),
+            (self.chapters_btn, "chapters"),
+            (self.chapter_choice, "chapters"),
+        ):
+            help_context.set_help_topic(control, topic)
+        try:
+            help_context.set_help_topic(self.cast_btn, "casting")
+        except Exception:
+            pass
+
         self._init_player_menu_bar()
         self._refresh_chapter_controls_state()
 
@@ -2194,6 +2214,15 @@ class PlayerFrame(wx.Frame):
             menubar.Append(playback_menu, _("&Playback"))
             menubar.Append(chapters_menu, _("&Chapters"))
             self.SetMenuBar(menubar)
+
+            for menu_item, topic in (
+                (self._cast_menu_item, "casting"),
+                (self._chapter_menu_show_item, "chapters"),
+                (self._chapter_menu_open_link_item, "chapters"),
+                (self._chapter_menu_prev_item, "chapters"),
+                (self._chapter_menu_next_item, "chapters"),
+            ):
+                help_context.register_menu_topic(menu_item, topic)
 
             self.Bind(wx.EVT_MENU, self.on_cast, self._cast_menu_item)
             self.Bind(wx.EVT_MENU, self.on_show_chapters_menu, self._chapter_menu_show_item)

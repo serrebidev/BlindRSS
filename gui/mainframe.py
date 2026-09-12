@@ -56,6 +56,7 @@ from core import announcements as announcements_mod
 from core.version import APP_VERSION
 from core import dependency_check
 from core import shortcuts as shortcuts_mod
+from core import help_topics
 from core.i18n import _, ngettext
 from core.categories import (
     UNCATEGORIZED,
@@ -66,6 +67,7 @@ from core.categories import (
 import core.discovery
 from .shortcut_keys import event_to_accel
 from .menu_mnemonics import apply_menu_mnemonics, apply_menubar_mnemonics
+from . import help_context
 from .widgets import force_ltr_reading
 from .reader_performance import (
     LARGE_READER_TEXT_CHARS,
@@ -599,6 +601,20 @@ class MainFrame(wx.Frame):
         except Exception as e:
             wx.CallAfter(wx.MessageBox, _("Installation failed: {error}").format(error=e), _("Error"), wx.ICON_ERROR)
 
+    def on_user_guide(self, event=None):
+        """Help > User Guide: open the guide at the front, not at a topic.
+
+        Context-sensitive F1 goes through gui.help_context instead; choosing
+        this menu item is an explicit request for the guide itself.
+        """
+        try:
+            help_context.show_help(help_topics.DEFAULT_TOPIC, parent=self)
+        except Exception:
+            log.exception("Could not open the user guide")
+            wx.MessageBox(
+                _("The user guide could not be opened."), _("User Guide"), wx.ICON_ERROR
+            )
+
     def on_about(self, event):
         dlg = AboutDialog(self, APP_VERSION)
         dlg.ShowModal()
@@ -719,7 +735,20 @@ class MainFrame(wx.Frame):
         right_panel.SetSizer(right_sizer)
 
         splitter.SplitVertically(self.tree, right_panel, 250)
-        
+
+        # Context-sensitive F1 for the main window's own controls. The resolver
+        # walks up from whatever has focus, so tagging the four panes covers
+        # every child they ever gain.
+        help_context.set_help_topic(self.tree, "feed-tree")
+        help_context.set_help_topic(self.list_ctrl, "article-list")
+        help_context.set_help_topic(self.search_ctrl, "search-field")
+        help_context.set_help_topic(self.reader_panel, "reading-pane")
+        help_context.set_help_topic(self.content_ctrl, "reading-pane")
+        try:
+            help_context.set_help_topic(self.GetStatusBar(), "status-bar")
+        except Exception:
+            pass
+
         self.Bind(wx.EVT_TREE_SEL_CHANGED, self.on_tree_select, self.tree)
         self.Bind(wx.EVT_CONTEXT_MENU, self.on_tree_context_menu, self.tree)
         self.tree.Bind(wx.EVT_KEY_DOWN, self.on_tree_key_down)
@@ -2255,6 +2284,10 @@ class MainFrame(wx.Frame):
         else:
             item = menu.Append(wxid, label, help_text)
         self._shortcut_menu_items.setdefault(command_id, []).append((item, base_label))
+        # F1 on this item opens the guide at whatever documents the command it
+        # runs (context-sensitive help). Registering here covers every
+        # registry-backed menu item without a per-item call site.
+        help_context.register_menu_command(item, command_id)
         return item
 
     def init_menus(self):
@@ -2523,6 +2556,11 @@ class MainFrame(wx.Frame):
         )
 
         help_menu = wx.Menu()
+        user_guide_item = self._append_shortcut_menu_item(
+            help_menu, "help.user_guide", _("&User Guide"),
+            _("Open the offline user guide (F1 opens it at the section for whatever you are using)"),
+        )
+        help_menu.AppendSeparator()
         check_updates_item = self._append_shortcut_menu_item(
             help_menu, "tools.check_updates", _("Check for &Updates..."),
             _("Check for new versions"),
@@ -2540,6 +2578,39 @@ class MainFrame(wx.Frame):
         menubar.Append(tools_menu, _("&Tools"))
         menubar.Append(help_menu, _("&Help"))
         self.SetMenuBar(menubar)
+        # Menu items that are not backed by a shortcut-registry command still
+        # deserve context-sensitive F1, so map them explicitly. The registry
+        # ones were registered by _append_shortcut_menu_item.
+        for menu_item, help_topic_id in (
+            (add_shortcuts_item, "desktop-shortcuts"),
+            (exit_item, "main-window"),
+            (about_item, "about"),
+            (player_rewind_item, "player-controls"),
+            (player_forward_item, "player-controls"),
+            (player_vol_up_item, "player-controls"),
+            (player_vol_down_item, "player-controls"),
+        ):
+            help_context.register_menu_topic(menu_item, help_topic_id)
+        for stock_id, help_topic_id in (
+            (wx.ID_CUT, "clipboard"),
+            (wx.ID_COPY, "clipboard"),
+            (wx.ID_PASTE, "clipboard"),
+            (wx.ID_SELECTALL, "clipboard"),
+        ):
+            help_context.register_menu_topic(stock_id, help_topic_id)
+        for speed_item in self._speed_menu_items.values():
+            help_context.register_menu_topic(speed_item, "playback-speed")
+        # F1 on a menu that is open with nothing highlighted yet (Alt+T, say)
+        # answers for the menu itself.
+        for menu_obj, english_title in (
+            (file_menu, "&File"),
+            (edit_menu, "&Edit"),
+            (view_menu, "&View"),
+            (player_menu, "&Player"),
+            (tools_menu, "&Tools"),
+            (help_menu, "&Help"),
+        ):
+            help_context.register_menu_title(menu_obj, english_title)
         # Every menu item gets an access key, in every locale (task: menu
         # mnemonics). Runs after the bar is fully built so per-menu uniqueness
         # sees the final item set.
@@ -2591,7 +2662,9 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_open_keyboard_shortcuts, keyboard_shortcuts_item)
         self.Bind(wx.EVT_MENU, self._cmd_announce_version, announce_version_item)
         self.Bind(wx.EVT_MENU, self.on_about, about_item)
+        self.Bind(wx.EVT_MENU, self.on_user_guide, user_guide_item)
         self.Bind(wx.EVT_MENU_OPEN, self.on_menu_open)
+        self.Bind(wx.EVT_MENU_CLOSE, self.on_menu_close)
         self._refresh_player_chapters_submenu()
 
     def init_shortcuts(self):
@@ -3244,6 +3317,8 @@ class MainFrame(wx.Frame):
             "tools.settings": self.on_settings,
             "tools.check_updates": self.on_check_updates,
             "tools.announce_version": self._cmd_announce_version,
+
+            "help.user_guide": self.on_user_guide,
         }
 
     # --- Registry command wrappers ------------------------------------
@@ -3592,6 +3667,13 @@ class MainFrame(wx.Frame):
             opened_menu = event.GetMenu()
         except Exception:
             opened_menu = None
+        # Read-only bookkeeping for context-sensitive F1. Nothing here may
+        # mutate a menu: doing that inside WM_INITMENUPOPUP is what used to
+        # wedge the whole menu session (see _player_chapters_signature).
+        try:
+            help_context.note_menu_opened(opened_menu)
+        except Exception:
+            pass
         try:
             player_menu = getattr(self, "_player_menu", None)
             chapters_submenu = getattr(self, "_player_chapters_submenu", None)
@@ -3603,6 +3685,17 @@ class MainFrame(wx.Frame):
             speed_submenu = getattr(self, "_speed_submenu", None)
             if opened_menu is getattr(self, "_player_menu", None) or opened_menu is speed_submenu:
                 self._sync_speed_menu_check()
+        except Exception:
+            pass
+        try:
+            event.Skip()
+        except Exception:
+            pass
+
+    def on_menu_close(self, event):
+        """Forget the open menu so F1 stops answering for it."""
+        try:
+            help_context.note_menu_closed()
         except Exception:
             pass
         try:
@@ -5028,7 +5121,10 @@ class MainFrame(wx.Frame):
 
         if menu.GetMenuItemCount() > 0:
             apply_menu_mnemonics(menu)
+            # Context-sensitive F1 for the items just built (gui.help_context).
+            help_context.register_menu_labels(menu)
             self.tree.PopupMenu(menu, menu_pos)
+        help_context.clear_context_menu_topics()
         menu.Destroy()
 
     @property
@@ -5426,7 +5522,9 @@ class MainFrame(wx.Frame):
                 article_item.Enable(False)
 
         apply_menu_mnemonics(menu)
+        help_context.register_menu_labels(menu)
         self.list_ctrl.PopupMenu(menu, menu_pos)
+        help_context.clear_context_menu_topics()
         menu.Destroy()
 
     def on_open_in_browser(self, idx):
@@ -5851,6 +5949,7 @@ class MainFrame(wx.Frame):
                 pass
             return None
         self._rich_view = rv
+        help_context.set_help_topic(rv.control, "rich-view")
         rich_view_links.attach(rv.view)
         # Native WebView2 swallows ALT (and F6/Shift+F6/Shift+Tab) before wx sees
         # them, so the menu bar and pane navigation are unreachable while the rich
@@ -10366,8 +10465,10 @@ class MainFrame(wx.Frame):
         self.content_ctrl.Bind(wx.EVT_MENU, self._on_content_menu_select_all, id=wx.ID_SELECTALL)
         try:
             apply_menu_mnemonics(menu)
+            help_context.register_menu_labels(menu)
             self.content_ctrl.PopupMenu(menu)
         finally:
+            help_context.clear_context_menu_topics()
             menu.Destroy()
 
     def _on_content_menu_copy(self, event):

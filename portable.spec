@@ -342,6 +342,12 @@ if _locale_root.is_dir():
     for _mo in _locale_root.glob("*/LC_MESSAGES/blindrss.mo"):
         add_data(_mo, str(Path("locale") / _mo.parent.parent.name / "LC_MESSAGES"))
 
+# Offline user guide (Help > User Guide / F1): docs/help/<lang>.md.
+_help_root = ROOT / "docs" / "help"
+if _help_root.is_dir():
+    for _doc in _help_root.glob("*.md"):
+        add_data(_doc, str(Path("docs") / "help"))
+
 # POSIX auto-update helper (macOS + Linux), placed next to the executable.
 add_data(ROOT / "update_helper.sh", ".")
 
