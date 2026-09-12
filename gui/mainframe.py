@@ -395,6 +395,7 @@ class MainFrame(wx.Frame):
         
         self.Bind(wx.EVT_CLOSE, self.on_close)
         self.Bind(wx.EVT_ICONIZE, self.on_iconize)
+        self.Bind(wx.EVT_ACTIVATE, self.on_activate)
         
         # Startup workers are deliberately deferred until the first event-loop
         # turn.  MainFrame is constructed before main.py calls Show(), and
@@ -3639,11 +3640,63 @@ class MainFrame(wx.Frame):
             except Exception:
                 pass
 
-    def _refresh_player_chapters_submenu(self) -> None:
+    def _player_chapters_signature(self):
+        """What the Chapters submenu should currently show, as a comparable value.
+
+        Rebuilding that submenu deletes and re-appends native menu items, and it
+        runs from on_menu_open — i.e. from inside WM_INITMENUPOPUP, while Windows
+        is tracking the menu. Churning the window's menus there for no reason is
+        what left the menu bar wedged after a long session (arrowing past Help or
+        File stopped moving and the whole menu session went dead). Compare against
+        this first and skip the rebuild whenever the answer is unchanged, which is
+        every open except the ones where the chapter list really did move on.
+        """
+        pw = getattr(self, "player_window", None)
+        chapters = list(getattr(pw, "current_chapters", []) or []) if pw else []
+        active_idx = -1
+        if pw is not None and chapters:
+            try:
+                active_idx = int(pw.get_active_chapter_index())
+            except Exception:
+                active_idx = -1
+        labels = []
+        for ch in chapters:
+            try:
+                labels.append(self._format_player_chapter_menu_label(ch))
+            except Exception:
+                labels.append("")
+        return (tuple(labels), active_idx)
+
+    def _unbind_player_chapter_items(self, submenu) -> None:
+        """Drop the handlers bound to the submenu items we are about to delete.
+
+        Each rebuild binds a fresh lambda to a fresh wx.ID_ANY id, so without this
+        the frame's and the menu's event tables grow for the life of the process.
+        """
+        for item_id in list(getattr(self, "_player_chapter_dynamic_item_ids", []) or []):
+            try:
+                submenu.Unbind(wx.EVT_MENU, id=int(item_id))
+            except Exception:
+                pass
+        for item_id in list(getattr(self, "_player_chapter_static_item_ids", []) or []):
+            try:
+                self.Unbind(wx.EVT_MENU, id=int(item_id))
+            except Exception:
+                pass
+
+    def _refresh_player_chapters_submenu(self, force: bool = False) -> None:
         submenu = getattr(self, "_player_chapters_submenu", None)
         if submenu is None:
             return
 
+        signature = self._player_chapters_signature()
+        if not force and signature == getattr(self, "_player_chapters_built_signature", None):
+            return
+        # Only set this once the rebuild below has actually run, so a failure
+        # partway through is retried rather than cached as "already correct".
+        self._player_chapters_built_signature = None
+
+        self._unbind_player_chapter_items(submenu)
         self._clear_menu_items(submenu)
         self._player_chapter_dynamic_item_ids = []
         self._player_chapter_static_item_ids = []
@@ -3732,6 +3785,7 @@ class MainFrame(wx.Frame):
             apply_menu_mnemonics(submenu)
         except Exception:
             pass
+        self._player_chapters_built_signature = signature
 
     def on_player_show_chapters(self, event):
         pw = getattr(self, "player_window", None)
@@ -4758,11 +4812,79 @@ class MainFrame(wx.Frame):
             pass
         os._exit(0)
 
-    def on_iconize(self, event):
-        if event.IsIconized() and self.config_manager.get("minimize_to_tray", True):
-            self.Hide()
+    def on_activate(self, event):
+        try:
+            if event.GetActive():
+                self._ensure_window_system_menu()
+        except Exception:
+            log.debug("Activation housekeeping failed", exc_info=True)
+        try:
+            event.Skip()
+        except Exception:
+            pass
+
+    def _ensure_window_system_menu(self) -> None:
+        """Keep the frame's window (System) menu intact, repairing it if it is gone.
+
+        Windows routes menu-bar arrow navigation *through* this menu: moving right
+        off the last menu, or left off the first, steps onto the window menu and
+        then wraps round. A frame that has lost it has no wrap target, and Windows
+        does not merely refuse the move — it wedges the whole menu session. Arrows
+        stop working, Down no longer opens the highlighted menu, Escape does not
+        leave, and the screen reader keeps announcing the menu title it last saw,
+        because no further focus events are ever fired. Only clicking gets out.
+
+        That is the state a long-running session was found in. Re-asserting the
+        default window menu costs three API calls and is idempotent, so verify it
+        whenever the frame is activated and rebuild it if it has gone. No-op off
+        Windows, where the menu bar does not work this way.
+        """
+        if not sys.platform.startswith("win"):
             return
+        try:
+            import ctypes
+
+            hwnd = int(self.GetHandle() or 0)
+            if not hwnd:
+                return
+            user32 = ctypes.windll.user32
+            user32.GetSystemMenu.argtypes = [ctypes.c_void_p, ctypes.c_bool]
+            user32.GetSystemMenu.restype = ctypes.c_void_p
+            user32.IsMenu.argtypes = [ctypes.c_void_p]
+            user32.IsMenu.restype = ctypes.c_bool
+            user32.GetMenuItemCount.argtypes = [ctypes.c_void_p]
+            user32.GetMenuItemCount.restype = ctypes.c_int
+
+            hmenu = user32.GetSystemMenu(hwnd, False)
+            if hmenu and user32.IsMenu(hmenu) and user32.GetMenuItemCount(hmenu) > 0:
+                return
+            # Passing True reverts the window to a fresh copy of the default
+            # system menu, which is exactly what is missing here.
+            user32.GetSystemMenu(hwnd, True)
+            log.info(
+                "Rebuilt the window system menu (it was missing, which wedges "
+                "menu bar navigation at both ends)"
+            )
+        except Exception:
+            log.debug("Could not verify the window system menu", exc_info=True)
+
+    def on_iconize(self, event):
+        # Always let wx finish processing the minimize, then hide on the next
+        # event-loop turn. Hiding from inside the event and swallowing it left the
+        # frame hidden while wx had never recorded the iconize, so the frame and
+        # the real window disagreed about their state and every later restore had
+        # to paper over it (show_and_focus_main's Iconize/Show pair).
         event.Skip()
+        if event.IsIconized() and self.config_manager.get("minimize_to_tray", True):
+            wx.CallAfter(self._hide_to_tray)
+
+    def _hide_to_tray(self) -> None:
+        try:
+            if not self.IsShown():
+                return
+            self.Hide()
+        except Exception:
+            log.debug("Failed to hide the main window to the tray", exc_info=True)
 
     def on_tree_context_menu(self, event):
         # Determine position for the menu

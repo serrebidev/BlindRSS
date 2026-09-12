@@ -54,6 +54,16 @@ class _FakeMenu:
     def Bind(self, evt, handler, item):
         self.bindings.append((evt, int(item.GetId()), handler))
 
+    def Unbind(self, evt, id=None):
+        if id is None:
+            return False
+        target = int(id)
+        before = len(self.bindings)
+        self.bindings = [
+            b for b in self.bindings if not (b[0] is evt and b[1] == target)
+        ]
+        return before != len(self.bindings)
+
     def GetMenuItems(self):
         return [self.items[item_id] for item_id in self._order if item_id in self.items]
 
@@ -85,6 +95,8 @@ class _DummyMain:
     _format_player_chapter_menu_label = mainframe.MainFrame._format_player_chapter_menu_label
     _clear_menu_items = mainframe.MainFrame._clear_menu_items
     _refresh_player_chapters_submenu = mainframe.MainFrame._refresh_player_chapters_submenu
+    _player_chapters_signature = mainframe.MainFrame._player_chapters_signature
+    _unbind_player_chapter_items = mainframe.MainFrame._unbind_player_chapter_items
     _shortcut_menu_label = mainframe.MainFrame._shortcut_menu_label
     on_player_show_chapters = mainframe.MainFrame.on_player_show_chapters
     on_player_prev_chapter = mainframe.MainFrame.on_player_prev_chapter
@@ -107,6 +119,14 @@ class _DummyMain:
 
     def Bind(self, evt, handler, item):
         self.bound.append((evt, handler, int(item.GetId())))
+
+    def Unbind(self, evt, id=None):
+        if id is None:
+            return False
+        target = int(id)
+        before = len(self.bound)
+        self.bound = [b for b in self.bound if not (b[0] is evt and b[2] == target)]
+        return before != len(self.bound)
 
 
 def test_refresh_player_chapters_submenu_populates_dynamic_entries():
@@ -189,3 +209,90 @@ def test_chapter_menu_enables_only_available_direction():
 
     assert host._player_chapters_prev_item.enabled is False
     assert host._player_chapters_next_item.enabled is True
+
+
+def test_repeat_open_does_not_touch_native_menu_when_nothing_changed():
+    """A menu open with an unchanged chapter list must not rebuild the submenu.
+
+    The rebuild runs from EVT_MENU_OPEN — inside WM_INITMENUPOPUP, while Windows is
+    tracking the menu — and deletes and re-appends every item. Doing that on every
+    open churned the window's menus for nothing and left the menu bar wedged after
+    a long session: arrowing past Help or File stopped moving and the whole menu
+    session went dead.
+    """
+    host = _DummyMain(
+        chapters=[
+            {"start": 0.0, "title": "Intro"},
+            {"start": 15.0, "title": "News"},
+        ],
+        active_idx=0,
+    )
+
+    host._refresh_player_chapters_submenu()
+    built_ids = list(host._player_chapters_submenu.items.keys())
+    dynamic_ids = list(host._player_chapter_dynamic_item_ids)
+
+    for _ in range(10):
+        host._refresh_player_chapters_submenu()
+
+    assert list(host._player_chapters_submenu.items.keys()) == built_ids
+    assert list(host._player_chapter_dynamic_item_ids) == dynamic_ids
+
+
+def test_rebuild_still_runs_when_the_active_chapter_moves_on():
+    host = _DummyMain(
+        chapters=[
+            {"start": 0.0, "title": "Intro"},
+            {"start": 15.0, "title": "News"},
+        ],
+        active_idx=0,
+    )
+    host._refresh_player_chapters_submenu()
+    assert host._player_chapters_next_item.enabled is True
+    assert host._player_chapters_prev_item.enabled is False
+
+    host.player_window._active_idx = 1
+    host._refresh_player_chapters_submenu()
+
+    labels = [
+        host._player_chapters_submenu.items[i].label
+        for i in host._player_chapter_dynamic_item_ids
+    ]
+    assert labels[1] == "Current chapter, 00:15, News"
+    assert host._player_chapters_prev_item.enabled is True
+    assert host._player_chapters_next_item.enabled is False
+
+
+def test_rebuild_runs_when_the_chapter_list_itself_changes():
+    host = _DummyMain(chapters=[], active_idx=-1)
+    host._refresh_player_chapters_submenu()
+    assert len(host._player_chapter_dynamic_item_ids) == 1
+
+    host.player_window.current_chapters = [
+        {"start": 0.0, "title": "Intro"},
+        {"start": 15.0, "title": "News"},
+    ]
+    host.player_window._active_idx = 0
+    host._refresh_player_chapters_submenu()
+
+    assert len(host._player_chapter_dynamic_item_ids) == 2
+
+
+def test_rebuild_does_not_accumulate_handler_bindings():
+    """Each rebuild binds fresh wx.ID_ANY handlers; the stale ones must go.
+
+    Without unbinding, the event tables grew for the life of the process — a menu
+    that had been rebuilt on every Player-menu open for hours.
+    """
+    host = _DummyMain(chapters=[{"start": 0.0, "title": "Intro"}], active_idx=0)
+    host._refresh_player_chapters_submenu()
+    submenu_bindings = len(host._player_chapters_submenu.bindings)
+    frame_bindings = len(host.bound)
+
+    for i in range(8):
+        # Force a different signature each time so the rebuild really runs.
+        host.player_window.current_chapters = [{"start": float(i), "title": f"Ch{i}"}]
+        host._refresh_player_chapters_submenu()
+
+    assert len(host._player_chapters_submenu.bindings) == submenu_bindings
+    assert len(host.bound) == frame_bindings
