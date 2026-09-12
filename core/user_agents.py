@@ -47,7 +47,7 @@ log = logging.getLogger(__name__)
 # Chromium majors move together across Chrome/Edge/Brave, so one number covers
 # all three; Gecko tracks its own.
 # BEGIN GENERATED VERSIONS
-CHROMIUM_MAJOR = "153"
+CHROMIUM_MAJOR = "154"
 FIREFOX_MAJOR = "155"
 # END GENERATED VERSIONS
 

@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.135.7 - 2026-09-12
+
+- Stop the menu bar wedging at either end.
+
 ## v1.135.6 - 2026-09-05
 
 - Integrate upstream documentation with automatic refresh recovery.
