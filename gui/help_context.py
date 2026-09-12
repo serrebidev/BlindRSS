@@ -289,6 +289,13 @@ def _in_native_menu_mode():
         return False
 
 
+def _focused_window():
+    try:
+        return wx.Window.FindFocus()
+    except Exception:
+        return None
+
+
 def _menu_item_id(item):
     if item is None:
         return None
@@ -357,6 +364,42 @@ def topic_for_window(window):
     return None
 
 
+# Dialogs that record raw keystrokes, where F1 is a key the user is trying to
+# assign rather than a request for help. A window may also opt out by setting
+# ``_captures_keys = True``.
+_KEY_CAPTURE_CLASSES = frozenset({"ShortcutCaptureDialog"})
+
+
+def is_capturing_keys(window):
+    """True while ``window`` sits inside a dialog that records keystrokes.
+
+    Tools, Keyboard Shortcuts lets a command be bound to a bare function key,
+    F1 included. Swallowing F1 there would make it the one key in the registry
+    that cannot be assigned.
+    """
+    seen = 0
+    current = window
+    while current is not None and seen < 64:
+        seen += 1
+        if getattr(current, "_captures_keys", False):
+            return True
+        try:
+            if _KEY_CAPTURE_CLASSES.intersection(
+                klass.__name__ for klass in type(current).__mro__
+            ):
+                return True
+        except Exception:
+            pass
+        try:
+            parent = current.GetParent()
+        except Exception:
+            parent = None
+        if parent is current:
+            break
+        current = parent
+    return False
+
+
 def _topic_for_instance(window):
     """Topic for ``window``'s class, honouring subclasses via the MRO."""
     try:
@@ -382,10 +425,7 @@ def resolve_topic(focus=None, menu_id=None):
         return topic
 
     if focus is None:
-        try:
-            focus = wx.Window.FindFocus()
-        except Exception:
-            focus = None
+        focus = _focused_window()
     topic = topic_for_window(focus)
     if topic:
         return topic
@@ -581,6 +621,8 @@ class HelpKeyFilter(wx.EventFilter):
             return wx.EventFilter.Event_Skip
 
         if event_type == wx.wxEVT_HELP:
+            if is_capturing_keys(_focused_window()):
+                return wx.EventFilter.Event_Skip
             try:
                 menu_id = int(event.GetId())
             except Exception:
@@ -603,10 +645,9 @@ class HelpKeyFilter(wx.EventFilter):
         if not self._is_help_key(event):
             return wx.EventFilter.Event_Skip
 
-        try:
-            focus = wx.Window.FindFocus()
-        except Exception:
-            focus = None
+        focus = _focused_window()
+        if is_capturing_keys(focus):
+            return wx.EventFilter.Event_Skip
         show_context_help(focus=focus)
         return wx.EventFilter.Event_Processed
 

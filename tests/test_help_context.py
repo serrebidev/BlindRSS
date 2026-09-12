@@ -409,3 +409,31 @@ def test_menu_id_arrives_unsigned_from_wm_help(wx_app):
     unsigned = item_id + 0x10000
     assert help_context.topic_for_menu_id(unsigned) == "settings"
     assert help_context.topic_for_menu_id(item_id) == "settings"
+
+
+# --------------------------------------------------------------------------
+# The shortcut capture dialog must still be able to record F1
+# --------------------------------------------------------------------------
+
+def test_shortcut_capture_dialog_keeps_f1(wx_app, filter_calls, monkeypatch):
+    class ShortcutCaptureDialog(wx.Dialog):
+        pass
+
+    dialog = ShortcutCaptureDialog(None)
+    try:
+        ctrl = wx.TextCtrl(dialog)
+        assert help_context.is_capturing_keys(ctrl)
+        monkeypatch.setattr(help_context, "_focused_window", lambda: ctrl)
+        handler = help_context.HelpKeyFilter(_FakeFrame())
+        assert handler.FilterEvent(_key_event(wx.WXK_F1)) == wx.EventFilter.Event_Skip
+        assert filter_calls == []
+    finally:
+        dialog.Destroy()
+
+
+def test_capturing_flag_opts_a_window_out(frame):
+    panel = wx.Panel(frame)
+    inner = wx.TextCtrl(panel)
+    assert not help_context.is_capturing_keys(inner)
+    panel._captures_keys = True
+    assert help_context.is_capturing_keys(inner)
