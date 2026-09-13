@@ -311,5 +311,25 @@ Main article paragraph two.
             fb,
         )
 
+    def test_sky_news_related_sections_are_removed(self):
+        text = (
+            "The last paragraph of the article remains available.\n"
+            "More from Sky News entertainment:\n"
+            "Celebrity headline that belongs to a related-story widget\n"
+            "More from Sky News:\n"
+            "Another related-story headline"
+        )
+        cleaned = article_extractor._postprocess_extracted_text(
+            text, "https://news.sky.com/story/example-13584148"
+        )
+        self.assertEqual(cleaned, "The last paragraph of the article remains available.")
+
+    def test_sky_related_section_rule_does_not_apply_to_other_hosts(self):
+        text = "Article body.\nMore from Sky News:\nA legitimate quoted heading."
+        self.assertEqual(
+            article_extractor._postprocess_extracted_text(text, "https://example.com/story"),
+            text,
+        )
+
 if __name__ == '__main__':
     unittest.main()

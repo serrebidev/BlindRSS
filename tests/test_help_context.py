@@ -248,6 +248,27 @@ def test_help_window_find_moves_the_caret(frame):
         window.Destroy()
 
 
+def test_help_contents_selection_relies_on_the_native_announcement(frame, monkeypatch):
+    """ListBox selection is already announced by NVDA/JAWS/VoiceOver."""
+    from gui.help_viewer import HelpWindow
+    import gui.help_viewer as help_viewer
+
+    window = HelpWindow(frame, topic=help_topics.DEFAULT_TOPIC)
+    try:
+        spoken = []
+        monkeypatch.setattr(help_viewer, "_speak", spoken.append)
+        window.contents_list.SetSelection(1)
+
+        class Event:
+            def Skip(self):
+                pass
+
+        window.on_contents_select(Event())
+        assert spoken == []
+    finally:
+        window.Destroy()
+
+
 def test_help_window_declares_its_own_topic(frame):
     from gui.help_viewer import HelpWindow
 

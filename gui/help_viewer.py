@@ -209,12 +209,14 @@ class HelpWindow(wx.Dialog):
         event.Skip()
         if index < 0 or index >= len(self._entries):
             return
-        _anchor, title, _level = self._entries[index]
+        _anchor, _title, _level = self._entries[index]
         # _section_lines is parallel to _entries, so an unanchored heading is
         # just as reachable as an anchored one.
         line = self._section_lines[index] if index < len(self._section_lines) else 0
         self._goto_line(int(line or 0))
-        _speak(title)
+        # wx.ListBox already reports its new selection to screen readers.  A
+        # second explicit announcement made NVDA speak every contents title
+        # twice while people navigate with Up/Down.
 
     # -- searching ---------------------------------------------------------
 

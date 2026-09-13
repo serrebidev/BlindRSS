@@ -2707,6 +2707,8 @@ def _postprocess_extracted_text(text: str, url: str) -> str:
         t = _strip_slashdot_boilerplate(t)
     elif "bloomberg.com" in netloc:
         t = _strip_bloomberg_boilerplate(t)
+    elif _host_matches(url, "news.sky.com"):
+        t = _strip_sky_related_sections(t)
     elif netloc.endswith(".ning.com") or netloc == "ning.com":
         t = _strip_ning_activity_noise(t)
 
@@ -2737,6 +2739,26 @@ def _postprocess_extracted_text(text: str, url: str) -> str:
     t = _strip_recirculation_labels(t)
 
     return _normalize_whitespace(t)
+
+
+_SKY_RELATED_SECTION_RE = re.compile(
+    r"(?im)^\s*more\s+from\s+sky\s+news(?:\s+entertainment)?\s*[:\u2013\u2014-]?\s*$"
+)
+
+
+def _strip_sky_related_sections(text: str) -> str:
+    """Drop Sky's trailing related-story widgets, not similarly named prose.
+
+    The widgets are emitted as a standalone heading followed by teaser titles;
+    no article body follows them.  Match the heading as a complete line and
+    discard only that trailing footer, so a sentence that mentions Sky News is
+    never affected.
+    """
+    match = _SKY_RELATED_SECTION_RE.search(text or "")
+    if not match:
+        return text
+    cleaned = text[:match.start()].rstrip()
+    return cleaned or text
 
 
 # Bare "here are some other stories" headings. The links they introduce are stripped as
