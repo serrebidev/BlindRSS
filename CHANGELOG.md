@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.136.1 - 2026-09-13
+
+- Avoid repeated guide headings and Sky related links.
+
 ## v1.136.0 - 2026-09-12
 
 - Translate offline user guide.
