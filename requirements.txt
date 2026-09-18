@@ -17,9 +17,12 @@ pytubefix>=10.11.0,<11
 python-dateutil
 mutagen
 python-vlc
+# Casting. The protocol clients are Caster's (tools/sync_caster.py); these
+# are the libraries they drive. soco is optional: without it Sonos speakers
+# simply do not appear.
 pychromecast>=14.0.0
-async-upnp-client
 pyatv
+soco>=0.30.0
 trafilatura>=2.1.0
 Markdown>=3.10.2,<4
 # Structured-metadata extraction (JSON-LD/microdata/OpenGraph) for article

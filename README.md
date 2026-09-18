@@ -25,7 +25,7 @@ A vibe-coded, screen-reader-friendly desktop RSS and podcast client for Windows,
 - Resolves YouTube, Rumble, and Odysee media through yt-dlp and built-in resolvers.
 - Smooths VLC playback and seeking with a local range-cache proxy.
 - Playback speed control, an equalizer, silence skipping, chapters, and soundcard selection.
-- Casts to Chromecast, DLNA/UPnP, and AirPlay.
+- Casts to Chromecast, AirPlay, DLNA/UPnP, Sonos, Roku and Kodi, using Caster's casting engine.
 - Tray controls, media-key support, and startup restore of your last feed and folder.
 - Windows notifications for new articles, with per-feed exclusions and per-refresh limits.
 - 67 remappable keyboard commands, grouped by feeds, articles, view, player, and playback speed.

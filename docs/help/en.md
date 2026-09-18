@@ -756,7 +756,9 @@ survives restarts.
 ## Casting to Other Devices {#casting}
 
 BlindRSS can send what it plays to a device on your network: Chromecast,
-DLNA/UPnP renderers, and AirPlay receivers.
+AirPlay speakers, DLNA/UPnP renderers, Sonos speakers, Roku players and Kodi.
+An episode continues on the device from where it was playing, and pause, seek
+and the position work there as they do locally (Roku has no seek).
 
 Choose the device from the cast dialog; BlindRSS streams through its own local
 proxy, so a device that cannot fetch the original address itself still plays

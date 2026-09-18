@@ -131,7 +131,7 @@ if PLATFORM.startswith("win"):
 packages_to_collect = [
     "pyatv",
     "pychromecast",
-    "async_upnp_client",
+    "soco",
     "trafilatura",
     # trafilatura/courlan metadata extraction loads the public-suffix list at
     # runtime. Importing tld succeeds without this data, then every metadata
@@ -150,7 +150,6 @@ packages_to_collect = [
     "six",
     "soupsieve",
     "defusedxml",
-    "didl_lite",
     "ifaddr",
     "certifi",
     "curl_cffi",
@@ -220,6 +219,11 @@ hiddenimports = [
     # Over-the-air translation updates, imported lazily inside functions.
     "core.po_compile",
     "core.translation_updates",
+    # Caster's casting engine and protocol clients (tools/sync_caster.py).
+    "caster_engine",
+    "caster_extras",
+    "caster_devices",
+    "caster_config",
 ]
 
 
@@ -377,6 +381,9 @@ a = Analysis(
         "nodejs_wheel",
         "tkinter",
         "_tkinter",
+        # Lazy imports in caster_extras for screen/PC-audio casting.
+        "caster",
+        "pyaudiowpatch",
     ],
     noarchive=False,
     optimize=0,

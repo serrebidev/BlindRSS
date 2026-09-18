@@ -2,1166 +2,315 @@
 # This file is part of BlindRSS
 # SPDX-License-Identifier: MIT
 
-import asyncio
-import threading
+"""Casting built on Caster's engine: routing, resume positions, transport controls."""
+
+import ast
+import os
+import sys
 import time
-from types import SimpleNamespace
-from uuid import UUID
 
 import pytest
 
-from core import casting
-
-
-class _Browser:
-    def __init__(self, *, fail_stop=False):
-        self.fail_stop = bool(fail_stop)
-        self.stop_calls = 0
-
-    def stop_discovery(self):
-        self.stop_calls += 1
-        if self.fail_stop:
-            raise RuntimeError("stop failed")
-
-
-class _Chromecast:
-    def __init__(
-        self,
-        *,
-        name="R & B Room",
-        identifier="94b4d1b1-08bb-5fee-ca1c-491e0f225607",
-        host="192.168.1.73",
-        wait_error=None,
-        connected=True,
-        app_id=casting.APP_MEDIA_RECEIVER,
-        start_app_error=None,
-        quit_app_error=None,
-    ):
-        self.name = name
-        self.uuid = UUID(identifier)
-        self.cast_info = SimpleNamespace(
-            friendly_name=name,
-            host=host,
-            port=8009,
-        )
-        self.model_name = "SmartTV 4K FFM"
-        self.cast_type = "cast"
-        self.wait_error = wait_error
-        self.wait_calls = []
-        self.disconnect_calls = []
-        self.start_app_calls = []
-        self.start_app_error = start_app_error
-        self.quit_app_calls = []
-        self.quit_app_error = quit_app_error
-        self.status = SimpleNamespace(app_id=app_id)
-        self.receiver_controller = SimpleNamespace(
-            status=SimpleNamespace(app_id=app_id),
-            app_id=app_id,
-            update_status=lambda callback_function=None: (
-                callback_function(True, {}) if callback_function else None
-            ),
-        )
-        self.socket_client = SimpleNamespace(
-            is_connected=bool(connected),
-            receiver_controller=self.receiver_controller,
-        )
-        self.media_controller = SimpleNamespace(
-            status=SimpleNamespace(media_session_id=None),
-            update_status=lambda: None,
-            stop=lambda: None,
-        )
-
-    def wait(self, timeout=None):
-        self.wait_calls.append(timeout)
-        if self.wait_error is not None:
-            raise self.wait_error
-
-    def disconnect(self, timeout=None):
-        self.disconnect_calls.append(timeout)
-
-    @property
-    def app_id(self):
-        return self.status.app_id
-
-    def start_app(self, app_id, force_launch=False, timeout=None):
-        self.start_app_calls.append((app_id, force_launch, timeout))
-        if self.start_app_error is not None:
-            raise self.start_app_error
-        self.status.app_id = app_id
-        self.receiver_controller.status.app_id = app_id
-        self.receiver_controller.app_id = app_id
-
-    def quit_app(self, timeout=None):
-        self.quit_app_calls.append(timeout)
-        if self.quit_app_error is not None:
-            raise self.quit_app_error
-        self.status.app_id = None
-        self.receiver_controller.status.app_id = None
-        self.receiver_controller.app_id = None
-
-
-def _device(
-    *,
-    name="R & B Room",
-    identifier="94b4d1b1-08bb-5fee-ca1c-491e0f225607",
-    host="192.168.1.73",
-):
-    return casting.CastDevice(
-        name=name,
-        protocol=casting.CastProtocol.CHROMECAST,
-        identifier=identifier,
-        host=host,
-        port=8009,
-    )
-
-
-def test_chromecast_discovery_preserves_name_and_always_stops_browser(monkeypatch):
-    browser = _Browser(fail_stop=True)
-    chromecast = _Chromecast()
-    monkeypatch.setattr(
-        casting.pychromecast,
-        "get_chromecasts",
-        lambda **kwargs: ([chromecast], browser),
-    )
-
-    caster = casting.ChromecastCaster()
-    devices = asyncio.run(caster.discover(timeout=2.5))
-
-    assert [device.name for device in devices] == ["R & B Room"]
-    assert devices[0].identifier == str(chromecast.uuid)
-    assert browser.stop_calls == 1
-
-
-def test_chromecast_connect_uses_uuid_object_and_known_host(monkeypatch):
-    browser = _Browser()
-    chromecast = _Chromecast()
-    calls = []
-
-    def get_listed_chromecasts(**kwargs):
-        calls.append(kwargs)
-        return [chromecast], browser
-
-    monkeypatch.setattr(
-        casting.pychromecast,
-        "get_listed_chromecasts",
-        get_listed_chromecasts,
-    )
-
-    caster = casting.ChromecastCaster()
-    asyncio.run(caster.connect(_device()))
-
-    assert len(calls) == 1
-    assert calls[0]["uuids"] == [chromecast.uuid]
-    assert isinstance(calls[0]["uuids"][0], UUID)
-    assert calls[0]["known_hosts"] == ["192.168.1.73"]
-    assert calls[0]["discovery_timeout"] == caster._DISCOVERY_TIMEOUT
-    assert chromecast.wait_calls == [caster._READY_TIMEOUT]
-    assert caster.is_connected() is True
-
-
-def test_chromecast_connect_falls_back_to_unescaped_name_and_cleans_first_browser(monkeypatch):
-    uuid_browser = _Browser()
-    name_browser = _Browser()
-    chromecast = _Chromecast()
-    calls = []
-
-    def get_listed_chromecasts(**kwargs):
-        calls.append(kwargs)
-        if "uuids" in kwargs:
-            return [], uuid_browser
-        return [chromecast], name_browser
-
-    monkeypatch.setattr(
-        casting.pychromecast,
-        "get_listed_chromecasts",
-        get_listed_chromecasts,
-    )
-
-    caster = casting.ChromecastCaster()
-    asyncio.run(caster.connect(_device()))
-
-    assert len(calls) == 2
-    assert calls[1]["friendly_names"] == ["R & B Room"]
-    assert calls[1]["known_hosts"] == ["192.168.1.73"]
-    assert uuid_browser.stop_calls == 1
-    assert name_browser.stop_calls == 0
-
-
-def test_chromecast_connect_failure_cleans_cast_and_browser(monkeypatch):
-    browser = _Browser()
-    chromecast = _Chromecast(wait_error=TimeoutError("not ready"))
-    monkeypatch.setattr(
-        casting.pychromecast,
-        "get_listed_chromecasts",
-        lambda **kwargs: ([chromecast], browser),
-    )
-
-    caster = casting.ChromecastCaster()
-    with pytest.raises(casting.ConnectionError, match="R & B Room"):
-        asyncio.run(caster.connect(_device()))
-
-    assert chromecast.disconnect_calls == [5.0]
-    assert browser.stop_calls == 1
-    assert caster.is_connected() is False
-
-
-def test_chromecast_connection_state_tracks_socket_state():
-    caster = casting.ChromecastCaster()
-    chromecast = _Chromecast(connected=False)
-    caster._cast = chromecast
-
-    assert caster.is_connected() is False
-
-    chromecast.socket_client.is_connected = True
-    assert caster.is_connected() is True
-
-
-def test_chromecast_disconnect_is_bounded_and_stops_browser():
-    caster = casting.ChromecastCaster()
-    chromecast = _Chromecast()
-    browser = _Browser()
-    caster._cast = chromecast
-    caster._browser = browser
-
-    asyncio.run(caster.disconnect())
-
-    assert chromecast.disconnect_calls == [5.0]
-    assert browser.stop_calls == 1
-    assert caster._cast is None
-    assert caster._browser is None
-
-
-def test_chromecast_play_proxies_windows_absolute_path_for_device(monkeypatch):
-    local_path = r"C:\Users\admin\Music\test.wav"
-    proxy_url = "http://192.168.1.20:8123/file/test-token"
-    proxy_calls = []
-    play_calls = []
-    block_calls = []
-
-    proxy = SimpleNamespace(
-        get_file_url=lambda path, device_ip=None: (
-            proxy_calls.append((path, device_ip)) or proxy_url
-        )
-    )
-    chromecast = _Chromecast(host="192.168.1.73")
-    chromecast.media_controller.play_media = (
-        lambda url, content_type, **kwargs: play_calls.append(
-            (url, content_type, kwargs)
-        )
-    )
-    chromecast.media_controller.block_until_active = (
-        lambda timeout=None: block_calls.append(timeout)
-    )
-
-    monkeypatch.setattr(casting, "get_proxy", lambda: proxy)
-    monkeypatch.setattr(
-        casting.os.path,
-        "isfile",
-        lambda path: path == local_path,
-    )
-
-    caster = casting.ChromecastCaster()
-    caster._cast = chromecast
-    asyncio.run(
-        caster.play(
-            local_path,
-            title="Local test",
-            content_type="audio/wav",
-        )
-    )
-
-    assert proxy_calls == [(local_path, "192.168.1.73")]
-    assert play_calls == [
-        (
-            proxy_url,
-            "audio/wav",
-            {
-                "title": "Local test",
-                "autoplay": True,
-                "stream_type": "BUFFERED",
-            },
-        )
-    ]
-    assert play_calls[0][0] != local_path
-    assert block_calls == [10]
-
-
-def test_chromecast_play_launches_default_receiver_before_media(monkeypatch):
-    events = []
-    chromecast = _Chromecast(app_id="70FE3A67")
-
-    def start_app(app_id, force_launch=False, timeout=None):
-        events.append(("start_app", app_id, force_launch, timeout))
-        chromecast.status.app_id = app_id
-        chromecast.receiver_controller.status.app_id = app_id
-        chromecast.receiver_controller.app_id = app_id
-
-    chromecast.start_app = start_app
-    chromecast.media_controller.play_media = (
-        lambda url, content_type, **kwargs: events.append(
-            ("play_media", url, content_type)
-        )
-    )
-    chromecast.media_controller.block_until_active = lambda timeout=None: None
-    monkeypatch.setattr(casting, "get_proxy", lambda: None)
-
-    caster = casting.ChromecastCaster()
-    caster._cast = chromecast
-    asyncio.run(
-        caster.play(
-            "https://example.com/test.wav",
-            title="Receiver handoff",
-            content_type="audio/wav",
-        )
-    )
-
-    assert events == [
-        (
-            "start_app",
-            casting.APP_MEDIA_RECEIVER,
-            True,
-            caster._RECEIVER_LAUNCH_TIMEOUT,
-        ),
-        ("play_media", "https://example.com/test.wav", "audio/wav"),
-    ]
-
-
-def test_chromecast_play_does_not_relaunch_default_receiver(monkeypatch):
-    chromecast = _Chromecast(app_id=casting.APP_MEDIA_RECEIVER)
-    play_calls = []
-    chromecast.media_controller.play_media = (
-        lambda url, content_type, **kwargs: play_calls.append((url, content_type))
-    )
-    chromecast.media_controller.block_until_active = lambda timeout=None: None
-    monkeypatch.setattr(casting, "get_proxy", lambda: None)
-
-    caster = casting.ChromecastCaster()
-    caster._cast = chromecast
-    asyncio.run(
-        caster.play(
-            "https://example.com/test.wav",
-            content_type="audio/wav",
-        )
-    )
-
-    assert chromecast.start_app_calls == []
-    assert play_calls == [("https://example.com/test.wav", "audio/wav")]
-
-
-def test_chromecast_play_sends_start_time_and_one_bounded_seek(monkeypatch):
-    chromecast = _Chromecast(app_id=casting.APP_MEDIA_RECEIVER)
-    play_calls = []
-    seek_calls = []
-    chromecast.media_controller.play_media = (
-        lambda url, content_type, **kwargs: play_calls.append((url, content_type, kwargs))
-    )
-    chromecast.media_controller.block_until_active = lambda timeout=None: None
-    chromecast.media_controller.seek = (
-        lambda position, timeout=None: seek_calls.append((position, timeout))
-    )
-    monkeypatch.setattr(casting, "get_proxy", lambda: None)
-
-    caster = casting.ChromecastCaster()
-    caster._cast = chromecast
-    asyncio.run(
-        caster.play(
-            "https://example.com/episode.mp3",
-            content_type="audio/mpeg",
-            start_time_seconds=42.5,
-        )
-    )
-
-    assert play_calls[0][2]["current_time"] == 42.5
-    assert seek_calls == [(42.5, 2.0)]
-
-
-def test_chromecast_status_waits_for_acknowledged_snapshot():
-    chromecast = _Chromecast(app_id=casting.APP_MEDIA_RECEIVER)
-    chromecast.status.transport_id = "transport-2"
-    chromecast.media_controller.status = SimpleNamespace(
-        media_session_id=9,
-        content_id="https://example.com/episode.mp3",
-        player_state="PLAYING",
-        adjusted_current_time=320.75,
-    )
-
-    def update_status(callback_function=None):
-        if callback_function:
-            callback_function(True, {})
-
-    chromecast.media_controller.update_status = update_status
-    caster = casting.ChromecastCaster()
-    caster._cast = chromecast
-
-    status = asyncio.run(caster.get_status())
-
-    assert status == {
-        "position_seconds": 320.75,
-        "media_session_id": 9,
-        "content_id": "https://example.com/episode.mp3",
-        "player_state": "PLAYING",
-        "receiver_app_ids": [casting.APP_MEDIA_RECEIVER],
-        "transport_id": "transport-2",
-        "connected": True,
-        "supports_session_detection": True,
-    }
-
-
-def test_casting_manager_seek_does_not_wait_for_network_completion():
-    completed = threading.Event()
-
-    class _SlowCaster:
-        async def seek(self, position):
-            await asyncio.sleep(0.15)
-            completed.set()
-
-    manager = casting.CastingManager()
-    manager.active_caster = _SlowCaster()
-    manager.start()
-    try:
-        started = time.monotonic()
-        manager.seek(12.0)
-        elapsed = time.monotonic() - started
-        assert elapsed < 0.1
-        assert completed.wait(1.0)
-    finally:
-        manager.stop()
-
-
-def test_chromecast_receiver_launch_failure_is_playback_error(monkeypatch):
-    chromecast = _Chromecast(
-        app_id="70FE3A67",
-        start_app_error=TimeoutError("launch timed out"),
-    )
-    play_calls = []
-    chromecast.media_controller.play_media = lambda *args, **kwargs: play_calls.append(args)
-    monkeypatch.setattr(casting, "get_proxy", lambda: None)
-
-    caster = casting.ChromecastCaster()
-    caster._RECEIVER_CONFIRM_TIMEOUT = 0.01
-    caster._RECEIVER_STATUS_WAIT = 0.005
-    caster._cast = chromecast
-
-    with pytest.raises(casting.PlaybackError, match="Default Media Receiver"):
-        asyncio.run(
-            caster.play(
-                "https://example.com/test.wav",
-                content_type="audio/wav",
-            )
-        )
-
-    assert play_calls == []
-
-
-def test_chromecast_play_accepts_acknowledged_launch_without_app_status(monkeypatch):
-    chromecast = _Chromecast(app_id=None)
-    launch_calls = []
-    play_calls = []
-    chromecast.start_app = (
-        lambda app_id, force_launch=False, timeout=None: launch_calls.append(
-            (app_id, force_launch, timeout)
-        )
-    )
-    chromecast.media_controller.play_media = (
-        lambda url, content_type, **kwargs: play_calls.append((url, content_type))
-    )
-    chromecast.media_controller.block_until_active = lambda timeout=None: None
-    monkeypatch.setattr(casting, "get_proxy", lambda: None)
-
-    caster = casting.ChromecastCaster()
-    caster._cast = chromecast
-    asyncio.run(
-        caster.play(
-            "https://example.com/test.wav",
-            content_type="audio/wav",
-        )
-    )
-
-    assert launch_calls == [
-        (
-            casting.APP_MEDIA_RECEIVER,
-            True,
-            caster._RECEIVER_LAUNCH_TIMEOUT,
-        )
-    ]
-    assert play_calls == [("https://example.com/test.wav", "audio/wav")]
-
-
-def test_chromecast_does_not_play_when_receiver_status_stays_on_other_app(monkeypatch):
-    chromecast = _Chromecast(app_id="70FE3A67")
-    chromecast.start_app = lambda app_id, force_launch=False, timeout=None: None
-    chromecast.quit_app = lambda timeout=None: None
-    play_calls = []
-    chromecast.media_controller.play_media = lambda *args, **kwargs: play_calls.append(args)
-    monkeypatch.setattr(casting, "get_proxy", lambda: None)
-
-    caster = casting.ChromecastCaster()
-    caster._RECEIVER_CONFIRM_TIMEOUT = 0.02
-    caster._RECEIVER_STATUS_WAIT = 0.005
-    caster._cast = chromecast
-
-    with pytest.raises(casting.PlaybackError, match="reported app: 70FE3A67"):
-        asyncio.run(
-            caster.play(
-                "https://example.com/test.wav",
-                content_type="audio/wav",
-            )
-        )
-
-    assert play_calls == []
-
-
-def test_chromecast_launch_timeout_can_be_confirmed_by_later_status(monkeypatch):
-    chromecast = _Chromecast(app_id="70FE3A67")
-    start_calls = []
-    play_calls = []
-
-    def start_app(app_id, force_launch=False, timeout=None):
-        start_calls.append((app_id, force_launch, timeout))
-        raise TimeoutError("launch response timed out")
-
-    def update_status(callback_function=None):
-        chromecast.status.app_id = casting.APP_MEDIA_RECEIVER
-        chromecast.receiver_controller.status.app_id = casting.APP_MEDIA_RECEIVER
-        chromecast.receiver_controller.app_id = casting.APP_MEDIA_RECEIVER
-        if callback_function:
-            callback_function(True, {})
-
-    chromecast.start_app = start_app
-    chromecast.receiver_controller.update_status = update_status
-    chromecast.media_controller.play_media = (
-        lambda url, content_type, **kwargs: play_calls.append((url, content_type))
-    )
-    chromecast.media_controller.block_until_active = lambda timeout=None: None
-    monkeypatch.setattr(casting, "get_proxy", lambda: None)
-
-    caster = casting.ChromecastCaster()
-    caster._cast = chromecast
-    asyncio.run(
-        caster.play(
-            "https://example.com/test.wav",
-            content_type="audio/wav",
-        )
-    )
-
-    assert start_calls == [
-        (
-            casting.APP_MEDIA_RECEIVER,
-            True,
-            caster._RECEIVER_LAUNCH_TIMEOUT,
-        )
-    ]
-    assert chromecast.quit_app_calls == []
-    assert play_calls == [("https://example.com/test.wav", "audio/wav")]
-
-
-def test_chromecast_stops_other_app_and_retries_launch_once(monkeypatch):
-    chromecast = _Chromecast(app_id="70FE3A67")
-    events = []
-    launch_attempts = 0
-
-    def start_app(app_id, force_launch=False, timeout=None):
-        nonlocal launch_attempts
-        launch_attempts += 1
-        events.append(("start_app", launch_attempts))
-        if launch_attempts == 1:
-            raise TimeoutError("first launch timed out")
-        chromecast.status.app_id = app_id
-        chromecast.receiver_controller.status.app_id = app_id
-        chromecast.receiver_controller.app_id = app_id
-
-    def quit_app(timeout=None):
-        events.append(("quit_app", timeout))
-        chromecast.status.app_id = None
-        chromecast.receiver_controller.status.app_id = None
-        chromecast.receiver_controller.app_id = None
-
-    chromecast.start_app = start_app
-    chromecast.quit_app = quit_app
-    chromecast.media_controller.play_media = (
-        lambda url, content_type, **kwargs: events.append(("play_media", url))
-    )
-    chromecast.media_controller.block_until_active = lambda timeout=None: None
-    monkeypatch.setattr(casting, "get_proxy", lambda: None)
-
-    caster = casting.ChromecastCaster()
-    caster._RECEIVER_CONFIRM_TIMEOUT = 0.01
-    caster._RECEIVER_STATUS_WAIT = 0.005
-    caster._cast = chromecast
-    asyncio.run(
-        caster.play(
-            "https://example.com/test.wav",
-            content_type="audio/wav",
-        )
-    )
-
-    assert events == [
-        ("start_app", 1),
-        ("quit_app", caster._RECEIVER_STOP_TIMEOUT),
-        ("start_app", 2),
-        ("play_media", "https://example.com/test.wav"),
-    ]
-
-
-def test_chromecast_media_command_failure_is_playback_error(monkeypatch):
-    chromecast = _Chromecast(app_id=casting.APP_MEDIA_RECEIVER)
-    chromecast.media_controller.play_media = (
-        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("load rejected"))
-    )
-    monkeypatch.setattr(casting, "get_proxy", lambda: None)
-
-    caster = casting.ChromecastCaster()
-    caster._cast = chromecast
-
-    with pytest.raises(casting.PlaybackError, match="load rejected"):
-        asyncio.run(
-            caster.play(
-                "https://example.com/test.wav",
-                content_type="audio/wav",
-            )
-        )
-
-
-def test_chromecast_stop_skips_invalid_command_without_media_session():
-    caster = casting.ChromecastCaster()
-    chromecast = _Chromecast()
-    stop_calls = []
-    chromecast.media_controller.stop = lambda: stop_calls.append(True)
-    caster._cast = chromecast
-
-    asyncio.run(caster.stop())
-
-    assert stop_calls == []
-
-
-def test_chromecast_stop_sends_command_for_active_media_session():
-    caster = casting.ChromecastCaster()
-    chromecast = _Chromecast()
-    stop_calls = []
-    chromecast.media_controller.status.media_session_id = 7
-    chromecast.media_controller.stop = lambda: stop_calls.append(True)
-    caster._cast = chromecast
-
-    asyncio.run(caster.stop())
-
-    assert stop_calls == [True]
-
-
-def test_casting_manager_matches_active_device_and_live_connection():
-    manager = object.__new__(casting.CastingManager)
-    device = _device()
-    manager.active_device = device
-    manager.active_caster = SimpleNamespace(is_connected=lambda: True)
-
-    assert manager.is_connected_to(device) is True
-    assert manager.is_connected_to(_device(identifier="11111111-1111-1111-1111-111111111111")) is False
-
-    manager.active_caster = SimpleNamespace(is_connected=lambda: False)
-    assert manager.is_connected_to(device) is False
-
-
-# ---------------------------------------------------------------------------
-# MIME detection, CastDevice metadata, and connect orchestration
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    "url, expected",
-    [
-        ("http://host/playlist.m3u8", "application/x-mpegURL"),
-        ("http://host/segment.ts", "video/mp2t"),
-        ("http://host/movie.MP4?token=1", "video/mp4"),  # uppercase + query string
-        ("http://host/clip.mkv", "video/x-matroska"),
-        ("http://host/episode.mp3", "audio/mpeg"),
-        ("http://host/audio.m4a", "audio/aac"),
-        ("http://host/audio.opus", "audio/opus"),
-        ("http://host/audio.flac", "audio/flac"),
-        ("http://host/audio.wave", "audio/wav"),
-    ],
-)
-def test_detect_mime_type_resolves_known_extensions(url, expected):
-    # Extension matches return before the best-effort HEAD probe, so no network.
-    assert casting._detect_mime_type(url) == expected
-
-
-def test_detect_mime_type_uses_radio_heuristic_for_extensionless_streams():
-    # A non-http scheme skips the HEAD probe; the radio/live heuristic applies.
-    assert casting._detect_mime_type("rtsp://host/listen/main") == "audio/mpeg"
-    assert casting._detect_mime_type("rtsp://host/live") == "audio/mpeg"
-
-
-def test_detect_mime_type_falls_back_to_default():
-    assert casting._detect_mime_type("rtsp://host/opaque") == "video/mp2t"
-    assert (
-        casting._detect_mime_type("rtsp://host/opaque", default="audio/mpeg")
-        == "audio/mpeg"
-    )
-
-
-def test_cast_device_display_name_and_unique_id():
-    device = _device()
-    assert device.display_name == "R & B Room [Chromecast]"
+REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, REPO_ROOT)
+
+from core import casting  # noqa: E402
+
+
+# --------------------------------------------------------------------------- #
+# The vendored engine
+# --------------------------------------------------------------------------- #
+def test_engine_is_gui_free_and_complete():
+    with open(os.path.join(REPO_ROOT, "caster_engine.py"), encoding="utf-8") as handle:
+        tree = ast.parse(handle.read())
+    imported = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imported.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imported.add(node.module.split(".")[0])
+    assert not imported & {"wx", "caster_ui", "caster_update", "pychromecast", "pyatv"}
+    import caster_engine
+    for name in ("HlsRelay", "TsSource", "probe_media", "Device", "LoopThread",
+                 "SeekablePipeReader", "_close_atv", "_set_atv_volume"):
+        assert hasattr(caster_engine, name), name
+
+
+def test_engine_matches_caster_checkout():
+    caster_dir = os.path.join(os.path.dirname(REPO_ROOT), "Caster")
+    if not os.path.exists(os.path.join(caster_dir, "caster.py")):
+        pytest.skip("no Caster checkout beside this repository")
+    sys.path.insert(0, os.path.join(REPO_ROOT, "tools"))
+    import sync_caster
+
+    with open(os.path.join(caster_dir, "caster.py"), encoding="utf-8") as handle:
+        engine, _version = sync_caster.extract_engine(handle.read())
+    with open(os.path.join(REPO_ROOT, "caster_engine.py"), encoding="utf-8") as handle:
+        vendored = handle.read()
+    if engine not in vendored:
+        pytest.skip("Caster has moved on since the last sync; run tools/sync_caster.py")
+
+
+def test_engine_uses_blindrss_ffmpeg():
+    casting._engine()
+    import caster_engine
+    import caster_extras
+    assert caster_engine._find_ffmpeg is casting._ffmpeg_path
+    assert caster_extras._find_ffmpeg is casting._ffmpeg_path
+
+
+# --------------------------------------------------------------------------- #
+# Devices
+# --------------------------------------------------------------------------- #
+def _device(kind, key, sinks=frozenset(), name=None):
+    import caster_engine
+    return casting.CastDevice.from_engine(
+        caster_engine.Device(kind, name or ("Test " + kind), key, sinks=sinks))
+
+
+def test_device_keeps_the_fields_the_player_uses():
+    device = _device("chromecast", {"host": "192.0.2.5", "port": 8009,
+                                    "uuid": "94b4d1b1-08bb-5fee-ca1c-491e0f225607"},
+                     name="RB Room")
+    assert device.protocol is casting.CastProtocol.CHROMECAST
+    assert device.display_name == "RB Room [Chromecast]"
     assert device.unique_id == "Chromecast:94b4d1b1-08bb-5fee-ca1c-491e0f225607"
+    assert device.host == "192.0.2.5"
+    # Built by hand (as the player's tests do), a device still works as a key.
+    manual = casting.CastDevice(name="X", protocol=casting.CastProtocol.KODI,
+                                identifier="http://k:8080", host="k", port=8080)
+    assert manual.kind == "kodi"
 
 
-class _RecordingCaster:
-    def __init__(self):
-        self.connect_calls = []
-        self.disconnect_calls = 0
-
-    async def connect(self, device):
-        self.connect_calls.append(device)
-
-    async def disconnect(self):
-        self.disconnect_calls += 1
-
-
-def _bare_manager(casters):
-    manager = object.__new__(casting.CastingManager)
-    manager.casters = dict(casters)
-    manager.active_caster = None
-    manager.active_device = None
-    return manager
-
-
-def test_connect_disconnects_previous_active_session():
-    previous = _RecordingCaster()
-    target = _RecordingCaster()
-    manager = _bare_manager({casting.CastProtocol.CHROMECAST: target})
-    manager.active_caster = previous
-    manager.active_device = _device()
-
-    asyncio.run(manager._connect_async(_device()))
-
-    assert previous.disconnect_calls == 1
-    assert target.connect_calls == [_device()]
-    assert manager.active_caster is target
-    assert manager.active_device == _device()
-
-
-def test_connect_falls_back_to_dlna_caster_for_upnp_devices():
-    dlna = _RecordingCaster()
-    manager = _bare_manager({casting.CastProtocol.DLNA: dlna})
-    device = casting.CastDevice(
-        name="Living Room",
-        protocol=casting.CastProtocol.UPNP,
-        identifier="upnp-1",
-        host="192.168.1.40",
-        port=8200,
-    )
-
-    asyncio.run(manager._connect_async(device))
-
-    assert dlna.connect_calls == [device]
-    assert manager.active_caster is dlna
-
-
-def test_connect_raises_when_no_caster_for_protocol():
-    manager = _bare_manager({})
+def test_pairing_is_not_offered():
+    manager = casting.CastingManager()
     with pytest.raises(casting.CastError):
-        asyncio.run(manager._connect_async(_device()))
+        manager.start_pairing(None)
+    assert manager.finish_pairing(None, "1234") is None
 
 
-# ============================================================================
-# AirPlay / AirPlay 2 (RAOP)
-# ============================================================================
-
-from pyatv.const import DeviceState, FeatureName, FeatureState  # noqa: E402
-from pyatv import conf as _pyatv_conf  # noqa: E402
-
-
-class _FakeStream:
-    def __init__(self, play_url_error=None):
-        self.play_url_calls = []
-        self.stream_file_calls = []
-        self.play_url_error = play_url_error
-
-    async def play_url(self, url, **kwargs):
-        self.play_url_calls.append((url, kwargs))
-        if self.play_url_error is not None:
-            raise self.play_url_error
-
-    async def stream_file(self, file, **kwargs):
-        self.stream_file_calls.append((file, kwargs))
-        # Emulate a long-running stream that stays active until cancelled.
-        await asyncio.Event().wait()
-
-
-class _FakeRemote:
-    def __init__(self):
-        self.set_position_calls = []
-        self.stop_calls = 0
-
-    async def set_position(self, pos):
-        self.set_position_calls.append(pos)
-
-    async def stop(self):
-        self.stop_calls += 1
-
-    async def pause(self):
-        pass
-
-    async def play(self):
-        pass
-
-
-class _FakeMetadata:
-    def __init__(self, position=None, device_state=None):
-        self._playing = SimpleNamespace(position=position, device_state=device_state)
-
-    async def playing(self):
-        return self._playing
-
-
-class _FakeFeatures:
-    def __init__(self, states):
-        self._states = states
-
-    def get_feature(self, name):
-        return SimpleNamespace(state=self._states.get(name, FeatureState.Unknown))
-
-
-class _FakeATV:
-    def __init__(self, features_states=None, position=None, device_state=None,
-                 play_url_error=None):
-        self.stream = _FakeStream(play_url_error=play_url_error)
-        self.remote_control = _FakeRemote()
-        self.metadata = _FakeMetadata(position=position, device_state=device_state)
-        self.audio = SimpleNamespace(set_volume=self._set_volume)
-        self.features = _FakeFeatures(features_states or {})
-        self.listener = None
-        self.close_calls = 0
-        self.pending = []
-        self.volume_calls = []
-
-    async def _set_volume(self, level, **kwargs):
-        self.volume_calls.append(level)
-
-    def close(self):
-        self.close_calls += 1
-        return set(self.pending)
-
-
-def _airplay_caster(atv, **flags):
-    caster = casting.AirPlayCaster()
-    caster._atv = atv
-    caster._supports_airplay_video = flags.get("video", True)
-    caster._supports_raop = flags.get("raop", False)
-    caster._device_host = flags.get("host")
-    return caster
-
-
-async def _play_then_cleanup(caster, *args, **kwargs):
-    await caster.play(*args, **kwargs)
-    # Let a scheduled RAOP task start and record its call before teardown.
-    await asyncio.sleep(0.05)
-    await caster._cancel_raop_task()
-
-
-def test_airplay_seek_calls_set_position():
-    atv = _FakeATV()
-    caster = _airplay_caster(atv)
-    asyncio.run(caster.seek(42.9))
-    assert atv.remote_control.set_position_calls == [42]
-
-
-def test_airplay_status_reports_position_and_state_without_session_detection():
-    atv = _FakeATV(position=88, device_state=DeviceState.Playing)
-    caster = _airplay_caster(atv)
-    status = asyncio.run(caster.get_status())
-    assert status["position_seconds"] == 88.0
-    assert status["player_state"] == "Playing"
-    assert status["connected"] is True
-    # AirPlay has no media-session id, so recovery machinery must stay off.
-    assert status["supports_session_detection"] is False
-
-
-def test_airplay_play_uses_play_url_for_video_receiver():
-    atv = _FakeATV({
-        FeatureName.PlayUrl: FeatureState.Available,
-        FeatureName.StreamFile: FeatureState.Unavailable,
-    })
-    caster = _airplay_caster(atv, video=True, raop=False)
-    asyncio.run(caster.play("https://cdn.example.com/video.mp4", "Clip",
-                            content_type="video/mp4", start_time_seconds=12))
-    assert len(atv.stream.play_url_calls) == 1
-    url, kwargs = atv.stream.play_url_calls[0]
-    assert url == "https://cdn.example.com/video.mp4"
-    assert kwargs.get("position") == 12
-    assert atv.stream.stream_file_calls == []
-    assert caster._uses_raop is False
-
-
-def test_airplay_play_uses_raop_for_audio_only_speaker():
-    atv = _FakeATV({
-        FeatureName.PlayUrl: FeatureState.Unsupported,
-        FeatureName.StreamFile: FeatureState.Available,
-    })
-    caster = _airplay_caster(atv, video=False, raop=True)
-    asyncio.run(_play_then_cleanup(caster, "https://cdn.example.com/podcast.mp3",
-                                   content_type="audio/mpeg"))
-    assert atv.stream.play_url_calls == []
-    assert len(atv.stream.stream_file_calls) == 1
-    assert atv.stream.stream_file_calls[0][0] == "https://cdn.example.com/podcast.mp3"
-    assert caster._uses_raop is True
-
-
-def test_airplay_play_url_notsupported_falls_back_to_raop():
-    class NotSupportedError(Exception):
-        pass
-
-    atv = _FakeATV(
-        {
-            FeatureName.PlayUrl: FeatureState.Available,
-            FeatureName.StreamFile: FeatureState.Available,
-        },
-        play_url_error=NotSupportedError("no video"),
-    )
-    caster = _airplay_caster(atv, video=True, raop=True)
-    asyncio.run(_play_then_cleanup(caster, "https://x/podcast.mp3",
-                                   content_type="audio/mpeg"))
-    assert len(atv.stream.play_url_calls) == 1
-    assert len(atv.stream.stream_file_calls) == 1
-    assert caster._uses_raop is True
-
-
-def test_airplay_prepare_url_routing(monkeypatch):
-    monkeypatch.setattr(casting, "get_proxy", lambda: _FakeProxy())
-    caster = casting.AirPlayCaster()
-    caster._device_host = "192.168.1.50"
-    loop_url = "http://127.0.0.1:9000/podcast.mp3"
-
-    # play_url: receiver fetches, so loopback must be proxied on a reachable IP.
-    out = caster._prepare_url(loop_url, "audio/mpeg", None, for_local=False)
-    assert out == f"proxied://192.168.1.50/{loop_url}"
-
-    # RAOP: pyatv reads locally, so loopback is reachable as-is.
-    assert caster._prepare_url(loop_url, "audio/mpeg", None, for_local=True) == loop_url
-
-    # RAOP with headers: proxy through loopback to inject them.
-    out_hdr = caster._prepare_url(loop_url, "audio/mpeg", {"X": "1"}, for_local=True)
-    assert out_hdr == f"proxied://127.0.0.1/{loop_url}"
-
-
-def test_airplay_connection_listener_marks_disconnected():
-    atv = _FakeATV()
-    caster = casting.AirPlayCaster()
-    device = casting.CastDevice(
-        name="ATV", protocol=casting.CastProtocol.AIRPLAY, identifier="atv-1",
-        host="192.168.1.50", port=7000,
-        metadata={"supports_airplay_video": True, "supports_raop": False},
-    )
-    caster._atv = atv
-    caster._after_connect(device, SimpleNamespace(address="192.168.1.50"))
-    assert caster.is_connected() is True
-
-    # pyatv reports the link dropped.
-    atv.listener.connection_lost(RuntimeError("boom"))
-    assert caster.is_connected() is False
-    assert asyncio.run(caster.get_status())["connected"] is False
-
-
-def test_airplay_disconnect_awaits_close_pending_tasks():
-    atv = _FakeATV()
-    caster = _airplay_caster(atv)
-
-    async def scenario():
-        async def _pending():
-            return None
-        atv.pending = [asyncio.ensure_future(_pending())]
-        await caster.disconnect()
-
-    asyncio.run(scenario())
-    assert atv.close_calls == 1
-    assert caster._atv is None
-    assert caster.is_connected() is False
-
-
-def test_airplay_finish_pairing_returns_credentials():
-    caster = casting.AirPlayCaster()
-
-    class _Handler:
-        def __init__(self):
-            self.service = SimpleNamespace(credentials="CRED123")
-            self.pin_calls = []
-            self.closed = False
-
-        def pin(self, code):
-            self.pin_calls.append(code)
-
-        async def finish(self):
-            pass
-
-        async def close(self):
-            self.closed = True
-
-    handler = _Handler()
-    caster._pairing_handler = handler
-    caster._pairing_protocol = _pyatv_conf.Protocol.AirPlay
-
-    creds = asyncio.run(caster.finish_pairing("1234"))
-    assert creds == {"AirPlay": "CRED123"}
-    assert handler.pin_calls == ["1234"]
-    assert handler.closed is True
-    assert caster._pairing_handler is None
-
-
-class _FakeProxy:
-    def get_proxied_url(self, url, headers, device_ip=None):
-        return f"proxied://{device_ip}/{url}"
-
-    def get_file_url(self, path, device_ip=None):
-        return f"file-proxied://{device_ip}{path}"
-
-
-# ============================================================================
-# Chromecast bounded-timeout + connection-listener robustness
-# ============================================================================
-
-class _RecordingMediaController:
-    def __init__(self, media_session_id=1):
-        self.status = SimpleNamespace(media_session_id=media_session_id)
-        self.seek_calls = []
-        self.pause_calls = []
-        self.play_calls = []
-        self.stop_calls = []
-        self.block_calls = []
-
-    def block_until_active(self, timeout=None):
-        self.block_calls.append(timeout)
-
-    def update_status(self, callback_function=None):
-        if callback_function:
-            callback_function(True, {})
-
-    def seek(self, position, timeout=None):
-        self.seek_calls.append((position, timeout))
-
-    def pause(self, timeout=None):
-        self.pause_calls.append(timeout)
-
-    def play(self, timeout=None):
-        self.play_calls.append(timeout)
-
-    def stop(self, timeout=None):
-        self.stop_calls.append(timeout)
-
-
-class _RichCast:
-    def __init__(self, connected=True, media_session_id=1):
-        self.media_controller = _RecordingMediaController(media_session_id=media_session_id)
-        self.registered_listeners = []
-        self.socket_client = SimpleNamespace(
-            is_connected=connected,
-            register_connection_listener=self.registered_listeners.append,
-        )
-        self.status = SimpleNamespace(transport_id="t-1")
-        self.volume_calls = []
-
-    def set_volume(self, level, timeout=None):
-        self.volume_calls.append((level, timeout))
-
-
-def _chromecast_caster(cast):
-    caster = casting.ChromecastCaster()
-    caster._cast = cast
-    return caster
-
-
-_CC_T = casting.ChromecastCaster._CONTROL_TIMEOUT
-
-
-def test_chromecast_seek_is_bounded():
-    cast = _RichCast()
-    caster = _chromecast_caster(cast)
-    asyncio.run(caster.seek(42.0))
-    # The fix: a bounded seek + a bounded block, never pychromecast's 10s default
-    # or the old 10s block/poll loop.
-    assert cast.media_controller.seek_calls == [(42.0, _CC_T)]
-    assert cast.media_controller.block_calls == [_CC_T]
-
-
-def test_chromecast_pause_resume_stop_are_bounded():
-    cast = _RichCast()
-    caster = _chromecast_caster(cast)
-    asyncio.run(caster.pause())
-    asyncio.run(caster.resume())
-    asyncio.run(caster.stop())
-    assert cast.media_controller.pause_calls == [_CC_T]
-    assert cast.media_controller.play_calls == [_CC_T]
-    assert cast.media_controller.stop_calls == [_CC_T]
-
-
-def test_chromecast_set_volume_is_bounded():
-    cast = _RichCast()
-    caster = _chromecast_caster(cast)
-    asyncio.run(caster.set_volume(0.5))
-    assert cast.volume_calls == [(0.5, _CC_T)]
-
-
-def test_chromecast_stop_skips_without_media_session():
-    cast = _RichCast(media_session_id=None)
-    caster = _chromecast_caster(cast)
-    asyncio.run(caster.stop())
-    assert cast.media_controller.stop_calls == []
-
-
-def test_chromecast_connection_listener_marks_lost():
-    cast = _RichCast(connected=True)
-    caster = casting.ChromecastCaster()
-    caster._conn_listener = casting._ChromecastConnListener(caster._on_conn_status)
-    caster._cast = cast
-    cast.socket_client.register_connection_listener(caster._conn_listener)
-    assert cast.registered_listeners == [caster._conn_listener]
-    assert caster.is_connected() is True
-
-    # pychromecast reports the socket dropped.
-    caster._conn_listener.new_connection_status(SimpleNamespace(status="LOST"))
-    assert caster.is_connected() is False
-    assert asyncio.run(caster.get_status())["connected"] is False
-
-    # A fresh CONNECTED clears the flag.
-    caster._conn_listener.new_connection_status(SimpleNamespace(status="CONNECTED"))
-    assert caster.is_connected() is True
-
-
-def test_chromecast_deliberate_disconnect_is_not_treated_as_lost():
-    caster = casting.ChromecastCaster()
-    caster._conn_listener = casting._ChromecastConnListener(caster._on_conn_status)
-    caster._cast = _RichCast(connected=True)
-    caster._conn_listener.new_connection_status(SimpleNamespace(status="DISCONNECTED"))
-    # A deliberate DISCONNECTED must not be flagged as an unexpected loss.
-    assert caster._connection_lost is False
-
-
-class _AsyncTransportCaster:
+# --------------------------------------------------------------------------- #
+# Where the receiver fetches from
+# --------------------------------------------------------------------------- #
+class _Proxy:
     def __init__(self):
         self.calls = []
 
-    async def resume(self):
-        self.calls.append("resume")
+    def get_file_url(self, path, device_ip=None):
+        self.calls.append(("file", path, device_ip))
+        return "http://lan/file"
 
-    async def stop(self):
-        self.calls.append("stop")
+    def get_proxied_url(self, url, headers=None, device_ip=None):
+        self.calls.append(("proxy", url, headers, device_ip))
+        return "http://lan/proxy"
 
 
-def test_manager_async_transport_dispatches():
-    caster = _AsyncTransportCaster()
-    manager = _bare_manager({})
-    manager.active_caster = caster
-    dispatched = []
+@pytest.fixture
+def proxy(monkeypatch):
+    import core.stream_proxy
+    fake = _Proxy()
+    monkeypatch.setattr(core.stream_proxy, "get_proxy", lambda: fake)
+    return fake
 
-    def fake_dispatch_async(coro, callback=None):
-        # Drive the coroutine to completion synchronously for the test.
-        try:
-            asyncio.run(coro)
-        finally:
-            dispatched.append(callback)
-        return object()
 
-    manager.dispatch_async = fake_dispatch_async
-    manager.resume_async()
-    manager.stop_async()
+def test_local_files_and_localhost_go_through_the_proxy(proxy, tmp_path):
+    episode = tmp_path / "episode.mp3"
+    episode.write_bytes(b"ID3")
+    device = _device("kodi", {"base": "http://192.0.2.9:8080"})
+    manager = casting.CastingManager()
+    assert manager._source_url(str(episode), {}, device) == "http://lan/file"
+    assert manager._source_url(episode.as_uri(), {}, device) == "http://lan/file"
+    assert manager._source_url("http://127.0.0.1:5000/cache/1", {}, device) == "http://lan/proxy"
+    assert manager._source_url("https://cdn.example/ep.mp3", {"User-Agent": "UA"}, device) \
+        == "http://lan/proxy"
+    assert manager._source_url("https://cdn.example/ep.mp3", {}, device) == "https://cdn.example/ep.mp3"
+    assert all(call[-1] == "192.0.2.9" for call in proxy.calls)
 
-    assert caster.calls == ["resume", "stop"]
-    assert len(dispatched) == 2
+
+# --------------------------------------------------------------------------- #
+# Routing and resume positions
+# --------------------------------------------------------------------------- #
+@pytest.fixture
+def manager(monkeypatch):
+    mgr = casting.CastingManager()
+    mgr._running = True
+    monkeypatch.setattr(casting.CastingManager, "stop_playback", lambda self: None)
+    return mgr
+
+
+def _probe(mime, audio=True, live=False):
+    return lambda url: {"url": url, "mime": mime, "is_audio": audio, "is_live": live}
+
+
+def test_kodi_plays_and_resumes_at_the_position(manager, monkeypatch):
+    import caster_devices
+    calls = []
+    monkeypatch.setattr(caster_devices, "kodi_play", lambda base, url, auth=("", ""): calls.append(("open", url)))
+    monkeypatch.setattr(casting.CastingManager, "_kodi_player", staticmethod(lambda device: 1))
+    monkeypatch.setattr(casting.CastingManager, "_kodi_seek",
+                        lambda self, device, target: calls.append(("seek", target)))
+    manager.active_device = _device("kodi", {"base": "http://kodi:8080"})
+    manager.play("https://cdn.example/ep.mp3", "Episode", start_time_seconds=95)
+    assert calls == [("open", "https://cdn.example/ep.mp3"), ("seek", 95.0)]
+
+
+def test_upnp_push_then_seek_to_the_resume_position(manager, monkeypatch):
+    import caster_engine
+    import caster_extras
+    pushed, sought = [], []
+    monkeypatch.setattr(caster_engine, "probe_media", _probe("audio/mpeg"))
+    monkeypatch.setattr(casting.CastingManager, "_upnp_push",
+                        staticmethod(lambda device, url, mime, title: pushed.append((url, mime))))
+    monkeypatch.setattr(caster_extras, "upnp_state", lambda control_url: "PLAYING")
+    monkeypatch.setattr(casting.CastingManager, "_upnp_seek",
+                        lambda self, device, target: sought.append(target))
+    manager.active_device = _device("upnp", {"control_url": "http://tv/ctl"})
+    manager.play("https://cdn.example/ep.mp3", "Episode", start_time_seconds=61)
+    assert pushed == [("https://cdn.example/ep.mp3", "audio/mpeg")]
+    assert sought == [61.0]
+
+
+def test_sonos_resumes_with_a_seek(manager, monkeypatch):
+    import caster_devices
+    import caster_engine
+    played, sought = [], []
+
+    class Zone:
+        def seek(self, target):
+            sought.append(target)
+
+    monkeypatch.setattr(caster_engine, "probe_media", _probe("audio/mpeg"))
+    monkeypatch.setattr(caster_devices, "sonos_play",
+                        lambda ip, url, title="", mime="": played.append((ip, mime)))
+    monkeypatch.setattr(casting.CastingManager, "_sonos_zone", staticmethod(lambda device: Zone()))
+    manager.active_device = _device("sonos", {"ip": "10.0.0.5"})
+    manager.play("https://cdn.example/ep.mp3", "Episode", start_time_seconds=3725)
+    assert played == [("10.0.0.5", "audio/mpeg")]
+    assert sought == ["1:02:05"]
+
+
+def test_play_without_a_device_raises(manager):
+    with pytest.raises(casting.CastError):
+        manager.play("https://cdn.example/ep.mp3", "Episode")
+
+
+def test_play_async_reports_none_on_failure(monkeypatch):
+    mgr = casting.CastingManager()
+    mgr.start()
+    try:
+        results = []
+        future = mgr.play_async("https://cdn.example/ep.mp3", "Episode",
+                                callback=results.append)
+        future.exception(timeout=5)
+        time.sleep(0.1)
+        assert results == [None]
+    finally:
+        mgr.stop()
+
+
+# --------------------------------------------------------------------------- #
+# Transport controls and status
+# --------------------------------------------------------------------------- #
+def test_roku_position_comes_from_the_clock(manager, monkeypatch):
+    import caster_devices
+    import caster_engine
+    keys = []
+    monkeypatch.setattr(caster_engine, "probe_media", _probe("video/mp4", audio=False))
+    monkeypatch.setattr(caster_devices, "roku_play", lambda *a, **k: None)
+    monkeypatch.setattr(caster_devices, "roku_key", lambda base, key: keys.append(key))
+    manager.active_device = _device("roku", {"base": "http://roku:8060"})
+    manager.play("https://cdn.example/video.mp4", "Video", start_time_seconds=10)
+    status = manager.get_status()
+    assert status["player_state"] == "PLAYING"
+    assert 10 <= status["position_seconds"] < 11
+    manager.pause()
+    assert keys == ["Play"]
+    paused = manager.get_status()
+    assert paused["player_state"] == "PAUSED"
+    manager.pause()                      # already paused: no second toggle
+    assert keys == ["Play"]
+    manager.resume()
+    assert keys == ["Play", "Play"]
+
+
+def test_airplay_pause_resume_and_seek_restart_on_the_same_session(monkeypatch):
+    """Pause stops the feed; resume and seek reopen it at the right position."""
+    mgr = casting.CastingManager()
+    woken = []
+    monkeypatch.setattr(mgr, "_wake_air", lambda air: woken.append(air.pending_seek))
+
+    class Proc:
+        killed = False
+
+        def poll(self):
+            return None if not self.killed else -9
+
+        def kill(self):
+            self.killed = True
+
+    air = casting._AirSession(0)
+    air.state, air.pos, air.t0 = "playing", 30.0, time.monotonic() - 5
+    air.proc = Proc()
+    mgr._air = air
+
+    mgr._air_pause()
+    assert air.state == "paused" and air.proc.killed
+    assert 34.5 < air.pos < 36
+    paused_at = air.pos
+
+    mgr._air_resume()
+    assert air.state == "playing"
+    assert woken[-1] == paused_at      # reopened where it paused
+
+    mgr._air_seek(120.0)
+    assert woken[-1] == 120.0
+    assert 120 <= air.position() < 121
+
+
+def test_airplay_live_stream_resumes_at_the_live_edge(monkeypatch):
+    mgr = casting.CastingManager()
+    woken = []
+    monkeypatch.setattr(mgr, "_wake_air", lambda air: woken.append(air.pending_seek))
+    air = casting._AirSession(0)
+    air.state, air.live = "paused", True
+    mgr._air = air
+    mgr._air_resume()
+    assert woken == [None]
+    mgr._air_seek(50.0)                 # no seeking in a live stream
+    assert woken == [None]
+
+
+def test_chromecast_status_without_a_connection_says_disconnected():
+    mgr = casting.CastingManager()
+    mgr.active_device = _device("chromecast", {"host": "192.0.2.5", "port": 8009,
+                                               "uuid": "94b4d1b1-08bb-5fee-ca1c-491e0f225607"})
+    status = mgr.get_status()
+    assert status["connected"] is False
+    assert status["supports_session_detection"] is True
+
+
+def test_hms_round_trip():
+    assert casting._hms(3725) == "1:02:05"
+    assert casting._parse_hms("1:02:05") == 3725
+    assert casting._parse_hms("0:00:07.5") == 7.5
+    assert casting._parse_hms("NOT_IMPLEMENTED") is None
+
+
+def test_airplay_resume_after_the_receiver_ended_the_session_starts_again(monkeypatch):
+    """A receiver can drop RAOP on its own; resume must not just claim PLAYING."""
+    import concurrent.futures
+    mgr = casting.CastingManager()
+    replayed = []
+    monkeypatch.setattr(mgr, "play", lambda url, title, channel, start_time_seconds=None:
+                        replayed.append((url, start_time_seconds)))
+    air = casting._AirSession(0)
+    air.state, air.pos = "stopped", 64.0
+    air.loop_future = concurrent.futures.Future()
+    air.loop_future.set_result(None)        # the runner has finished
+    mgr._air = air
+    mgr._last_play = ("https://cdn.example/ep.mp3", "Episode", None)
+
+    mgr._air_resume()
+    assert replayed == [("https://cdn.example/ep.mp3", 64.0)]
+    mgr._air_seek(150.0)
+    assert replayed[-1] == ("https://cdn.example/ep.mp3", 150.0)

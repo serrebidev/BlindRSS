@@ -105,18 +105,18 @@ bin_path = os.path.join(os.getcwd(), 'bin')
 
 # Packages whose data files / dynamic imports PyInstaller's analysis can miss.
 # Audited 2026-07-08: every entry is either imported directly by the app
-# (casting: pyatv/pychromecast/async_upnp_client; extraction: trafilatura,
+# (casting: pyatv/pychromecast/soco; extraction: trafilatura,
 # yt_dlp/pytubefix; transport: curl_cffi) or an installed transitive dependency of one
 # (aiohttp/zeroconf/pydantic <- casting stack; lxml/soupsieve <- parsers;
-# sgmllib <- feedparser; six <- html5lib; defusedxml/didl_lite/ifaddr <-
-# async_upnp_client/zeroconf; certifi <- TLS in frozen builds). Dropped dead
+# sgmllib <- feedparser; six <- html5lib; defusedxml/ifaddr <- soco/zeroconf;
+# certifi <- TLS in frozen builds). Dropped dead
 # entries that were never installed and never imported: readability,
 # xmltodict, langcodes, language_data.
 packages_to_collect = [
-    'pyatv', 'pychromecast', 'async_upnp_client', 'trafilatura', 'tld', 'markdown',
+    'pyatv', 'pychromecast', 'soco', 'trafilatura', 'tld', 'markdown',
     'yt_dlp', 'pytubefix', 'aiohttp', 'zeroconf', 'pydantic', 'lxml',
     'sgmllib', 'six', 'soupsieve',
-    'defusedxml', 'didl_lite', 'ifaddr',
+    'defusedxml', 'ifaddr',
     'certifi', 'curl_cffi',
     # Chromium v20 cookie decryption (core/chromium_cookies.py) uses
     # AES-256-GCM/ChaCha20-Poly1305 from cryptography, imported lazily inside
@@ -175,6 +175,12 @@ hiddenimports = [
     # explicitly rather than relying on bytecode scanning of lazy imports.
     'core.po_compile',
     'core.translation_updates',
+    # Caster's casting engine and protocol clients (tools/sync_caster.py),
+    # imported lazily by core/casting.py.
+    'caster_engine',
+    'caster_extras',
+    'caster_devices',
+    'caster_config',
 ]
 
 if importlib.util.find_spec('_webrtcvad') is not None:
@@ -308,7 +314,9 @@ a = Analysis(
     # pytubefix normally pulls a complete Node distribution solely for its
     # signature worker. core.youtube_pytubefix injects the tiny import surface
     # it needs and runs that worker through BlindRSS's existing bundled Deno.
-    excludes=['behave', 'seleniumbase.behave', 'nodejs_wheel'],
+    # caster/pyaudiowpatch: lazy imports in caster_extras for Caster's screen and
+    # PC-audio casting, which BlindRSS does not use.
+    excludes=['behave', 'seleniumbase.behave', 'nodejs_wheel', 'caster', 'pyaudiowpatch'],
     noarchive=False,
     optimize=0,
 )

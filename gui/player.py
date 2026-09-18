@@ -19,7 +19,7 @@ from core import utils
 from core import discovery
 from core import equalizer as equalizer_mod
 from core import playback_state
-from core.casting import CastingManager, CastProtocol
+from core.casting import CastingManager
 from core import vlc_instance as vlc_shared
 from core.i18n import _
 from urllib.parse import urlparse
@@ -384,47 +384,6 @@ def _should_reapply_seek(target_ms: int, current_ms: int, tolerance_ms: int, rem
         return False
 
 
-def _airplay_creds_store(config_manager):
-    try:
-        store = config_manager.get("airplay_credentials", {})
-        return dict(store) if isinstance(store, dict) else {}
-    except Exception:
-        return {}
-
-
-def _load_airplay_creds(config_manager, identifier):
-    """Return the persisted ``{protocol: credential}`` mapping for a device."""
-    if not config_manager or not identifier:
-        return None
-    return _airplay_creds_store(config_manager).get(identifier) or None
-
-
-def _save_airplay_creds(config_manager, identifier, creds):
-    if not config_manager or not identifier or not creds:
-        return
-    try:
-        store = _airplay_creds_store(config_manager)
-        # Merge so pairing a second protocol keeps the first one's credential.
-        existing = store.get(identifier)
-        if isinstance(existing, dict) and isinstance(creds, dict):
-            merged = dict(existing)
-            merged.update(creds)
-            store[identifier] = merged
-        else:
-            store[identifier] = creds
-        config_manager.set("airplay_credentials", store)
-    except Exception:
-        pass
-
-
-def _airplay_needs_pairing(exc) -> bool:
-    """Heuristic: does this connect failure look like it needs (re)pairing?"""
-    text = str(exc).lower()
-    return any(tok in text for tok in (
-        "auth", "pair", "credential", "not authenticated", "verification", "pin",
-    ))
-
-
 class CastDialog(wx.Dialog):
     def __init__(self, parent, manager: CastingManager, config_manager=None):
         super().__init__(parent, title=_("Cast to Device"), size=(400, 300))
@@ -506,84 +465,15 @@ class CastDialog(wx.Dialog):
     def _connect_thread(self, device):
         success = False
         try:
-            is_airplay = getattr(device, "protocol", None) == CastProtocol.AIRPLAY
-            creds = _load_airplay_creds(self.config_manager, device.identifier) if is_airplay else None
-            try:
-                # This blocks the worker thread, not the GUI
-                self.manager.connect(device, credentials=creds)
-                success = True
-            except Exception as e:
-                # AirPlay devices (Apple TV / HomePod) often require a one-time
-                # PIN pairing. Offer it, persist the credentials, and retry.
-                if is_airplay and _airplay_needs_pairing(e):
-                    new_creds = self._pair_airplay(device)
-                    if not new_creds:
-                        raise
-                    _save_airplay_creds(self.config_manager, device.identifier, new_creds)
-                    merged = _load_airplay_creds(self.config_manager, device.identifier)
-                    self.manager.connect(device, credentials=merged)
-                    success = True
-                else:
-                    raise
+            # This blocks the worker thread, not the GUI. Casting follows
+            # Caster: only AirPlay receivers that need no pairing are listed,
+            # so there is no PIN step here.
+            self.manager.connect(device)
+            success = True
         except Exception as e:
             wx.CallAfter(self._on_connect_error, str(e))
         finally:
             wx.CallAfter(self._on_connect_complete, success)
-
-    def _pair_airplay(self, device):
-        """Drive the pyatv pairing flow, prompting the user for the PIN.
-
-        Runs on the connect worker thread; the PIN dialog is marshaled to the
-        wx thread. Returns a ``{protocol: credential}`` mapping or None.
-        """
-        try:
-            self.manager.start_pairing(device)
-        except Exception as e:
-            wx.CallAfter(
-                self._on_connect_error,
-                _("Could not start pairing: {error}").format(error=str(e)),
-            )
-            return None
-
-        pin = self._prompt_pin()
-        if pin is None:
-            try:
-                # Cancel the in-progress pairing handler cleanly.
-                self.manager.finish_pairing(device, None)
-            except Exception:
-                pass
-            return None
-
-        try:
-            return self.manager.finish_pairing(device, pin)
-        except Exception as e:
-            wx.CallAfter(
-                self._on_connect_error,
-                _("Pairing failed: {error}").format(error=str(e)),
-            )
-            return None
-
-    def _prompt_pin(self):
-        """Show a PIN entry dialog on the wx thread and block until answered."""
-        result = {}
-        done = threading.Event()
-
-        def ask():
-            try:
-                dlg = wx.TextEntryDialog(
-                    self,
-                    _("Enter the PIN code shown on the device:"),
-                    _("AirPlay Pairing"),
-                )
-                if dlg.ShowModal() == wx.ID_OK:
-                    result["pin"] = dlg.GetValue().strip()
-                dlg.Destroy()
-            finally:
-                done.set()
-
-        wx.CallAfter(ask)
-        done.wait()
-        return result.get("pin")
 
     def _on_connect_error(self, error_msg):
         if self._dialog_destroyed:
@@ -2548,10 +2438,7 @@ class PlayerFrame(wx.Frame):
                 # that live session instead of disconnecting it and repeating
                 # discovery; reconnect only if the session dropped meanwhile.
                 if not self.casting_manager.is_connected_to(device):
-                    reconnect_creds = None
-                    if getattr(device, "protocol", None) == CastProtocol.AIRPLAY:
-                        reconnect_creds = _load_airplay_creds(self.config_manager, device.identifier)
-                    self.casting_manager.connect(device, credentials=reconnect_creds)
+                    self.casting_manager.connect(device)
                 self.is_casting = True
                 self._cast_session_token = int(getattr(self, "_cast_session_token", 0) or 0) + 1
                 self._cast_missing_status_count = 0
