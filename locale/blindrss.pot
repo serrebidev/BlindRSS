@@ -2877,7 +2877,7 @@ msgstr ""
 #: gui/dialogs.py:7746
 #: gui/dialogs.py:5130
 #: gui/player.py:1999
-#: gui/player.py:5864
+#: gui/player.py:5925
 msgid "Play"
 msgstr ""
 
@@ -5393,8 +5393,8 @@ msgstr ""
 
 #: gui/dialogs.py:7848
 #: gui/mainframe.py:1912
-#: gui/player.py:4221
-#: gui/player.py:6829
+#: gui/player.py:4282
+#: gui/player.py:6890
 msgid "Playing"
 msgstr ""
 
@@ -5412,8 +5412,8 @@ msgstr ""
 
 #: gui/dialogs.py:7850
 #: gui/mainframe.py:1912
-#: gui/player.py:6885
-#: gui/player.py:6902
+#: gui/player.py:6946
+#: gui/player.py:6963
 msgid "Paused"
 msgstr ""
 
@@ -5422,13 +5422,13 @@ msgid "Paused: {title}"
 msgstr ""
 
 #: gui/dialogs.py:7854
-#: gui/player.py:4282
-#: gui/player.py:4829
+#: gui/player.py:4343
+#: gui/player.py:4890
 msgid "Buffering..."
 msgstr ""
 
 #: gui/dialogs.py:7856
-#: gui/player.py:4424
+#: gui/player.py:4485
 msgid "Connecting..."
 msgstr ""
 
@@ -7399,7 +7399,7 @@ msgstr ""
 msgid "No Track Loaded"
 msgstr ""
 
-#: gui/player.py:4549
+#: gui/player.py:4610
 msgid "download failed"
 msgstr ""
 
@@ -7463,24 +7463,24 @@ msgstr ""
 msgid "&Cast to Device..."
 msgstr ""
 
-#: gui/player.py:3520
-#: gui/player.py:4071
-#: gui/player.py:4145
-#: gui/player.py:4147
+#: gui/player.py:3581
+#: gui/player.py:4132
+#: gui/player.py:4206
+#: gui/player.py:4208
 msgid "Playing Audio..."
 msgstr ""
 
-#: gui/player.py:5743
+#: gui/player.py:5804
 msgid "Elapsed Time"
 msgstr ""
 
-#: gui/player.py:5746
+#: gui/player.py:5807
 msgid "Total Time"
 msgstr ""
 
-#: gui/player.py:6941
-#: gui/player.py:7053
-#: gui/player.py:4835
+#: gui/player.py:7002
+#: gui/player.py:7114
+#: gui/player.py:4896
 msgid "Stopped"
 msgstr ""
 
@@ -7544,34 +7544,34 @@ msgstr ""
 msgid "Open Link for Selected Chapter"
 msgstr ""
 
-#: gui/player.py:2613
+#: gui/player.py:2674
 msgid "Cast device disconnected; resuming local playback"
 msgstr ""
 
-#: gui/player.py:3095
+#: gui/player.py:3156
 msgid "This link opens a web page, not audio or video. The server returned {content_type} instead of a media file, which often means the item needs you to sign in, or the feed has no downloadable enclosure."
 msgstr ""
 
-#: gui/player.py:3483
-#: gui/player.py:4136
+#: gui/player.py:3544
+#: gui/player.py:4197
 msgid "Failed to load media"
 msgstr ""
 
-#: gui/player.py:4138
+#: gui/player.py:4199
 msgid "VLC is not initialized. Playback is unavailable."
 msgstr ""
 
-#: gui/player.py:4416
-#: gui/player.py:4418
-#: gui/player.py:4403
+#: gui/player.py:4477
+#: gui/player.py:4479
+#: gui/player.py:4464
 msgid "Loading media..."
 msgstr ""
 
-#: gui/player.py:4484
+#: gui/player.py:4545
 msgid "Downloading for playback..."
 msgstr ""
 
-#: gui/player.py:5769
+#: gui/player.py:5830
 msgid "Elapsed {elapsed}, Remaining {remaining}, Total {total}"
 msgstr ""
 
@@ -7603,62 +7603,66 @@ msgstr ""
 msgid "Chapters, none available"
 msgstr ""
 
-#: gui/player.py:3499
+#: gui/player.py:2559
+msgid "Casting failed: {error}"
+msgstr ""
+
+#: gui/player.py:3560
 msgid "Cannot play this item"
 msgstr ""
 
-#: gui/player.py:5740
+#: gui/player.py:5801
 msgid "{name}: {value}"
 msgstr ""
 
-#: gui/player.py:5767
+#: gui/player.py:5828
 msgid "Elapsed {elapsed}"
 msgstr ""
 
-#: gui/player.py:5879
+#: gui/player.py:5940
 msgid "Volume Level"
 msgstr ""
 
-#: gui/player.py:6633
+#: gui/player.py:6694
 msgid "End of track"
 msgstr ""
 
-#: gui/player.py:6633
+#: gui/player.py:6694
 msgid "Beginning of track"
 msgstr ""
 
-#: gui/player.py:2617
+#: gui/player.py:2555
+#: gui/player.py:2678
 #: gui/player.py:2409
-#: gui/player.py:2492
 msgid "{title} (Local)"
 msgstr ""
 
-#: gui/player.py:3536
-#: gui/player.py:4013
-#: gui/player.py:4032
-#: gui/player.py:3962
+#: gui/player.py:3597
+#: gui/player.py:4074
+#: gui/player.py:4093
+#: gui/player.py:4023
 msgid "Media Stream"
 msgstr ""
 
-#: gui/player.py:4616
-#: gui/player.py:3883
+#: gui/player.py:4677
+#: gui/player.py:3944
 msgid "Trying pytubefix..."
 msgstr ""
 
-#: gui/player.py:4641
-#: gui/player.py:3906
+#: gui/player.py:4702
+#: gui/player.py:3967
 msgid "Preparing YouTube browser session..."
 msgstr ""
 
-#: gui/player.py:4726
+#: gui/player.py:4787
 msgid "Could not play this YouTube item. yt-dlp could not fetch it: {error}"
 msgstr ""
 
-#: gui/player.py:5864
+#: gui/player.py:5925
 msgid "Pause"
 msgstr ""
 
-#: gui/player.py:6662
+#: gui/player.py:6723
 msgid "Could not seek there. Position {position}"
 msgstr ""
 
@@ -7682,11 +7686,11 @@ msgstr ""
 msgid "{title} (Casting to {device})"
 msgstr ""
 
-#: gui/player.py:4049
+#: gui/player.py:4110
 msgid "Rokfin post is listed but not streamable right now: Rokfin returned an invalid playback ID for this post."
 msgstr ""
 
-#: gui/player.py:5881
+#: gui/player.py:5942
 msgid "Volume: {percent}%"
 msgstr ""
 
@@ -7694,19 +7698,15 @@ msgstr ""
 msgid "[Current]"
 msgstr ""
 
-#: gui/player.py:2501
-msgid "Casting failed: {error}"
-msgstr ""
-
-#: gui/player.py:4047
+#: gui/player.py:4108
 msgid "yt-dlp resolve failed: {error}"
 msgstr ""
 
-#: gui/player.py:4054
+#: gui/player.py:4115
 msgid "Rokfin post is not anonymously streamable right now. Rokfin requires a login/cookies to play this post."
 msgstr ""
 
-#: gui/player.py:4059
+#: gui/player.py:4120
 msgid "yt-dlp resolve failed: this media may require a login, but browser cookies could not be loaded on this Windows session (DPAPI). Try running BlindRSS as your normal Windows user and restart the app."
 msgstr ""
 

@@ -7,8 +7,16 @@ import pytest
 wx = pytest.importorskip("wx")
 pytest.importorskip("vlc")
 
+import concurrent.futures
+
 import gui.player as player_mod
 from core.casting import CastDevice, CastProtocol
+
+
+@pytest.fixture(autouse=True)
+def _call_after_inline(monkeypatch):
+    # The cast start now finishes through wx.CallAfter; run it inline here.
+    monkeypatch.setattr(player_mod.wx, "CallAfter", lambda fn, *args, **kwargs: fn(*args, **kwargs))
 
 
 class _Control:
@@ -74,10 +82,23 @@ class _CastingManager:
 
     def play_async(self, url, title, content_type=None, start_time_seconds=None, callback=None):
         self.play_calls.append((url, title, content_type, start_time_seconds))
-        self.recovery_callback = callback
-        return object()
+        if callback is not None:
+            self.recovery_callback = callback
+            return object()
+        # A cast start: a finished future carrying the play outcome.
+        future = concurrent.futures.Future()
+        if self.play_error is not None:
+            future.set_exception(self.play_error)
+        else:
+            future.set_result(None)
+        return future
+
+    def disconnect_async(self):
+        self.disconnect_calls += 1
+        self.connected = False
 
     def pause_async(self):
+        self.remote_pauses = getattr(self, "remote_pauses", 0) + 1
         return object()
 
 
@@ -191,9 +212,6 @@ def test_on_cast_paused_item_sends_resume_position_and_pauses_remote(monkeypatch
     frame.current_url = "https://example.com/episode.mp3"
     frame.is_playing = False  # user casts a paused episode
     frame._current_position_ms = lambda: 30000
-    remote_pauses = []
-    frame.casting_manager.pause = lambda: remote_pauses.append(True)
-
     player_mod.PlayerFrame.on_cast(frame, None)
 
     assert frame.is_casting is True
@@ -201,7 +219,7 @@ def test_on_cast_paused_item_sends_resume_position_and_pauses_remote(monkeypatch
     assert frame.casting_manager.play_calls == [
         ("https://example.com/episode.mp3", "Test episode", "audio/mpeg", 30.0)
     ]
-    assert remote_pauses == [True]  # remote paused to mirror local state
+    assert frame.casting_manager.remote_pauses == 1  # remote paused to mirror local state
     assert frame.is_playing is False
     assert frame._cast_handoff_source_url == "https://example.com/episode.mp3"
 
@@ -381,3 +399,41 @@ def test_live_stream_recovery_recasts_without_start_position(monkeypatch):
     assert frame.casting_manager.play_calls == [
         ("https://example.com/live", "Test episode", "audio/mpeg", None)
     ]
+
+
+def test_cast_result_from_an_older_session_is_ignored(monkeypatch):
+    """A slow cast start that finishes after a newer episode or a disconnect is moot."""
+    messages = []
+    monkeypatch.setattr(player_mod.wx, "MessageBox",
+                        lambda message, title, style: messages.append(message))
+    frame = _Frame(connected=True)
+    frame.is_casting = True
+    frame._cast_session_token = 5
+    failures = []
+
+    player_mod.PlayerFrame._finish_cast_playback(
+        frame, 4, RuntimeError("late failure"), False, lambda: failures.append(True))
+
+    assert frame.is_casting is True
+    assert messages == [] and failures == []
+
+
+def test_failed_cast_of_a_new_item_falls_back_to_local_playback(monkeypatch):
+    messages = []
+    monkeypatch.setattr(player_mod.wx, "MessageBox",
+                        lambda message, title, style: messages.append(message))
+    frame = _Frame(connected=True, play_error=RuntimeError("load rejected"))
+    frame.is_casting = True
+    frame._cast_session_token = 2
+    restored = []
+
+    player_mod.PlayerFrame._start_cast_playback(
+        frame, "https://example.com/next.mp3", 12.0,
+        on_failure=lambda: restored.append(True))
+
+    assert frame.casting_manager.play_calls[-1] == (
+        "https://example.com/next.mp3", "Test episode", "audio/mpeg", 12.0)
+    assert frame.is_casting is False
+    assert frame.casting_manager.disconnect_calls == 1
+    assert restored == [True]
+    assert messages == ["Casting failed: load rejected"]

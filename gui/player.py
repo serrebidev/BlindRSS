@@ -2470,43 +2470,104 @@ class PlayerFrame(wx.Frame):
                         start_sec = None
                     self._cast_handoff_source_url = self.current_url
                     self._cast_content_type = "audio/mpeg"
-                    self.casting_manager.play(self.current_url, self.current_title, content_type=self._cast_content_type, start_time_seconds=start_sec)
-
                     if not local_was_playing:
-                        try:
-                            self.casting_manager.pause()
-                        except Exception:
-                            pass
                         self.is_playing = False
+                    resume_local = bool(local_was_playing and local_paused_for_cast)
+                    PlayerFrame._start_cast_playback(
+                        self, self.current_url, start_sec,
+                        pause_after=not local_was_playing,
+                        on_failure=lambda: PlayerFrame._resume_local_player(self, resume_local))
             except Exception as e:
                 try:
                     self.casting_manager.disconnect()
                 except Exception:
                     pass
-                self.is_casting = False
-                self._cast_session_token = int(getattr(self, "_cast_session_token", 0) or 0) + 1
-                self._cast_status_poll_inflight = False
-                self._cast_handoff_source_url = None
-                PlayerFrame._refresh_cast_menu_state(self)
-                try:
-                    self.title_lbl.SetLabel(_("{title} (Local)").format(title=self.current_title))
-                except Exception:
-                    pass
+                PlayerFrame._abandon_cast(self, e)
                 if local_was_playing and local_paused_for_cast:
-                    try:
-                        self.player.play()
-                    except Exception:
-                        pass
-                wx.MessageBox(
-                    _("Casting failed: {error}").format(error=e),
-                    _("Error"),
-                    wx.ICON_ERROR,
-                )
+                    PlayerFrame._resume_local_player(self, True)
         finally:
             try:
                 dlg.Destroy()
             except Exception:
                 pass
+
+    def _start_cast_playback(self, url, start_sec, pause_after=False, on_failure=None):
+        """Send ``url`` to the cast device without blocking the wx thread.
+
+        Starting a cast probes the media and waits for the receiver to report
+        playing, which takes seconds and on a slow receiver much longer. Done
+        on the wx thread that froze the window, and a screen reader went
+        silent, until the device answered. The result comes back through
+        ``_finish_cast_playback`` on the wx thread; a newer session (another
+        episode, a disconnect) makes it moot.
+        """
+        token = int(getattr(self, "_cast_session_token", 0) or 0)
+        future = self.casting_manager.play_async(
+            url,
+            self.current_title,
+            content_type=getattr(self, "_cast_content_type", "audio/mpeg"),
+            start_time_seconds=start_sec,
+        )
+
+        def done(finished):
+            try:
+                error = finished.exception()
+            except Exception as exc:  # cancelled
+                error = exc
+            wx.CallAfter(PlayerFrame._finish_cast_playback, self, token, error,
+                         pause_after, on_failure)
+
+        future.add_done_callback(done)
+        return future
+
+    def _finish_cast_playback(self, token, error, pause_after, on_failure):
+        if token != int(getattr(self, "_cast_session_token", 0) or 0):
+            return
+        if not bool(getattr(self, "is_casting", False)):
+            return
+        if error is None:
+            if pause_after:
+                try:
+                    self.casting_manager.pause_async()
+                except Exception:
+                    pass
+                self.is_playing = False
+            return
+        try:
+            self.casting_manager.disconnect_async()
+        except Exception:
+            pass
+        PlayerFrame._abandon_cast(self, error)
+        if on_failure is not None:
+            try:
+                on_failure()
+            except Exception:
+                log.exception("Restoring local playback after a failed cast failed")
+
+    def _abandon_cast(self, error):
+        """Leave a cast that could not start, and say why."""
+        self.is_casting = False
+        self._cast_session_token = int(getattr(self, "_cast_session_token", 0) or 0) + 1
+        self._cast_status_poll_inflight = False
+        self._cast_handoff_source_url = None
+        PlayerFrame._refresh_cast_menu_state(self)
+        try:
+            self.title_lbl.SetLabel(_("{title} (Local)").format(title=self.current_title))
+        except Exception:
+            pass
+        wx.MessageBox(
+            _("Casting failed: {error}").format(error=error),
+            _("Error"),
+            wx.ICON_ERROR,
+        )
+
+    def _resume_local_player(self, resume):
+        if not resume:
+            return
+        try:
+            self.player.play()
+        except Exception:
+            pass
 
     def _request_cast_status_poll(self):
         """Request one remote status snapshot without blocking the wx thread."""
@@ -4203,20 +4264,20 @@ class PlayerFrame(wx.Frame):
                 start_ms = getattr(self, "_pending_resume_seek_ms", None)
             except Exception:
                 start_ms = None
+            start_sec = None
             if start_ms is not None and int(start_ms) > 0:
                 try:
                     self._cast_last_pos_ms = int(start_ms)
                     self._cast_last_pos_ts = time.monotonic()
                 except Exception:
                     pass
-                self.casting_manager.play(
-                    final_url,
-                    self.current_title,
-                    content_type="audio/mpeg",
-                    start_time_seconds=float(int(start_ms)) / 1000.0,
-                )
-            else:
-                self.casting_manager.play(final_url, self.current_title, content_type="audio/mpeg")
+                start_sec = float(int(start_ms)) / 1000.0
+            self._cast_content_type = "audio/mpeg"
+            resume_ms = int(start_ms or 0)
+            # A failed cast falls back to playing this item here, where it was.
+            PlayerFrame._start_cast_playback(
+                self, final_url, start_sec,
+                on_failure=lambda: self._restore_local_after_cast(resume_ms, True))
             self.is_playing = True
             self._set_status(_("Playing"))
         else:
