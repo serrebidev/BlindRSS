@@ -231,3 +231,17 @@ def test_translated_guide_has_the_same_anchors(path, english_guide):
     assert not (actual - expected), (
         f"{os.path.basename(path)} has unknown anchors: {sorted(actual - expected)}"
     )
+
+
+def test_no_guide_repeats_a_section():
+    """A translated guide once carried a second copy of sixteen sections."""
+    import glob
+    import os
+    import re
+
+    help_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "docs", "help")
+    for path in glob.glob(os.path.join(help_dir, "*.md")):
+        with open(path, encoding="utf-8") as handle:
+            anchors = re.findall(r"^#+ .*\{#([\w-]+)\}\s*$", handle.read(), flags=re.MULTILINE)
+        repeated = sorted({a for a in anchors if anchors.count(a) > 1})
+        assert not repeated, f"{os.path.basename(path)} repeats {repeated}"

@@ -755,12 +755,9 @@ sobrevive descansando.
 
 ## Casting a otros dispositivos {#casting}
 
-BlindRSS puede enviar lo que juega a un dispositivo en su red: Chromecast,
-DLNA/UPnP renderers, y receptores de AirPlay.
+BlindRSS puede enviar lo que reproduce a un dispositivo de su red: Chromecast, altavoces AirPlay, reproductores DLNA/UPnP, altavoces Sonos, reproductores Roku y Kodi. Un episodio continúa en el dispositivo desde donde se estaba reproduciendo, y la pausa, el avance y retroceso y la posición funcionan allí igual que en local (Roku no permite avanzar ni retroceder).
 
-Elija el dispositivo del diálogo de fundición; BlindRSS fluye a través de su propio local
-proxy, por lo que un dispositivo que no puede buscar la dirección original todavía juega
-los controles de transporte siguen trabajando desde BlindRSS mientras se está fundiendo.
+Elija el dispositivo en el diálogo de transmisión; BlindRSS transmite a través de su propio proxy local, de modo que un dispositivo que no puede obtener la dirección original por sí mismo reproduce igualmente el elemento. Los controles de reproducción siguen funcionando desde BlindRSS mientras transmite.
 
 ## Skip Silence {#silence-skipping}
 

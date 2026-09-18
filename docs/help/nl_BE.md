@@ -526,7 +526,7 @@ In het wachtrijvenster start Afspelen het geselecteerde item, Omhoog en Omlaag v
 
 ## Casten naar andere apparaten {#casting}
 
-BlindRSS kan wat het speelt naar een apparaat op uw netwerk sturen: Chromecast, DLNA/UPnP-renderers en AirPlay-ontvangers.
+BlindRSS kan wat het speelt naar een apparaat op uw netwerk sturen: Chromecast, AirPlay-luidsprekers, DLNA/UPnP-renderers, Sonos-luidsprekers, Roku-spelers en Kodi. Een aflevering speelt op het apparaat verder waar ze was, en pauzeren, spoelen en de positie werken daar zoals lokaal (Roku kan niet spoelen).
 
 Kies het apparaat in het castdialoogvenster; BlindRSS streamt via zijn eigen lokale proxy, zodat een apparaat dat zelf het oorspronkelijke adres niet kan ophalen het item toch afspeelt. Transportbediening blijft vanuit BlindRSS werken tijdens het casten.
 

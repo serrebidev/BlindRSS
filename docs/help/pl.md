@@ -746,8 +746,7 @@ Kolejka pozostaje po ponownym uruchomieniu.
 
 ## Przesyłanie na inne urządzenia {#casting}
 
-BlindRSS może wysyłać odtwarzane treści do urządzenia w twojej sieci: Chromecasta,
-rendererów DLNA/UPnP oraz odbiorników AirPlay.
+BlindRSS może wysyłać odtwarzane treści do urządzenia w twojej sieci: Chromecasta, głośników AirPlay, rendererów DLNA/UPnP, głośników Sonos, odtwarzaczy Roku i Kodi. Odcinek jest kontynuowany na urządzeniu od miejsca, w którym był odtwarzany, a pauza, przewijanie i pozycja działają tam tak samo jak lokalnie (Roku nie obsługuje przewijania).
 
 Wybierz urządzenie w oknie przesyłania; BlindRSS przesyła strumień przez własny
 lokalny serwer proxy, więc urządzenie, które nie może samodzielnie pobrać pierwotnego

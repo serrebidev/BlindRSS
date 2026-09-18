@@ -527,7 +527,7 @@ Ctrl+Shift+E 或“播放器，均衡器”打开带前置放大的十段均衡�
 
 ## 投放到其他设备 {#casting}
 
-BlindRSS 可将正在播放的内容发送到您网络中的设备：Chromecast、DLNA/UPnP 渲染器和 AirPlay 接收器。
+BlindRSS 可将正在播放的内容发送到您网络中的设备：Chromecast、AirPlay 音箱、DLNA/UPnP 渲染器、Sonos 音箱、Roku 播放器和 Kodi。单集会从正在播放的位置在设备上继续，暂停、跳转和播放位置在那里与本地一样可用（Roku 不支持跳转）。
 
 从投放对话框选择设备；BlindRSS 通过自身的本地代理流式传输，因此即使设备本身无法获取原始地址，仍可播放该项目。投放期间，BlindRSS 中的传输控制仍可使用。
 

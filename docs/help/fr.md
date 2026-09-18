@@ -673,8 +673,7 @@ file survit aux redémarrages.
 
 ## Diffusion vers d’autres appareils {#casting}
 
-BlindRSS peut envoyer ce qu’il lit vers un appareil de votre réseau : Chromecast,
-lecteurs DLNA/UPnP et récepteurs AirPlay.
+BlindRSS peut envoyer ce qu’il lit vers un appareil de votre réseau : Chromecast, enceintes AirPlay, lecteurs DLNA/UPnP, enceintes Sonos, lecteurs Roku et Kodi. Un épisode reprend sur l’appareil là où il en était, et la pause, les déplacements et la position y fonctionnent comme en local (Roku ne permet pas de se déplacer).
 
 Choisissez l’appareil dans la boîte de dialogue de diffusion ; BlindRSS transmet
 le flux par son propre proxy local, de sorte qu’un appareil incapable de récupérer

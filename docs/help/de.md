@@ -830,8 +830,7 @@ Warteschlange überdauert einen Neustart.
 
 ## Übertragung an andere Geräte {#casting}
 
-BlindRSS kann das, was es abspielt, an ein Gerät in Ihrem Netzwerk senden:
-Chromecast, DLNA/UPnP-Renderer und AirPlay-Empfänger.
+BlindRSS kann das, was es abspielt, an ein Gerät in Ihrem Netzwerk senden: Chromecast, AirPlay-Lautsprecher, DLNA/UPnP-Renderer, Sonos-Lautsprecher, Roku-Player und Kodi. Eine Folge läuft auf dem Gerät an der Stelle weiter, an der sie gerade war, und Pause, Spulen und die Position funktionieren dort wie lokal (Roku kann nicht spulen).
 
 Wählen Sie das Gerät im Übertragungsdialog; BlindRSS streamt über seinen
 eigenen lokalen Proxy, sodass auch ein Gerät, das die Originaladresse nicht

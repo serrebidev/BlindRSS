@@ -526,7 +526,7 @@ Nella finestra della coda, Riproduci avvia l'elemento selezionato, Sposta su e S
 
 ## Trasmettere ad altri dispositivi {#casting}
 
-BlindRSS può inviare ciò che riproduce a un dispositivo in rete: Chromecast, renderer DLNA/UPnP e ricevitori AirPlay.
+BlindRSS può inviare ciò che riproduce a un dispositivo in rete: Chromecast, altoparlanti AirPlay, renderer DLNA/UPnP, altoparlanti Sonos, lettori Roku e Kodi. Un episodio prosegue sul dispositivo dal punto in cui si trovava, e pausa, spostamento e posizione funzionano lì come in locale (Roku non consente lo spostamento).
 
 Scegliere il dispositivo dalla finestra di trasmissione; BlindRSS trasmette tramite il proprio proxy locale, così un dispositivo che non può recuperare da solo l'indirizzo originale riproduce comunque l'elemento. I controlli di trasporto restano operativi da BlindRSS durante la trasmissione.
 

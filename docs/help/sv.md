@@ -528,7 +528,7 @@ I köfönstret startar Spela upp valt objekt, Flytta upp och Flytta ned ordnar o
 
 ## Casta till andra enheter {#casting}
 
-BlindRSS kan skicka det som spelas till en enhet i ditt nätverk: Chromecast, DLNA/UPnP-renderare och AirPlay-mottagare.
+BlindRSS kan skicka det som spelas till en enhet i ditt nätverk: Chromecast, AirPlay-högtalare, DLNA/UPnP-renderare, Sonos-högtalare, Roku-spelare och Kodi. Ett avsnitt fortsätter på enheten där det var, och paus, spolning och position fungerar där som lokalt (Roku kan inte spola).
 
 Välj enheten i castdialogrutan; BlindRSS strömmar genom sin egen lokala proxy, så en enhet som inte själv kan hämta originaladressen ändå spelar objektet. Transportkontroller fortsätter fungera från BlindRSS medan den castar.
 
