@@ -15,7 +15,7 @@ can be set as `providers.miniflux.browser_feed_fallback_path` in `config.json`.
 
 1. Install Google Chrome and Python 3 with `venv` support.
 2. Create `/opt/blindrss-feed-browser/venv` and install the same pinned runtime
-   used by BlindRSS: `pip install seleniumbase==4.51.3`.
+   used by BlindRSS: `pip install seleniumbase==4.54.11`.
 3. Copy `miniflux_browser_fallback_service.py` to
    `/opt/blindrss-feed-browser/service.py`.
 4. Create the unprivileged `blindrss-browser` system account and writable
