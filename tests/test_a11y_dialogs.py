@@ -38,6 +38,15 @@ def wx_app():
     except Exception as exc:  # pragma: no cover - depends on display availability
         pytest.skip(f"no display / wx.App() unavailable: {exc}")
     yield app
+    # Destroy() on a top-level window is deferred to the next idle pass; with
+    # no event loop the dialogs were still alive at wx shutdown ("UnregisterClass
+    # failed ... Class still has open windows").
+    for win in list(wx.GetTopLevelWindows()):
+        try:
+            win.Destroy()
+        except Exception:
+            pass
+    wx.Yield()
     # Let wx tear down naturally; explicit destroy can crash some backends.
 
 
