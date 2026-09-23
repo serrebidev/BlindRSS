@@ -69,13 +69,13 @@ jobs:
     runs-on: windows-latest
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ inputs.ref || inputs.release_tag }}
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 
@@ -111,13 +111,21 @@ jobs:
 
       # build.bat build skips signing with only a warning when signtool is
       # missing; a CI release must never ship an unsigned exe or installer.
+      # Same rule as core/updater.py: the release certificate is self-signed, so
+      # Windows reports an untrusted root (UnknownError/NotTrusted); accept that
+      # only when the signer is the certificate imported above.
       - name: Verify Authenticode signatures
         run: |
           $version = "${{ inputs.release_tag }}".TrimStart('v')
+          $pinned = (Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Select-Object -First 1).Thumbprint
+          if (-not $pinned) { throw "No code-signing certificate was imported" }
           foreach ($f in @("dist\BlindRSS\BlindRSS.exe", "dist\BlindRSS-Setup-v$version.exe")) {
             $sig = Get-AuthenticodeSignature $f
-            if ($sig.Status -ne 'Valid') { throw "$f signature is $($sig.Status)" }
-            "$f signed by $($sig.SignerCertificate.Subject)"
+            $thumb = if ($sig.SignerCertificate) { $sig.SignerCertificate.Thumbprint } else { "" }
+            $status = "$($sig.Status)"
+            if ($thumb -ne $pinned) { throw "$f is not signed by the release certificate (status $status, signer '$thumb')" }
+            if ($status -notin @("Valid", "UnknownError", "NotTrusted")) { throw "$f signature is $status" }
+            "$f signed by $($sig.SignerCertificate.Subject) ($status)"
           }
 
       - name: Compute checksums and write update manifest
@@ -147,7 +155,7 @@ jobs:
           "installer=$installer" >> $env:GITHUB_OUTPUT
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: BlindRSS-windows-${{ inputs.release_tag }}
           path: |
@@ -167,13 +175,13 @@ jobs:
     runs-on: macos-14
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref || inputs.release_tag) || github.sha }}
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.14"
 
@@ -192,7 +200,7 @@ jobs:
           ./build.sh build
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: BlindRSS-macos-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
           path: dist/BlindRSS-macos-*.zip
@@ -224,13 +232,13 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Check out release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref || inputs.release_tag) || github.sha }}
           fetch-depth: 0
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -254,7 +262,7 @@ jobs:
           ./build.sh build
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: BlindRSS-linux-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
           path: dist/BlindRSS-linux-*.tar.gz

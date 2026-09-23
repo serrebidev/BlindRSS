@@ -177,6 +177,19 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
         self.assertEqual(run.call_args_list[0].args[0][0], "bad-powershell")
         self.assertEqual(run.call_args_list[1].args[0][0], "pwsh")
 
+    def test_pinned_thumbprint_never_accepts_a_tampered_file(self) -> None:
+        from core import updater
+
+        for status in ("HashMismatch", "NotSigned", "NotSupportedFileFormat", "Incompatible"):
+            result = MagicMock(returncode=0, stderr="")
+            result.stdout = json.dumps(
+                {"Status": status, "StatusMessage": "", "Subject": "CN=BlindRSS Dev", "Thumbprint": "aabbcc"}
+            )
+            with patch("core.updater._powershell_executables", return_value=("pwsh",)):
+                with patch("core.updater.subprocess.run", return_value=result):
+                    ok, _msg = updater._verify_authenticode_signature("BlindRSS.exe", ["AABBCC"])
+            self.assertFalse(ok, status)
+
 
 if __name__ == "__main__":
     unittest.main()

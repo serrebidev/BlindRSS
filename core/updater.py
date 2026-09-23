@@ -599,6 +599,11 @@ def _find_linux_staging(extract_dir: str) -> Optional[str]:
     return None
 
 
+# Get-AuthenticodeSignature statuses a pinned signer thumbprint may override:
+# the self-signed release certificate chains to an untrusted root.
+_PINNABLE_SIGNATURE_STATUSES = frozenset({"unknownerror", "nottrusted"})
+
+
 def _verify_authenticode_signature(exe_path: str, allowed_thumbprints: Iterable[str]) -> Tuple[bool, str]:
     allowed = set(_normalize_thumbprints(allowed_thumbprints))
     ps_script = (
@@ -648,8 +653,10 @@ def _verify_authenticode_signature(exe_path: str, allowed_thumbprints: Iterable[
                 return False, _("Update is signed but not by a trusted certificate{suffix}").format(suffix=suffix)
             return True, ""
         # Status is not 'Valid' (e.g. an untrusted root for a self-signed cert):
-        # accept only if the signer thumbprint is explicitly pinned in the allowlist.
-        if thumbprint and thumbprint in allowed:
+        # accept only if the signer thumbprint is explicitly pinned in the allowlist,
+        # and only for trust-chain statuses. A tampered file (HashMismatch) still
+        # reports its original signer, so a pin alone must not accept it.
+        if thumbprint and thumbprint in allowed and status.lower() in _PINNABLE_SIGNATURE_STATUSES:
             return True, ""
         message = f"Signature check failed: {status} {status_msg}".strip()
         if thumbprint:

@@ -1137,28 +1137,28 @@ msgstr ""
 msgid "Update available."
 msgstr ""
 
-#: core/updater.py:661
+#: core/updater.py:668
 msgid "Authenticode verification failed: PowerShell was not found."
 msgstr ""
 
-#: core/updater.py:1006
+#: core/updater.py:1013
 msgid "Verifying download…"
 msgstr ""
 
-#: core/updater.py:1021
+#: core/updater.py:1028
 msgid "Extracting update…"
 msgstr ""
 
-#: core/updater.py:1059
-#: core/updater.py:1114
-#: core/updater.py:1193
+#: core/updater.py:1066
+#: core/updater.py:1121
+#: core/updater.py:1200
 msgid "Verifying signature…"
 msgstr ""
 
-#: core/updater.py:1064
-#: core/updater.py:1119
-#: core/updater.py:1198
-#: core/updater.py:1218
+#: core/updater.py:1071
+#: core/updater.py:1126
+#: core/updater.py:1205
+#: core/updater.py:1225
 msgid "Preparing restart…"
 msgstr ""
 
@@ -1198,31 +1198,31 @@ msgstr ""
 msgid "Update manifest has an invalid SHA-256 hash."
 msgstr ""
 
-#: core/updater.py:937
+#: core/updater.py:944
 msgid "Auto-update is not available for this build."
 msgstr ""
 
-#: core/updater.py:1009
+#: core/updater.py:1016
 msgid "Downloaded update failed SHA-256 verification."
 msgstr ""
 
-#: core/updater.py:1112
+#: core/updater.py:1119
 msgid "Downloaded Windows installer is missing."
 msgstr ""
 
-#: core/updater.py:1181
+#: core/updater.py:1188
 msgid "Could not locate the running .app bundle to update."
 msgstr ""
 
-#: core/updater.py:1189
+#: core/updater.py:1196
 msgid "Update package does not contain a BlindRSS.app bundle."
 msgstr ""
 
-#: core/updater.py:1191
+#: core/updater.py:1198
 msgid "Update package .app is missing its executable."
 msgstr ""
 
-#: core/updater.py:1216
+#: core/updater.py:1223
 msgid "Update package is missing the BlindRSS executable."
 msgstr ""
 
@@ -1230,21 +1230,21 @@ msgstr ""
 msgid "Failed to download update metadata. GitHub may be temporarily unavailable; please try again in a few minutes."
 msgstr ""
 
-#: core/updater.py:982
-#: core/updater.py:990
+#: core/updater.py:989
+#: core/updater.py:997
 msgid "Downloading update…"
 msgstr ""
 
-#: core/updater.py:1001
+#: core/updater.py:1008
 msgid "Failed to download update. GitHub may be temporarily unavailable; please try again in a few minutes."
 msgstr ""
 
-#: core/updater.py:1034
+#: core/updater.py:1041
 #: core/updater.py:364
 msgid "Auto-update is not supported on this platform ({platform})."
 msgstr ""
 
-#: core/updater.py:1175
+#: core/updater.py:1182
 msgid "Update signature verification failed: {error}"
 msgstr ""
 
@@ -1296,21 +1296,21 @@ msgstr ""
 msgid "Update installer is missing a download URL."
 msgstr ""
 
-#: core/updater.py:660
+#: core/updater.py:667
 msgid "Authenticode verification failed: {error}"
 msgstr ""
 
-#: core/updater.py:1041
+#: core/updater.py:1048
 msgid "Update package is missing {name}."
 msgstr ""
 
-#: core/updater.py:1055
-#: core/updater.py:1110
-#: core/updater.py:1212
+#: core/updater.py:1062
+#: core/updater.py:1117
+#: core/updater.py:1219
 msgid "{name} is missing from the install directory."
 msgstr ""
 
-#: core/updater.py:1185
+#: core/updater.py:1192
 msgid "{name} is missing from the app bundle."
 msgstr ""
 
@@ -1326,18 +1326,18 @@ msgstr ""
 msgid "Unsupported update archive type: {type}"
 msgstr ""
 
-#: core/updater.py:751
-#: core/updater.py:1069
-#: core/updater.py:1123
-#: core/updater.py:1276
+#: core/updater.py:758
+#: core/updater.py:1076
+#: core/updater.py:1130
+#: core/updater.py:1283
 msgid "Failed to start update helper: {error}"
 msgstr ""
 
-#: core/updater.py:964
+#: core/updater.py:971
 msgid "Download failed; retrying (attempt {attempt})…"
 msgstr ""
 
-#: core/updater.py:1025
+#: core/updater.py:1032
 msgid "Failed to extract update: {error}"
 msgstr ""
 
@@ -1349,11 +1349,11 @@ msgstr ""
 msgid "Update installer '{name}' not found in release assets."
 msgstr ""
 
-#: core/updater.py:648
+#: core/updater.py:653
 msgid "Update is signed but not by a trusted certificate{suffix}"
 msgstr ""
 
-#: core/updater.py:997
+#: core/updater.py:1004
 msgid "Failed to download update: {error}. GitHub may be temporarily unavailable; please try again in a few minutes."
 msgstr ""
 
