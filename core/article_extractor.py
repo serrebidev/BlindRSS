@@ -41,10 +41,8 @@ LOG = logging.getLogger(__name__)
 
 try:
     import trafilatura
-    from trafilatura.metadata import extract_metadata
 except Exception:
     trafilatura = None
-    extract_metadata = None
 
 
 class ExtractionError(RuntimeError):
@@ -4104,33 +4102,27 @@ def _extract_title_author_from_meta(html: str, url: str) -> Tuple[str, str]:
     title = ""
     author = ""
 
-    if trafilatura is not None and extract_metadata is not None and html:
-        try:
-            meta = extract_metadata(html, url=url)
-            if meta:
-                title = (meta.title or "") if hasattr(meta, "title") else ""
-                author = (meta.author or "") if hasattr(meta, "author") else ""
-        except Exception:
-            pass
-
-    if not title or not author:
-        try:
-            soup = BeautifulSoup(html, "html.parser")
-            if not title:
-                t = soup.find("title")
-                if t and t.get_text(strip=True):
-                    title = t.get_text(strip=True)
-            if not author:
-                # NYT publishes the byline only as <meta name="byl" content="By ...">,
-                # which trafilatura does not read; the reader header was left blank.
-                candidate = _AUTHOR_BY_PREFIX_RE.sub(
-                    "", _extract_meta_content(soup, _AUTHOR_META_CANDIDATES)
-                ).strip()
-                # `article:author` often holds a profile URL, not a name — never a byline.
-                if candidate and not re.match(r"(?i)^(?:https?:)?//", candidate):
-                    author = candidate
-        except Exception:
-            pass
+    # BeautifulSoup only: trafilatura.extract_metadata prefers the first post
+    # heading over <title> on forum/thread documents (and its date search is
+    # expensive). Its old call used a url= kwarg trafilatura 2.x rejects, so
+    # this was already the effective behavior.
+    try:
+        soup = BeautifulSoup(html, "html.parser")
+        if not title:
+            t = soup.find("title")
+            if t and t.get_text(strip=True):
+                title = t.get_text(strip=True)
+        if not author:
+            # NYT publishes the byline only as <meta name="byl" content="By ...">,
+            # which trafilatura does not read; the reader header was left blank.
+            candidate = _AUTHOR_BY_PREFIX_RE.sub(
+                "", _extract_meta_content(soup, _AUTHOR_META_CANDIDATES)
+            ).strip()
+            # `article:author` often holds a profile URL, not a name — never a byline.
+            if candidate and not re.match(r"(?i)^(?:https?:)?//", candidate):
+                author = candidate
+    except Exception:
+        pass
 
     return (title or "").strip(), (author or "").strip()
 

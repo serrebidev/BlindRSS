@@ -396,11 +396,11 @@ class AccessibleBrowserFrame(wx.Frame):
         # Full-text state: bump _content_token on every article switch so stale
         # background loads can't overwrite the pane; cache bodies by article id.
         self._content_token = 0
-        self._fulltext_cache = {}
+        self._fulltext_cache = utils.LRUDict(300)
         self._fulltext_inflight = set()
         self._fulltext_timer = None
         self._fulltext_debounce_ms = 350
-        self._chapter_cache = {}
+        self._chapter_cache = utils.LRUDict(300)
         self._chapter_inflight = set()
         self._current_body_art_id = None
         self._current_body_text = ""
@@ -410,7 +410,7 @@ class AccessibleBrowserFrame(wx.Frame):
         # SAME config key as the main window so the setting is shared.
         self._rich_view = None
         self._rich_view_unavailable = False
-        self._rich_html_cache = {}
+        self._rich_html_cache = utils.LRUDict(100)
         self._rich_token = 0
         self._rich_debounce = None
         self._current_rich_art_id = None
@@ -2193,14 +2193,9 @@ class AccessibleBrowserFrame(wx.Frame):
             return None
 
         def _sink(html, page_url):
-            def _enrich():
-                try:
-                    from core import metadata_enrich
-                    metadata_enrich.enrich_stored_article(aid, html, page_url)
-                except Exception:
-                    pass
             try:
-                threading.Thread(target=_enrich, daemon=True).start()
+                from core import metadata_enrich
+                metadata_enrich.enrich_stored_article_async(aid, html, page_url)
             except Exception:
                 pass
 

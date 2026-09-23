@@ -124,3 +124,38 @@ def test_enrich_missing_article_is_noop(temp_db):
     assert me.enrich_stored_article("nope", JSONLD_HTML) is False
     assert me.enrich_stored_article("", JSONLD_HTML) is False
     assert me.enrich_stored_article("a1", "") is False
+
+
+def test_hosted_article_without_local_row_is_not_parsed(temp_db, monkeypatch):
+    # Miniflux/Inoreader rows are not in the local table; parsing the page for
+    # them was pure CPU waste (dateparser burned ~26s on one page).
+    def boom(*_a, **_k):
+        raise AssertionError("page must not be parsed for a missing row")
+
+    monkeypatch.setattr(me, "extract_page_metadata", boom)
+    assert me.enrich_stored_article("hosted-123", JSONLD_HTML, "https://example.com") is False
+
+
+def test_trafilatura_fallback_skips_extensive_date_search(monkeypatch):
+    import trafilatura
+
+    seen = {}
+
+    def fake_extract_metadata(html, default_url=None, extensive=True, **_k):
+        seen["extensive"] = extensive
+        return None
+
+    monkeypatch.setattr(trafilatura, "extract_metadata", fake_extract_metadata)
+    me.extract_page_metadata("<html><body><p>No structured data here.</p></body></html>", "https://example.com")
+    assert seen == {"extensive": False}
+
+
+def test_async_enrichment_runs_on_shared_worker(temp_db):
+    me.enrich_stored_article_async("a1", JSONLD_HTML, "https://example.com/story")
+    me._executor.submit(lambda: None).result(timeout=30)
+    conn = db.get_connection()
+    try:
+        author = conn.execute("SELECT author FROM articles WHERE id='a1'").fetchone()[0]
+    finally:
+        conn.close()
+    assert author == "Ada Lovelace"

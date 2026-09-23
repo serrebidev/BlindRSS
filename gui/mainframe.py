@@ -727,7 +727,7 @@ class MainFrame(wx.Frame):
         self.reader_panel.SetSizer(self._reader_sizer)
         self._rich_view = None            # AccessibleWebView, created on demand
         self._rich_view_unavailable = False
-        self._fulltext_html_cache = {}    # cache_key -> rendered rich HTML
+        self._fulltext_html_cache = utils.LRUDict(100)    # cache_key -> rendered rich HTML
         self._rich_debounce = None
 
         right_splitter.SplitHorizontally(self.list_ctrl, self.reader_panel, 300)
@@ -765,8 +765,8 @@ class MainFrame(wx.Frame):
         self.search_ctrl.Bind(wx.EVT_SEARCHCTRL_CANCEL_BTN, self.on_search_clear)
 
         # Full-text extraction cache (url -> rendered text)
-        self._fulltext_cache = {}
-        self._fulltext_cache_source = {}
+        self._fulltext_cache = utils.LRUDict(300)
+        self._fulltext_cache_source = utils.LRUDict(300)
         # Last search term used by find-in-article (reading pane).
         self._content_find_term = ""
         self._fulltext_token = 0
@@ -11497,22 +11497,13 @@ class MainFrame(wx.Frame):
             article_id_for_meta = str(req.get("article_id") or "").strip()
 
             def _metadata_sink(html, page_url, _aid=article_id_for_meta):
-                if not _aid:
-                    return
-
-                def _enrich():
-                    try:
-                        from core import metadata_enrich
-                        metadata_enrich.enrich_stored_article(_aid, html, page_url)
-                    except Exception:
-                        pass
-
                 # Off the extraction worker: the enrichment UPDATE can wait on
                 # SQLite's write lock while a refresh is saving feeds, and the
                 # sink runs between page download and text extraction — doing
                 # it inline stalled rendering for the duration of the refresh.
                 try:
-                    threading.Thread(target=_enrich, daemon=True).start()
+                    from core import metadata_enrich
+                    metadata_enrich.enrich_stored_article_async(_aid, html, page_url)
                 except Exception:
                     pass
 

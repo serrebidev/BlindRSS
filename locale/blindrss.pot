@@ -124,71 +124,71 @@ msgstr ""
 msgid "Status"
 msgstr ""
 
-#: core/article_extractor.py:216
+#: core/article_extractor.py:214
 msgid "This page is behind an anti-bot / human-verification check (e.g. Cloudflare or a \"you're not a robot\" page), so the full text can't be fetched automatically. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:243
+#: core/article_extractor.py:241
 msgid "The page has no readable article text — only navigation or related-story links were found (common for video-only pages). Open the original link in your browser to view it."
 msgstr ""
 
-#: core/article_extractor.py:335
+#: core/article_extractor.py:333
 msgid "This article is behind a paywall (subscription required), so the full text can't be fetched automatically. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:370
+#: core/article_extractor.py:368
 msgid "Only the free preview of this article is published on the page — the rest requires a subscription. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:3010
+#: core/article_extractor.py:3008
 msgid "Google News could not resolve the original publisher link. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:4840
+#: core/article_extractor.py:4832
 #: core/open_article.py:89
 #: gui/dialogs.py:4910
 msgid "(unknown)"
 msgstr ""
 
-#: core/article_extractor.py:4912
+#: core/article_extractor.py:4904
 msgid "Could not extract full text from the webpage or from feed content."
 msgstr ""
 
-#: core/article_extractor.py:4668
+#: core/article_extractor.py:4660
 msgid "trafilatura is not installed or failed to import. Reinstall requirements."
 msgstr ""
 
-#: core/article_extractor.py:4762
+#: core/article_extractor.py:4754
 msgid "Download failed (site blocked, offline, or connection problem)."
 msgstr ""
 
-#: core/article_extractor.py:4786
+#: core/article_extractor.py:4778
 msgid "Downloaded page, but could not extract readable text (empty result)."
 msgstr ""
 
-#: core/article_extractor.py:210
+#: core/article_extractor.py:208
 msgid "This page is behind an anti-bot / human-verification check, and the access BlindRSS had for this site has expired — these checks only stay valid for a short time. Open the page in {browser} and BlindRSS will pick the access back up automatically within a minute."
 msgstr ""
 
-#: core/article_extractor.py:4841
+#: core/article_extractor.py:4833
 #: core/open_article.py:85
 #: gui/dialogs.py:4277
 msgid "Title:"
 msgstr ""
 
-#: core/article_extractor.py:4842
+#: core/article_extractor.py:4834
 #: gui/accessibility.py:1509
 #: gui/mainframe.py:6424
 #: gui/mainframe.py:10334
 msgid "Author:"
 msgstr ""
 
-#: core/article_extractor.py:4654
-#: core/article_extractor.py:4665
+#: core/article_extractor.py:4646
+#: core/article_extractor.py:4657
 msgid "Could not retrieve YouTube video details."
 msgstr ""
 
-#: core/article_extractor.py:4903
+#: core/article_extractor.py:4895
 msgid "Unknown extraction error"
 msgstr ""
 
@@ -412,7 +412,7 @@ msgstr ""
 
 #: core/help_topics.py:85
 #: core/shortcuts.py:216
-#: gui/mainframe.py:15404
+#: gui/mainframe.py:15395
 msgid "Filter Rules"
 msgstr ""
 
@@ -526,7 +526,7 @@ msgstr ""
 #: core/help_topics.py:112
 #: core/shortcuts.py:220
 #: gui/dialogs.py:928
-#: gui/mainframe.py:14416
+#: gui/mainframe.py:14407
 msgid "Settings"
 msgstr ""
 
@@ -677,7 +677,7 @@ msgid "Try opening it in your browser, or import that site's cookies from Tools 
 msgstr ""
 
 #: core/open_article.py:167
-#: gui/mainframe.py:14851
+#: gui/mainframe.py:14842
 msgid "That does not look like a web address. Enter a full address, for example https://example.com/story."
 msgstr ""
 
@@ -774,14 +774,14 @@ msgstr ""
 
 #: core/shortcuts.py:159
 #: gui/dialogs.py:225
-#: gui/mainframe.py:14769
+#: gui/mainframe.py:14760
 msgid "Add Feed"
 msgstr ""
 
 #: core/shortcuts.py:160
-#: gui/mainframe.py:13370
-#: gui/mainframe.py:13424
-#: gui/mainframe.py:13409
+#: gui/mainframe.py:13361
+#: gui/mainframe.py:13415
+#: gui/mainframe.py:13400
 msgid "Detect Feeds on Page"
 msgstr ""
 
@@ -837,19 +837,19 @@ msgid "Remove Category"
 msgstr ""
 
 #: core/shortcuts.py:171
-#: gui/mainframe.py:13840
+#: gui/mainframe.py:13831
 msgid "Import OPML"
 msgstr ""
 
 #: core/shortcuts.py:172
 #: gui/dialogs.py:550
-#: gui/mainframe.py:13851
-#: gui/mainframe.py:13930
+#: gui/mainframe.py:13842
+#: gui/mainframe.py:13921
 msgid "Import YouTube Takeout"
 msgstr ""
 
 #: core/shortcuts.py:173
-#: gui/mainframe.py:14198
+#: gui/mainframe.py:14189
 msgid "Export OPML"
 msgstr ""
 
@@ -860,8 +860,8 @@ msgstr ""
 
 #: core/shortcuts.py:176
 #: gui/dialogs.py:332
-#: gui/mainframe.py:14908
-#: gui/mainframe.py:14932
+#: gui/mainframe.py:14899
+#: gui/mainframe.py:14923
 msgid "Open Media URL"
 msgstr ""
 
@@ -899,14 +899,14 @@ msgstr ""
 
 #: core/shortcuts.py:184
 #: gui/accessibility.py:470
-#: gui/mainframe.py:12803
-#: gui/mainframe.py:12822
+#: gui/mainframe.py:12794
+#: gui/mainframe.py:12813
 msgid "Download"
 msgstr ""
 
 #: core/shortcuts.py:185
-#: gui/mainframe.py:12844
-#: gui/mainframe.py:12830
+#: gui/mainframe.py:12835
+#: gui/mainframe.py:12821
 msgid "Download As"
 msgstr ""
 
@@ -1369,17 +1369,17 @@ msgstr ""
 msgid "{label} {major} (installed)"
 msgstr ""
 
-#: core/utils.py:1442
+#: core/utils.py:1443
 msgid "Just now"
 msgstr ""
 
-#: core/utils.py:1447
+#: core/utils.py:1448
 msgid "{n} hour ago"
 msgid_plural "{n} hours ago"
 msgstr[0] ""
 msgstr[1] ""
 
-#: core/utils.py:1445
+#: core/utils.py:1446
 msgid "{n} minute ago"
 msgid_plural "{n} minutes ago"
 msgstr[0] ""
@@ -1423,7 +1423,7 @@ msgstr ""
 
 #: gui/accessibility.py:60
 #: gui/mainframe.py:3722
-#: gui/mainframe.py:11775
+#: gui/mainframe.py:11766
 msgid "Untitled chapter"
 msgstr ""
 
@@ -1592,7 +1592,7 @@ msgid "Mark &Unread"
 msgstr ""
 
 #: gui/accessibility.py:645
-#: gui/mainframe.py:15424
+#: gui/mainframe.py:15415
 msgid "De&lete"
 msgstr ""
 
@@ -1772,7 +1772,7 @@ msgstr ""
 msgid "Full text unavailable. Showing feed content."
 msgstr ""
 
-#: gui/accessibility.py:2342
+#: gui/accessibility.py:2337
 msgid "Loading more articles..."
 msgstr ""
 
@@ -1966,8 +1966,8 @@ msgstr ""
 
 #: gui/accessibility.py:1056
 #: gui/dialogs.py:4803
-#: gui/mainframe.py:13786
-#: gui/mainframe.py:13837
+#: gui/mainframe.py:13777
+#: gui/mainframe.py:13828
 msgid "Error"
 msgstr ""
 
@@ -2124,7 +2124,7 @@ msgstr ""
 #: gui/article_window.py:341
 #: gui/dialogs.py:441
 #: gui/mainframe.py:5324
-#: gui/mainframe.py:14855
+#: gui/mainframe.py:14846
 msgid "Open Article"
 msgstr ""
 
@@ -2761,7 +2761,7 @@ msgstr ""
 #: gui/dialogs.py:4915
 #: gui/dialogs.py:2098
 #: gui/mainframe.py:657
-#: gui/mainframe.py:12111
+#: gui/mainframe.py:12102
 msgid "Unknown error"
 msgstr ""
 
@@ -2967,13 +2967,13 @@ msgstr ""
 
 #: gui/dialogs.py:144
 #: gui/dialogs.py:8130
-#: gui/mainframe.py:15425
+#: gui/mainframe.py:15416
 msgid "Move &Up"
 msgstr ""
 
 #: gui/dialogs.py:145
 #: gui/dialogs.py:8134
-#: gui/mainframe.py:15426
+#: gui/mainframe.py:15417
 msgid "Move &Down"
 msgstr ""
 
@@ -2992,8 +2992,8 @@ msgstr ""
 
 #: gui/dialogs.py:401
 #: gui/dialogs.py:5313
-#: gui/mainframe.py:12806
-#: gui/mainframe.py:12825
+#: gui/mainframe.py:12797
+#: gui/mainframe.py:12816
 msgid "Downloads are disabled. Enable them in Settings > Downloads."
 msgstr ""
 
@@ -4142,8 +4142,8 @@ msgid "Where BlindRSS stores config.json and rss.db.\nUser Data Folder keeps you
 msgstr ""
 
 #: gui/dialogs.py:3966
-#: gui/mainframe.py:14685
-#: gui/mainframe.py:14653
+#: gui/mainframe.py:14676
+#: gui/mainframe.py:14644
 msgid "Updates"
 msgstr ""
 
@@ -4248,9 +4248,9 @@ msgid "Select one or more episodes first."
 msgstr ""
 
 #: gui/dialogs.py:5314
-#: gui/mainframe.py:12806
-#: gui/mainframe.py:12825
-#: gui/mainframe.py:14958
+#: gui/mainframe.py:12797
+#: gui/mainframe.py:12816
+#: gui/mainframe.py:14949
 msgid "Downloads disabled"
 msgstr ""
 
@@ -5569,22 +5569,22 @@ msgstr ""
 msgid "New article available."
 msgstr ""
 
-#: gui/mainframe.py:12071
+#: gui/mainframe.py:12062
 #: gui/mainframe.py:1477
-#: gui/mainframe.py:12037
-#: gui/mainframe.py:12250
+#: gui/mainframe.py:12028
+#: gui/mainframe.py:12241
 msgid "Read"
 msgstr ""
 
-#: gui/mainframe.py:12996
+#: gui/mainframe.py:12987
 msgid "yt-dlp download failed"
 msgstr ""
 
-#: gui/mainframe.py:13783
+#: gui/mainframe.py:13774
 msgid "Could not update feed."
 msgstr ""
 
-#: gui/mainframe.py:13834
+#: gui/mainframe.py:13825
 msgid "Could not reset feed title."
 msgstr ""
 
@@ -5992,108 +5992,108 @@ msgstr ""
 msgid "No previous occurrences of \"{term}\"."
 msgstr ""
 
-#: gui/mainframe.py:12069
+#: gui/mainframe.py:12060
 #: gui/mainframe.py:1477
-#: gui/mainframe.py:12048
+#: gui/mainframe.py:12039
 msgid "Unread"
 msgstr ""
 
-#: gui/mainframe.py:12076
+#: gui/mainframe.py:12067
 msgid "Mark all items in all feeds as read?"
 msgstr ""
 
-#: gui/mainframe.py:12230
+#: gui/mainframe.py:12221
 msgid "Failed to mark all items as read."
 msgstr ""
 
-#: gui/mainframe.py:12843
+#: gui/mainframe.py:12834
 msgid "Choose the format to download this item in:"
 msgstr ""
 
-#: gui/mainframe.py:13369
+#: gui/mainframe.py:13360
 msgid "Enter the address of a webpage to scan for feeds:"
 msgstr ""
 
-#: gui/mainframe.py:13439
+#: gui/mainframe.py:13430
 msgid "Select a feed to subscribe to:"
 msgstr ""
 
-#: gui/mainframe.py:13440
+#: gui/mainframe.py:13431
 msgid "Detected Feeds"
 msgstr ""
 
-#: gui/mainframe.py:13862
+#: gui/mainframe.py:13853
 msgid "BlindRSS - Reading YouTube Takeout..."
 msgstr ""
 
-#: gui/mainframe.py:13884
-#: gui/mainframe.py:13983
+#: gui/mainframe.py:13875
+#: gui/mainframe.py:13974
 msgid "YouTube Takeout import failed."
 msgstr ""
 
-#: gui/mainframe.py:13929
+#: gui/mainframe.py:13920
 msgid "Choose the category for imported YouTube subscriptions:"
 msgstr ""
 
-#: gui/mainframe.py:13943
+#: gui/mainframe.py:13934
 msgid "BlindRSS - Importing YouTube Takeout..."
 msgstr ""
 
-#: gui/mainframe.py:14140
+#: gui/mainframe.py:14131
 msgid "Refreshing imported feeds..."
 msgstr ""
 
-#: gui/mainframe.py:14667
+#: gui/mainframe.py:14658
 msgid "Release notes are available on GitHub."
 msgstr ""
 
-#: gui/mainframe.py:14694
+#: gui/mainframe.py:14685
 msgid "Updating BlindRSS"
 msgstr ""
 
-#: gui/mainframe.py:14695
+#: gui/mainframe.py:14686
 msgid "Starting update..."
 msgstr ""
 
-#: gui/mainframe.py:14769
+#: gui/mainframe.py:14760
 msgid "Choose category:"
 msgstr ""
 
-#: gui/mainframe.py:15114
+#: gui/mainframe.py:15105
 msgid "Folder name"
 msgstr ""
 
-#: gui/mainframe.py:15197
-#: gui/mainframe.py:15106
+#: gui/mainframe.py:15188
+#: gui/mainframe.py:15097
 #: gui/mainframe.py:9059
 msgid "Smart Folder"
 msgstr ""
 
-#: gui/mainframe.py:15245
+#: gui/mainframe.py:15236
 msgid "Rule name"
 msgstr ""
 
-#: gui/mainframe.py:15284
+#: gui/mainframe.py:15275
 msgid "Then do this"
 msgstr ""
 
-#: gui/mainframe.py:15292
+#: gui/mainframe.py:15283
 msgid "Move to category (full path, blank for none)"
 msgstr ""
 
-#: gui/mainframe.py:15303
+#: gui/mainframe.py:15294
 msgid "Also show under category (label, blank for none)"
 msgstr ""
 
-#: gui/mainframe.py:15417
+#: gui/mainframe.py:15408
 msgid "Filter rules"
 msgstr ""
 
-#: gui/mainframe.py:15475
+#: gui/mainframe.py:15466
 msgid " [stop]"
 msgstr ""
 
-#: gui/mainframe.py:15533
+#: gui/mainframe.py:15524
 msgid "this rule"
 msgstr ""
 
@@ -6119,7 +6119,7 @@ msgid "(No saved searches)"
 msgstr ""
 
 #: gui/mainframe.py:1961
-#: gui/mainframe.py:12490
+#: gui/mainframe.py:12481
 msgid "Contains audio"
 msgstr ""
 
@@ -6433,177 +6433,177 @@ msgstr ""
 msgid "Loading..."
 msgstr ""
 
-#: gui/mainframe.py:12490
-#: gui/mainframe.py:12497
+#: gui/mainframe.py:12481
+#: gui/mainframe.py:12488
 msgid "No audio"
 msgstr ""
 
-#: gui/mainframe.py:12803
-#: gui/mainframe.py:12822
+#: gui/mainframe.py:12794
+#: gui/mainframe.py:12813
 msgid "No downloadable media found for this item."
 msgstr ""
 
-#: gui/mainframe.py:12829
+#: gui/mainframe.py:12820
 msgid "This item is a direct media file, so it can only be downloaded in its original format."
 msgstr ""
 
-#: gui/mainframe.py:13423
+#: gui/mainframe.py:13414
 msgid "No feeds detected on this page."
 msgstr ""
 
-#: gui/mainframe.py:13577
+#: gui/mainframe.py:13568
 msgid "Failed to add feed."
 msgstr ""
 
-#: gui/mainframe.py:13607
+#: gui/mainframe.py:13598
 msgid "BlindRSS - Removing feed..."
 msgstr ""
 
-#: gui/mainframe.py:13655
+#: gui/mainframe.py:13646
 msgid "Please try again."
 msgstr ""
 
-#: gui/mainframe.py:13749
+#: gui/mainframe.py:13740
 msgid "This provider does not support changing the feed URL.\nThe title and category will be updated, but the URL will stay the same."
 msgstr ""
 
-#: gui/mainframe.py:13753
+#: gui/mainframe.py:13744
 msgid "Feed URL not supported"
 msgstr ""
 
-#: gui/mainframe.py:13843
+#: gui/mainframe.py:13834
 msgid "BlindRSS - Importing OPML..."
 msgstr ""
 
-#: gui/mainframe.py:13891
+#: gui/mainframe.py:13882
 msgid "Subscribed channels ({count})"
 msgstr ""
 
-#: gui/mainframe.py:13892
+#: gui/mainframe.py:13883
 msgid "Channels from watch history ({count})"
 msgstr ""
 
-#: gui/mainframe.py:13893
+#: gui/mainframe.py:13884
 msgid "Owned channels ({count})"
 msgstr ""
 
-#: gui/mainframe.py:13894
+#: gui/mainframe.py:13885
 msgid "Playlists ({count})"
 msgstr ""
 
-#: gui/mainframe.py:13911
+#: gui/mainframe.py:13902
 msgid "Select at least one item type to import."
 msgstr ""
 
-#: gui/mainframe.py:13917
+#: gui/mainframe.py:13908
 msgid "No subscribable items were selected."
 msgstr ""
 
-#: gui/mainframe.py:14193
+#: gui/mainframe.py:14184
 msgid "Import successful."
 msgstr ""
 
-#: gui/mainframe.py:14195
+#: gui/mainframe.py:14186
 msgid "Import failed. Please check the latest opml_debug_*.log in the temporary directory."
 msgstr ""
 
-#: gui/mainframe.py:14668
+#: gui/mainframe.py:14659
 msgid "A new version of BlindRSS is available ({version}).\n\n{summary}\n\nDownload and install this update now?"
 msgstr ""
 
-#: gui/mainframe.py:14673
+#: gui/mainframe.py:14664
 msgid "Update Available"
 msgstr ""
 
-#: gui/mainframe.py:14681
+#: gui/mainframe.py:14672
 msgid "Auto-update is only available in the packaged app build.\nDownload the latest release from GitHub."
 msgstr ""
 
-#: gui/mainframe.py:14750
+#: gui/mainframe.py:14741
 msgid "Update Failed"
 msgstr ""
 
-#: gui/mainframe.py:14931
+#: gui/mainframe.py:14922
 msgid "The media player could not be opened, so this link cannot be streamed."
 msgstr ""
 
-#: gui/mainframe.py:15119
+#: gui/mainframe.py:15110
 msgid "Show articles that match"
 msgstr ""
 
-#: gui/mainframe.py:15228
+#: gui/mainframe.py:15219
 msgid "Filter Rule"
 msgstr ""
 
-#: gui/mainframe.py:15250
+#: gui/mainframe.py:15241
 msgid "Apply this rule to articles that match"
 msgstr ""
 
-#: gui/mainframe.py:15307
+#: gui/mainframe.py:15298
 msgid "Mark as &read"
 msgstr ""
 
-#: gui/mainframe.py:15309
+#: gui/mainframe.py:15300
 msgid "Mark as &favorite"
 msgstr ""
 
-#: gui/mainframe.py:15311
+#: gui/mainframe.py:15302
 msgid "&Delete (uses the configured delete behavior)"
 msgstr ""
 
-#: gui/mainframe.py:15313
+#: gui/mainframe.py:15304
 msgid "Skip &notification"
 msgstr ""
 
-#: gui/mainframe.py:15319
+#: gui/mainframe.py:15310
 msgid "&Stop processing later rules when this rule matches"
 msgstr ""
 
-#: gui/mainframe.py:15322
+#: gui/mainframe.py:15313
 msgid "Rule &enabled"
 msgstr ""
 
-#: gui/mainframe.py:15381
+#: gui/mainframe.py:15372
 msgid "Choose at least one action for this rule (move, label, mark, delete, or skip notification)."
 msgstr ""
 
-#: gui/mainframe.py:15382
+#: gui/mainframe.py:15373
 msgid "No Actions"
 msgstr ""
 
-#: gui/mainframe.py:15422
+#: gui/mainframe.py:15413
 msgid "&Add..."
 msgstr ""
 
-#: gui/mainframe.py:15423
+#: gui/mainframe.py:15414
 msgid "&Edit..."
 msgstr ""
 
-#: gui/mainframe.py:15427
+#: gui/mainframe.py:15418
 msgid "En&able/Disable"
 msgstr ""
 
-#: gui/mainframe.py:15428
+#: gui/mainframe.py:15419
 msgid "Apply to E&xisting Articles"
 msgstr ""
 
-#: gui/mainframe.py:15471
+#: gui/mainframe.py:15462
 msgid "{name}: if {condition} then {actions}"
 msgstr ""
 
-#: gui/mainframe.py:15536
+#: gui/mainframe.py:15527
 msgid "Delete Rule"
 msgstr ""
 
-#: gui/mainframe.py:15575
+#: gui/mainframe.py:15566
 msgid "Run all enabled rules against every existing article now? This may move, label, or delete articles."
 msgstr ""
 
-#: gui/mainframe.py:15579
+#: gui/mainframe.py:15570
 msgid "Apply to Existing Articles"
 msgstr ""
 
-#: gui/mainframe.py:15612
+#: gui/mainframe.py:15603
 msgid "Filter Rules Applied"
 msgstr ""
 
@@ -6736,162 +6736,162 @@ msgid "Refresh stopped"
 msgstr ""
 
 #: gui/mainframe.py:11075
-#: gui/mainframe.py:11614
+#: gui/mainframe.py:11605
 msgid "Full-text extraction failed. Showing feed content."
 msgstr ""
 
 #: gui/mainframe.py:11076
-#: gui/mainframe.py:11612
+#: gui/mainframe.py:11603
 msgid "No webpage URL for this item. Showing feed content."
 msgstr ""
 
-#: gui/mainframe.py:11772
+#: gui/mainframe.py:11763
 msgid "Chapters ({count}):"
 msgstr ""
 
-#: gui/mainframe.py:12083
-#: gui/mainframe.py:12238
+#: gui/mainframe.py:12074
+#: gui/mainframe.py:12229
 msgid "Mark All as Read"
 msgstr ""
 
-#: gui/mainframe.py:12238
+#: gui/mainframe.py:12229
 msgid "All items are already marked as read."
 msgstr ""
 
-#: gui/mainframe.py:12406
+#: gui/mainframe.py:12397
 msgid "Custom command failed"
 msgstr ""
 
-#: gui/mainframe.py:13178
+#: gui/mainframe.py:13169
 msgid "{error}\n\nBrowser cookies could not be read on this Windows session (Chromium App-Bound Encryption). If this item needs a login, export a cookies.txt from your browser and set it in Settings."
 msgstr ""
 
-#: gui/mainframe.py:13187
-#: gui/mainframe.py:13259
-#: gui/mainframe.py:13127
+#: gui/mainframe.py:13178
+#: gui/mainframe.py:13250
+#: gui/mainframe.py:13118
 msgid "Download error"
 msgstr ""
 
-#: gui/mainframe.py:13191
-#: gui/mainframe.py:13265
-#: gui/mainframe.py:13128
+#: gui/mainframe.py:13182
+#: gui/mainframe.py:13256
+#: gui/mainframe.py:13119
 msgid "Download failed: {title}"
 msgstr ""
 
-#: gui/mainframe.py:13216
-#: gui/mainframe.py:15006
+#: gui/mainframe.py:13207
+#: gui/mainframe.py:14997
 msgid "Downloading: {title}"
 msgstr ""
 
-#: gui/mainframe.py:13646
+#: gui/mainframe.py:13637
 msgid "Could not remove feed."
 msgstr ""
 
-#: gui/mainframe.py:13703
+#: gui/mainframe.py:13694
 msgid "This provider does not support editing feeds."
 msgstr ""
 
-#: gui/mainframe.py:13703
-#: gui/mainframe.py:13803
+#: gui/mainframe.py:13694
+#: gui/mainframe.py:13794
 msgid "Not supported"
 msgstr ""
 
-#: gui/mainframe.py:13802
+#: gui/mainframe.py:13793
 msgid "This provider does not support resetting feed titles."
 msgstr ""
 
-#: gui/mainframe.py:13992
+#: gui/mainframe.py:13983
 msgid "YouTube Takeout import complete.\n\nNew subscriptions: {new}\nSubscription channels: {subscriptions}\nWatch-history channels: {history}\nOwned channels: {owned}\nPlaylists: {playlists}\n\nThe imported feeds will update during normal background refreshes."
 msgstr ""
 
-#: gui/mainframe.py:14062
+#: gui/mainframe.py:14053
 msgid "Refreshing category: {title}..."
 msgstr ""
 
-#: gui/mainframe.py:14238
+#: gui/mainframe.py:14229
 msgid "Export failed for category \"{category}\"."
 msgstr ""
 
-#: gui/mainframe.py:14246
+#: gui/mainframe.py:14237
 msgid "Export \"{category}\" Category OPML"
 msgstr ""
 
-#: gui/mainframe.py:14643
+#: gui/mainframe.py:14634
 msgid "Update Check Failed"
 msgstr ""
 
-#: gui/mainframe.py:14648
+#: gui/mainframe.py:14639
 msgid "No Updates"
 msgstr ""
 
-#: gui/mainframe.py:14653
+#: gui/mainframe.py:14644
 msgid "Unable to determine update status."
 msgstr ""
 
-#: gui/mainframe.py:14775
-#: gui/mainframe.py:13361
+#: gui/mainframe.py:14766
+#: gui/mainframe.py:13352
 msgid "BlindRSS - Adding feed {url}..."
 msgstr ""
 
-#: gui/mainframe.py:14854
+#: gui/mainframe.py:14845
 msgid "Enter the address of the article you want to open."
 msgstr ""
 
-#: gui/mainframe.py:14904
+#: gui/mainframe.py:14895
 msgid "That does not look like a media link. Enter a full web address, for example https://www.youtube.com/watch?v=..."
 msgstr ""
 
-#: gui/mainframe.py:14907
+#: gui/mainframe.py:14898
 msgid "Enter the address of the media you want to open."
 msgstr ""
 
-#: gui/mainframe.py:14942
-#: gui/mainframe.py:14997
+#: gui/mainframe.py:14933
+#: gui/mainframe.py:14988
 msgid "Opening: {title}"
 msgstr ""
 
-#: gui/mainframe.py:15111
+#: gui/mainframe.py:15102
 msgid "Folder &name:"
 msgstr ""
 
-#: gui/mainframe.py:15120
-#: gui/mainframe.py:15251
+#: gui/mainframe.py:15111
+#: gui/mainframe.py:15242
 msgid "All conditions (AND)"
 msgstr ""
 
-#: gui/mainframe.py:15120
-#: gui/mainframe.py:15251
+#: gui/mainframe.py:15111
+#: gui/mainframe.py:15242
 msgid "Any condition (OR)"
 msgstr ""
 
-#: gui/mainframe.py:15128
-#: gui/mainframe.py:15260
+#: gui/mainframe.py:15119
+#: gui/mainframe.py:15251
 msgid "Field"
 msgstr ""
 
-#: gui/mainframe.py:15129
-#: gui/mainframe.py:15261
+#: gui/mainframe.py:15120
+#: gui/mainframe.py:15252
 msgid "Condition"
 msgstr ""
 
-#: gui/mainframe.py:15130
-#: gui/mainframe.py:15262
+#: gui/mainframe.py:15121
+#: gui/mainframe.py:15253
 msgid "Value"
 msgstr ""
 
-#: gui/mainframe.py:15242
+#: gui/mainframe.py:15233
 msgid "Rule &name:"
 msgstr ""
 
-#: gui/mainframe.py:15286
+#: gui/mainframe.py:15277
 msgid "&Move to category:"
 msgstr ""
 
-#: gui/mainframe.py:15297
+#: gui/mainframe.py:15288
 msgid "Also &label with category:"
 msgstr ""
 
-#: gui/mainframe.py:15411
+#: gui/mainframe.py:15402
 msgid "Rules run top to bottom for each incoming article, like email filters."
 msgstr ""
 
@@ -7054,95 +7054,95 @@ msgstr ""
 msgid "Checked: {title}"
 msgstr ""
 
-#: gui/mainframe.py:11638
+#: gui/mainframe.py:11629
 msgid "No text available.\n"
 msgstr ""
 
-#: gui/mainframe.py:11779
+#: gui/mainframe.py:11770
 msgid ". Link: {url}"
 msgstr ""
 
-#: gui/mainframe.py:13251
-#: gui/mainframe.py:13150
+#: gui/mainframe.py:13242
+#: gui/mainframe.py:13141
 msgid "Download complete: {title}"
 msgstr ""
 
-#: gui/mainframe.py:13398
+#: gui/mainframe.py:13389
 msgid "BlindRSS could not complete this site's browser verification page automatically.\n\nYou can still open the site in your web browser, export its cookies with a cookies.txt extension, then use Tools > Import Site Cookies."
 msgstr ""
 
-#: gui/mainframe.py:13405
+#: gui/mainframe.py:13396
 msgid "Unable to retrieve the page."
 msgstr ""
 
-#: gui/mainframe.py:13584
+#: gui/mainframe.py:13575
 msgid "Are you sure you want to remove this feed?"
 msgstr ""
 
-#: gui/mainframe.py:13605
+#: gui/mainframe.py:13596
 msgid "BlindRSS - Removing feed {title}..."
 msgstr ""
 
-#: gui/mainframe.py:13651
+#: gui/mainframe.py:13642
 msgid "It may be busy due to another operation."
 msgstr ""
 
-#: gui/mainframe.py:13840
-#: gui/mainframe.py:14198
-#: gui/mainframe.py:14247
+#: gui/mainframe.py:13831
+#: gui/mainframe.py:14189
+#: gui/mainframe.py:14238
 msgid "OPML files"
 msgstr ""
 
-#: gui/mainframe.py:13852
+#: gui/mainframe.py:13843
 msgid "ZIP archives"
 msgstr ""
 
-#: gui/mainframe.py:14204
-#: gui/mainframe.py:14257
+#: gui/mainframe.py:14195
+#: gui/mainframe.py:14248
 msgid "Export successful."
 msgstr ""
 
-#: gui/mainframe.py:14206
-#: gui/mainframe.py:14259
+#: gui/mainframe.py:14197
+#: gui/mainframe.py:14250
 msgid "Export failed."
 msgstr ""
 
-#: gui/mainframe.py:14234
+#: gui/mainframe.py:14225
 msgid "No feeds found in category \"{category}\"."
 msgstr ""
 
-#: gui/mainframe.py:14322
+#: gui/mainframe.py:14313
 msgid "Storage Location"
 msgstr ""
 
-#: gui/mainframe.py:14327
+#: gui/mainframe.py:14318
 msgid "Config has been moved. The feed database will be migrated to the new location the next time BlindRSS starts."
 msgstr ""
 
-#: gui/mainframe.py:14331
+#: gui/mainframe.py:14322
 msgid "Storage Location Changed"
 msgstr ""
 
-#: gui/mainframe.py:15135
-#: gui/mainframe.py:15267
+#: gui/mainframe.py:15126
+#: gui/mainframe.py:15258
 msgid "Condition {n} field"
 msgstr ""
 
-#: gui/mainframe.py:15138
-#: gui/mainframe.py:15270
+#: gui/mainframe.py:15129
+#: gui/mainframe.py:15261
 msgid "Condition {n} operator"
 msgstr ""
 
-#: gui/mainframe.py:15141
-#: gui/mainframe.py:15273
+#: gui/mainframe.py:15132
+#: gui/mainframe.py:15264
 msgid "Condition {n} value"
 msgstr ""
 
-#: gui/mainframe.py:15535
+#: gui/mainframe.py:15526
 msgid "Delete filter rule \"{name}\"? Articles it already filed are not changed."
 msgstr ""
 
-#: gui/mainframe.py:15605
+#: gui/mainframe.py:15596
 msgid "Scanned {scanned} article; {changed} matched a rule."
 msgid_plural "Scanned {scanned} articles; {changed} matched a rule."
 msgstr[0] ""
@@ -7265,7 +7265,7 @@ msgid "played {position}"
 msgstr ""
 
 #: gui/mainframe.py:8025
-#: gui/mainframe.py:13653
+#: gui/mainframe.py:13644
 msgid "Error: {error}"
 msgstr ""
 
@@ -7283,57 +7283,57 @@ msgstr ""
 msgid "Filter: {shown} of {total}"
 msgstr ""
 
-#: gui/mainframe.py:12401
+#: gui/mainframe.py:12392
 msgid "Could not open the article with your custom command:\n\n{err}\n\nOpening in the default browser instead. You can change this in Settings > General > Article opening method."
 msgstr ""
 
-#: gui/mainframe.py:13037
+#: gui/mainframe.py:13028
 msgid "Trying pytubefix: {title}"
 msgstr ""
 
-#: gui/mainframe.py:13060
+#: gui/mainframe.py:13051
 msgid "Preparing YouTube browser session: {title}"
 msgstr ""
 
-#: gui/mainframe.py:13131
+#: gui/mainframe.py:13122
 msgid "yt-dlp download timed out"
 msgstr ""
 
-#: gui/mainframe.py:13186
-#: gui/mainframe.py:13258
+#: gui/mainframe.py:13177
+#: gui/mainframe.py:13249
 msgid "Download failed: {error}"
 msgstr ""
 
-#: gui/mainframe.py:13248
-#: gui/mainframe.py:13147
+#: gui/mainframe.py:13239
+#: gui/mainframe.py:13138
 msgid "Download complete"
 msgstr ""
 
-#: gui/mainframe.py:13644
+#: gui/mainframe.py:13635
 msgid "Could not remove feed '{title}'."
 msgstr ""
 
-#: gui/mainframe.py:14321
+#: gui/mainframe.py:14312
 msgid "Could not move config file."
 msgstr ""
 
-#: gui/mainframe.py:14415
+#: gui/mainframe.py:14406
 msgid "Could not update startup registration."
 msgstr ""
 
-#: gui/mainframe.py:14634
+#: gui/mainframe.py:14625
 msgid "Update check failed: {error}"
 msgstr ""
 
-#: gui/mainframe.py:15493
+#: gui/mainframe.py:15484
 msgid "Could not create the rule."
 msgstr ""
 
-#: gui/mainframe.py:15522
+#: gui/mainframe.py:15513
 msgid "Could not update the rule."
 msgstr ""
 
-#: gui/mainframe.py:15598
+#: gui/mainframe.py:15589
 msgid "Could not apply rules.\n\n{error}"
 msgstr ""
 
@@ -7365,11 +7365,11 @@ msgstr ""
 msgid "Remove category '{category}'? Feeds will be moved to Uncategorized."
 msgstr ""
 
-#: gui/mainframe.py:14261
+#: gui/mainframe.py:14252
 msgid "Export failed: {error}"
 msgstr ""
 
-#: gui/mainframe.py:14431
+#: gui/mainframe.py:14422
 msgid "Windows notification prerequisites could not be fully configured."
 msgstr ""
 
@@ -7377,8 +7377,8 @@ msgstr ""
 msgid "Translation failed: {error}"
 msgstr ""
 
-#: gui/mainframe.py:13247
-#: gui/mainframe.py:13146
+#: gui/mainframe.py:13238
+#: gui/mainframe.py:13137
 msgid "Downloaded to:\n{path}"
 msgstr ""
 
@@ -7390,7 +7390,7 @@ msgstr ""
 msgid "This Linux build should already bundle these tools.\nIf they still appear missing, see the log: {log_path}\n\nTip: You can disable this prompt in Settings > YouTube."
 msgstr ""
 
-#: gui/mainframe.py:13126
+#: gui/mainframe.py:13117
 msgid "yt-dlp is not installed. Install it via Settings to download YouTube items."
 msgstr ""
 

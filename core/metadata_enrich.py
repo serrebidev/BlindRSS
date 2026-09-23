@@ -22,8 +22,14 @@ callers (the full-text pipeline must keep working exactly as before).
 from __future__ import annotations
 
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 log = logging.getLogger(__name__)
+
+# One shared worker for background enrichment. A thread per extraction piled
+# up parsers (each holding a whole page of HTML) while the user arrowed through
+# articles.
+_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="metadata-enrich")
 
 # Schema.org types whose author/keywords/articleSection describe the page's
 # main article (JSON-LD @type values, case-sensitive per schema.org).
@@ -205,7 +211,12 @@ def extract_page_metadata(html, url: str = "") -> dict:
     if not _meta_complete(meta):
         try:
             import trafilatura
-            tmeta = trafilatura.extract_metadata(html, default_url=str(url or "") or None)
+            # extensive=False: the extensive date search hands every date-like
+            # string to dateparser, which compiled regexes for every language
+            # (measured 26s of CPU for one page). The date is never used here.
+            tmeta = trafilatura.extract_metadata(
+                html, default_url=str(url or "") or None, extensive=False
+            )
             if tmeta is not None:
                 extra = {
                     "author": _clean(getattr(tmeta, "author", "")),
@@ -250,6 +261,18 @@ def enrich_stored_article(article_id, html, url: str = "") -> bool:
     """
     aid = _clean(article_id)
     if not aid or not str(html or "").strip():
+        return False
+    # Hosted-provider articles have no local row; don't parse the page for them.
+    try:
+        from core.db import get_connection
+        conn = get_connection()
+        try:
+            if not conn.execute("SELECT 1 FROM articles WHERE id = ?", (aid,)).fetchone():
+                return False
+        finally:
+            conn.close()
+    except Exception:
+        log.debug("Article metadata lookup failed for %s", aid, exc_info=True)
         return False
     meta = extract_page_metadata(html, url)
     found_tags = list(meta.get("tags") or [])
@@ -296,3 +319,13 @@ def enrich_stored_article(article_id, html, url: str = "") -> bool:
     except Exception:
         log.debug("Article metadata enrichment failed for %s", aid, exc_info=True)
         return False
+
+
+def enrich_stored_article_async(article_id, html, url: str = "") -> None:
+    """Queue :func:`enrich_stored_article` on the shared background worker."""
+    if not _clean(article_id) or not str(html or "").strip():
+        return
+    try:
+        _executor.submit(enrich_stored_article, article_id, html, url)
+    except Exception:
+        pass

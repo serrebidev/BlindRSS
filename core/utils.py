@@ -15,6 +15,7 @@ import socket
 import threading
 import time
 import xml.etree.ElementTree as ET
+from collections import OrderedDict
 from collections.abc import Mapping
 from bs4 import BeautifulSoup as BS
 from datetime import datetime, timezone, timedelta
@@ -2810,3 +2811,37 @@ def launch_open_command(template, url):
         return False, f"Command not found: {argv[0]}"
     except OSError as exc:
         return False, str(exc)
+
+
+class LRUDict(OrderedDict):
+    """dict that keeps only the ``maxlen`` most recently written or read keys.
+
+    For session caches (rendered full text, rich HTML) that otherwise grew for
+    as long as the app stayed open in the tray. Written from worker threads and
+    read on the UI thread, hence the lock.
+    """
+
+    def __init__(self, maxlen: int, *args, **kwargs):
+        self.maxlen = max(1, int(maxlen))
+        self._lru_lock = threading.RLock()
+        super().__init__(*args, **kwargs)
+
+    def __setitem__(self, key, value):
+        with self._lru_lock:
+            super().__setitem__(key, value)
+            self.move_to_end(key)
+            while len(self) > self.maxlen:
+                self.popitem(last=False)
+
+    def __getitem__(self, key):
+        with self._lru_lock:
+            value = super().__getitem__(key)
+            self.move_to_end(key)
+            return value
+
+    def get(self, key, default=None):
+        with self._lru_lock:
+            try:
+                return self[key]
+            except KeyError:
+                return default
