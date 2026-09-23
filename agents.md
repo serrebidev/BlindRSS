@@ -24,8 +24,13 @@
 ## Build & Release
 You should not need to open `build.bat`/`build.sh` to cut a release — everything operational is here. `build.md` has the long-form prose and the full env-var list.
 
-### Ship a release (one canonical path)
+### Ship a release (two supported paths)
 - Run `.\build.bat release` on this Windows machine. It bumps the version, builds and signs Windows locally, publishes the GitHub release with the Windows assets, builds Linux in an Ubuntu 22.04 Docker container over SSH on `root@serrebiradio.com`, copies back and uploads the self-contained Linux tarball + manifest, then dispatches GitHub Actions for macOS only.
+- **Cloud path (cloud agents, or any machine without the Windows host): `.github/workflows/cloud-release.yml`.** Everything runs on GitHub-hosted runners. `gh workflow run cloud-release.yml -f dry_run=true` builds Windows (signed), macOS and Linux as workflow artifacts and pushes, tags and publishes nothing — run it first after touching the build. `gh workflow run cloud-release.yml -f dry_run=false` is a real release. Watch it with `gh run watch <id> --exit-status`.
+  - `prepare` (ubuntu): refuses to run off `main`, with no commits since the last tag, when the next tag already exists, or when ANY draft release exists; then runs the same `tools/release.py` next-version/bump-version/write-notes/update-changelog as `build.bat`, commits `Release vX.Y.Z` as github-actions[bot], pushes commit + annotated tag atomically, and creates a **draft** release. `build` calls `cross-platform-release.yml` (now also `workflow_call`, with `ref` and `publish_assets` inputs) with `secrets: inherit`. `publish` requires all seven assets (Windows ZIP/installer/manifest, Linux tarball/manifest, macOS ZIP/manifest), then `--draft=false --latest`, then checks `/releases/latest`. The draft window is why the updater never sees a partial release.
+  - Windows CI signs with the `WINDOWS_CODESIGN_PFX`/`WINDOWS_CODESIGN_PASSWORD` repo secrets and then `Get-AuthenticodeSignature` must report Valid for the exe and installer: `build.bat build` only WARNS and skips signing when signtool is missing. The Windows manifest gets the same notes summary as `build.bat` (regenerated from the previous tag).
+  - A failed build after `prepare` leaves the pushed tag and the draft: re-run the failed jobs of the SAME run (`gh run rerun <id> --failed`). Do not start a new run (it refuses while the draft exists) and never auto-delete the release. The commit is pushed by `GITHUB_TOKEN`, so it does not trigger the push-to-main validation build. Guard: `tests/test_cloud_release_workflow.py`.
+- Do not run both paths at once: `build.bat release` and the cloud workflow both bump from the latest tag.
 - Do not hand-edit the version, tag manually, or run `gh release create` yourself. `./build.sh release` without a tag is intentionally rejected. `./build.sh release vX.Y.Z` is only for re-dispatching the macOS asset onto an EXISTING release.
 
 ### `build.bat` modes (Windows)
@@ -427,7 +432,7 @@ Casting is Caster's code (github.com/serrebidev/Caster), not a re-implementation
 - BlindRSS is accessibility-first. A fix that works visually but regresses NVDA, JAWS, or VoiceOver is not done.
 - Do not block startup with network, dependency checks, yt-dlp extractor loading, translation, full-text extraction, or media probing. Use background workers and marshal GUI changes with `wx.CallAfter`.
 - Do not write mutable runtime data into Program Files installed builds. Installed Windows data goes to `%APPDATA%\BlindRSS`; runtime-managed `yt-dlp.exe` goes to `%LOCALAPPDATA%\BlindRSS\bin`; episode downloads default to `Downloads\BlindRSS`.
-- Do not invent new release steps. `.\build.bat release` is the release process.
+- Do not invent new release steps. `.\build.bat release` and `cloud-release.yml` are the release processes.
 - Do not trust one provider shape. Local feeds, Miniflux, Inoreader, The Old Reader, and BazQux have different article IDs, chapter APIs, category behavior, and favorite support.
 - Do not replace fuller feed/article text with a shorter scrape, translation failure, or bot-interstitial page.
 - Do not add broad synchronous loops in the UI thread. Batch DB reads (`get_chapters_batch`), cap prefetch/enrichment work, and keep provider refreshes bounded.
@@ -441,7 +446,7 @@ Casting is Caster's code (github.com/serrebidev/Caster), not a re-implementation
 5. Naming: app name is **BlindRSS**.
 6. Timeouts: all provider HTTP requests must set finite timeouts.
 7. Inoreader OAuth: HTTPS localhost redirect URIs may require pasted redirect URL flow; validate `state`.
-8. Releases: cut every official release with `.\build.bat release` on Windows; never hand-pick the version or tag. Full mechanics and the publish/Latest guards are in **Build & Release** above.
+8. Releases: cut every official release with `.\build.bat release` on Windows or `cloud-release.yml` on GitHub runners; never hand-pick the version or tag. Full mechanics and the publish/Latest guards are in **Build & Release** above.
 9. Release publication: a release MUST end up published and Latest or the updater never sees it. Do not remove the `build.bat release` guards (`--draft=false --latest`, no-drafts check, `/releases/latest` verify) or auto-delete releases. See **Build & Release** > Updater visibility.
 10. Tests: add/extend tests in `tests/` for behavior changes and regressions.
 11. Secrets: never print, log, commit, or include API keys/cookies/Authorization headers in tests or diagnostics.

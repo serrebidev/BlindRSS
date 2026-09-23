@@ -20,6 +20,39 @@ on:
         required: false
         default: true
         type: boolean
+      publish_assets:
+        description: Upload assets and manifests to the release (off = workflow artifacts only)
+        required: false
+        default: true
+        type: boolean
+  # cloud-release.yml calls this after it has tagged a draft release.
+  workflow_call:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+      ref:
+        description: Git ref to build (defaults to release_tag; a dry run passes a commit SHA)
+        required: false
+        default: ""
+        type: string
+      build_windows:
+        required: false
+        default: true
+        type: boolean
+      build_linux:
+        required: false
+        default: true
+        type: boolean
+      publish_assets:
+        required: false
+        default: true
+        type: boolean
+    secrets:
+      WINDOWS_CODESIGN_PFX:
+        required: false
+      WINDOWS_CODESIGN_PASSWORD:
+        required: false
 
 permissions:
   contents: write
@@ -38,7 +71,7 @@ jobs:
       - name: Check out release tag
         uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.release_tag }}
+          ref: ${{ inputs.ref || inputs.release_tag }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -76,6 +109,17 @@ jobs:
           SIGNTOOL_PATH: ${{ steps.signtool.outputs.path }}
         run: .\build.bat build
 
+      # build.bat build skips signing with only a warning when signtool is
+      # missing; a CI release must never ship an unsigned exe or installer.
+      - name: Verify Authenticode signatures
+        run: |
+          $version = "${{ inputs.release_tag }}".TrimStart('v')
+          foreach ($f in @("dist\BlindRSS\BlindRSS.exe", "dist\BlindRSS-Setup-v$version.exe")) {
+            $sig = Get-AuthenticodeSignature $f
+            if ($sig.Status -ne 'Valid') { throw "$f signature is $($sig.Status)" }
+            "$f signed by $($sig.SignerCertificate.Subject)"
+          }
+
       - name: Compute checksums and write update manifest
         id: manifest
         run: |
@@ -85,6 +129,11 @@ jobs:
           $zipSha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
           $installerSha = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
           $thumbprint = (Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Select-Object -First 1).Thumbprint
+          # Same notes summary build.bat puts in the manifest.
+          $prevTag = (git describe --tags --abbrev=0 "HEAD^" 2>$null)
+          $summary = Join-Path $env:RUNNER_TEMP "notes-summary.txt"
+          .venv\Scripts\python.exe tools\release.py write-notes --from-tag "$prevTag" --to-tag "${{ inputs.release_tag }}" `
+            --output (Join-Path $env:RUNNER_TEMP "notes.md") --summary-output $summary | Out-Null
           .venv\Scripts\python.exe tools\release.py write-manifest `
             --version-tag "${{ inputs.release_tag }}" `
             --asset-name (Split-Path $zip -Leaf) `
@@ -92,7 +141,8 @@ jobs:
             --installer-asset-name (Split-Path $installer -Leaf) `
             --installer-sha256 $installerSha `
             --output dist\BlindRSS-update.json `
-            --signing-thumbprint $thumbprint
+            --signing-thumbprint $thumbprint `
+            --notes-summary-file $summary
           "zip=$zip" >> $env:GITHUB_OUTPUT
           "installer=$installer" >> $env:GITHUB_OUTPUT
 
@@ -106,6 +156,7 @@ jobs:
             dist/BlindRSS-update.json
 
       - name: Upload release assets
+        if: ${{ inputs.publish_assets }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -118,7 +169,7 @@ jobs:
       - name: Check out release tag
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref || inputs.release_tag) || github.sha }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -147,17 +198,17 @@ jobs:
           path: dist/BlindRSS-macos-*.zip
 
       - name: Upload release asset
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-macos-*.zip --clobber
 
       - name: Publish macOS update manifest
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ASSET="$(ls dist/BlindRSS-macos-*.zip | head -n1)"
+          ASSETS=(dist/BlindRSS-macos-*.zip); ASSET="${ASSETS[0]}"
           ASSET_NAME="$(basename "$ASSET")"
           SHA="$(shasum -a 256 "$ASSET" | awk '{print $1}')"
           python tools/release.py write-manifest \
@@ -175,7 +226,7 @@ jobs:
       - name: Check out release tag
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && (inputs.ref || inputs.release_tag) || github.sha }}
           fetch-depth: 0
 
       - name: Set up Python
@@ -209,17 +260,17 @@ jobs:
           path: dist/BlindRSS-linux-*.tar.gz
 
       - name: Upload release asset
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-linux-*.tar.gz --clobber
 
       - name: Publish Linux update manifest
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ASSET="$(ls dist/BlindRSS-linux-*.tar.gz | head -n1)"
+          ASSETS=(dist/BlindRSS-linux-*.tar.gz); ASSET="${ASSETS[0]}"
           ASSET_NAME="$(basename "$ASSET")"
           SHA="$(sha256sum "$ASSET" | awk '{print $1}')"
           python tools/release.py write-manifest \

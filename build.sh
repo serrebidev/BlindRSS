@@ -374,6 +374,7 @@ dispatch_macos_release() {
   if [[ -z "$release_tag" ]]; then
     echo "[X] ./build.sh release requires an existing GitHub release tag."
     echo "[X] Usage: ./build.sh release vX.Y.Z"
+    echo "[X] For a full release from this machine, use GitHub runners: gh workflow run cloud-release.yml -f dry_run=false"
     exit 1
   fi
   if ! command -v gh >/dev/null 2>&1; then
@@ -455,12 +456,12 @@ if [[ "$MODE" == "dry-run" ]]; then
   if [[ "$PLATFORM_ID" == "macos" ]]; then
     echo "[Dry Run] Would prepare .venv, install dependencies, compile translations, bundle yt-dlp, deno, ffmpeg, and macOS VLC assets."
     echo "[Dry Run] Would ad-hoc sign dist/BlindRSS.app and zip it to dist/BlindRSS-macos-v<version>.zip"
-    echo "[Dry Run] Official releases start on Windows with build.bat release."
+    echo "[Dry Run] Official releases: build.bat release on Windows, or gh workflow run cloud-release.yml on GitHub runners."
     echo "[Dry Run] ./build.sh release <tag> re-dispatches only the macOS asset build for an existing tag."
   else
     echo "[Dry Run] Would prepare .venv, install dependencies, compile translations, bundle yt-dlp, deno, ffmpeg, and Linux VLC assets."
     echo "[Dry Run] Would build dist/BlindRSS/ and tar it to dist/BlindRSS-linux-v<version>.tar.gz"
-    echo "[Dry Run] Official releases start on Windows with build.bat release."
+    echo "[Dry Run] Official releases: build.bat release on Windows, or gh workflow run cloud-release.yml on GitHub runners."
     echo "[Dry Run] ./build.sh release <tag> re-dispatches only the macOS asset build for an existing tag."
   fi
   exit 0

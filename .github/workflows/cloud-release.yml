@@ -1,0 +1,172 @@
+name: Cloud Release
+
+# Full release on GitHub-hosted runners, for cloud agents or any machine without
+# the Windows release host. Same versioning, notes and changelog as
+# `build.bat release` (tools/release.py); Windows is signed from the
+# WINDOWS_CODESIGN_PFX/PASSWORD secrets. The release stays a draft until every
+# platform's assets and manifests are uploaded, so the updater never sees a
+# partial release.
+#
+#   gh workflow run cloud-release.yml -f dry_run=true    # build all, publish nothing
+#   gh workflow run cloud-release.yml -f dry_run=false   # real release
+#
+# A failed build leaves the tag and the draft in place: re-run the failed jobs
+# of the same run. Never delete a release automatically.
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Build every platform as workflow artifacts without pushing, tagging or publishing
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: blindrss-release
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Version, notes, tag and draft release
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.plan.outputs.release_tag }}
+      build_ref: ${{ steps.plan.outputs.build_ref }}
+    steps:
+      - name: Require main
+        if: ${{ github.ref != 'refs/heads/main' }}
+        run: |
+          echo "::error::Cloud releases run from main only (got ${{ github.ref }})."
+          exit 1
+
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Compute next version
+        id: version
+        run: |
+          python tools/release.py next-version | tee -a "$GITHUB_OUTPUT"
+          python tools/release.py current-version | tee -a "$GITHUB_OUTPUT"
+
+      - name: Refuse an empty or conflicting release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LATEST_TAG: ${{ steps.version.outputs.LATEST_TAG }}
+          NEXT_TAG: ${{ steps.version.outputs.NEXT_TAG }}
+        run: |
+          if [ -n "$LATEST_TAG" ] && [ "$(git rev-list --count "$LATEST_TAG..HEAD")" = "0" ]; then
+            echo "::error::No commits since $LATEST_TAG; nothing to release."
+            exit 1
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$NEXT_TAG" >/dev/null; then
+            echo "::error::Tag $NEXT_TAG already exists."
+            exit 1
+          fi
+          drafts="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '[.[] | select(.draft) | .tag_name] | join(" ")')"
+          if [ -n "$drafts" ]; then
+            echo "::error::Unpublished draft release(s) exist: $drafts. Publish or delete them by exact tag first."
+            exit 1
+          fi
+
+      - name: Bump version, write notes and changelog
+        env:
+          LATEST_TAG: ${{ steps.version.outputs.LATEST_TAG }}
+          NEXT_TAG: ${{ steps.version.outputs.NEXT_TAG }}
+          NEXT_VERSION: ${{ steps.version.outputs.NEXT_VERSION }}
+        run: |
+          mkdir -p dist
+          python tools/release.py bump-version --version "$NEXT_VERSION"
+          python tools/release.py write-notes --from-tag "$LATEST_TAG" --to-tag "$NEXT_TAG" \
+            --output "dist/release-notes-$NEXT_TAG.md" --summary-output dist/notes-summary.txt
+          python tools/release.py update-changelog --version-tag "$NEXT_TAG" \
+            --notes-file "dist/release-notes-$NEXT_TAG.md" --output CHANGELOG.md
+          git --no-pager diff --stat
+          cat "dist/release-notes-$NEXT_TAG.md"
+
+      - name: Commit, tag and create draft release
+        if: ${{ !inputs.dry_run }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          NEXT_TAG: ${{ steps.version.outputs.NEXT_TAG }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add core/version.py CHANGELOG.md
+          git commit -m "Release $NEXT_TAG"
+          git tag -a "$NEXT_TAG" -m "Release $NEXT_TAG"
+          git push --atomic origin HEAD:main "refs/tags/$NEXT_TAG"
+          gh release create "$NEXT_TAG" --draft --verify-tag --title "$NEXT_TAG" \
+            --notes-file "dist/release-notes-$NEXT_TAG.md"
+
+      - name: Plan build
+        id: plan
+        env:
+          NEXT_TAG: ${{ steps.version.outputs.NEXT_TAG }}
+          CURRENT_VERSION: ${{ steps.version.outputs.CURRENT_VERSION }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          if [ "$DRY_RUN" = "true" ]; then
+            # Nothing was committed: build main as-is, named by its current version.
+            echo "release_tag=v$CURRENT_VERSION" >> "$GITHUB_OUTPUT"
+            echo "build_ref=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_tag=$NEXT_TAG" >> "$GITHUB_OUTPUT"
+            echo "build_ref=$NEXT_TAG" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Build
+    needs: prepare
+    uses: ./.github/workflows/cross-platform-release.yml
+    with:
+      release_tag: ${{ needs.prepare.outputs.release_tag }}
+      ref: ${{ needs.prepare.outputs.build_ref }}
+      build_windows: true
+      build_linux: true
+      publish_assets: ${{ !inputs.dry_run }}
+    secrets: inherit
+
+  publish:
+    name: Verify assets and publish as Latest
+    needs: [prepare, build]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.prepare.outputs.release_tag }}
+    steps:
+      - name: Verify every platform uploaded its assets
+        run: |
+          v="${TAG#v}"
+          have="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          missing=0
+          for want in "BlindRSS-v$v.zip" "BlindRSS-Setup-v$v.exe" BlindRSS-update.json \
+                      "BlindRSS-linux-v$v.tar.gz" BlindRSS-update-linux.json \
+                      "BlindRSS-macos-v$v.zip" BlindRSS-update-macos.json; do
+            if ! grep -qxF "$want" <<<"$have"; then echo "::error::Missing asset $want"; missing=1; fi
+          done
+          [ "$missing" = 0 ]
+
+      - name: Publish as Latest
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+      - name: Verify the updater will see it
+        run: |
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          if [ "$latest" != "$TAG" ]; then
+            echo "::error::/releases/latest is $latest, expected $TAG"
+            exit 1
+          fi
+          echo "Published $TAG as Latest."
