@@ -4311,6 +4311,7 @@ def _fetch_youtube_listing_items(listing_url: str, max_items, timeout_s, cookief
 
     base_cmd = [
         _resolve_ytdlp_cli_path(),
+        "--ignore-config",
         "--dump-json",
         "--flat-playlist",
         "--ignore-errors",
@@ -4348,7 +4349,7 @@ def _fetch_youtube_listing_items(listing_url: str, max_items, timeout_s, cookief
             res = subprocess.run(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 stdin=subprocess.DEVNULL,
                 creationflags=creationflags,
                 startupinfo=startupinfo,
@@ -4357,15 +4358,22 @@ def _fetch_youtube_listing_items(listing_url: str, max_items, timeout_s, cookief
                 encoding="utf-8",
                 errors="replace",
             )
-        except subprocess.TimeoutExpired:
-            failures.append("yt-dlp search timed out")
-            return False, ""
+        except subprocess.TimeoutExpired as exc:
+            detail = exc.stderr or ""
+            if isinstance(detail, bytes):
+                detail = detail.decode("utf-8", errors="replace")
+            failures.append(f"yt-dlp search timed out: {detail.strip()[-1000:]}")
+            output = exc.stdout or ""
+            if isinstance(output, bytes):
+                output = output.decode("utf-8", errors="replace")
+            return False, output
         except Exception as exc:
             failures.append(f"yt-dlp search failed: {exc}")
             return False, ""
         if res.returncode != 0:
-            failures.append(f"yt-dlp search exited with status {res.returncode}")
-            return False, ""
+            detail = str(getattr(res, "stderr", "") or "").strip()[-1000:]
+            failures.append(detail or f"yt-dlp search exited with status {res.returncode}")
+            return False, res.stdout or ""
         return True, res.stdout or ""
 
     uploader: list[str] = []
@@ -4420,36 +4428,39 @@ def _fetch_youtube_listing_items(listing_url: str, max_items, timeout_s, cookief
             )
         return out
 
-    # Public listings should not wait for every browser's cookie decryption.
-    # Keep an explicitly configured cookie file first for authenticated listings.
-    attempts: list[tuple[str | None, str | None]] = []
-    if cookiefile and os.path.isfile(cookiefile):
-        attempts.append((None, cookiefile))
-    attempts.append((None, None))
-    try:
-        for src in get_ytdlp_cookie_sources("https://www.youtube.com/"):
+    def _attempts():
+        # Public feeds must work even with a stale imported cookie jar. Ignore
+        # external yt-dlp config too, so this first request is truly anonymous.
+        yield None, None
+        if cookiefile and os.path.isfile(cookiefile):
+            yield None, cookiefile
+        try:
+            sources = get_ytdlp_cookie_sources("https://www.youtube.com/")
+        except Exception:
+            sources = []
+        seen = set()
+        for src in sources:
             arg = cookie_arg_for_ytdlp(src)
-            attempt = (arg, None)
-            if arg and attempt not in attempts:
-                attempts.append(attempt)
-    except Exception:
-        pass
+            if arg and arg not in seen:
+                seen.add(arg)
+                yield arg, None
+
     had_successful_attempt = False
-    for cookie_value, attempt_cookiefile in attempts:
+    for cookie_value, attempt_cookiefile in _attempts():
         succeeded, stdout = _run(
             cookie_value=cookie_value,
             cookiefile=attempt_cookiefile,
         )
-        if not succeeded:
-            continue
-        had_successful_attempt = True
+        had_successful_attempt = had_successful_attempt or succeeded
+        # A later page can fail after complete JSON entries have arrived. Keep
+        # those videos; the parser skips any interrupted final JSON line.
         items = _parse(stdout)
         if items:
             return (uploader[0] if uploader else None, items)
 
     if had_successful_attempt:
         return (None, [])
-    detail = failures[-1] if failures else "yt-dlp search did not run"
+    detail = "; ".join(dict.fromkeys(failures)) if failures else "yt-dlp search did not run"
     raise RuntimeError(f"YouTube search failed: {detail}")
 
 

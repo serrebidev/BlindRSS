@@ -78,6 +78,52 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
         self.assertIsNone(title)
         self.assertEqual(items, [])
 
+    def test_public_channel_does_not_wait_for_configured_cookies(self):
+        def fake_run(cmd, **kwargs):
+            if "--cookies" in cmd or "--cookies-from-browser" in cmd:
+                raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+            self.assertIn("--ignore-config", cmd)
+            return types.SimpleNamespace(
+                returncode=0, stdout=json.dumps({"id": "public", "title": "Public video"}), stderr=""
+            )
+
+        with patch("core.discovery.os.path.isfile", return_value=True), patch(
+            "core.discovery.get_ytdlp_cookie_sources", return_value=[("firefox",)]
+        ) as cookie_sources, patch("core.discovery.subprocess.run", side_effect=fake_run), patch(
+            "core.discovery.time.monotonic", side_effect=[100.0, 100.0, 111.0, 111.0]
+        ):
+            _title, items = discovery.fetch_youtube_channel_items(
+                "UCfKWQxY7aTUw7YTrHY4apTw", cookiefile="cookies.txt", timeout_s=10
+            )
+        self.assertEqual([item.title for item in items], ["Public video"])
+        cookie_sources.assert_not_called()
+
+    def test_configured_cookies_still_recover_authenticated_listing(self):
+        def fake_run(cmd, **kwargs):
+            if "--cookies" in cmd:
+                self.assertEqual(cmd[cmd.index("--cookies") + 1], "cookies.txt")
+                return types.SimpleNamespace(returncode=0, stdout=json.dumps({"id": "private"}), stderr="")
+            return types.SimpleNamespace(returncode=1, stdout="", stderr="ERROR: Sign in required")
+
+        with patch("core.discovery.os.path.isfile", return_value=True), patch(
+            "core.discovery.get_ytdlp_cookie_sources", return_value=[]
+        ), patch("core.discovery.subprocess.run", side_effect=fake_run):
+            _title, items = discovery.fetch_youtube_channel_items(
+                "UCfKWQxY7aTUw7YTrHY4apTw", cookiefile="cookies.txt"
+            )
+        self.assertEqual([item.url for item in items], ["https://www.youtube.com/watch?v=private"])
+
+    def test_failure_preserves_ytdlp_diagnostic(self):
+        def fake_run(cmd, **kwargs):
+            stderr = "ERROR: Unable to connect to proxy" if kwargs["stderr"] == subprocess.PIPE else None
+            return types.SimpleNamespace(returncode=1, stdout="", stderr=stderr)
+
+        with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[]), patch(
+            "core.discovery.subprocess.run", side_effect=fake_run
+        ):
+            with self.assertRaisesRegex(RuntimeError, "Unable to connect to proxy"):
+                discovery.fetch_youtube_channel_items("UCfKWQxY7aTUw7YTrHY4apTw")
+
     def test_successful_empty_result_is_not_reported_as_failure(self):
         calls = {"count": 0}
 
@@ -127,6 +173,31 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
         ):
             with self.assertRaisesRegex(RuntimeError, "timed out"):
                 discovery.fetch_youtube_search_items("timeout", timeout_s=10)
+
+    def test_completed_entries_survive_timeout_or_later_listing_error(self):
+        output = json.dumps({"id": "complete", "title": "Already fetched"}) + '\n{"id": "incomplete'
+        for timed_out in (True, False):
+            with self.subTest(timed_out=timed_out):
+                def fake_run(cmd, **kwargs):
+                    if timed_out:
+                        raise subprocess.TimeoutExpired(cmd, 10, output=output.encode("utf-8"))
+                    return types.SimpleNamespace(returncode=1, stdout=output, stderr="ERROR: Next page failed")
+
+                with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[]), patch(
+                    "core.discovery.subprocess.run", side_effect=fake_run
+                ):
+                    _title, items = discovery.fetch_youtube_channel_items("UCfKWQxY7aTUw7YTrHY4apTw")
+                self.assertEqual([item.title for item in items], ["Already fetched"])
+
+    def test_timeout_keeps_diagnostic_before_retries(self):
+        with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[]), patch(
+            "core.discovery.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(
+                ["yt-dlp"], 10, stderr=b"ERROR: Connection refused; retrying"
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "timed out.*Connection refused"):
+                discovery.fetch_youtube_channel_items("UCfKWQxY7aTUw7YTrHY4apTw")
 
 
 class RumbleSearchNormalizationTests(unittest.TestCase):
@@ -297,6 +368,22 @@ class YoutubeChannelFeedFallbackTests(YoutubeSearchRefreshIntegrationTests):
         # The native RSS entry id, so a recovered feed does not duplicate it.
         self.assertEqual(rows, [("yt:video:1Cl8fSsiMJ8", "video/youtube")])
         self.assertEqual(title, "BUZZR")
+
+    def test_fallback_failure_is_saved_in_feed_errors(self):
+        import requests
+
+        resp = requests.Response()
+        resp.status_code = 404
+        resp.url = self.feed_url
+        with patch("providers.local.utils.safe_requests_get", return_value=resp), patch.object(
+            discovery, "fetch_youtube_channel_items", side_effect=RuntimeError("yt-dlp listing timed out")
+        ):
+            self.provider.refresh(force=True)
+
+        errors = self.db.get_feed_errors()
+        self.assertEqual(len(errors), 1)
+        self.assertIn("404", errors[0]["last_error"])
+        self.assertIn("yt-dlp listing timed out", errors[0]["last_error"])
 
 
 if __name__ == "__main__":

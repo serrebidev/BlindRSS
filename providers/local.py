@@ -3544,8 +3544,9 @@ class LocalProvider(RSSProvider):
                         cookiefile=(str(self.config.get("ytdlp_cookies_file", "") or "").strip() or None),
                     )
                 except Exception as yt_exc:
-                    log.info("YouTube channel fallback failed for %s: %s", feed_url, yt_exc)
-                    yt_items = []
+                    error_msg = f"{error_msg}; YouTube channel fallback failed: {yt_exc}"
+                    failure_cooldown_seconds = _TRANSIENT_FAILURE_COOLDOWN_SECONDS
+                    raise RuntimeError(error_msg) from yt_exc
                 if not yt_items:
                     raise last_exc
                 log.info(
