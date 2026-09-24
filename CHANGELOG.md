@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.137.6 - 2026-09-24
+
+- List YouTube channels through yt-dlp when their RSS feed fails.
+
 ## v1.137.5 - 2026-09-23
 
 - Update SeleniumBase to 4.54.11.
