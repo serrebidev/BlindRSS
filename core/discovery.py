@@ -4420,12 +4420,12 @@ def _fetch_youtube_listing_items(listing_url: str, max_items, timeout_s, cookief
             )
         return out
 
-    # A configured cookies.txt takes priority (works for Chromium ABE on Windows),
-    # then each detected browser's cookies (Brave first), then an anonymous request
-    # (reliable for public search; avoids per-browser decryption failures).
+    # Public listings should not wait for every browser's cookie decryption.
+    # Keep an explicitly configured cookie file first for authenticated listings.
     attempts: list[tuple[str | None, str | None]] = []
     if cookiefile and os.path.isfile(cookiefile):
         attempts.append((None, cookiefile))
+    attempts.append((None, None))
     try:
         for src in get_ytdlp_cookie_sources("https://www.youtube.com/"):
             arg = cookie_arg_for_ytdlp(src)
@@ -4434,8 +4434,6 @@ def _fetch_youtube_listing_items(listing_url: str, max_items, timeout_s, cookief
                 attempts.append(attempt)
     except Exception:
         pass
-    attempts.append((None, None))  # anonymous fallback
-
     had_successful_attempt = False
     for cookie_value, attempt_cookiefile in attempts:
         succeeded, stdout = _run(
