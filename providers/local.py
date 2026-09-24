@@ -2888,46 +2888,9 @@ class LocalProvider(RSSProvider):
             except Exception:
                 is_youtube_search = False
 
-            if is_youtube_search:
-                # YouTube search results have no native RSS; enumerate recent videos
-                # via yt-dlp (date-sorted) and store them as video/youtube articles so
-                # the existing yt-dlp playback path handles them.
-                from core import discovery as _disc
-                query = _disc.youtube_search_query(feed_url) or ""
-                try:
-                    max_items = int(self.config.get("youtube_search_max_items", 30))
-                except Exception:
-                    max_items = 30
-                max_items = max(1, min(100, max_items))
-
-                page_title = None
-                all_items = []
-                with limiter:
-                    last_exc = None
-                    attempts = retries + 1
-                    deadline = _per_feed_attempt_deadline(max(10, feed_timeout))
-                    for attempt in range(1, attempts + 1):
-                        try:
-                            page_title, all_items = _disc.fetch_youtube_search_items(
-                                query,
-                                max_items=max_items,
-                                timeout_s=float(max(10, feed_timeout)),
-                                cookiefile=(str(self.config.get("ytdlp_cookies_file", "") or "").strip() or None),
-                            )
-                            break
-                        except Exception as e:
-                            last_exc = e
-                            status = "error"
-                            error_msg = str(e)
-                            if attempt <= retries and time.monotonic() < deadline:
-                                if self._sleep_or_cancel_refresh(min(4, attempt), cancel_event):
-                                    return
-                                continue
-                            raise last_exc
-
-                if page_title:
-                    final_title = page_title
-
+            def _store_youtube_items(all_items, stable_video_ids=False):
+                # Shared by YouTube search feeds and the channel-feed fallback.
+                nonlocal new_items, entry_count
                 conn = get_connection()
                 try:
                     c = conn.cursor()
@@ -2956,12 +2919,21 @@ class LocalProvider(RSSProvider):
                             legacy_article_id = item.id
                             title = item.title or "No Title"
                             url = item.url or ""
-                            article_id = str(
-                                uuid.uuid5(
-                                    uuid.NAMESPACE_URL,
-                                    f"blindrss:youtube-search:{feed_id}:{url or legacy_article_id}",
+                            if stable_video_ids:
+                                # Same id the native RSS feed uses, so the two
+                                # sources never duplicate each other (issue #107).
+                                article_id = "yt:video:" + url.rsplit("=", 1)[-1]
+                                c.execute("SELECT feed_id FROM articles WHERE id = ?", (article_id,))
+                                owner = c.fetchone()
+                                if owner and owner[0] != feed_id:
+                                    article_id = f"{feed_id}:{article_id}"
+                            else:
+                                article_id = str(
+                                    uuid.uuid5(
+                                        uuid.NAMESPACE_URL,
+                                        f"blindrss:youtube-search:{feed_id}:{url or legacy_article_id}",
+                                    )
                                 )
-                            )
                             author = item.author or final_title or "YouTube"
                             raw_date = item.published or ""
                             date = utils.normalize_date(raw_date, title, "", url)
@@ -3018,6 +2990,48 @@ class LocalProvider(RSSProvider):
                         conn.close()
                     except Exception:
                         pass
+
+            if is_youtube_search:
+                # YouTube search results have no native RSS; enumerate recent videos
+                # via yt-dlp (date-sorted) and store them as video/youtube articles so
+                # the existing yt-dlp playback path handles them.
+                from core import discovery as _disc
+                query = _disc.youtube_search_query(feed_url) or ""
+                try:
+                    max_items = int(self.config.get("youtube_search_max_items", 30))
+                except Exception:
+                    max_items = 30
+                max_items = max(1, min(100, max_items))
+
+                page_title = None
+                all_items = []
+                with limiter:
+                    last_exc = None
+                    attempts = retries + 1
+                    deadline = _per_feed_attempt_deadline(max(10, feed_timeout))
+                    for attempt in range(1, attempts + 1):
+                        try:
+                            page_title, all_items = _disc.fetch_youtube_search_items(
+                                query,
+                                max_items=max_items,
+                                timeout_s=float(max(10, feed_timeout)),
+                                cookiefile=(str(self.config.get("ytdlp_cookies_file", "") or "").strip() or None),
+                            )
+                            break
+                        except Exception as e:
+                            last_exc = e
+                            status = "error"
+                            error_msg = str(e)
+                            if attempt <= retries and time.monotonic() < deadline:
+                                if self._sleep_or_cancel_refresh(min(4, attempt), cancel_event):
+                                    return
+                                continue
+                            raise last_exc
+
+                if page_title:
+                    final_title = page_title
+
+                _store_youtube_items(all_items)
 
                 return
 
@@ -3249,6 +3263,10 @@ class LocalProvider(RSSProvider):
                         feed_url,
                     )
 
+            try:
+                youtube_channel_id = _disc.youtube_channel_id_from_feed_url(feed_url)
+            except Exception:
+                youtube_channel_id = None
             with limiter:
                 last_exc = None
                 configured_retries = max(0, int(direct_fetch_retries or 0))
@@ -3512,7 +3530,35 @@ class LocalProvider(RSSProvider):
                                 canonical_feed_url = str(resp.url)
                                 feed_metadata_changed = True
                             break
+                        if youtube_channel_id:
+                            break
                         raise last_exc
+
+            if youtube_channel_id and status == "error":
+                # Issue #107: YouTube's feeds/videos.xml answers 404/500 at random
+                # for some channels. List the channel's Videos tab instead.
+                try:
+                    yt_title, yt_items = _disc.fetch_youtube_channel_items(
+                        youtube_channel_id,
+                        timeout_s=float(max(10, feed_timeout)),
+                        cookiefile=(str(self.config.get("ytdlp_cookies_file", "") or "").strip() or None),
+                    )
+                except Exception as yt_exc:
+                    log.info("YouTube channel fallback failed for %s: %s", feed_url, yt_exc)
+                    yt_items = []
+                if not yt_items:
+                    raise last_exc
+                log.info(
+                    "YouTube channel feed failed (%s); used yt-dlp listing with %s items: %s",
+                    error_msg, len(yt_items), feed_url,
+                )
+                status = "ok"
+                error_msg = None
+                failure_cooldown_seconds = None
+                if yt_title:
+                    final_title = yt_title
+                _store_youtube_items(yt_items, stable_video_ids=True)
+                return
 
             if status == "not_modified":
                 # A conditional request can still have followed a permanent

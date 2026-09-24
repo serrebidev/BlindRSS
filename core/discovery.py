@@ -4266,16 +4266,48 @@ def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float
     query = (query or "").strip()
     if not query:
         return (None, [])
+    # Use YouTube's own date-sorted search results URL (sp=CAI%3D == "Sort by upload
+    # date"). yt-dlp's `ytsearchdate` prefix is unreliable across versions, but the
+    # results URL is handled robustly by the YouTube tab extractor.
+    search_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}&sp=CAI%3D"
+    _uploader, items = _fetch_youtube_listing_items(search_url, max_items, timeout_s, cookiefile)
+    return (f"YouTube: {query}", items)
+
+
+def youtube_channel_id_from_feed_url(url: str) -> str | None:
+    """Return the channel id of a native ``feeds/videos.xml?channel_id=`` URL, or None."""
+    try:
+        parts = urlparse(url or "")
+    except Exception:
+        return None
+    if not _host_matches(parts.hostname or "", "youtube.com"):
+        return None
+    if (parts.path or "").rstrip("/").lower() != "/feeds/videos.xml":
+        return None
+    vals = parse_qs(parts.query or "").get("channel_id") or []
+    cid = (vals[0] if vals else "").strip()
+    return cid if re.fullmatch(r"UC[\w-]{22}", cid) else None
+
+
+def fetch_youtube_channel_items(channel_id: str, max_items: int = 30, timeout_s: float = 30.0, cookiefile: str | None = None):
+    """Enumerate a channel's newest uploads through yt-dlp (issue #107).
+
+    YouTube's own ``feeds/videos.xml`` endpoint answers 404/500 at random for
+    some channels, so refresh falls back to the channel's Videos tab.
+    Returns (channel_name_or_None, list[YoutubeSearchItem]).
+    """
+    listing_url = f"https://www.youtube.com/channel/{channel_id}/videos"
+    return _fetch_youtube_listing_items(listing_url, max_items, timeout_s, cookiefile)
+
+
+def _fetch_youtube_listing_items(listing_url: str, max_items, timeout_s, cookiefile):
+    """Flat-enumerate a YouTube listing page. Returns (uploader_or_None, items)."""
     try:
         total_timeout = max(0.1, float(timeout_s or 30.0))
     except (TypeError, ValueError):
         total_timeout = 30.0
     deadline = time.monotonic() + total_timeout
     n = max(1, min(100, int(max_items or 30)))
-    # Use YouTube's own date-sorted search results URL (sp=CAI%3D == "Sort by upload
-    # date"). yt-dlp's `ytsearchdate` prefix is unreliable across versions, but the
-    # results URL is handled robustly by the YouTube tab extractor.
-    search_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}&sp=CAI%3D"
 
     base_cmd = [
         _resolve_ytdlp_cli_path(),
@@ -4283,6 +4315,9 @@ def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float
         "--flat-playlist",
         "--ignore-errors",
         "--no-warnings",
+        # Flat listing entries carry no date; this derives one from "2 days ago".
+        "--extractor-args",
+        "youtubetab:approximate_date",
         "--playlist-end",
         str(n),
     ]
@@ -4304,7 +4339,7 @@ def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float
             cmd.extend(["--cookies", cookiefile])
         elif cookie_value:
             cmd.extend(["--cookies-from-browser", cookie_value])
-        cmd.append(search_url)
+        cmd.append(listing_url)
         remaining = deadline - time.monotonic()
         if remaining <= 0:
             failures.append("total search deadline expired")
@@ -4333,6 +4368,8 @@ def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float
             return False, ""
         return True, res.stdout or ""
 
+    uploader: list[str] = []
+
     def _parse(stdout: str) -> list[YoutubeSearchItem]:
         out: list[YoutubeSearchItem] = []
         seen_urls: set[str] = set()
@@ -4346,6 +4383,8 @@ def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float
                 continue
             if not isinstance(entry, dict):
                 continue
+            if not uploader and entry.get("playlist_uploader"):
+                uploader.append(str(entry["playlist_uploader"]).strip())
             entry_type = str(entry.get("_type") or "").strip().lower()
             if entry_type in ("channel", "playlist"):
                 continue
@@ -4408,10 +4447,10 @@ def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float
         had_successful_attempt = True
         items = _parse(stdout)
         if items:
-            return (f"YouTube: {query}", items)
+            return (uploader[0] if uploader else None, items)
 
     if had_successful_attempt:
-        return (f"YouTube: {query}", [])
+        return (None, [])
     detail = failures[-1] if failures else "yt-dlp search did not run"
     raise RuntimeError(f"YouTube search failed: {detail}")
 

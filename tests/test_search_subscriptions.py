@@ -248,5 +248,56 @@ class YoutubeSearchRefreshIntegrationTests(unittest.TestCase):
         self.assertTrue(any(row[1] == "Updated title" for row in rows))
 
 
+class YoutubeChannelFeedFallbackTests(YoutubeSearchRefreshIntegrationTests):
+    """Issue #107: YouTube's channel RSS answers 404/500 at random."""
+
+    def setUp(self):
+        super().setUp()
+        self.feed_url = "https://www.youtube.com/feeds/videos.xml?channel_id=UCNkETBwkARrGDx-G7P-jLJg"
+        conn = self.db.get_connection()
+        conn.execute("UPDATE feeds SET url = ?, title = ? WHERE id = ?", (self.feed_url, self.feed_url, self.feed_id))
+        conn.commit()
+        conn.close()
+
+    test_refresh_inserts_video_articles = None
+    test_overlapping_search_feeds_keep_separate_articles_and_refresh_metadata = None
+
+    def test_channel_id_detection(self):
+        self.assertEqual(discovery.youtube_channel_id_from_feed_url(self.feed_url), "UCNkETBwkARrGDx-G7P-jLJg")
+        self.assertIsNone(discovery.youtube_channel_id_from_feed_url("https://www.youtube.com/feeds/videos.xml?playlist_id=PL1"))
+        self.assertIsNone(discovery.youtube_channel_id_from_feed_url("https://example.com/feeds/videos.xml?channel_id=UCNkETBwkARrGDx-G7P-jLJg"))
+
+    def test_failed_channel_feed_falls_back_to_ytdlp_listing(self):
+        import requests
+
+        resp = requests.Response()
+        resp.status_code = 500
+        resp.url = self.feed_url
+        items = [
+            discovery.YoutubeSearchItem(
+                url="https://www.youtube.com/watch?v=1Cl8fSsiMJ8", title="Family Feud", author="BUZZR", published="2026-09-23"
+            )
+        ]
+        seen = []
+
+        def fake_channel(channel_id, max_items=30, timeout_s=30.0, cookiefile=None):
+            seen.append(channel_id)
+            return ("BUZZR", items)
+
+        with patch("providers.local.utils.safe_requests_get", return_value=resp), patch.object(
+            discovery, "fetch_youtube_channel_items", fake_channel
+        ):
+            self.provider.refresh(force=True)
+
+        conn = self.db.get_connection()
+        rows = conn.execute("SELECT id, media_type FROM articles WHERE feed_id = ?", (self.feed_id,)).fetchall()
+        title = conn.execute("SELECT title FROM feeds WHERE id = ?", (self.feed_id,)).fetchone()[0]
+        conn.close()
+        self.assertEqual(seen, ["UCNkETBwkARrGDx-G7P-jLJg"])
+        # The native RSS entry id, so a recovered feed does not duplicate it.
+        self.assertEqual(rows, [("yt:video:1Cl8fSsiMJ8", "video/youtube")])
+        self.assertEqual(title, "BUZZR")
+
+
 if __name__ == "__main__":
     unittest.main()
