@@ -40,6 +40,8 @@ from core.db import (
     claim_podcast_archive_scan,
     finish_podcast_archive_scan,
     reset_podcast_archive_scan,
+    youtube_history_due,
+    mark_youtube_history,
     article_is_outside_retention,
     retention_cutoff_date,
 )
@@ -90,6 +92,12 @@ _DISCOVERY_SUCCESS_CACHE_TTL_SECONDS = 86400.0
 _RETRYABLE_HTTP_STATUS_CODES = {408, 425, 429, 500, 502, 503, 504}
 _PERMANENT_FAILURE_COOLDOWN_SECONDS = 1800.0
 _TRANSIENT_FAILURE_COOLDOWN_SECONDS = 300.0
+# Issue #109: one-time full Videos-tab listing per YouTube channel feed.
+# ponytail: one backfill at a time app-wide, so a Takeout import of thousands of
+# channels spreads over refresh cycles instead of launching thousands of yt-dlps.
+_YOUTUBE_HISTORY_LOCK = threading.Lock()
+_YOUTUBE_HISTORY_MAX_ITEMS = 5000
+_YOUTUBE_HISTORY_TIMEOUT_S = 300.0
 # Upper bound for exponential retry backoff (issue #29): repeated failures back off
 # 1, 2, 4, 8s rather than hammering an unhappy/anti-bot server.
 _MAX_RETRY_BACKOFF_SECONDS = 8.0
@@ -2888,9 +2896,9 @@ class LocalProvider(RSSProvider):
             except Exception:
                 is_youtube_search = False
 
-            def _store_youtube_items(all_items, stable_video_ids=False):
+            def _store_youtube_items(all_items, stable_video_ids=False, history=False):
                 # Shared by YouTube search feeds and the channel-feed fallback.
-                nonlocal new_items, entry_count
+                nonlocal new_items, entry_count, content_changed
                 conn = get_connection()
                 try:
                     c = conn.cursor()
@@ -2970,10 +2978,13 @@ class LocalProvider(RSSProvider):
                                 "VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
                                 (article_id, feed_id, title, url, "", date, author, url, "video/youtube"),
                             )
-                            new_items += 1
-                            _record_new_article(
-                                article_id, title, author, url=url, media_url=url, media_type="video/youtube"
-                            )
+                            content_changed = True
+                            if not history:
+                                # Back catalogue is not news: no notification storm.
+                                new_items += 1
+                                _record_new_article(
+                                    article_id, title, author, url=url, media_url=url, media_type="video/youtube"
+                                )
 
                             if i % 5 == 0 or i == total_entries - 1:
                                 conn.commit()
@@ -3267,6 +3278,34 @@ class LocalProvider(RSSProvider):
                 youtube_channel_id = _disc.youtube_channel_id_from_feed_url(feed_url)
             except Exception:
                 youtube_channel_id = None
+            if (
+                youtube_channel_id
+                and youtube_history_due(feed_id)
+                and _YOUTUBE_HISTORY_LOCK.acquire(blocking=False)
+            ):
+                # Issue #109: the channel RSS carries only the newest 15 videos.
+                try:
+                    mark_youtube_history(feed_id, done=False)
+                    _hist_title, hist_items = _disc.fetch_youtube_channel_items(
+                        youtube_channel_id,
+                        max_items=_YOUTUBE_HISTORY_MAX_ITEMS,
+                        timeout_s=_YOUTUBE_HISTORY_TIMEOUT_S,
+                        cookiefile=(str(self.config.get("ytdlp_cookies_file", "") or "").strip() or None),
+                    )
+                    if hist_items:
+                        _store_youtube_items(hist_items, stable_video_ids=True, history=True)
+                        if not self._refresh_cancelled(cancel_event):
+                            mark_youtube_history(feed_id, done=True)
+                    log.info(
+                        "YouTube channel history listed %s videos id=%s url=%s",
+                        len(hist_items or []), feed_id, feed_url,
+                    )
+                except Exception as hist_exc:
+                    log.info("YouTube channel history listing failed id=%s: %s", feed_id, hist_exc)
+                finally:
+                    _YOUTUBE_HISTORY_LOCK.release()
+                if self._refresh_cancelled(cancel_event):
+                    return
             with limiter:
                 last_exc = None
                 configured_retries = max(0, int(direct_fetch_retries or 0))

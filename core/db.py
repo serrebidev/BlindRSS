@@ -359,6 +359,16 @@ def init_db():
             FOREIGN KEY(feed_id) REFERENCES feeds(id) ON DELETE CASCADE
         )''')
 
+        # Issue #109: YouTube's channel RSS lists only the newest 15 uploads.
+        # A channel feed lists its whole Videos tab once; this records that it
+        # happened (done=1) or when it last failed (retried a day later).
+        c.execute('''CREATE TABLE IF NOT EXISTS youtube_history_state (
+            feed_id TEXT PRIMARY KEY,
+            done INTEGER NOT NULL DEFAULT 0,
+            last_attempt REAL,
+            FOREIGN KEY(feed_id) REFERENCES feeds(id) ON DELETE CASCADE
+        )''')
+
         # Hosted services such as Miniflux do not expose an API for inserting
         # historical entries recovered from Wayback.  Keep those recovered
         # episodes in a provider/account-scoped sidecar and merge them into the
@@ -964,6 +974,33 @@ def reset_podcast_archive_scan(feed_id: str) -> None:
     conn = get_connection()
     try:
         conn.execute("DELETE FROM podcast_archive_state WHERE feed_id = ?", (str(feed_id),))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def youtube_history_due(feed_id: str, retry_after_s: float = 86400.0) -> bool:
+    """True when a YouTube channel feed still needs its one-time history listing."""
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT done, last_attempt FROM youtube_history_state WHERE feed_id = ?",
+            (str(feed_id),),
+        ).fetchone()
+    finally:
+        conn.close()
+    if not row:
+        return True
+    return not row[0] and time.time() - float(row[1] or 0) >= retry_after_s
+
+
+def mark_youtube_history(feed_id: str, done: bool) -> None:
+    conn = get_connection()
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO youtube_history_state (feed_id, done, last_attempt) VALUES (?, ?, ?)",
+            (str(feed_id), 1 if done else 0, time.time()),
+        )
         conn.commit()
     finally:
         conn.close()

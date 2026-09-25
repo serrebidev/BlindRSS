@@ -4270,7 +4270,7 @@ def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float
     # date"). yt-dlp's `ytsearchdate` prefix is unreliable across versions, but the
     # results URL is handled robustly by the YouTube tab extractor.
     search_url = f"https://www.youtube.com/results?search_query={quote_plus(query)}&sp=CAI%3D"
-    _uploader, items = _fetch_youtube_listing_items(search_url, max_items, timeout_s, cookiefile)
+    _uploader, items = _fetch_youtube_listing_items(search_url, min(100, max_items or 30), timeout_s, cookiefile)
     return (f"YouTube: {query}", items)
 
 
@@ -4307,7 +4307,7 @@ def _fetch_youtube_listing_items(listing_url: str, max_items, timeout_s, cookief
     except (TypeError, ValueError):
         total_timeout = 30.0
     deadline = time.monotonic() + total_timeout
-    n = max(1, min(100, int(max_items or 30)))
+    n = max(1, int(max_items or 30))
 
     base_cmd = [
         _resolve_ytdlp_cli_path(),

@@ -329,6 +329,8 @@ class YoutubeChannelFeedFallbackTests(YoutubeSearchRefreshIntegrationTests):
         conn.execute("UPDATE feeds SET url = ?, title = ? WHERE id = ?", (self.feed_url, self.feed_url, self.feed_id))
         conn.commit()
         conn.close()
+        # These tests cover the RSS failure fallback, not the issue #109 backfill.
+        self.db.mark_youtube_history(self.feed_id, done=True)
 
     test_refresh_inserts_video_articles = None
     test_overlapping_search_feeds_keep_separate_articles_and_refresh_metadata = None
@@ -384,6 +386,79 @@ class YoutubeChannelFeedFallbackTests(YoutubeSearchRefreshIntegrationTests):
         self.assertEqual(len(errors), 1)
         self.assertIn("404", errors[0]["last_error"])
         self.assertIn("yt-dlp listing timed out", errors[0]["last_error"])
+
+
+class YoutubeChannelHistoryTests(YoutubeChannelFeedFallbackTests):
+    """Issue #109: channel RSS has only 15 videos; list the whole Videos tab once."""
+
+    test_failed_channel_feed_falls_back_to_ytdlp_listing = None
+    test_fallback_failure_is_saved_in_feed_errors = None
+
+    def setUp(self):
+        super().setUp()
+        conn = self.db.get_connection()
+        conn.execute("DELETE FROM youtube_history_state")
+        conn.commit()
+        conn.close()
+
+    def _refresh(self, fake_channel):
+        import requests
+
+        resp = requests.Response()
+        resp.status_code = 304
+        resp.url = self.feed_url
+        states = []
+        with patch("providers.local.utils.safe_requests_get", return_value=resp), patch.object(
+            discovery, "fetch_youtube_channel_items", fake_channel
+        ):
+            self.provider.refresh(progress_cb=states.append, force=True)
+        return states
+
+    def test_history_listed_once_without_notifications(self):
+        calls = []
+
+        def fake_channel(channel_id, max_items=30, timeout_s=30.0, cookiefile=None):
+            calls.append(max_items)
+            return ("Chan", [
+                discovery.YoutubeSearchItem(
+                    url=f"https://www.youtube.com/watch?v=vid{i:08d}", title=f"Old {i}", author="Chan", published="2024-01-01"
+                )
+                for i in range(150)
+            ])
+
+        states = self._refresh(fake_channel)
+        self._refresh(fake_channel)
+
+        conn = self.db.get_connection()
+        count = conn.execute("SELECT COUNT(*) FROM articles WHERE feed_id = ?", (self.feed_id,)).fetchone()[0]
+        conn.close()
+        self.assertEqual(count, 150)
+        self.assertEqual(len(calls), 1)
+        self.assertGreater(calls[0], 100)
+        mine = [s for s in states if s.get("id") == self.feed_id]
+        self.assertTrue(mine and mine[-1]["content_changed"])
+        self.assertEqual(mine[-1]["new_items"], 0)
+
+    def test_failed_history_listing_is_retried_later(self):
+        def failing(*_args, **_kwargs):
+            raise RuntimeError("offline")
+
+        self._refresh(failing)
+        self.assertFalse(self.db.youtube_history_due(self.feed_id))
+        self.assertTrue(self.db.youtube_history_due(self.feed_id, retry_after_s=0))
+
+    def test_channel_listing_is_not_capped_at_100(self):
+        seen = {}
+
+        def fake_run(cmd, **kwargs):
+            seen["end"] = cmd[cmd.index("--playlist-end") + 1]
+            return types.SimpleNamespace(returncode=0, stdout=json.dumps({"id": "x"}), stderr="")
+
+        with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[]), patch(
+            "core.discovery.subprocess.run", side_effect=fake_run
+        ):
+            discovery.fetch_youtube_channel_items("UCNkETBwkARrGDx-G7P-jLJg", max_items=5000)
+        self.assertEqual(seen["end"], "5000")
 
 
 if __name__ == "__main__":
