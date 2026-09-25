@@ -4259,9 +4259,9 @@ def youtube_search_query(url: str) -> str | None:
 def fetch_youtube_search_items(query: str, max_items: int = 30, timeout_s: float = 30.0, cookiefile: str | None = None):
     """Enumerate recent YouTube videos for a search query, newest first.
 
-    Uses yt-dlp's ``ytsearchdate`` (date-sorted search) and a flat playlist dump so
-    we get lightweight entries without resolving every video. Returns
-    (feed_title, list[YoutubeSearchItem]).
+    Uses a flat playlist dump of YouTube's own date-sorted search results URL
+    (``sp=CAI%3D``) so we get lightweight entries without resolving every
+    video. Returns (feed_title, list[YoutubeSearchItem]).
     """
     query = (query or "").strip()
     if not query:
