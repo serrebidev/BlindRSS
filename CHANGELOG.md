@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v1.138.1 - 2026-09-25
+
+- List YouTube live streams in channel feeds again (#109).
+
 ## v1.138.0 - 2026-09-25
 
 - Load a YouTube channel's full video history once (#109).
