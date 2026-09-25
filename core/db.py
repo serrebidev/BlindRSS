@@ -991,7 +991,14 @@ def youtube_history_due(feed_id: str, retry_after_s: float = 86400.0) -> bool:
         conn.close()
     if not row:
         return True
-    return not row[0] and time.time() - float(row[1] or 0) >= retry_after_s
+    if row[0]:
+        # done=1 was the Videos-tab listing, which missed live streams: list again.
+        return row[0] < _YOUTUBE_HISTORY_DONE
+    return time.time() - float(row[1] or 0) >= retry_after_s
+
+
+# Bump to make every channel list its history once more after a listing change.
+_YOUTUBE_HISTORY_DONE = 2
 
 
 def mark_youtube_history(feed_id: str, done: bool) -> None:
@@ -999,7 +1006,7 @@ def mark_youtube_history(feed_id: str, done: bool) -> None:
     try:
         conn.execute(
             "INSERT OR REPLACE INTO youtube_history_state (feed_id, done, last_attempt) VALUES (?, ?, ?)",
-            (str(feed_id), 1 if done else 0, time.time()),
+            (str(feed_id), _YOUTUBE_HISTORY_DONE if done else 0, time.time()),
         )
         conn.commit()
     finally:

@@ -2422,7 +2422,11 @@ class LocalProvider(RSSProvider):
                             url = item.url or ""
                             author = item.author or final_title or "Odysee"
                             raw_date = item.published or ""
-                            date = utils.normalize_date(raw_date, title, "", url)
+                            # Live and upcoming streams carry no date in a listing;
+                            # without one they sorted as year 0001 at the very bottom.
+                            date = utils.normalize_date(
+                                raw_date or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), title, "", url
+                            )
                             if _article_matches_deleted_tombstone(
                                 deleted_article_ids,
                                 deleted_article_urls,
@@ -2728,6 +2732,8 @@ class LocalProvider(RSSProvider):
                             row = c.fetchone()
                             if row:
                                 existing_id, existing_date = row
+                                if not raw_date:
+                                    date = existing_date  # keep the date RSS gave it
                                 c.execute(
                                     "UPDATE articles SET title = ?, url = ?, content = ?, "
                                     "date = ?, author = ? WHERE id = ?",
@@ -2859,6 +2865,8 @@ class LocalProvider(RSSProvider):
                             row = c.fetchone()
                             if row:
                                 existing_id, existing_date = row
+                                if not raw_date:
+                                    date = existing_date  # keep the date RSS gave it
                                 c.execute(
                                     "UPDATE articles SET title = ?, url = ?, content = ?, date = ?, author = ? WHERE id = ?",
                                     (title, url, item.content or "", date, author, existing_id),
@@ -2944,7 +2952,11 @@ class LocalProvider(RSSProvider):
                                 )
                             author = item.author or final_title or "YouTube"
                             raw_date = item.published or ""
-                            date = utils.normalize_date(raw_date, title, "", url)
+                            # Live and upcoming streams carry no date in a listing;
+                            # without one they sorted as year 0001 at the very bottom.
+                            date = utils.normalize_date(
+                                raw_date or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), title, "", url
+                            )
                             if _article_matches_deleted_tombstone(
                                 deleted_article_ids,
                                 deleted_article_urls,
@@ -2962,6 +2974,8 @@ class LocalProvider(RSSProvider):
                             row = c.fetchone()
                             if row:
                                 existing_id, existing_date = row
+                                if not raw_date:
+                                    date = existing_date  # keep the date RSS gave it
                                 c.execute(
                                     "UPDATE articles SET title = ?, url = ?, date = ?, author = ?, "
                                     "media_url = ?, media_type = ? WHERE id = ?",
@@ -3165,7 +3179,11 @@ class LocalProvider(RSSProvider):
                             url = item.url or ""
                             author = item.author or final_title or "Rumble"
                             raw_date = item.published or ""
-                            date = utils.normalize_date(raw_date, title, "", url)
+                            # Live and upcoming streams carry no date in a listing;
+                            # without one they sorted as year 0001 at the very bottom.
+                            date = utils.normalize_date(
+                                raw_date or time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), title, "", url
+                            )
                             if _article_matches_deleted_tombstone(
                                 deleted_article_ids,
                                 deleted_article_urls,

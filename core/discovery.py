@@ -4293,10 +4293,12 @@ def fetch_youtube_channel_items(channel_id: str, max_items: int = 30, timeout_s:
     """Enumerate a channel's newest uploads through yt-dlp (issue #107).
 
     YouTube's own ``feeds/videos.xml`` endpoint answers 404/500 at random for
-    some channels, so refresh falls back to the channel's Videos tab.
+    some channels, so refresh falls back to a yt-dlp listing. It lists the
+    channel's uploads playlist (``UU`` + id), which holds exactly what the RSS
+    feed holds: videos, live streams and Shorts. The Videos tab left streams out.
     Returns (channel_name_or_None, list[YoutubeSearchItem]).
     """
-    listing_url = f"https://www.youtube.com/channel/{channel_id}/videos"
+    listing_url = f"https://www.youtube.com/playlist?list=UU{channel_id[2:]}"
     return _fetch_youtube_listing_items(listing_url, max_items, timeout_s, cookiefile)
 
 

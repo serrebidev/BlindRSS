@@ -8,6 +8,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 import types
 import unittest
 import subprocess
@@ -459,6 +460,51 @@ class YoutubeChannelHistoryTests(YoutubeChannelFeedFallbackTests):
         ):
             discovery.fetch_youtube_channel_items("UCNkETBwkARrGDx-G7P-jLJg", max_items=5000)
         self.assertEqual(seen["end"], "5000")
+
+    def test_channel_listing_uses_uploads_playlist_with_streams(self):
+        seen = {}
+
+        def fake_run(cmd, **kwargs):
+            seen["url"] = cmd[-1]
+            return types.SimpleNamespace(returncode=0, stdout=json.dumps({"id": "x"}), stderr="")
+
+        with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[]), patch(
+            "core.discovery.subprocess.run", side_effect=fake_run
+        ):
+            discovery.fetch_youtube_channel_items("UCNkETBwkARrGDx-G7P-jLJg")
+        # The Videos tab left live streams out; the uploads playlist has them.
+        self.assertEqual(seen["url"], "https://www.youtube.com/playlist?list=UUNkETBwkARrGDx-G7P-jLJg")
+
+    def test_old_videos_tab_history_is_listed_again(self):
+        conn = self.db.get_connection()
+        conn.execute(
+            "INSERT INTO youtube_history_state (feed_id, done, last_attempt) VALUES (?, 1, ?)",
+            (self.feed_id, time.time()),
+        )
+        conn.commit()
+        conn.close()
+        self.assertTrue(self.db.youtube_history_due(self.feed_id))
+        self.db.mark_youtube_history(self.feed_id, done=True)
+        self.assertFalse(self.db.youtube_history_due(self.feed_id))
+
+    def test_undated_live_stream_is_not_sorted_to_year_one(self):
+        live = discovery.YoutubeSearchItem(
+            url="https://www.youtube.com/watch?v=liveStream1", title="24/7 radio", author="Chan", published=None
+        )
+        self._refresh(lambda *a, **k: ("Chan", [live]))
+        conn = self.db.get_connection()
+        date = conn.execute("SELECT date FROM articles WHERE id = 'yt:video:liveStream1'").fetchone()[0]
+        conn.execute("UPDATE articles SET date = '2020-05-05 00:00:00' WHERE id = 'yt:video:liveStream1'")
+        conn.execute("DELETE FROM youtube_history_state")
+        conn.commit()
+        conn.close()
+        self.assertFalse(date.startswith("0001"))
+
+        self._refresh(lambda *a, **k: ("Chan", [live]))
+        conn = self.db.get_connection()
+        date = conn.execute("SELECT date FROM articles WHERE id = 'yt:video:liveStream1'").fetchone()[0]
+        conn.close()
+        self.assertEqual(date, "2020-05-05 00:00:00")
 
 
 if __name__ == "__main__":
