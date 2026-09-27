@@ -11,6 +11,7 @@ plus the original link instead of saving the block-page text as the article body
 import types
 
 import core.article_extractor as article_extractor
+import core.site_cookies as site_cookies
 import core.utils as utils
 
 
@@ -113,6 +114,46 @@ def test_fetch_page_proxy_recovers_blocked_page(monkeypatch):
     res = article_extractor._fetch_page("https://www.example.com/x")
     assert res.blocked is False
     assert "Hello world recovered content." in (res.html or "")
+
+
+def test_stale_clearance_retries_without_the_cookie(monkeypatch):
+    url = "https://www.theatlantic.com/story"
+    site_cookies.merge_records_into_jar([(
+        ".theatlantic.com", "TRUE", "/", "TRUE", "0", "cf_clearance", "stale"
+    )])
+    site_cookies.set_host_user_agent("theatlantic.com", "Mozilla/5.0 Firefox/152.0")
+    monkeypatch.setattr(utils, "CURL_CFFI_AVAILABLE", True)
+    monkeypatch.setattr(site_cookies, "refresh_clearance_from_browsers", lambda url: False)
+    for name in ("_download_via_jina", "_download_via_smry", "_download_via_wayback", "_download_via_browser"):
+        monkeypatch.setattr(article_extractor, name, lambda *args: None)
+
+    def fake_get(target, **kwargs):
+        if site_cookies.has_clearance_for(target) or not kwargs.get("impersonate"):
+            return _resp(403, CLOUDFLARE_GATE)
+        return _resp(200, REAL_ARTICLE)
+
+    monkeypatch.setattr(utils, "safe_requests_get", fake_get)
+    result = article_extractor._fetch_page(url)
+    assert "Anthropic" in (result.html or "")
+    assert not site_cookies.has_clearance_for(url)
+
+
+def test_failed_browser_fallback_is_shared_by_the_site(monkeypatch):
+    host = "https://forum.audiogames.net"
+    monkeypatch.setattr(article_extractor, "_BROWSER_GATE_FAILURES", {}, raising=False)
+    site_cookies.merge_records_into_jar([(
+        ".audiogames.net", "TRUE", "/", "TRUE", "0", "cf_clearance", "stale"
+    )])
+    monkeypatch.setattr(site_cookies, "refresh_clearance_from_browsers", lambda url: False)
+    monkeypatch.setattr(utils, "safe_requests_get", lambda *args, **kwargs: _resp(403, CLOUDFLARE_GATE))
+    for name in ("_download_via_impersonation", "_download_via_jina", "_download_via_smry", "_download_via_wayback"):
+        monkeypatch.setattr(article_extractor, name, lambda *args: None)
+    browser_calls = []
+    monkeypatch.setattr(article_extractor, "_download_via_browser", lambda *args: browser_calls.append(1))
+
+    assert article_extractor._fetch_page(host + "/topic/1").blocked
+    assert article_extractor._fetch_page(host + "/topic/2").blocked
+    assert len(browser_calls) == 1
 
 
 def test_bloomberg_fetch_tries_impersonation_first(monkeypatch):

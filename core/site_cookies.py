@@ -299,6 +299,41 @@ def has_clearance_for(url: str, *, now: float | None = None) -> bool:
     return any(_is_harvestable(name) for name in cookies_for(url, now=now))
 
 
+def forget_clearance_for(url: str) -> bool:
+    """Discard a rejected clearance without disturbing ordinary site cookies."""
+    try:
+        host = (urllib.parse.urlsplit(url).hostname or "").lower()
+    except ValueError:
+        return False
+    if not host:
+        return False
+    dest = jar_path()
+    with _write_lock:
+        records = _jar_records()
+        kept = [fields for fields in records if not (
+            _host_matches(host, _record_key(fields)[0],
+                          str(fields[0]).startswith(".") or str(fields[1]).upper() == "TRUE")
+            and _is_harvestable(fields[5])
+        )]
+        if len(kept) == len(records):
+            return False
+        fd, temp_path = tempfile.mkstemp(prefix="site-cookies-", suffix=".tmp", dir=os.path.dirname(dest))
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+                fh.write("# Netscape HTTP Cookie File\n")
+                for fields in kept:
+                    fh.write("\t".join(str(field) for field in fields) + "\n")
+            os.replace(temp_path, dest)
+        finally:
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+    _invalidate()
+    for domain in _load_host_user_agents():
+        if host == domain or host.endswith("." + domain):
+            set_host_user_agent(domain, "")
+    return True
+
+
 def user_agent_for(url: str, *, now: float | None = None) -> str:
     """The browser UA these cookies belong to, or "" when none should be forced.
 

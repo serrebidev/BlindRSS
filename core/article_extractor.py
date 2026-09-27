@@ -2983,6 +2983,7 @@ _SMRY_DATA_LINE_RE = re.compile(r"^data:\s*(\{.*)$", re.M)
 # A Chromium launch plus the page render needs far more headroom than an HTTP
 # fetch; matches core.config's browser_feed_fallback_timeout_seconds default.
 _BROWSER_FALLBACK_TIMEOUT_S = 90.0
+_BROWSER_GATE_FAILURES: dict[str, float] = {}
 
 _HTML_ACCEPT_HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
@@ -4015,10 +4016,14 @@ def _fetch_page(url: str, timeout: int = 20, encoding_override: str = "") -> _Fe
         return None
 
     def _try_fallbacks(*, gate_seen: bool) -> _FetchResult:
+        dropped_stale_clearance = False
         if gate_seen:
             recovered = _retry_with_refreshed_clearance()
             if recovered is not None:
                 return recovered
+            if _has_stored_clearance(url):
+                from core import site_cookies
+                dropped_stale_clearance = site_cookies.forget_clearance_for(url)
         if is_bloomberg_video and gate_seen:
             return _FetchResult(blocked=True)
         # Every fallback body is re-checked for interstitials so a gate served by the fallback
@@ -4026,25 +4031,30 @@ def _fetch_page(url: str, timeout: int = 20, encoding_override: str = "") -> _Fe
         candidates: List[Callable[[], Optional[str]]] = []
         if (urlsplit(url).hostname or "").lower() == "news.sky.com":
             candidates.append(lambda: _download_sky_via_google_translate(url, timeout))
-        if not tried_impersonation_first:
+        if not tried_impersonation_first or dropped_stale_clearance:
             candidates.append(lambda: _download_via_impersonation(url, timeout))
         if gate_seen:
             candidates.append(lambda: _download_via_jina(url, timeout))
         candidates.append(lambda: _download_via_smry(url, timeout))
         candidates.append(lambda: _download_via_wayback(url, timeout))
-        if gate_seen and not _has_stored_clearance(url):
+        host = (urlsplit(url).hostname or "").lower()
+        last_browser_failure = _BROWSER_GATE_FAILURES.get(host)
+        if (gate_seen and not _has_stored_clearance(url) and
+                (last_browser_failure is None or time.monotonic() - last_browser_failure > 600)):
             # Costly (serialized Chromium launch), so it is genuinely last and only
             # runs when a gate was actually seen: sites like nytimes.com refuse every
             # HTTP fallback above, and a real browser is the only way in.
             #
-            # Skipped when we hold a clearance for the host. That cookie exists
-            # because the site demands an interactive browser session, and the
-            # automated browser has been measured unable to win one there (both
-            # headless and headed). The per-URL cooldown does not help, since
-            # every article on such a site is a new URL — so each one paid a
-            # fresh ~40s launch to fail. Getting a current cookie is the fix,
-            # and _retry_with_refreshed_clearance above already tried that.
-            candidates.append(lambda: _download_via_browser(url, timeout))
+            # One failed launch covers the host for ten minutes; a per-URL
+            # cooldown would launch again for every article on the same site.
+            def browser_fallback():
+                body = _download_via_browser(url, timeout)
+                if not body or _looks_like_bot_interstitial(body):
+                    if len(_BROWSER_GATE_FAILURES) >= 256:
+                        _BROWSER_GATE_FAILURES.clear()
+                    _BROWSER_GATE_FAILURES[host] = time.monotonic()
+                return body
+            candidates.append(browser_fallback)
         for fetch in candidates:
             alt = fetch()
             if alt and not _looks_like_bot_interstitial(alt):

@@ -55,6 +55,21 @@ def test_harvested_ua_is_paired_with_the_cookie():
     assert site_cookies.user_agent_for(URL) == UA
 
 
+def test_forget_clearance_keeps_unrelated_cookies_and_sites():
+    expiry = str(int(time.time() + 3600))
+    site_cookies.merge_records_into_jar([
+        (".audiogames.net", "TRUE", "/", "TRUE", expiry, "cf_clearance", "stale"),
+        (".audiogames.net", "TRUE", "/", "TRUE", expiry, "session", "keep"),
+        (".example.com", "TRUE", "/", "TRUE", expiry, "cf_clearance", "other"),
+    ])
+    site_cookies.set_host_user_agent("audiogames.net", UA)
+
+    assert site_cookies.forget_clearance_for(URL)
+    assert site_cookies.cookies_for(URL) == {"session": "keep"}
+    assert site_cookies.user_agent_for(URL) == ""
+    assert site_cookies.cookies_for("https://example.com/") == {"cf_clearance": "other"}
+
+
 def test_harvested_ua_does_not_leak_to_other_sites():
     site_cookies.record_browser_session(
         URL, [Cookie("cf_clearance", "t", ".audiogames.net", expires=time.time() + 3600)], UA
