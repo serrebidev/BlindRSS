@@ -40,7 +40,7 @@ docker run --rm \
   --volume "$REPO_DIR:/src" \
   --workdir /src \
   "$IMAGE_NAME" \
-  bash -lc "uv venv --python 3.12 --seed .venv; .venv/bin/python -m pip install --only-binary=:all: https://extras.wxpython.org/wxPython4/extras/linux/gtk3/ubuntu-22.04/wxpython-4.2.5-cp312-cp312-linux_x86_64.whl; find . -path ./.venv -prune -o -path ./.git -prune -o -path ./build -prune -o -path ./dist -prune -o -name '*.py' -print0 | xargs -0 .venv/bin/python -W error::SyntaxWarning -m py_compile; printf 'wxPython==4.2.5\\n' > /tmp/blindrss-linux-constraints.txt; export PIP_CONSTRAINT=/tmp/blindrss-linux-constraints.txt; export PYTHONWARNINGS='ignore:invalid escape sequence:SyntaxWarning'; chmod +x build.sh; ./build.sh build"
+  bash -lc "set -e; uv venv --python 3.12 --seed .venv; find . -path ./.venv -prune -o -path ./.git -prune -o -path ./build -prune -o -path ./dist -prune -o -name '*.py' -print0 | xargs -0 .venv/bin/python -W error::SyntaxWarning -m py_compile; export PYTHONWARNINGS='ignore:invalid escape sequence:SyntaxWarning'; chmod +x build.sh; ./build.sh build"
 
 mapfile -t archives < <(
   find "$REPO_DIR/dist" -maxdepth 1 -type f -name 'BlindRSS-linux-v*.tar.gz' -print

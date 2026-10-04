@@ -1,64 +1,64 @@
-wxPython==4.2.5; sys_platform == "linux"
-wxPython; sys_platform != "linux"
+wxPython>=4.3.1; sys_platform == "linux"
+wxPython>=4.3.1; sys_platform != "linux"
 # Accessible wx.html2.WebView surfaces for the opt-in rich full-text reader
 # (renders links, embedded videos, and social posts; reads in NVDA/JAWS).
 wx-accessible-webview>=0.2.0
-pywin32; sys_platform == "win32"
+pywin32>=312; sys_platform == "win32"
 # Screen-reader speech + Braille output for key-event announcements (issue #67).
-accessible_output2
-feedparser
-requests
-beautifulsoup4
-yt-dlp[default]
+accessible_output2>=0.17
+feedparser>=6.0.14
+requests>=2.34.2
+beautifulsoup4>=4.15.0
+yt-dlp[default]>=2026.8.19
 # Independent YouTube extractor used only after yt-dlp fails and before the
 # invisible-browser fallback. BlindRSS reuses its bundled Deno runtime instead
 # of shipping pytubefix's 100+ MB nodejs-wheel-binaries executable.
-pytubefix>=10.11.0,<11
-python-dateutil
-mutagen
-python-vlc
+pytubefix>=11.2.0
+python-dateutil>=2.9.0.post0
+mutagen>=1.48.1
+python-vlc>=3.0.21203
 # Casting. The protocol clients are Caster's (tools/sync_caster.py); these
 # are the libraries they drive. soco is optional: without it Sonos speakers
 # simply do not appear.
-pychromecast>=14.0.0
-pyatv
-soco>=0.30.0
-trafilatura>=2.1.0
-Markdown>=3.10.2,<4
+pychromecast>=14.0.10
+pyatv>=0.18.0
+soco>=0.31.4
+trafilatura>=2.3.0
+Markdown>=3.11
 # Structured-metadata extraction (JSON-LD/microdata/OpenGraph) for article
 # author/tags/section enrichment used by Filter Rules categorization.
-extruct
-webrtcvad-wheels
+extruct>=0.18.0
+webrtcvad-wheels>=2.0.14.post1
 # Security floor (pip-audit 2026-07-17): setuptools <83 carries PYSEC-2026-3447.
 # The old <81 pin only silenced pkg_resources deprecation warnings; security wins.
-setuptools>=83
-pytest>=9.0.3
-pyinstaller
-packaging
-brotli
+setuptools>=84.0.0
+pytest>=9.1.1
+pyinstaller>=6.22.3
+packaging>=26.3
+brotli>=1.2.0
 # Browser TLS/JA3 impersonation fallback for anti-bot feeds (issue #29)
-curl_cffi
+curl_cffi>=0.16.3
 # Fully automated invisible-browser fallback after ordinary feed fetches fail.
 # SeleniumBase UC/CDP headless2 is lazy: successful refreshes never start it.
-seleniumbase==4.54.13
+seleniumbase>=4.55.0
 # Tier-3 escalation after the UC session settles on a challenge it cannot
 # clear: driverless CDP Chromium with a Turnstile auto-clicker. Lazy import.
-pydoll-python>=2.23.1
-html5lib
-lxml
+pydoll-python>=3.0.0
+html5lib>=1.1
+lxml>=6.1.3
 
 # --- Security floors (pip-audit, 2026-07-17) ---------------------------------
 # Mostly transitive dependencies; the floors force pip to take the patched
 # releases. Re-run `python -m pip_audit --local` in the build venv after
 # changing any of these.
-requests>=2.33.0
-urllib3>=2.7.0
-idna>=3.15
-aiohttp>=3.14.1
-cryptography>=48.0.1
-zeroconf>=0.149.16
-protobuf>=6.33.5
-soupsieve>=2.8.4
-pygments>=2.20.0
-tinytag>=2.2.1
+requests>=2.34.2
+urllib3>=2.8.0
+idna>=3.20
+aiohttp>=3.14.3
+cryptography>=50.0.2
+zeroconf>=0.151.5
+protobuf>=7.36.2
+soupsieve>=2.10
+pygments>=2.21.0
+tinytag>=2.3.2
 lxml-html-clean>=0.4.5

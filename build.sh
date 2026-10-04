@@ -215,20 +215,30 @@ ensure_vlc_macos() {
     fi
   done
 
-  local vlc_version="${BLINDRSS_VLC_VERSION:-3.0.23}"
+  local vlc_version="${BLINDRSS_VLC_VERSION:-}"
+  if [[ -z "$vlc_version" ]]; then
+    # VideoLAN's stable update feed also tracks the macOS release version.
+    vlc_version="$(curl -fsSL --max-time 10 https://update.videolan.org/vlc/status-win-x64 | head -n 1 | tr -d '\r')" || vlc_version=""
+    if [[ ! "$vlc_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      vlc_version="3.0.24" # Verified stable fallback when the feed is offline.
+    fi
+  elif [[ ! "$vlc_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "[X] BLINDRSS_VLC_VERSION must contain three numeric version components."
+    exit 1
+  fi
   local vlc_arch
   local expected_vlc_sha="${BLINDRSS_VLC_SHA256:-}"
   case "$UNAME_M" in
     arm64|aarch64)
       vlc_arch="arm64"
-      if [[ -z "$expected_vlc_sha" && "$vlc_version" == "3.0.23" ]]; then
-        expected_vlc_sha="fc6fac08d87f538517d44aca0c5e7a244b67c8c4cb589bf478363a7315fd5e0d"
+      if [[ -z "$expected_vlc_sha" && "$vlc_version" == "3.0.24" ]]; then
+        expected_vlc_sha="64a89d93cdd30b0e97131743e246373db82d6826ea882d265d46d74b136da2b7"
       fi
       ;;
     x86_64)
       vlc_arch="intel64"
-      if [[ -z "$expected_vlc_sha" && "$vlc_version" == "3.0.23" ]]; then
-        expected_vlc_sha="ec01530ce69d849dd057fba8876e68ac39bf279dc28de4e9c04e4aec11fc98db"
+      if [[ -z "$expected_vlc_sha" && "$vlc_version" == "3.0.24" ]]; then
+        expected_vlc_sha="1ef6c903e2dc026d4e58ddf7b2a9ed0eb6f8caf80a9a9f46f96490340b962707"
       fi
       ;;
     *)

@@ -1,4 +1,4 @@
-FROM ghcr.io/astral-sh/uv:0.11.6 AS uv
+FROM ghcr.io/astral-sh/uv:latest AS uv
 
 FROM ubuntu:22.04
 
@@ -12,15 +12,26 @@ RUN apt-get update \
         ffmpeg \
         git \
         libgstreamer-plugins-base1.0-0 \
+        libgstreamer-plugins-base1.0-dev \
         libgstreamer1.0-0 \
+        libgstreamer1.0-dev \
         libgtk-3-0 \
+        libgtk-3-dev \
+        libjpeg-dev \
         libjavascriptcoregtk-4.0-18 \
         libnotify4 \
+        libnotify-dev \
+        libpng-dev \
         libpcre2-32-0 \
         libsdl2-2.0-0 \
+        libsdl2-dev \
+        libsm-dev \
+        libtiff-dev \
         libvlc-dev \
         libwebkit2gtk-4.0-37 \
+        libwebkit2gtk-4.0-dev \
         libxtst6 \
+        libxtst-dev \
         python3 \
         python3-dev \
         python3-pip \

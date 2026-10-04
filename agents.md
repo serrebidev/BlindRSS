@@ -60,12 +60,11 @@ You should not need to open `build.bat`/`build.sh` to cut a release — everythi
 
 ### Prerequisites & toggles
 - Windows release host: Python 3.14 (`py`/`python`), VLC 64-bit at `C:\Program Files\VideoLAN\VLC`, Inno Setup 6/7 (`ISCC.exe`; per-user/Program Files/PATH auto-detected or `INNO_SETUP_COMPILER`), authenticated `gh`, Windows SDK `signtool.exe`, OpenSSH `ssh`/`scp`, network access, and key-based root access to `root@serrebiradio.com`.
-- Linux release host: `root@serrebiradio.com` with Git and a working Docker daemon. The tracked `tools/linux-build.Dockerfile` supplies a uv-managed Python 3.12, a direct pinned wxPython 4.2.5 wheel, VLC, ffmpeg, and build dependencies inside Ubuntu 22.04; do not install those desktop packages into the server host.
+- Linux release host: `root@serrebiradio.com` with Git and a working Docker daemon. The tracked `tools/linux-build.Dockerfile` supplies a uv-managed Python 3.12, current wxPython compiled from source, VLC, ffmpeg, and GTK/WebKit build dependencies inside Ubuntu 22.04; do not install those desktop packages into the server host.
 - Pushes to `main` trigger `cross-platform-release.yml` to build macOS/Linux validation artifacts (no published release). A canonical release dispatch passes `build_windows=false` and `build_linux=false`; CI builds macOS only because Windows and Linux have already been built on user-controlled machines.
-- Linux packaging pins wxPython 4.2.5 through both `requirements.txt` and a
-  workflow constraint. Keep the constraint for existing-tag re-dispatches:
-  unpinned pip otherwise prefers the source-only wxPython 4.3.0 release over the
-  compatible Ubuntu 22.04 wheel and fails while compiling wxWidgets.
+- Linux packaging builds current wxPython from source. The Docker image and
+  hosted workflow install GTK3, WebKit, GStreamer and image-library development
+  packages; do not restore an old wheel URL or PIP_CONSTRAINT.
 - Env toggles (full list in `build.md`): `SKIP_SIGN=1` (build mode only), `SIGNTOOL_PATH`, `SIGN_CERT_THUMBPRINT`, `GITHUB_REPO_SLUG`, `RELEASE_REMOTE`, `LINUX_BUILD_HOST`, `LINUX_BUILD_REPO_URL`, `BLINDRSS_LINUX_BUILD_IMAGE`, `BLINDRSS_VLC_*`, `BLINDRSS_*CODESIGN*`.
 
 ## Casting
