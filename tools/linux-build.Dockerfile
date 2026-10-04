@@ -27,6 +27,7 @@ RUN apt-get update \
         libsdl2-dev \
         libsm-dev \
         libtiff-dev \
+        libunwind-dev \
         libvlc-dev \
         libwebkit2gtk-4.0-37 \
         libwebkit2gtk-4.0-dev \
