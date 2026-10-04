@@ -4,6 +4,11 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.0.1 - 2026-10-04
+
+- Add libunwind-dev for Linux gstreamer headers.
+- Update dependencies, drop the wxPython 4.2.5 Linux pin.
+
 ## v2.0.0 - 2026-10-03
 
 - Bump seleniumbase 4.54.12 -> 4.54.13 (patch: dependency refresh; no breaking changes).
