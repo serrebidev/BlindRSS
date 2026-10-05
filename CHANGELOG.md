@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.0.3 - 2026-10-05
+
+- Cache prefetched full text under the right article.
+
 ## v2.0.2 - 2026-10-04
 
 - Maintenance update.
