@@ -564,7 +564,7 @@ class TsSource(threading.Thread):
         super().__init__(daemon=True, name="caster-ts-source")
         self.url = url
         self.sink = sink
-        self._stop = threading.Event()
+        self._stop_event = threading.Event()
         self._tail = b""
         #: Held across forward-and-remember, so attach_with_replay() can hand
         #: a new encoder the tail and then the live stream with no byte
@@ -575,7 +575,7 @@ class TsSource(threading.Thread):
         self.deduped = 0        # bytes of replay dropped (diagnostics)
 
     def stop(self) -> None:
-        self._stop.set()
+        self._stop_event.set()
         self.rotate()
 
     def rotate(self) -> None:
@@ -593,15 +593,15 @@ class TsSource(threading.Thread):
                 pass
 
     def run(self) -> None:
-        while not self._stop.is_set():
+        while not self._stop_event.is_set():
             try:
                 self._one_connection()
             except Exception as exc:
                 trace("ts.error", type(exc).__name__)
-            if self._stop.is_set():
+            if self._stop_event.is_set():
                 break
             self.reconnects += 1
-            self._stop.wait(self.RECONNECT_DELAY)
+            self._stop_event.wait(self.RECONNECT_DELAY)
 
     def _one_connection(self) -> None:
         request = urllib.request.Request(
@@ -610,7 +610,7 @@ class TsSource(threading.Thread):
                                     timeout=self.OPEN_TIMEOUT) as response:
             self._response = response
             first = b""
-            while len(first) < self.PROBE and not self._stop.is_set():
+            while len(first) < self.PROBE and not self._stop_event.is_set():
                 chunk = response.read(self.CHUNK)
                 if not chunk:
                     break
@@ -619,7 +619,7 @@ class TsSource(threading.Thread):
             if skip:
                 self.deduped += skip
                 trace("ts.dedupe", f"dropped {skip} replayed bytes")
-            while not self._stop.is_set():
+            while not self._stop_event.is_set():
                 if skip >= len(first):
                     skip -= len(first)
                 else:

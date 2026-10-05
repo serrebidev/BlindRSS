@@ -11653,7 +11653,16 @@ class MainFrame(wx.Frame):
                 except Exception:
                     pass
             else:
-                def cache_only():
+                # Bind this request's values now: the worker loop moves on to the
+                # next request (rebinding cache_key/rendered) before the main
+                # thread runs this, which cached one article's text under another.
+                def cache_only(
+                    prefetch_token=prefetch_token,
+                    cacheable=cacheable,
+                    cache_key=cache_key,
+                    rendered=rendered,
+                    cache_source=cache_source,
+                ):
                     if not self._fulltext_prefetch_enabled():
                         return
                     if prefetch_token is not None and prefetch_token != int(getattr(self, "_fulltext_prefetch_token", 0)):
