@@ -172,7 +172,7 @@ jobs:
 
   macos:
     name: Build macOS Artifact
-    runs-on: macos-14
+    runs-on: macos-latest
     steps:
       - name: Check out release tag
         uses: actions/checkout@v7
