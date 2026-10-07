@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.1.0 - 2026-10-07
+
+- System-wide Ctrl+Alt+B shows or hides BlindRSS (#112).
+
 ## v2.0.4 - 2026-10-07
 
 - Relaunching BlindRSS brings the running window forward (#111).
