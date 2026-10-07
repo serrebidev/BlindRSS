@@ -367,9 +367,9 @@ _WIN_MOD_FLAGS = {"Alt": 0x1, "Ctrl": 0x2, "Shift": 0x4, "Cmd": 0x8}
 def global_hotkey_spec(accel: Optional[str]) -> Optional[Tuple[int, int]]:
     """Return ``(modifier_flags, virtual_key)`` for a system-wide hotkey, or None.
 
-    Only letters, digits and F1-F24 are accepted, and a letter/digit needs Ctrl,
-    Alt or Win: a bare or Shift-only key would swallow ordinary typing in every
-    other application.
+    Only ASCII letters, digits and F1-F24 (not F12, which Windows reserves for
+    debuggers) are accepted, and a letter/digit needs Ctrl, Alt or Win: a bare
+    or Shift-only key would swallow ordinary typing in every other application.
     """
     parsed = parse_accel(accel)
     if parsed is None:
@@ -378,11 +378,11 @@ def global_hotkey_spec(accel: Optional[str]) -> Optional[Tuple[int, int]]:
     flags = 0
     for m in mods:
         flags |= _WIN_MOD_FLAGS[m]
-    if len(key) == 1 and key.isalnum():
+    if len(key) == 1 and key.isascii() and key.isalnum():
         if not flags & ~_WIN_MOD_FLAGS["Shift"]:
             return None
         return flags, ord(key.upper())
-    if key.startswith("F") and key[1:].isdigit():
+    if key.startswith("F") and key[1:].isdigit() and key != "F12":
         return flags, 0x6F + int(key[1:])  # VK_F1 = 0x70
     return None
 

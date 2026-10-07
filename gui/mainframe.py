@@ -11896,23 +11896,33 @@ class MainFrame(wx.Frame):
         """(Re)register the system-wide show/hide hotkey from config (Windows only)."""
         if not sys.platform.startswith("win"):
             return
-        if self._global_hotkey_id is not None:
-            try:
-                self.UnregisterHotKey(self._global_hotkey_id)
-            except Exception:
-                pass
-            self._global_hotkey_id = None
-        accel = self.config_manager.get("global_show_hide_hotkey", "Ctrl+Alt+B")
+        accel = str(self.config_manager.get("global_show_hide_hotkey", "Ctrl+Alt+B") or "").strip()
         spec = shortcuts_mod.global_hotkey_spec(accel)
-        if spec is None:
+        if accel and spec is None:
+            log.warning("Global hotkey %r is not usable; keeping the current one", accel)
             return
-        try:
-            if self.RegisterHotKey(_GLOBAL_HOTKEY_ID, spec[0], spec[1]):
-                self._global_hotkey_id = _GLOBAL_HOTKEY_ID
-            else:
-                log.warning("Global hotkey %s is already taken by another program", accel)
-        except Exception:
-            log.debug("Could not register the global hotkey", exc_info=True)
+        # Win32 directly, not wx.Window.RegisterHotKey: wx re-maps the key code
+        # from its own WXK numbering and drops MOD_NOREPEAT. wx still turns the
+        # resulting WM_HOTKEY into EVT_HOTKEY for this id.
+        import ctypes
+
+        user32 = ctypes.windll.user32
+        hwnd = self.GetHandle()
+        previous = self._global_hotkey_id  # the (flags, vk) currently registered
+        if previous is not None:
+            user32.UnregisterHotKey(hwnd, _GLOBAL_HOTKEY_ID)
+            self._global_hotkey_id = None
+        if spec is None:
+            return  # blank: turned off
+        mod_norepeat = 0x4000  # holding the keys must not toggle repeatedly
+        if user32.RegisterHotKey(hwnd, _GLOBAL_HOTKEY_ID, spec[0] | mod_norepeat, spec[1]):
+            self._global_hotkey_id = spec
+            return
+        log.warning("Global hotkey %s is already taken by another program", accel)
+        if previous is not None and user32.RegisterHotKey(
+            hwnd, _GLOBAL_HOTKEY_ID, previous[0] | mod_norepeat, previous[1]
+        ):
+            self._global_hotkey_id = previous
 
     def _on_global_hotkey(self, _event=None) -> None:
         """Hide to the tray when BlindRSS is in front, otherwise bring it forward."""
