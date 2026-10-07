@@ -401,6 +401,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_CLOSE, self.on_close)
         self.Bind(wx.EVT_ICONIZE, self.on_iconize)
         self._global_hotkey_id = None
+        self._global_hotkey_accel = ""
         self.Bind(wx.EVT_HOTKEY, self._on_global_hotkey, id=_GLOBAL_HOTKEY_ID)
         self._apply_global_hotkey()
         self.Bind(wx.EVT_ACTIVATE, self.on_activate)
@@ -11913,16 +11914,31 @@ class MainFrame(wx.Frame):
             user32.UnregisterHotKey(hwnd, _GLOBAL_HOTKEY_ID)
             self._global_hotkey_id = None
         if spec is None:
+            self._global_hotkey_accel = ""
             return  # blank: turned off
         mod_norepeat = 0x4000  # holding the keys must not toggle repeatedly
         if user32.RegisterHotKey(hwnd, _GLOBAL_HOTKEY_ID, spec[0] | mod_norepeat, spec[1]):
             self._global_hotkey_id = spec
+            self._global_hotkey_accel = accel
             return
         log.warning("Global hotkey %s is already taken by another program", accel)
-        if previous is not None and user32.RegisterHotKey(
-            hwnd, _GLOBAL_HOTKEY_ID, previous[0] | mod_norepeat, previous[1]
-        ):
+        if previous is None:
+            # Startup: keep the configured value; whoever holds it may let go.
+            return
+        # Settings change: put the working hotkey back, in config too, or it
+        # would be lost on the next launch.
+        if user32.RegisterHotKey(hwnd, _GLOBAL_HOTKEY_ID, previous[0] | mod_norepeat, previous[1]):
             self._global_hotkey_id = previous
+        self.config_manager.set("global_show_hide_hotkey", self._global_hotkey_accel)
+        wx.MessageBox(
+            _(
+                "Another program is already using {hotkey}, so it cannot show or hide "
+                "BlindRSS. The hotkey stays {previous}."
+            ).format(hotkey=accel, previous=self._global_hotkey_accel),
+            "BlindRSS",
+            wx.ICON_WARNING,
+            self,
+        )
 
     def _on_global_hotkey(self, _event=None) -> None:
         """Hide to the tray when BlindRSS is in front, otherwise bring it forward."""
