@@ -96,6 +96,17 @@ Casting is Caster's code (github.com/serrebidev/Caster), not a re-implementation
     while leaving the tray icon and background refresh active. It applies to
     manual and start-at-login launches and takes precedence over
     start_maximized.
+  - Getting back to a tray-hidden window. A second launch hands off to the running copy
+    (`core/single_instance.py`: token-checked loopback socket, state file
+    private to the user, request and ack each read to EOF) and exits instead
+    of the "already running" box. On Windows, `global_show_hide_hotkey`
+    (default Ctrl+Alt+B) is a system-wide toggle registered through
+    `user32.RegisterHotKey` with MOD_NOREPEAT. Never use
+    `wx.Window.RegisterHotKey`: it re-maps key codes from WXK numbering and
+    drops NOREPEAT. Settings refuses unusable keys (`shortcuts.global_hotkey_spec`:
+    ASCII letter/digit with Ctrl/Alt/Win, or F-keys except F12). A Settings
+    change to a combination another program owns rolls config back to the
+    value it held before the save. Startup never rewrites config.
   - When debug mode is enabled, configures rotating `blindrss.log` in the active data/config directory. This file log should capture DEBUG and above from app and third-party Python loggers; when debug mode is disabled, do not create or attach the file log.
 
 - `tests/`
