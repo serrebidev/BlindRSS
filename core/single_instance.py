@@ -32,6 +32,17 @@ def _state_path() -> str:
     return os.path.join(base, ".blindrss-instance.json")
 
 
+def _read_to_eof(conn, limit: int = 256) -> bytes:
+    """Read until the peer shuts down its side; TCP may split even tiny messages."""
+    data = b""
+    while len(data) <= limit:
+        chunk = conn.recv(limit)
+        if not chunk:
+            break
+        data += chunk
+    return data
+
+
 def serve(on_activate) -> socket.socket | None:
     """Listen for activation requests; call on_activate() (from a worker thread)."""
     try:
@@ -60,14 +71,9 @@ def serve(on_activate) -> socket.socket | None:
             try:
                 with conn:
                     conn.settimeout(2)
-                    data = b""
-                    while len(data) <= 256:  # TCP may split the request
-                        chunk = conn.recv(256)
-                        if not chunk:
-                            break
-                        data += chunk
-                    if data.strip() == token.encode("ascii") + b" " + _MESSAGE:
+                    if _read_to_eof(conn).strip() == token.encode("ascii") + b" " + _MESSAGE:
                         conn.sendall(_ACK)
+                        conn.shutdown(socket.SHUT_WR)
                         on_activate()
             except Exception:
                 log.debug("Activation request failed", exc_info=True)
@@ -99,6 +105,6 @@ def activate_existing(timeout: float = 2.0) -> bool:
             conn.shutdown(socket.SHUT_WR)
             # Only an acknowledged request counts; otherwise the caller falls
             # back to the "already running" message instead of exiting silently.
-            return conn.recv(16) == _ACK
+            return _read_to_eof(conn) == _ACK
     except OSError:
         return False
