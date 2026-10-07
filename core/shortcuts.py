@@ -360,6 +360,33 @@ def normalize_accel(accel: Optional[str]) -> str:
     return format_accel(mods, key)
 
 
+# Win32 RegisterHotKey modifier flags (wx.MOD_* use the same values on MSW).
+_WIN_MOD_FLAGS = {"Alt": 0x1, "Ctrl": 0x2, "Shift": 0x4, "Cmd": 0x8}
+
+
+def global_hotkey_spec(accel: Optional[str]) -> Optional[Tuple[int, int]]:
+    """Return ``(modifier_flags, virtual_key)`` for a system-wide hotkey, or None.
+
+    Only ASCII letters, digits and F1-F24 (not F12, which Windows reserves for
+    debuggers) are accepted, and a letter/digit needs Ctrl, Alt or Win: a bare
+    or Shift-only key would swallow ordinary typing in every other application.
+    """
+    parsed = parse_accel(accel)
+    if parsed is None:
+        return None
+    mods, key = parsed
+    flags = 0
+    for m in mods:
+        flags |= _WIN_MOD_FLAGS[m]
+    if len(key) == 1 and key.isascii() and key.isalnum():
+        if not flags & ~_WIN_MOD_FLAGS["Shift"]:
+            return None
+        return flags, ord(key.upper())
+    if key.startswith("F") and key[1:].isdigit() and key != "F12":
+        return flags, 0x6F + int(key[1:])  # VK_F1 = 0x70
+    return None
+
+
 # --------------------------------------------------------------------------
 # Binding resolution (defaults + user overrides)
 # --------------------------------------------------------------------------

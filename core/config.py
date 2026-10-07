@@ -315,6 +315,8 @@ DEFAULT_CONFIG = {
     "close_to_tray": True,
     "minimize_to_tray": True,
     "start_maximized": False,
+    # System-wide show/hide hotkey for the main window (Windows). Blank = off.
+    "global_show_hide_hotkey": "Ctrl+Alt+B",
     "max_cached_views": 15,
     "cache_full_text": False,
     "confirm_article_delete": True,

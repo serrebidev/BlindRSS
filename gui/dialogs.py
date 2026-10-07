@@ -1381,6 +1381,20 @@ class SettingsDialog(wx.Dialog):
         self.start_in_tray_chk.SetValue(bool(config.get("start_in_system_tray", False)))
         startup_sizer.Add(self.start_in_tray_chk, 0, wx.ALL, 5)
 
+        if sys.platform.startswith("win"):
+            hotkey_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            hotkey_label = wx.StaticText(
+                startup_panel,
+                label=_("Show or hide BlindRSS from anywhere (hotkey, blank to turn off):"),
+            )
+            hotkey_sizer.Add(hotkey_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+            self.global_hotkey_ctrl = wx.TextCtrl(
+                startup_panel, value=str(config.get("global_show_hide_hotkey", "Ctrl+Alt+B") or "")
+            )
+            self.global_hotkey_ctrl.SetName(hotkey_label.GetLabel())
+            hotkey_sizer.Add(self.global_hotkey_ctrl, 1, wx.ALL, 5)
+            startup_sizer.Add(hotkey_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
         self.start_maximized_chk = wx.CheckBox(startup_panel, label=_("Always start maximized"))
         self.start_maximized_chk.SetValue(bool(config.get("start_maximized", False)))
         startup_sizer.Add(self.start_maximized_chk, 0, wx.ALL, 5)
@@ -1850,7 +1864,8 @@ class SettingsDialog(wx.Dialog):
         
         btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
         main_sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        
+        self.Bind(wx.EVT_BUTTON, self._on_settings_ok, id=wx.ID_OK)
+
         self.SetSizer(main_sizer)
         self.Centre()
 
@@ -4069,6 +4084,34 @@ class SettingsDialog(wx.Dialog):
         )
         advanced_sizer.Add(search_sizer, 0, wx.EXPAND | wx.ALL, 8)
 
+    def _on_settings_ok(self, event):
+        # Refuse to save a hotkey Windows cannot register: once it is in
+        # config.json the working one would be gone on the next launch.
+        ctrl = getattr(self, "global_hotkey_ctrl", None)
+        value = ctrl.GetValue().strip() if ctrl is not None else ""
+        if value and shortcuts_mod.global_hotkey_spec(value) is None:
+            wx.MessageBox(
+                _(
+                    "\"{hotkey}\" cannot be used as the show or hide hotkey. Use Ctrl, Alt "
+                    "or Win with a letter or digit (for example Ctrl+Alt+B), or a function "
+                    "key other than F12. Leave it blank to turn the hotkey off."
+                ).format(hotkey=value),
+                _("Settings"),
+                wx.ICON_ERROR,
+                self,
+            )
+            try:
+                page = ctrl.GetParent()
+                idx = self.notebook.FindPage(page)
+                if idx != wx.NOT_FOUND:
+                    self.notebook.SetSelection(idx)
+            except Exception:
+                pass
+            ctrl.SetFocus()
+            ctrl.SelectAll()
+            return
+        event.Skip()
+
     def get_data(self):
         # Reads controls from every page, so no page may still be pending: an
         # unbuilt page has no controls to read and would silently write its
@@ -4162,6 +4205,11 @@ class SettingsDialog(wx.Dialog):
             "minimize_to_tray": self.min_tray_chk.GetValue(),
             "start_in_system_tray": self.start_in_tray_chk.GetValue(),
             "start_maximized": self.start_maximized_chk.GetValue(),
+            **(
+                {"global_show_hide_hotkey": self.global_hotkey_ctrl.GetValue().strip()}
+                if hasattr(self, "global_hotkey_ctrl")
+                else {}
+            ),
             "debug_mode": self.debug_mode_chk.GetValue(),
             "refresh_on_startup": self.refresh_startup_chk.GetValue(),
             "automatic_feed_refresh_workload": self.automatic_refresh_workload_map.get(
