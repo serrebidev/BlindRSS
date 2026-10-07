@@ -1864,7 +1864,8 @@ class SettingsDialog(wx.Dialog):
         
         btn_sizer = self.CreateButtonSizer(wx.OK | wx.CANCEL)
         main_sizer.Add(btn_sizer, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        
+        self.Bind(wx.EVT_BUTTON, self._on_settings_ok, id=wx.ID_OK)
+
         self.SetSizer(main_sizer)
         self.Centre()
 
@@ -4082,6 +4083,34 @@ class SettingsDialog(wx.Dialog):
             6,
         )
         advanced_sizer.Add(search_sizer, 0, wx.EXPAND | wx.ALL, 8)
+
+    def _on_settings_ok(self, event):
+        # Refuse to save a hotkey Windows cannot register: once it is in
+        # config.json the working one would be gone on the next launch.
+        ctrl = getattr(self, "global_hotkey_ctrl", None)
+        value = ctrl.GetValue().strip() if ctrl is not None else ""
+        if value and shortcuts_mod.global_hotkey_spec(value) is None:
+            wx.MessageBox(
+                _(
+                    "\"{hotkey}\" cannot be used as the show or hide hotkey. Use Ctrl, Alt "
+                    "or Win with a letter or digit (for example Ctrl+Alt+B), or a function "
+                    "key other than F12. Leave it blank to turn the hotkey off."
+                ).format(hotkey=value),
+                _("Settings"),
+                wx.ICON_ERROR,
+                self,
+            )
+            try:
+                page = ctrl.GetParent()
+                idx = self.notebook.FindPage(page)
+                if idx != wx.NOT_FOUND:
+                    self.notebook.SetSelection(idx)
+            except Exception:
+                pass
+            ctrl.SetFocus()
+            ctrl.SelectAll()
+            return
+        event.Skip()
 
     def get_data(self):
         # Reads controls from every page, so no page may still be pending: an
