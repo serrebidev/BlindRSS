@@ -18,6 +18,7 @@ import threading
 log = logging.getLogger(__name__)
 
 _MESSAGE = b"activate"
+_ACK = b"ok"
 
 
 def _state_path() -> str:
@@ -59,7 +60,14 @@ def serve(on_activate) -> socket.socket | None:
             try:
                 with conn:
                     conn.settimeout(2)
-                    if conn.recv(256).strip() == token.encode("ascii") + b" " + _MESSAGE:
+                    data = b""
+                    while len(data) <= 256:  # TCP may split the request
+                        chunk = conn.recv(256)
+                        if not chunk:
+                            break
+                        data += chunk
+                    if data.strip() == token.encode("ascii") + b" " + _MESSAGE:
+                        conn.sendall(_ACK)
                         on_activate()
             except Exception:
                 log.debug("Activation request failed", exc_info=True)
@@ -88,6 +96,9 @@ def activate_existing(timeout: float = 2.0) -> bool:
     try:
         with socket.create_connection(("127.0.0.1", port), timeout=timeout) as conn:
             conn.sendall(token.encode("ascii") + b" " + _MESSAGE)
-        return True
+            conn.shutdown(socket.SHUT_WR)
+            # Only an acknowledged request counts; otherwise the caller falls
+            # back to the "already running" message instead of exiting silently.
+            return conn.recv(16) == _ACK
     except OSError:
         return False
