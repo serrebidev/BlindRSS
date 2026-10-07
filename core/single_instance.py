@@ -21,8 +21,14 @@ _MESSAGE = b"activate"
 
 
 def _state_path() -> str:
-    # Per-user temp dir: the same scope as the wx instance lock.
-    return os.path.join(tempfile.gettempdir(), "BlindRSS-instance.json")
+    # Must be private to this user, like the wx instance lock. Windows %TEMP%
+    # is per-user; POSIX /tmp is shared and world-writable (another account
+    # could plant a symlink there), so use the runtime dir or home instead.
+    if sys.platform.startswith("win"):
+        base = tempfile.gettempdir()
+    else:
+        base = os.environ.get("XDG_RUNTIME_DIR") or os.path.expanduser("~")
+    return os.path.join(base, ".blindrss-instance.json")
 
 
 def serve(on_activate) -> socket.socket | None:
@@ -32,7 +38,13 @@ def serve(on_activate) -> socket.socket | None:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.bind(("127.0.0.1", 0))
         server.listen(4)
-        with open(_state_path(), "w", encoding="utf-8") as f:
+        path = _state_path()
+        try:
+            os.unlink(path)  # never write through a planted symlink
+        except FileNotFoundError:
+            pass
+        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
             json.dump({"port": server.getsockname()[1], "pid": os.getpid(), "token": token}, f)
     except Exception:
         log.debug("Single-instance activation listener not started", exc_info=True)
