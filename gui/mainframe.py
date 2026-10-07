@@ -401,7 +401,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_CLOSE, self.on_close)
         self.Bind(wx.EVT_ICONIZE, self.on_iconize)
         self._global_hotkey_id = None
-        self._global_hotkey_accel = ""
+        self._global_hotkey_config = ""
         self.Bind(wx.EVT_HOTKEY, self._on_global_hotkey, id=_GLOBAL_HOTKEY_ID)
         self._apply_global_hotkey()
         self.Bind(wx.EVT_ACTIVATE, self.on_activate)
@@ -11893,14 +11893,23 @@ class MainFrame(wx.Frame):
         except Exception:
             pass
 
-    def _apply_global_hotkey(self) -> None:
-        """(Re)register the system-wide show/hide hotkey from config (Windows only)."""
+    def _apply_global_hotkey(self, from_settings: bool = False) -> None:
+        """(Re)register the system-wide show/hide hotkey from config (Windows only).
+
+        from_settings: the user just saved Settings. If the new combination is
+        unusable or owned by another program, config goes back to the value it
+        held before that save; at startup the configured value is left alone,
+        since whoever holds the combination may release it.
+        """
         if not sys.platform.startswith("win"):
             return
         accel = str(self.config_manager.get("global_show_hide_hotkey", "Ctrl+Alt+B") or "").strip()
+        prior = self._global_hotkey_config  # config value applied before this call
         spec = shortcuts_mod.global_hotkey_spec(accel)
         if accel and spec is None:
             log.warning("Global hotkey %r is not usable; keeping the current one", accel)
+            if from_settings:
+                self.config_manager.set("global_show_hide_hotkey", prior)
             return
         # Win32 directly, not wx.Window.RegisterHotKey: wx re-maps the key code
         # from its own WXK numbering and drops MOD_NOREPEAT. wx still turns the
@@ -11913,32 +11922,35 @@ class MainFrame(wx.Frame):
         if previous is not None:
             user32.UnregisterHotKey(hwnd, _GLOBAL_HOTKEY_ID)
             self._global_hotkey_id = None
+        self._global_hotkey_config = accel
         if spec is None:
-            self._global_hotkey_accel = ""
             return  # blank: turned off
         mod_norepeat = 0x4000  # holding the keys must not toggle repeatedly
         if user32.RegisterHotKey(hwnd, _GLOBAL_HOTKEY_ID, spec[0] | mod_norepeat, spec[1]):
             self._global_hotkey_id = spec
-            self._global_hotkey_accel = accel
             return
         log.warning("Global hotkey %s is already taken by another program", accel)
-        if previous is None:
-            # Startup: keep the configured value; whoever holds it may let go.
+        if not from_settings:
             return
-        # Settings change: put the working hotkey back, in config too, or it
-        # would be lost on the next launch.
-        if user32.RegisterHotKey(hwnd, _GLOBAL_HOTKEY_ID, previous[0] | mod_norepeat, previous[1]):
+        # Put back what was there before the save, in config too, or the
+        # rejected combination would be all that is left on the next launch.
+        if previous is not None and user32.RegisterHotKey(
+            hwnd, _GLOBAL_HOTKEY_ID, previous[0] | mod_norepeat, previous[1]
+        ):
             self._global_hotkey_id = previous
-        self.config_manager.set("global_show_hide_hotkey", self._global_hotkey_accel)
-        wx.MessageBox(
-            _(
+        self._global_hotkey_config = prior
+        self.config_manager.set("global_show_hide_hotkey", prior)
+        if prior:
+            msg = _(
                 "Another program is already using {hotkey}, so it cannot show or hide "
                 "BlindRSS. The hotkey stays {previous}."
-            ).format(hotkey=accel, previous=self._global_hotkey_accel),
-            "BlindRSS",
-            wx.ICON_WARNING,
-            self,
-        )
+            ).format(hotkey=accel, previous=prior)
+        else:
+            msg = _(
+                "Another program is already using {hotkey}, so it cannot show or hide "
+                "BlindRSS. The hotkey stays off."
+            ).format(hotkey=accel)
+        wx.MessageBox(msg, "BlindRSS", wx.ICON_WARNING, self)
 
     def _on_global_hotkey(self, _event=None) -> None:
         """Hide to the tray when BlindRSS is in front, otherwise bring it forward."""
@@ -14423,7 +14435,7 @@ class MainFrame(wx.Frame):
                 log.debug("Could not apply the configured User-Agent", exc_info=True)
 
             try:
-                self._apply_global_hotkey()
+                self._apply_global_hotkey(from_settings=True)
             except Exception:
                 log.debug("Could not apply the global show/hide hotkey", exc_info=True)
 
