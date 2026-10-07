@@ -303,6 +303,12 @@ class RSSApp(wx.App):
 
         self.instance_checker = wx.SingleInstanceChecker("BlindRSS-Instance-Lock")
         if self.instance_checker.IsAnotherRunning():
+            # A relaunch (desktop shortcut hotkey, Start menu) means "show me
+            # BlindRSS": bring the running window forward instead of erroring.
+            from core import single_instance
+
+            if single_instance.activate_existing():
+                return False
             wx.MessageBox(_("BlindRSS is already running."), "BlindRSS", wx.ICON_ERROR)
             return False
 
@@ -340,6 +346,11 @@ class RSSApp(wx.App):
         
         self.frame = MainFrame(self.provider, self.config_manager)
         self.frame.Show(not bool(self.config_manager.get("start_in_system_tray", False)))
+        from core import single_instance
+
+        self._activation_server = single_instance.serve(
+            lambda: wx.CallAfter(self._activate_from_relaunch)
+        )
 
         # Warm the shared libVLC instance on a background thread shortly after
         # startup so the first playback doesn't wait on the plugin scan.
@@ -385,6 +396,21 @@ class RSSApp(wx.App):
         except Exception as e:
             log.error(f"Failed to install the F1 help filter: {e}")
         return True
+
+    def _activate_from_relaunch(self):
+        frame = getattr(self, "frame", None)
+        if not frame:
+            return
+        frame.show_and_focus_main(flash=False)
+        if sys.platform.startswith("win"):
+            # Raise() alone may only flash the taskbar button; the relaunched
+            # copy granted this process the foreground with AllowSetForegroundWindow.
+            try:
+                import ctypes
+
+                ctypes.windll.user32.SetForegroundWindow(frame.GetHandle())
+            except Exception:
+                pass
 
     def _on_cookies_auto_imported(self, dest_path):
         """Notify the user (on the UI thread) when cookies were auto-imported."""
@@ -450,6 +476,12 @@ class RSSApp(wx.App):
 
     def OnExit(self):
         log.info("Shutting down proxies...")
+        try:
+            server = getattr(self, "_activation_server", None)
+            if server is not None:
+                server.close()
+        except Exception:
+            pass
         try:
             watcher = getattr(self, "_cookie_watcher", None)
             if watcher is not None:
