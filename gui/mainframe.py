@@ -79,6 +79,9 @@ from . import rich_view_links
 
 log = logging.getLogger(__name__)
 
+# RegisterHotKey id for the system-wide show/hide hotkey (any value 0-0xBFFF).
+_GLOBAL_HOTKEY_ID = 0xB55
+
 
 def _article_is_youtube_video(article) -> bool:
     try:
@@ -397,6 +400,9 @@ class MainFrame(wx.Frame):
         
         self.Bind(wx.EVT_CLOSE, self.on_close)
         self.Bind(wx.EVT_ICONIZE, self.on_iconize)
+        self._global_hotkey_id = None
+        self.Bind(wx.EVT_HOTKEY, self._on_global_hotkey, id=_GLOBAL_HOTKEY_ID)
+        self._apply_global_hotkey()
         self.Bind(wx.EVT_ACTIVATE, self.on_activate)
         
         # Startup workers are deliberately deferred until the first event-loop
@@ -11886,6 +11892,43 @@ class MainFrame(wx.Frame):
         except Exception:
             pass
 
+    def _apply_global_hotkey(self) -> None:
+        """(Re)register the system-wide show/hide hotkey from config (Windows only)."""
+        if not sys.platform.startswith("win"):
+            return
+        if self._global_hotkey_id is not None:
+            try:
+                self.UnregisterHotKey(self._global_hotkey_id)
+            except Exception:
+                pass
+            self._global_hotkey_id = None
+        accel = self.config_manager.get("global_show_hide_hotkey", "Ctrl+Alt+B")
+        spec = shortcuts_mod.global_hotkey_spec(accel)
+        if spec is None:
+            return
+        try:
+            if self.RegisterHotKey(_GLOBAL_HOTKEY_ID, spec[0], spec[1]):
+                self._global_hotkey_id = _GLOBAL_HOTKEY_ID
+            else:
+                log.warning("Global hotkey %s is already taken by another program", accel)
+        except Exception:
+            log.debug("Could not register the global hotkey", exc_info=True)
+
+    def _on_global_hotkey(self, _event=None) -> None:
+        """Hide to the tray when BlindRSS is in front, otherwise bring it forward."""
+        try:
+            if self.IsShown() and not self.IsIconized() and self.IsActive():
+                self._hide_to_tray()
+                return
+            self.show_and_focus_main(flash=False)
+            # The hotkey press grants this process the foreground; take it so
+            # the window gets focus instead of just a flashing taskbar button.
+            import ctypes
+
+            ctypes.windll.user32.SetForegroundWindow(self.GetHandle())
+        except Exception:
+            log.debug("Global hotkey toggle failed", exc_info=True)
+
     def show_and_focus_main(self, flash: bool = True):
         """Restore window from tray/minimized state and focus the tree."""
         try:
@@ -14352,6 +14395,11 @@ class MainFrame(wx.Frame):
                 user_agents.apply_to_headers(self.config_manager.get)
             except Exception:
                 log.debug("Could not apply the configured User-Agent", exc_info=True)
+
+            try:
+                self._apply_global_hotkey()
+            except Exception:
+                log.debug("Could not apply the global show/hide hotkey", exc_info=True)
 
             # A changed global column layout only reaches the list on a render,
             # and the current view may well be one that just changed (article list columns).

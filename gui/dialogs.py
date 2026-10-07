@@ -1381,6 +1381,20 @@ class SettingsDialog(wx.Dialog):
         self.start_in_tray_chk.SetValue(bool(config.get("start_in_system_tray", False)))
         startup_sizer.Add(self.start_in_tray_chk, 0, wx.ALL, 5)
 
+        if sys.platform.startswith("win"):
+            hotkey_sizer = wx.BoxSizer(wx.HORIZONTAL)
+            hotkey_label = wx.StaticText(
+                startup_panel,
+                label=_("Show or hide BlindRSS from anywhere (hotkey, blank to turn off):"),
+            )
+            hotkey_sizer.Add(hotkey_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+            self.global_hotkey_ctrl = wx.TextCtrl(
+                startup_panel, value=str(config.get("global_show_hide_hotkey", "Ctrl+Alt+B") or "")
+            )
+            self.global_hotkey_ctrl.SetName(hotkey_label.GetLabel())
+            hotkey_sizer.Add(self.global_hotkey_ctrl, 1, wx.ALL, 5)
+            startup_sizer.Add(hotkey_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
         self.start_maximized_chk = wx.CheckBox(startup_panel, label=_("Always start maximized"))
         self.start_maximized_chk.SetValue(bool(config.get("start_maximized", False)))
         startup_sizer.Add(self.start_maximized_chk, 0, wx.ALL, 5)
@@ -4162,6 +4176,11 @@ class SettingsDialog(wx.Dialog):
             "minimize_to_tray": self.min_tray_chk.GetValue(),
             "start_in_system_tray": self.start_in_tray_chk.GetValue(),
             "start_maximized": self.start_maximized_chk.GetValue(),
+            **(
+                {"global_show_hide_hotkey": self.global_hotkey_ctrl.GetValue().strip()}
+                if hasattr(self, "global_hotkey_ctrl")
+                else {}
+            ),
             "debug_mode": self.debug_mode_chk.GetValue(),
             "refresh_on_startup": self.refresh_startup_chk.GetValue(),
             "automatic_feed_refresh_workload": self.automatic_refresh_workload_map.get(
