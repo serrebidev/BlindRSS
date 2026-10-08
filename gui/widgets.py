@@ -18,6 +18,13 @@ from typing import Callable, Optional
 
 import wx
 
+# Status-bar style without any wx.STB_ELLIPSIZE_* flag (the default has END).
+# With ellipsizing, wxMSW stores a shortened copy ("Playing: Title gr...") in
+# the native control and that copy is all NVDA's read-status-bar command gets,
+# so the playback time at the end was never spoken. Without it the full text
+# stays readable; only the drawing is clipped.
+STATUS_BAR_STYLE = wx.STB_SIZEGRIP | wx.STB_SHOW_TIPS | wx.FULL_REPAINT_ON_RESIZE
+
 
 def force_ltr_reading(ctrl) -> None:
     """Reset a Windows RichEdit control to left-to-right reading order.

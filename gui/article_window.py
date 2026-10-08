@@ -34,7 +34,7 @@ from .reader_performance import (
     replace_text_control_value,
     set_accessible_webview_content,
 )
-from .widgets import force_ltr_reading
+from .widgets import STATUS_BAR_STYLE, force_ltr_reading
 
 log = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class ArticleWindow(wx.Frame):
         self._sizer.Add(self.content_ctrl, 1, wx.EXPAND)
         self._panel.SetSizer(self._sizer)
 
-        self.CreateStatusBar()
+        self.CreateStatusBar(style=STATUS_BAR_STYLE)
         self._build_menu_bar()
         self.Bind(wx.EVT_CHAR_HOOK, self._on_char_hook)
         self.Bind(wx.EVT_CLOSE, self._on_close)

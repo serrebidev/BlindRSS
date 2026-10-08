@@ -68,7 +68,7 @@ import core.discovery
 from .shortcut_keys import event_to_accel
 from .menu_mnemonics import apply_menu_mnemonics, apply_menubar_mnemonics
 from . import help_context
-from .widgets import force_ltr_reading
+from .widgets import STATUS_BAR_STYLE, force_ltr_reading
 from .reader_performance import (
     LARGE_READER_TEXT_CHARS,
     notify_reader_content_changed,
@@ -679,7 +679,7 @@ class MainFrame(wx.Frame):
         # mid-read (issue: status bar shows nothing while work is happening).
         # Field 2 is dedicated to live playback status (now-playing title plus
         # elapsed/remaining time) so it never fights the refresh/filter fields.
-        self.CreateStatusBar(3)
+        self.CreateStatusBar(3, style=STATUS_BAR_STYLE)
         self.SetStatusWidths([-2, -1, -1])
         self._playback_status_field = 2
         # Main Splitter: Tree vs Content Area
@@ -1917,7 +1917,8 @@ class MainFrame(wx.Frame):
             else:
                 time_part = elapsed
             verb = state or (_("Playing") if info.get("playing") else _("Paused"))
-            self.SetStatusText(f"{verb}: {title} — {time_part}", field)
+            # Time before title: a long title must not push the time out of reach.
+            self.SetStatusText(f"{verb}: {time_part} — {title}", field)
         except Exception:
             log.debug("Failed to update playback status field", exc_info=True)
 
