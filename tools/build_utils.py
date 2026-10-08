@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import os
 import re
+import struct
 import subprocess
 import zipfile
 from pathlib import Path
@@ -83,6 +84,65 @@ def signtool_thumbprint(signtool_exe: Path, exe_path: Path) -> str:
     return (m.group(1).strip().replace(" ", "") if m else "")
 
 
+_VERSION_INFO_KEY = "VS_VERSION_INFO\0".encode("utf-16-le")
+
+
+def _align4(n: int) -> int:
+    return (n + 3) & ~3
+
+
+def _trim_version_node(buf: bytearray, pos: int) -> int:
+    """Trim space padding from every string under the version node at ``pos``.
+
+    Returns how many strings changed. Nothing moves: a trimmed value is
+    NUL-filled to its old width and only its wValueLength is rewritten.
+    """
+    length, value_len, kind = struct.unpack_from("<HHH", buf, pos)
+    end = pos + length
+    key_end = buf.find(b"\0\0", pos + 6, end)
+    while key_end != -1 and (key_end - pos) % 2:  # NUL must sit on a UTF-16 boundary
+        key_end = buf.find(b"\0\0", key_end + 1, end)
+    if length < 8 or key_end == -1:
+        raise ValueError(f"malformed version resource node at offset {pos}")
+    value_pos = pos + _align4(key_end + 2 - pos)
+    if kind == 1 and value_len:  # a String: its value fills the rest of the node
+        text = buf[value_pos:end].decode("utf-16-le").split("\0")[0]
+        trimmed = text.rstrip(" ")
+        if trimmed == text:
+            return 0
+        buf[value_pos:end] = trimmed.encode("utf-16-le").ljust(end - value_pos, b"\0")
+        struct.pack_into("<H", buf, pos + 2, len(trimmed) + 1)
+        return 1
+    changed = 0
+    child = value_pos + _align4(value_len)
+    while child + 6 <= end:
+        changed += _trim_version_node(buf, child)
+        child += _align4(struct.unpack_from("<H", buf, child)[0])
+    return changed
+
+
+def trim_version_strings(exe_path: Path) -> int:
+    """Remove the space padding Inno Setup leaves in an installer's version strings.
+
+    Inno Setup writes ProductName, ProductVersion and the rest over fixed-width,
+    space-filled slots, so the installer reports its product name as "BlindRSS"
+    followed by 52 spaces. SignPath compares the product name and version
+    exactly and refuses that. Edited in place so no file offset changes, which
+    the installer's own offset table depends on.
+    """
+    buf = bytearray(exe_path.read_bytes())
+    changed = 0
+    found = buf.find(_VERSION_INFO_KEY)
+    if found == -1:
+        raise ValueError(f"{exe_path} has no version resource")
+    while found != -1:
+        changed += _trim_version_node(buf, found - 6)
+        found = buf.find(_VERSION_INFO_KEY, found + len(_VERSION_INFO_KEY))
+    if changed:
+        exe_path.write_bytes(buf)
+    return changed
+
+
 def main():
     parser = argparse.ArgumentParser()
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -105,6 +165,9 @@ def main():
     p_sig.add_argument("--exe", required=True)
     p_sig.add_argument("--output")
 
+    p_trim = sub.add_parser("trim-version-strings", help="Strip Inno Setup's space padding from version strings")
+    p_trim.add_argument("--exe", required=True)
+
     args = parser.parse_args()
 
     def _write_output(digest: str) -> None:
@@ -120,6 +183,8 @@ def main():
             _write_output(sha256_file(Path(args.input)))
         case "zip-directory":
             zip_directory(Path(args.input), Path(args.output))
+        case "trim-version-strings":
+            print(f"Trimmed {trim_version_strings(Path(args.exe))} version string(s) in {args.exe}")
         case "signtool-thumbprint":
             _write_output(signtool_thumbprint(Path(args.signtool), Path(args.exe)))
 
