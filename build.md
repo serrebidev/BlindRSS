@@ -5,10 +5,15 @@ This is the only approved workflow for packaging and publishing BlindRSS.
 ## Every Release, Bluntly
 
 Run `.\build.bat release` on the Windows development machine. This is the one
-canonical release command. It builds and signs Windows locally, creates the
-GitHub release, builds Linux inside an Ubuntu 22.04 Docker container reached via
+canonical release command. It bumps the version, tags, creates a draft GitHub
+release, builds Linux inside an Ubuntu 22.04 Docker container reached via
 `ssh root@serrebiradio.com`, copies the self-contained Linux tarball back and
-uploads it with its manifest, then dispatches GitHub Actions for macOS only.
+uploads it with its manifest, then dispatches GitHub Actions, which builds macOS
+and builds and signs Windows through SignPath, and publishes the release as
+Latest once every asset is uploaded. `build.bat` waits for that run.
+
+You must approve two signing requests in SignPath during every release:
+`BlindRSS.exe` first, then the installer. The run waits up to two hours for each.
 
 `./build.sh release` without a tag is rejected. Only run
 `./build.sh release vX.Y.Z` to re-dispatch the macOS CI asset for an existing
@@ -18,10 +23,11 @@ release.
 
 - Official release from Windows:
   - Run `.\build.bat release`.
-  - Windows builds and signs locally on this machine.
+  - Windows builds on a GitHub-hosted runner and is signed by SignPath
+    (see "Windows Code Signing"). Nothing is signed on this machine.
   - Linux builds on the user-controlled `root@serrebiradio.com` Docker host and
     is copied back, hashed, manifested, and uploaded by `build.bat`.
-  - GitHub Actions builds and uploads macOS only.
+  - GitHub Actions builds and uploads Windows and macOS, then publishes.
 - Local build from macOS or Linux:
   - Run `./build.sh build`.
   - This builds the mac app (macOS) or Linux tarball locally only.
@@ -43,17 +49,17 @@ release.
 
 Use `.\build.bat release` on Windows to cut a release—never hand-assemble a GitHub release. It:
 
-- Creates `BlindRSS-update.json` for Windows auto-updates (locally by `build.bat`, or by the `windows` CI job when dispatched from `build.sh`).
-- Computes the release ZIP SHA-256 hash.
-- Builds the Program Files Windows installer and computes its SHA-256 hash.
-- Signs `BlindRSS.exe` and the installer locally via `signtool.exe`.
-- Bumps `core/version.py`, tags Git, pushes, and creates the GitHub release.
+- Bumps `core/version.py`, tags Git, pushes, and creates the GitHub release as a draft.
 - Builds Linux over SSH on `root@serrebiradio.com`, verifies the tarball includes
   the executable and bundled Python runtime, uploads it and
-  `BlindRSS-update-linux.json`, then dispatches GitHub Actions with Windows and
-  Linux disabled so CI builds macOS only.
+  `BlindRSS-update-linux.json`, then dispatches GitHub Actions with Linux
+  disabled so CI builds Windows and macOS.
+- The `windows` CI job builds the app, has SignPath sign `BlindRSS.exe`, builds
+  the ZIP and the Program Files installer around the signed exe, has SignPath
+  sign the installer, verifies all three signatures, and writes
+  `BlindRSS-update.json` with both SHA-256 hashes and the signing thumbprint.
 - Pushes to `main` also trigger GitHub Actions workflow builds for macOS and Linux as workflow artifacts so you can validate packaging without publishing a release. The Windows CI job only runs on `workflow_dispatch` (release cuts), not on every push, since it's a heavier build.
-- `build.bat release` forces the created GitHub release to published/latest, verifies there are no draft releases, and verifies GitHub's `/releases/latest` endpoint points at the new tag before exiting. Never leave draft releases behind. Do not automatically delete releases during this check; publish or delete drafts manually by exact tag if needed.
+- The release stays a draft until the workflow's `publish` job has seen all seven assets; it then publishes it as Latest. `build.bat release` waits for the run, then verifies there are no draft releases and that GitHub's `/releases/latest` endpoint points at the new tag before exiting. If the run fails, the draft stays: fix the cause and `gh run rerun <id> --failed`. Never leave draft releases behind. Do not automatically delete releases during this check; publish or delete drafts manually by exact tag if needed.
 
 ## Updater Visibility Rule
 
@@ -66,10 +72,10 @@ BlindRSS auto-update does not look at Git tags, commits on `main`, or GitHub Act
 - macOS: `BlindRSS-update-macos.json` -> `BlindRSS-macos-vX.Y.Z.zip`
 - Linux: `BlindRSS-update-linux.json` -> `BlindRSS-linux-vX.Y.Z.tar.gz`
 
-`build.bat release` creates the Windows manifest locally. It creates the Linux
-manifest after copying the server-built artifact back to Windows. The dispatched
-workflow creates only the macOS manifest and asset, so macOS may appear a few
-minutes after Windows and Linux.
+`build.bat release` creates the Linux manifest after copying the server-built
+artifact back to Windows. The dispatched workflow creates the Windows and macOS
+manifests and assets. Nothing is visible to the updater until the workflow
+publishes the draft.
 
 After cutting a release, the latest endpoint must return the new tag:
 
@@ -82,18 +88,32 @@ If this returns the previous tag, users will see "BlindRSS is up to date" for th
 `./build.sh release vX.Y.Z` re-dispatches the macOS CI build for an existing
 release. It does not bump the version or create a new release.
 
-## Emergency GitHub Actions Windows/Linux Builds
+## Windows Code Signing (SignPath)
 
-`cross-platform-release.yml` retains opt-in `build_windows` and `build_linux`
-inputs for disaster recovery, but the canonical `build.bat release` dispatch
-sets both false. Normal release assets must come from this Windows machine and
-`root@serrebiradio.com`, not hosted runners. The emergency Windows job needs two
-repo secrets:
+Release binaries are signed with a certificate issued to SignPath Foundation.
+The private key never leaves SignPath's HSM, and SignPath only signs artifacts
+that GitHub proves were built from this repository on a GitHub-hosted runner.
+That is why Windows cannot be built or signed locally for a release.
 
-- `WINDOWS_CODESIGN_PFX`: base64-encoded, password-protected PFX export of the code-signing certificate (`Export-PfxCertificate` on the machine that holds it, then base64-encode the file).
-- `WINDOWS_CODESIGN_PASSWORD`: the PFX's password.
+- SignPath project `BlindRSS`, artifact configuration `exe-in-zip` (takes a `version` parameter): a ZIP holding
+  one `BlindRSS*.exe` whose version resource has product name `BlindRSS` and
+  product version equal to the release version.
+- Signing policy `release-signing`: the trusted certificate; every request needs
+  approval in SignPath. Used by real releases only.
+- Signing policy `test-signing`: an untrusted test certificate, no approval.
+  Used by `cloud-release.yml` dry runs.
+- Repo secret `SIGNPATH_API_TOKEN`: API token of the SignPath CI user, which is
+  a submitter on both policies. Set it with
+  `gh secret set SIGNPATH_API_TOKEN --repo serrebidev/BlindRSS` (reads stdin).
+- The organization ID, project slug and artifact configuration slug are not
+  secret and are set in `env:` at the top of `cross-platform-release.yml`.
 
-The job imports the cert into `Cert:\CurrentUser\My` on the runner, installs VLC and Inno Setup via Chocolatey (VLC must land at `C:\Program Files\VideoLAN\VLC` — the path `main.spec` hardcodes), locates `signtool.exe` under the Windows SDK, then runs `build.bat build` with `SIGNTOOL_PATH` pointed at it. Rotate these secrets with `gh secret set WINDOWS_CODESIGN_PFX --repo serrebidev/BlindRSS` / `gh secret set WINDOWS_CODESIGN_PASSWORD --repo serrebidev/BlindRSS` (each reads the value from stdin) if the certificate is ever replaced.
+Test the whole pipeline without publishing or spending a release signature
+(builds `main` as it is, signs with `test-signing`, uploads workflow artifacts only):
+
+```powershell
+gh workflow run cloud-release.yml -f dry_run=true
+```
 
 The Linux CI job remains enabled on ordinary pushes as packaging validation and
 can be manually selected for an existing release, but it is not part of the
@@ -164,7 +184,9 @@ default release dispatch.
   what NVDA's app-version command and the JAWS equivalent read; an unstamped exe
   makes them announce "Application unknown, version not detected".
 - Preserves `dist\BlindRSS` user data (`rss.db`, `rss.db-wal`, `rss.db-shm`, `podcasts\`) between iterative builds.
-- Signs when possible (or skip with `SKIP_SIGN=1`).
+- Signs with whatever local certificate `signtool /a` finds, when possible (or
+  skip with `SKIP_SIGN=1`). That is a development signature only; it is not the
+  release certificate and is never published.
 - Produces:
   - `dist\BlindRSS\`
   - `dist\BlindRSS-vX.Y.Z.zip`
@@ -175,19 +197,19 @@ default release dispatch.
 ### `release`
 
 - Computes next version and bumps `core/version.py`.
-- Performs a clean build (wipes `build\` and `dist\`).
-- Compiles gettext `locale\<lang>\LC_MESSAGES\blindrss.po` catalogs to
-  generated `.mo` files before PyInstaller runs.
-- Signs executable.
-- Produces:
-  - `dist\BlindRSS-vX.Y.Z.zip`
-  - `dist\BlindRSS-Setup-vX.Y.Z.exe`
-  - `dist\BlindRSS-update.json`
-  - `dist\release-notes-vX.Y.Z.md`
+- Does not build Windows. Produces `dist\release-notes-vX.Y.Z.md` and the Linux
+  tarball and manifest.
 - Updates `CHANGELOG.md`, commits the version bump + changelog entry, tags,
-  pushes, creates GitHub release assets (ZIP + installer + manifest), and
-  builds/uploads Linux through `root@serrebiradio.com`, then dispatches the
-  `cross-platform-release.yml` workflow to attach macOS to the same release.
+  pushes, creates a draft GitHub release, builds/uploads Linux through
+  `root@serrebiradio.com`, then dispatches the `cross-platform-release.yml`
+  workflow to build and attach Windows and macOS, waits for it, and verifies the
+  release is published as Latest.
+
+### `app` and `package`
+
+The two halves of `build`, used by the `windows` CI job so SignPath can sign
+`BlindRSS.exe` in between. `app` runs PyInstaller only. `package` builds the ZIP
+and the installer from the existing `dist\BlindRSS`. Neither signs.
 
 ## Windows Installer and Data Locations
 
@@ -252,8 +274,7 @@ default release dispatch.
 
 ## Optional Environment Variables
 
-- `SIGNTOOL_PATH`: override default signtool path.
-- `SIGN_CERT_THUMBPRINT`: force manifest signing thumbprint value.
+- `SIGNTOOL_PATH`: override default signtool path (local `build` only).
 - `INNO_SETUP_COMPILER`: full path to `ISCC.exe` when auto-detection is not
   sufficient.
 - `SKIP_SIGN=1`: skip signing in `build` mode only.

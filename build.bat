@@ -13,12 +13,16 @@ if "%MODE%"=="" set "MODE=build"
 
 if /I "%MODE%"=="build" (
     rem ok
+) else if /I "%MODE%"=="app" (
+    rem ok
+) else if /I "%MODE%"=="package" (
+    rem ok
 ) else if /I "%MODE%"=="release" (
     rem ok
 ) else if /I "%MODE%"=="dry-run" (
     rem ok
 ) else (
-    echo Usage: build.bat ^<build^|release^|dry-run^>
+    echo Usage: build.bat ^<build^|app^|package^|release^|dry-run^>
     exit /b 1
 )
 
@@ -41,15 +45,12 @@ if /I "%MODE%"=="dry-run" (
     if errorlevel 1 exit /b 1
     call :compute_next_version
     if errorlevel 1 exit /b 1
-    call :find_inno_setup
-    if errorlevel 1 exit /b 1
     call :verify_linux_builder
     if errorlevel 1 exit /b 1
     echo [Dry Run] Latest tag: !LATEST_TAG!
     echo [Dry Run] Next version: v!NEXT_VERSION! [!BUMP! bump]
-    echo [Dry Run] Inno Setup compiler: !INNO_SETUP_EXE!
     echo [Dry Run] Linux builder: %LINUX_BUILD_HOST% [Docker, Ubuntu 22.04]
-    echo [Dry Run] Would bump core/version.py, compile translations, build and sign Windows locally, create the portable ZIP and Program Files installer, generate release notes, update CHANGELOG.md, generate the Windows manifest, tag, push to "%RELEASE_REMOTE%", create a GitHub release in "%GITHUB_REPO_SLUG%", build Linux over SSH on %LINUX_BUILD_HOST%, upload the Linux tarball and manifest, and dispatch the macOS GitHub Actions asset build.
+    echo [Dry Run] Would bump core/version.py, generate release notes, update CHANGELOG.md, tag, push to "%RELEASE_REMOTE%", create a draft GitHub release in "%GITHUB_REPO_SLUG%", build Linux over SSH on %LINUX_BUILD_HOST%, upload the Linux tarball and manifest, dispatch the GitHub Actions build that builds macOS and builds and SignPath-signs Windows, wait for it, and verify the release is published as Latest.
     goto :done
 )
 
@@ -75,31 +76,15 @@ if /I "%MODE%"=="release" (
     "%TOOL_PY%" tools\release.py bump-version --version !VERSION_NO_V!
     if errorlevel 1 exit /b 1
 
-    call :build_app
-    if errorlevel 1 exit /b 1
-    call :sign_exe
-    if errorlevel 1 exit /b 1
-    call :zip_release
-    if errorlevel 1 exit /b 1
-    call :hash_zip
-    if errorlevel 1 exit /b 1
-    call :build_installer
-    if errorlevel 1 exit /b 1
-    call :sign_installer
-    if errorlevel 1 exit /b 1
-    call :hash_installer
-    if errorlevel 1 exit /b 1
     call :write_notes
     if errorlevel 1 exit /b 1
     call :update_changelog
-    if errorlevel 1 exit /b 1
-    call :write_manifest
     if errorlevel 1 exit /b 1
     call :git_release
     if errorlevel 1 exit /b 1
     call :build_linux_release
     if errorlevel 1 exit /b 1
-    call :dispatch_macos_release
+    call :dispatch_ci_release
     if errorlevel 1 exit /b 1
 ) else (
     call :compute_current_version
@@ -107,20 +92,33 @@ if /I "%MODE%"=="release" (
     set "VERSION_NO_V=!CURRENT_VERSION!"
     set "VERSION_TAG=v!CURRENT_VERSION!"
 
-    call :build_app
-    if errorlevel 1 exit /b 1
-    call :sign_exe
-    if errorlevel 1 exit /b 1
-    call :zip_release
-    if errorlevel 1 exit /b 1
-    call :hash_zip
-    if errorlevel 1 exit /b 1
-    call :build_installer
-    if errorlevel 1 exit /b 1
-    call :sign_installer
-    if errorlevel 1 exit /b 1
-    call :hash_installer
-    if errorlevel 1 exit /b 1
+    rem app + package are the two halves of build, split so CI can have SignPath
+    rem sign BlindRSS.exe before it goes into the ZIP and the installer. They
+    rem never sign: a release is signed by SignPath in GitHub Actions only.
+    if /I not "%MODE%"=="package" (
+        call :build_app
+        if errorlevel 1 exit /b 1
+    )
+    if /I "%MODE%"=="build" (
+        call :sign_exe
+        if errorlevel 1 exit /b 1
+    )
+    if /I not "%MODE%"=="app" (
+        call :zip_release
+        if errorlevel 1 exit /b 1
+        call :hash_zip
+        if errorlevel 1 exit /b 1
+        call :build_installer
+        if errorlevel 1 exit /b 1
+    )
+    if /I "%MODE%"=="build" (
+        call :sign_installer
+        if errorlevel 1 exit /b 1
+    )
+    if /I not "%MODE%"=="app" (
+        call :hash_installer
+        if errorlevel 1 exit /b 1
+    )
 )
 
 goto :done
@@ -569,17 +567,6 @@ if not defined INSTALLER_SHA (
 )
 exit /b 0
 
-:write_manifest
-set "MANIFEST_PATH=%SCRIPT_DIR%dist\BlindRSS-update.json"
-echo [BlindRSS Build] Writing update manifest...
-if defined SIGNING_THUMBPRINT (
-    "%TOOL_PY%" tools\release.py write-manifest --version-tag "%VERSION_TAG%" --asset-name "%ZIP_NAME%" --sha256 "%ZIP_SHA%" --installer-asset-name "%INSTALLER_NAME%" --installer-sha256 "%INSTALLER_SHA%" --output "%MANIFEST_PATH%" --notes-summary-file "%SUMMARY_FILE%" --signing-thumbprint "!SIGNING_THUMBPRINT!"
-) else (
-    "%TOOL_PY%" tools\release.py write-manifest --version-tag "%VERSION_TAG%" --asset-name "%ZIP_NAME%" --sha256 "%ZIP_SHA%" --installer-asset-name "%INSTALLER_NAME%" --installer-sha256 "%INSTALLER_SHA%" --output "%MANIFEST_PATH%" --notes-summary-file "%SUMMARY_FILE%"
-)
-if errorlevel 1 exit /b 1
-exit /b 0
-
 :git_release
 echo [BlindRSS Release] Committing version bump...
 git add core\version.py CHANGELOG.md core\user_agents.py
@@ -602,21 +589,10 @@ if errorlevel 1 (
     echo [X] gh CLI not found in PATH.
     exit /b 1
 )
-gh release create "%VERSION_TAG%" "%ZIP_PATH%" "%INSTALLER_PATH%" "%MANIFEST_PATH%" --repo "%GITHUB_REPO_SLUG%" --title "%VERSION_TAG%" --notes-file "%RELEASE_NOTES%" --latest
-if errorlevel 1 exit /b 1
-
-rem The Windows updater queries /releases/latest, which silently skips drafts.
-rem gh release create has been observed leaving releases as drafts under some
-rem configurations, so explicitly publish and mark this release as Latest.
-echo [BlindRSS Release] Ensuring %VERSION_TAG% is published and marked as Latest...
-gh release edit "%VERSION_TAG%" --repo "%GITHUB_REPO_SLUG%" --draft=false --latest
-if errorlevel 1 (
-    echo [X] Failed to publish %VERSION_TAG% as Latest. The Windows updater will not see it until this is resolved.
-    exit /b 1
-)
-call :verify_no_draft_releases
-if errorlevel 1 exit /b 1
-call :verify_latest_release
+rem Draft: the updater queries /releases/latest, which skips drafts, so users
+rem never see a release that is still missing a platform. The GitHub Actions
+rem build publishes it as Latest once all seven assets are uploaded.
+gh release create "%VERSION_TAG%" --repo "%GITHUB_REPO_SLUG%" --draft --verify-tag --title "%VERSION_TAG%" --notes-file "%RELEASE_NOTES%"
 if errorlevel 1 exit /b 1
 exit /b 0
 
@@ -727,14 +703,51 @@ if errorlevel 1 exit /b 1
 echo [BlindRSS Release] Linux assets uploaded for %VERSION_TAG%.
 exit /b 0
 
-:dispatch_macos_release
-echo [BlindRSS Release] Dispatching GitHub Actions macOS artifact build in %GITHUB_REPO_SLUG%...
-gh workflow run "cross-platform-release.yml" --repo "%GITHUB_REPO_SLUG%" --ref "%VERSION_TAG%" -f release_tag="%VERSION_TAG%" -f build_windows=false -f build_linux=false
+:dispatch_ci_release
+rem Dispatched on the default branch, whose HEAD is the release commit just
+rem pushed: SignPath records the branch and commit the workflow ran on.
+echo [BlindRSS Release] Dispatching GitHub Actions Windows and macOS build in %GITHUB_REPO_SLUG%...
+set "CI_RUN_LIST=gh run list --repo "%GITHUB_REPO_SLUG%" --workflow cross-platform-release.yml --event workflow_dispatch --limit 1 --json databaseId --jq .[].databaseId"
+set "PREVIOUS_RUN_ID="
+for /f "delims=" %%R in ('!CI_RUN_LIST! 2^>nul') do set "PREVIOUS_RUN_ID=%%R"
+gh workflow run "cross-platform-release.yml" --repo "%GITHUB_REPO_SLUG%" -f release_tag="%VERSION_TAG%" -f build_windows=true -f build_linux=false -f publish_assets=true -f publish_release=true -f signing_policy=release-signing
 if errorlevel 1 (
-    echo [X] Failed to dispatch the macOS GitHub Actions build.
+    echo [X] Failed to dispatch the GitHub Actions build.
     exit /b 1
 )
-echo [BlindRSS Release] macOS build dispatched for %VERSION_TAG%.
+rem The new run is the first one whose id differs from the newest run before the dispatch.
+set "CI_RUN_ID="
+for /L %%N in (1,1,24) do (
+    if not defined CI_RUN_ID (
+        timeout /t 5 /nobreak >nul
+        for /f "delims=" %%R in ('!CI_RUN_LIST! 2^>nul') do (
+            if not "%%R"=="!PREVIOUS_RUN_ID!" set "CI_RUN_ID=%%R"
+        )
+    )
+)
+if not defined CI_RUN_ID (
+        timeout /t 5 /nobreak >nul
+        for /f "delims=" %%R in ('gh run list --repo "%GITHUB_REPO_SLUG%" --workflow "cross-platform-release.yml" --event workflow_dispatch --status in_progress --limit 1 --json databaseId --jq ".[].databaseId" 2^>nul') do (
+            set "CI_RUN_ID=%%R"
+        )
+    )
+)
+if not defined CI_RUN_ID (
+    echo [X] The dispatched GitHub Actions run did not appear. %VERSION_TAG% is still a draft.
+    exit /b 1
+)
+echo [BlindRSS Release] Watching run !CI_RUN_ID!.
+echo [BlindRSS Release] ACTION NEEDED: approve two signing requests at https://app.signpath.io when they appear - BlindRSS.exe first, then the installer.
+gh run watch !CI_RUN_ID! --repo "%GITHUB_REPO_SLUG%" --exit-status --interval 30 >nul
+if errorlevel 1 (
+    echo [X] GitHub Actions run !CI_RUN_ID! failed. %VERSION_TAG% is still a draft.
+    echo [X] Fix the cause, then: gh run rerun !CI_RUN_ID! --repo "%GITHUB_REPO_SLUG%" --failed
+    exit /b 1
+)
+call :verify_no_draft_releases
+if errorlevel 1 exit /b 1
+call :verify_latest_release
+if errorlevel 1 exit /b 1
 exit /b 0
 
 :done

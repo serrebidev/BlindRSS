@@ -32,6 +32,7 @@ A vibe-coded, screen-reader-friendly desktop RSS and podcast client for Windows,
 - An offline user guide under Help, with context-sensitive F1: pressing it on a control, a dialog, or a highlighted menu item opens the guide at that section.
 - Translated into 15 languages, with catalog updates delivered between app releases.
 - Built-in updater that verifies SHA-256 and Authenticode before applying an update.
+- Signed Windows builds. See the [code signing policy](#code-signing-policy).
 
 ## Help
 
@@ -67,6 +68,23 @@ Download the matching `…-macos.zip` or `…-linux.tar.gz` asset from the same 
 
 Installed builds keep your settings and database in `%APPDATA%\BlindRSS` and default episode downloads to your Downloads folder. Uninstalling leaves your data untouched.
 
+## Code signing policy
+
+Free code signing provided by [SignPath.io](https://about.signpath.io), certificate by [SignPath Foundation](https://signpath.org).
+
+Windows releases are built from this repository on GitHub-hosted runners by [`cross-platform-release.yml`](.github/workflows/cross-platform-release.yml) and signed by SignPath. Only `BlindRSS.exe` and the BlindRSS installer are signed; bundled third-party components such as VLC, ffmpeg, yt-dlp and Deno are shipped as their own projects release them.
+
+Team roles:
+
+- Committers and reviewers: [serrebidev](https://github.com/serrebidev), the repository owner. Pull requests from anyone else are reviewed by the owner before they are merged.
+- Approvers: [serrebidev](https://github.com/serrebidev). Every release signing request is approved by hand.
+
+## Privacy policy
+
+This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.
+
+BlindRSS has no telemetry, analytics or accounts of its own. It connects to the feeds, podcast and video hosts, feed search providers, hosted reader services and casting devices you choose to use, each under its own privacy policy. It also checks this repository's GitHub releases for app updates, and downloads translation updates and updates to the yt-dlp media helper; automatic update checks can be turned off in Settings.
+
 ## Run from source (any OS)
 
 1. Install Python 3.14.
@@ -75,7 +93,7 @@ Installed builds keep your settings and database in `%APPDATA%\BlindRSS` and def
 
 ## Building
 
-See [`build.md`](build.md) for the full release pipeline — PyInstaller packaging, Authenticode signing, the Program Files installer, and the macOS/Linux build dispatch.
+See [`build.md`](build.md) for the full release pipeline — PyInstaller packaging, SignPath code signing, the Program Files installer, and the Windows/macOS/Linux build dispatch.
 
 ## Debug logging
 
