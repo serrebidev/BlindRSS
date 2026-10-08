@@ -64,17 +64,25 @@ def test_build_python_missing_message_is_safe_inside_cmd_block():
 
 
 def test_release_uploads_installer_and_manifest_contains_installer_hash():
-    text = BUILD.read_text(encoding="utf-8")
+    # The Windows manifest is written where the SignPath-signed files exist: CI.
+    text = WORKFLOW.read_text(encoding="utf-8")
 
     assert "--installer-asset-name" in text
     assert "--installer-sha256" in text
-    assert '"%INSTALLER_PATH%" "%MANIFEST_PATH%"' in text
+    assert "--signing-thumbprint" in text
 
 
-def test_windows_release_skips_redundant_windows_ci_build():
+def test_installer_version_resource_names_the_product_for_signpath():
+    text = ISS.read_text(encoding="utf-8")
+
+    assert "VersionInfoProductName={#MyAppName}" in text
+    assert "VersionInfoProductVersion={#MyAppVersion}" in text
+
+
+def test_windows_release_builds_windows_in_ci():
     build_text = BUILD.read_text(encoding="utf-8")
     workflow_text = WORKFLOW.read_text(encoding="utf-8")
 
-    assert '-f build_windows=false' in build_text
+    assert '-f build_windows=true' in build_text
     assert "build_windows:" in workflow_text
     assert "inputs.build_windows" in workflow_text

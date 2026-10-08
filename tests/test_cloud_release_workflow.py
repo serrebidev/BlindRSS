@@ -37,14 +37,18 @@ def test_cloud_release_pushes_and_publishes_only_for_real_runs():
     tag_step = prepare["Commit, tag and create draft release"]
     assert tag_step["if"] == "${{ !inputs.dry_run }}"
     assert "--draft" in tag_step["run"] and "git push --atomic" in tag_step["run"]
-    publish = wf["jobs"]["publish"]
-    assert publish["if"] == "${{ !inputs.dry_run }}"
-    assert set(publish["needs"]) == {"prepare", "build"}
-    assert wf["jobs"]["build"]["with"]["publish_assets"] == "${{ !inputs.dry_run }}"
+    build = wf["jobs"]["build"]["with"]
+    assert build["publish_assets"] == "${{ !inputs.dry_run }}"
+    assert build["publish_release"] == "${{ !inputs.dry_run }}"
+    # A dry run must never spend a release signature.
+    assert build["signing_policy"] == "${{ inputs.dry_run && 'test-signing' || 'release-signing' }}"
 
 
-def test_cloud_release_verifies_every_asset_before_publishing_latest():
-    steps = _load("cloud-release.yml")["jobs"]["publish"]["steps"]
+def test_release_verifies_every_asset_before_publishing_latest():
+    publish = _load("cross-platform-release.yml")["jobs"]["publish"]
+    assert set(publish["needs"]) == {"windows", "macos", "linux"}
+    assert "inputs.publish_release" in publish["if"] and "failure" in publish["if"]
+    steps = publish["steps"]
     names = [s["name"] for s in steps]
     assert names.index("Verify every platform uploaded its assets") < names.index("Publish as Latest")
     verify = steps[0]["run"]
@@ -68,10 +72,37 @@ def test_cloud_release_builds_all_platforms_with_signing_secrets():
 def test_cross_platform_workflow_is_reusable_and_gates_uploads():
     wf = _load("cross-platform-release.yml")
     call_inputs = wf["on"]["workflow_call"]["inputs"]
-    assert {"release_tag", "ref", "build_windows", "build_linux", "publish_assets"} <= set(call_inputs)
+    assert {"release_tag", "ref", "build_windows", "build_linux", "publish_assets",
+            "publish_release", "signing_policy"} <= set(call_inputs)
     for job in ("windows", "macos", "linux"):
         for step in wf["jobs"][job]["steps"]:
             if "gh release upload" in str(step.get("run", "")):
                 assert "inputs.publish_assets" in step["if"], (job, step["name"])
     win = [s["name"] for s in wf["jobs"]["windows"]["steps"]]
     assert win.index("Verify Authenticode signatures") < win.index("Upload release assets")
+
+
+def test_windows_is_signed_by_signpath_exe_first_then_installer():
+    wf = _load("cross-platform-release.yml")
+    steps = wf["jobs"]["windows"]["steps"]
+    names = [s["name"] for s in steps]
+    order = ["Build application", "Sign executable with SignPath",
+             "Package ZIP and installer around the signed executable",
+             "Sign installer with SignPath", "Verify Authenticode signatures"]
+    assert [names.index(n) for n in order] == sorted(names.index(n) for n in order)
+    for step in steps:
+        if "signpath/" in str(step.get("uses", "")):
+            assert step["with"]["signing-policy-slug"] == "${{ inputs.signing_policy }}"
+            assert step["with"]["api-token"] == "${{ secrets.SIGNPATH_API_TOKEN }}"
+    # No certificate or private key ever reaches the repository or a runner.
+    text = (WORKFLOWS / "cross-platform-release.yml").read_text(encoding="utf-8")
+    assert "PFX" not in text and "signtool" not in text.lower()
+
+
+def test_local_release_never_builds_or_signs_windows():
+    bat = (ROOT / "build.bat").read_text(encoding="utf-8")
+    release = bat[bat.index('if /I "%MODE%"=="release" ('):bat.index(") else (\n    call :compute_current_version")]
+    for call in ("build_app", "sign_exe", "sign_installer", "build_installer"):
+        assert f"call :{call}" not in release
+    assert "call :dispatch_ci_release" in release
+    assert "--draft --verify-tag" in bat and "signing_policy=release-signing" in bat
