@@ -529,6 +529,10 @@ if not exist "%INSTALLER_PATH%" (
     echo [X] Installer output was not created at "%INSTALLER_PATH%".
     exit /b 1
 )
+rem Inno Setup pads its version strings with spaces; SignPath matches the
+rem product name and version exactly, so strip the padding before signing.
+"%TOOL_PY%" tools\build_utils.py trim-version-strings --exe "%INSTALLER_PATH%"
+if errorlevel 1 exit /b 1
 exit /b 0
 
 :sign_installer
