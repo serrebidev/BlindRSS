@@ -202,6 +202,17 @@ jobs:
           }
           "thumbprint=$pinned" >> $env:GITHUB_OUTPUT
 
+      # build.bat edits the installer's version strings in place after Inno
+      # Setup compiles it; prove the signed result still installs.
+      - name: Install the signed installer silently
+        run: |
+          $version = "${{ inputs.release_tag }}".TrimStart('v')
+          $dir = Join-Path $env:RUNNER_TEMP "install-smoke"
+          $p = Start-Process "dist\BlindRSS-Setup-v$version.exe" -Wait -PassThru -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=`"$dir`""
+          if ($p.ExitCode -ne 0) { throw "Installer exited with code $($p.ExitCode)" }
+          if (-not (Test-Path (Join-Path $dir "BlindRSS.exe"))) { throw "Installer did not install BlindRSS.exe" }
+          "Installed to $dir"
+
       - name: Compute checksums and write update manifest
         id: manifest
         run: |
