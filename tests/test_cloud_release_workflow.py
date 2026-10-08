@@ -106,3 +106,22 @@ def test_local_release_never_builds_or_signs_windows():
         assert f"call :{call}" not in release
     assert "call :dispatch_ci_release" in release
     assert "--draft --verify-tag" in bat and "signing_policy=release-signing" in bat
+
+
+def test_cloud_caller_grants_what_the_signing_job_needs():
+    # A called workflow can only keep or reduce its caller's permissions.
+    called = _load("cross-platform-release.yml")["permissions"]
+    caller = _load("cloud-release.yml")["permissions"]
+    assert called == caller == {"contents": "write", "actions": "read"}
+
+
+def test_dispatch_block_parentheses_balance():
+    bat = (ROOT / "build.bat").read_text(encoding="utf-8")
+    block = bat[bat.index("\n:dispatch_ci_release\n"):bat.index("\n:done")]
+    depth = 0
+    for line in block.splitlines():
+        if line.startswith(("echo ", "rem ", "set ")):
+            continue
+        depth += line.rstrip().endswith("(") - (line.strip() == ")")
+        assert depth >= 0, line
+    assert depth == 0
