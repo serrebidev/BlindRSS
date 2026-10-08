@@ -88,7 +88,8 @@ def test_windows_is_signed_by_signpath_exe_first_then_installer():
     names = [s["name"] for s in steps]
     order = ["Build application", "Sign executable with SignPath",
              "Package ZIP and installer around the signed executable",
-             "Sign installer with SignPath", "Verify Authenticode signatures"]
+             "Sign installer with SignPath", "Verify Authenticode signatures",
+             "Install the signed installer silently", "Upload release assets"]
     assert [names.index(n) for n in order] == sorted(names.index(n) for n in order)
     for step in steps:
         if "signpath/" in str(step.get("uses", "")):
