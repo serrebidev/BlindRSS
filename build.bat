@@ -726,13 +726,6 @@ for /L %%N in (1,1,24) do (
     )
 )
 if not defined CI_RUN_ID (
-        timeout /t 5 /nobreak >nul
-        for /f "delims=" %%R in ('gh run list --repo "%GITHUB_REPO_SLUG%" --workflow "cross-platform-release.yml" --event workflow_dispatch --status in_progress --limit 1 --json databaseId --jq ".[].databaseId" 2^>nul') do (
-            set "CI_RUN_ID=%%R"
-        )
-    )
-)
-if not defined CI_RUN_ID (
     echo [X] The dispatched GitHub Actions run did not appear. %VERSION_TAG% is still a draft.
     exit /b 1
 )
