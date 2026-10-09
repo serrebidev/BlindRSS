@@ -340,7 +340,7 @@ class TheOldReaderProvider(HostedPodcastArchiveMixin, RSSProvider):
         
         try:
             real_feed_id = feed_id
-            params = {"output": "json", "n": 50}
+            params = {"output": "json"}
 
             if feed_id.startswith("unread:"):
                 real_feed_id = feed_id[7:]
@@ -362,14 +362,26 @@ class TheOldReaderProvider(HostedPodcastArchiveMixin, RSSProvider):
             # Use 's' parameter for stream ID to avoid path encoding issues with TheOldReader
             url = f"{self.base_url}/stream/contents"
             params["s"] = stream_id
-            
-            log.debug(f"TheOldReader: Fetching articles for {stream_id} -> {url} params={params}")
-            resp = requests.get(url, headers=self._headers(), params=params, timeout=self._timeout_s())
-            log.debug(f"TheOldReader: Article fetch status: {resp.status_code}. Final URL: {resp.url}")
-            resp.raise_for_status()
-            data = resp.json()
-            
-            items = data.get("items", [])
+            params["n"] = 1000
+
+            # Paginate via continuation token to get the full feed, not just the first page
+            items = []
+            continuation = None
+            while True:
+                page_params = dict(params)
+                if continuation:
+                    page_params["c"] = continuation
+                log.debug(f"TheOldReader: Fetching articles for {stream_id} -> {url} params={page_params}")
+                resp = requests.get(url, headers=self._headers(), params=page_params, timeout=self._timeout_s())
+                log.debug(f"TheOldReader: Article fetch status: {resp.status_code}. Final URL: {resp.url}")
+                resp.raise_for_status()
+                data = resp.json()
+
+                page_items = data.get("items", [])
+                items.extend(page_items)
+                continuation = data.get("continuation")
+                if not continuation or not page_items:
+                    break
             log.info(f"TheOldReader: Found {len(items)} items in API response.")
             
             article_ids = [str(item["id"]) for item in items]
