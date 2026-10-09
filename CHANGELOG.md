@@ -4,6 +4,16 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.2.0 - 2026-10-09
+
+- SponsorBlock skipping, YouTube account sync, and data backup.
+- Strip Inno Setup padding from installer version strings.
+- Grant actions read in cloud-release so SignPath can fetch the artifact.
+- Remove stray block that broke build.bat release after dispatch.
+- Add trim-version-strings to build_utils.
+- Stamp product name and version for SignPath.
+- Sign Windows releases with SignPath in GitHub Actions.
+
 ## v2.1.1 - 2026-10-08
 
 - Status bar text reaches NVDA in full, playback time first (#113).
