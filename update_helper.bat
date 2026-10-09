@@ -42,7 +42,7 @@ rem it is never moved out and never restored: it stays where it is while the
 rem build swaps around it. See core/browser_feed.py,
 rem core/youtube_browser_session.py, core/play_cache.py, core/site_cookies.py
 rem and core/chromium_cookies.py.
-set "SKIP_DIRS=.git .venv __pycache__ feed_browser_profile feed_browser_pydoll_profile youtube_browser_profile feed_browser_runtime ytplay_cache podcasts"
+set "SKIP_DIRS=.git .venv __pycache__ feed_browser_profile feed_browser_pydoll_profile youtube_browser_profile feed_browser_runtime ytplay_cache podcasts backups restore_pending"
 set "SKIP_FILES=site_cookies.txt site_cookies_ua.txt site_cookies_ua_hosts.json chromium_v20_keys.json blindrss.log"
 
 call :main >> "%LOG_FILE%" 2>&1

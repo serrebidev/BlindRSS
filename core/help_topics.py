@@ -235,6 +235,9 @@ COMMAND_TOPICS: Dict[str, str] = {
 
     "tools.filter_rules": "filter-rules",
     "tools.import_site_cookies": "site-cookies",
+    "tools.youtube_account": "import-youtube-takeout",
+    "tools.backup_data": "export-opml",
+    "tools.restore_data": "export-opml",
     "tools.persistent_search": "persistent-search",
     "tools.keyboard_shortcuts": "keyboard-shortcuts",
     "tools.settings": "settings",
@@ -267,6 +270,7 @@ DIALOG_TOPICS: Dict[str, str] = {
     "TakeoutImportSelectionDialog": "import-youtube-takeout",
     "ExcludeNotificationFeedsDialog": "notifications",
     "ImportSiteCookiesDialog": "site-cookies",
+    "YouTubeAccountDialog": "import-youtube-takeout",
     "SettingsDialog": "settings",
     "FeedPropertiesDialog": "feed-properties",
     "CategoryPropertiesDialog": "category-properties",

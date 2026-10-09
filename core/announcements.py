@@ -112,6 +112,12 @@ EVENTS: List[Event] = [
         DEFAULT_MODE,
     ),
     Event(
+        "sponsor_skip",
+        "SponsorBlock skip",
+        "Announce when a sponsor or other SponsorBlock segment is skipped.",
+        DEFAULT_MODE,
+    ),
+    Event(
         "general",
         "Other notifications",
         "Announce other significant interface changes and notifications.",
@@ -150,6 +156,8 @@ _POT_ANCHORS = (
     _("Announce the current playback speed when it is changed by keyboard."),
     _("Media and chapter navigation"),
     _("Announce the item or chapter when moving to the next/previous one."),
+    _("SponsorBlock skip"),
+    _("Announce when a sponsor or other SponsorBlock segment is skipped."),
     _("Other notifications"),
     _("Announce other significant interface changes and notifications."),
     _("None"),

@@ -113,7 +113,7 @@ restore_user_data_linux() {
   # the downloaded driver/Chrome-for-Testing runtime. See core/browser_feed.py,
   # core/youtube_browser_session.py, core/play_cache.py, core/site_cookies.py
   # and core/chromium_cookies.py.
-  for f in feed_browser_profile feed_browser_pydoll_profile            youtube_browser_profile feed_browser_runtime ytplay_cache            site_cookies.txt site_cookies_ua.txt site_cookies_ua_hosts.json            chromium_v20_keys.json; do
+  for f in feed_browser_profile feed_browser_pydoll_profile            youtube_browser_profile feed_browser_runtime ytplay_cache backups restore_pending            site_cookies.txt site_cookies_ua.txt site_cookies_ua_hosts.json            chromium_v20_keys.json; do
     restore_file "$f"
   done
 }

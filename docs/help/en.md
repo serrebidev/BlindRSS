@@ -400,6 +400,19 @@ Use it to back up your subscriptions, to move them to another reader or
 machine, or to share a set of feeds with someone else. Export Category to OPML
 on a category's context menu exports only that branch.
 
+OPML holds only the subscriptions. File, Back Up Data saves everything else
+too: settings, subscriptions, read and favorite state, Filter Rules, Smart
+Folders, playback positions and saved site cookies, in one ZIP file. The backup
+contains your passwords, API keys and cookies, so keep it private.
+
+File, Restore Data replaces this copy's data with a backup. BlindRSS asks first,
+then restarts to finish, because the database cannot be swapped while it is
+open.
+
+Settings, General can also back up automatically once a day. It keeps the last
+seven automatic backups, in a Backups folder next to your data unless you choose
+another folder.
+
 ## Importing a YouTube Takeout Archive {#import-youtube-takeout}
 
 Google Takeout is Google's data-export service. A YouTube Takeout archive is a
@@ -429,6 +442,25 @@ groups to import:
 Duplicate addresses are removed, so importing a second archive later adds only
 what is new. The ZIP is never unpacked to disk; only the small data files inside
 it are read.
+
+Instead of a Takeout archive, Tools, YouTube Account can sign in to your
+YouTube account and keep following it. Choose Sign In. BlindRSS shows a short
+code in the status field. Go to google.com/device in your browser (the Open
+Sign-in Page button does this, and Copy Code puts the code on the clipboard),
+enter the code, and approve. You never type your password into BlindRSS.
+
+Once you approve, BlindRSS asks which category the channels go in. Pick one
+from the list, or choose New Category to create one there. Every channel you
+subscribe to is then added as a feed. After that BlindRSS checks every six
+hours and adds channels you have subscribed to since. Add New Subscriptions Now
+checks immediately, and Change Category picks a different category for channels
+added later.
+
+Each channel is added only once. If you remove a channel's feed from BlindRSS,
+it is not added back, and unsubscribing on YouTube does not remove its feed.
+Sign Out forgets the sign-in and leaves your feeds alone. To revoke access from
+Google's side, remove "YouTube TV" under Your connections to third-party apps
+and services at myaccount.google.com.
 
 ## Persistent Searches {#persistent-search}
 
@@ -809,6 +841,8 @@ Pressing F1 on a tab opens that tab's section of this guide.
   blindrss.log next to your data.
 - Startup and tray: close to tray, minimize to tray, start in the tray, always
   start maximized, and check for updates on startup.
+- Backup: back up your data automatically once a day, and the folder to keep
+  those backups in. See Exporting OPML for what a backup contains.
 
 ## Settings: Feeds and Articles {#settings-feeds}
 
@@ -835,6 +869,18 @@ Pressing F1 on a tab opens that tab's section of this guide.
   reliable option.
 - The YouTube playback cache folder, its maximum size in megabytes, and a
   button to clear it now.
+- "Skip SponsorBlock segments in YouTube videos", and which kinds of segment to
+  skip: sponsors, self promotion, subscribe reminders, intros, endcards,
+  previews, filler, and non-music parts of music videos. Sponsors, self
+  promotion and subscribe reminders are skipped by default.
+
+SponsorBlock is a free, volunteer-run database of where those segments are in
+YouTube videos. When playback reaches one, BlindRSS jumps past it and says what
+it skipped and for how long; Settings, Notifications sets how that is
+announced. Each segment is skipped once, so if you go back into one on purpose
+it plays. Lookups send SponsorBlock only the first four characters of a hash of
+the video's ID, never which video you are watching. Not every video has
+segments submitted, and a skip may be slightly early or late.
 
 Cookies are what make age-restricted and members-only videos playable, and they
 are what a "sign in to confirm you're not a bot" error is asking for.

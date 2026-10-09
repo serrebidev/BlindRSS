@@ -3218,6 +3218,56 @@ class PlayerFrame(wx.Frame):
         except Exception:
             pass
 
+    def _start_sponsorblock_lookup(self, url: str, load_seq: int) -> None:
+        """Fetch SponsorBlock segments for a YouTube item off the UI thread."""
+        self._sponsor_segments = []
+        self._sponsor_done = set()
+        from core import sponsorblock
+        from core.youtube_fulltext import video_id_from_url
+
+        if not video_id_from_url(url) or not sponsorblock.skip_categories(self.config_manager.get):
+            return
+
+        def worker():
+            segments = sponsorblock.segments_for_url(url, self.config_manager.get)
+            if segments:
+                wx.CallAfter(self._set_sponsor_segments, segments, load_seq)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _set_sponsor_segments(self, segments, load_seq: int) -> None:
+        if int(load_seq) == int(getattr(self, "_active_load_seq", 0) or 0):
+            self._sponsor_segments = list(segments)
+
+    def _maybe_skip_sponsor(self, pos_ms: int) -> None:
+        """Jump over the SponsorBlock segment playback is in, once per segment.
+
+        A segment counts as done once skipped, so seeking back into it on
+        purpose plays it.
+        """
+        segments = getattr(self, "_sponsor_segments", None)
+        if not segments or self.is_casting or getattr(self, "_is_dragging_slider", False):
+            return
+        if getattr(self, "_pending_resume_seek_ms", None) is not None:
+            return
+        from core import sponsorblock
+
+        seg = sponsorblock.segment_at(segments, pos_ms / 1000.0, self._sponsor_done)
+        if seg is None:
+            return
+        self._sponsor_done.add(seg["uuid"])
+        self._apply_seek_time_ms(int(seg["end"] * 1000), force=True, reason="sponsorblock")
+        label = _(sponsorblock.CATEGORIES.get(seg["category"], seg["category"]))
+        text = _("Skipped {category}, {seconds} seconds").format(
+            category=label, seconds=int(round(seg["end"] - seg["start"]))
+        )
+        try:
+            announce = getattr(self.GetParent(), "_announce_event", None)
+            if callable(announce):
+                announce("sponsor_skip", text)
+        except Exception:
+            log.debug("SponsorBlock announcement failed", exc_info=True)
+
     def _maybe_skip_silence(self, pos_ms: int) -> None:
         if not self.config_manager.get("skip_silence", False):
             return
@@ -4429,6 +4479,7 @@ class PlayerFrame(wx.Frame):
         except Exception:
             pass
         self._cancel_silence_scan()
+        self._start_sponsorblock_lookup(str(url), int(getattr(self, "_active_load_seq", 0) or 0))
 
         try:
             self._pos_ms = 0
@@ -4819,6 +4870,7 @@ class PlayerFrame(wx.Frame):
             return
         # Replay as a plain local file (use_ytdlp=False). Passing the original
         # article id keeps resume/position continuity across the swap.
+        sponsor_segments = list(getattr(self, "_sponsor_segments", None) or [])
         self.load_media(
             local_path,
             use_ytdlp=False,
@@ -4826,6 +4878,8 @@ class PlayerFrame(wx.Frame):
             title=getattr(self, "_ytdlp_play_title", None),
             article_id=getattr(self, "_ytdlp_play_article_id", None),
         )
+        # Same video, so the same SponsorBlock segments.
+        self._sponsor_segments = sponsor_segments
 
     def toggle_play_pause(self) -> None:
         if self.is_audio_playing():
@@ -5349,6 +5403,7 @@ class PlayerFrame(wx.Frame):
             if silence_pos < 0:
                 silence_pos = 0
             self._maybe_skip_silence(int(silence_pos))
+            self._maybe_skip_sponsor(int(silence_pos))
         except Exception:
             pass
 

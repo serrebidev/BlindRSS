@@ -247,6 +247,23 @@ DEFAULT_CONFIG = {
     # deleting the oldest cached audio first; 0 = unlimited.
     "youtube_play_cache_dir": "",
     "youtube_play_cache_max_mb": 500,
+    # SponsorBlock (core/sponsorblock.py): skip crowdsourced segments of these
+    # categories in YouTube playback.
+    "sponsorblock_enabled": True,
+    "sponsorblock_categories": ["sponsor", "selfpromo", "interaction"],
+    # YouTube account (core/youtube_account.py). The refresh token is a
+    # credential: never log it. known = every channel id sync has seen, so a
+    # feed the user deleted is not added back.
+    "youtube_account_refresh_token": "",
+    "youtube_account_auto_add": True,
+    "youtube_account_category": "YouTube",
+    "youtube_account_known_channels": [],
+    "youtube_account_last_sync": 0.0,
+    # Automatic daily backup (core/backup.py). Blank folder = "backups" beside
+    # config.json.
+    "auto_backup_enabled": False,
+    "auto_backup_dir": "",
+    "auto_backup_last": 0.0,
     # Optional explicit paths to the media-tool executables. When set, they take
     # priority over auto-detection (PATH, Scoop/Choco/WinGet, portable layouts,
     # etc.). Empty => auto-detect. Surfaced in Settings > Media Player.

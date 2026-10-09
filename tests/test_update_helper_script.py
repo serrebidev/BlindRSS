@@ -219,6 +219,8 @@ def test_update_helper_preserves_install_local_runtime_state():
         "feed_browser_runtime",
         "ytplay_cache",
         "podcasts",
+        "backups",
+        "restore_pending",
     ):
         assert name in dirs
 

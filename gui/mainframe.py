@@ -2341,6 +2341,12 @@ class MainFrame(wx.Frame):
             _("Import YouTube subscriptions, playlists, channels, and watch-history channels"))
         export_opml_item = self._append_shortcut_menu_item(
             file_menu, "feeds.export_opml", _("E&xport OPML..."), _("Export feeds to OPML"))
+        backup_data_item = self._append_shortcut_menu_item(
+            file_menu, "tools.backup_data", _("&Back Up Data..."),
+            _("Save settings, subscriptions, read state, rules and saved cookies to one file"))
+        restore_data_item = self._append_shortcut_menu_item(
+            file_menu, "tools.restore_data", _("&Restore Data..."),
+            _("Replace this copy's data with a backup and restart BlindRSS"))
         file_menu.AppendSeparator()
         persistent_search_item = self._append_shortcut_menu_item(
             file_menu, "tools.persistent_search", _("Configure &Persistent Search..."),
@@ -2553,6 +2559,10 @@ class MainFrame(wx.Frame):
             tools_menu, "tools.import_site_cookies", _("Import Site &Cookies..."),
             _("Import browser cookies so challenge-protected sites can be read"),
         )
+        youtube_account_item = self._append_shortcut_menu_item(
+            tools_menu, "tools.youtube_account", _("YouTube &Account..."),
+            _("Sign in to YouTube so new channel subscriptions are added as feeds"),
+        )
         tools_menu.AppendSeparator()
         keyboard_shortcuts_item = self._append_shortcut_menu_item(
             tools_menu, "tools.keyboard_shortcuts", _("&Keyboard Shortcuts..."),
@@ -2667,6 +2677,9 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_ytdlp_global_search, ytdlp_global_search_item)
         self.Bind(wx.EVT_MENU, self.on_manage_filter_rules, filter_rules_item)
         self.Bind(wx.EVT_MENU, self.on_import_site_cookies, import_site_cookies_item)
+        self.Bind(wx.EVT_MENU, self.on_youtube_account, youtube_account_item)
+        self.Bind(wx.EVT_MENU, self.on_backup_data, backup_data_item)
+        self.Bind(wx.EVT_MENU, self.on_restore_data, restore_data_item)
         self.Bind(wx.EVT_MENU, self.on_open_keyboard_shortcuts, keyboard_shortcuts_item)
         self.Bind(wx.EVT_MENU, self._cmd_announce_version, announce_version_item)
         self.Bind(wx.EVT_MENU, self.on_about, about_item)
@@ -3320,6 +3333,9 @@ class MainFrame(wx.Frame):
 
             "tools.filter_rules": self.on_manage_filter_rules,
             "tools.import_site_cookies": self.on_import_site_cookies,
+            "tools.youtube_account": self.on_youtube_account,
+            "tools.backup_data": self.on_backup_data,
+            "tools.restore_data": self.on_restore_data,
             "tools.persistent_search": self.on_configure_persistent_search,
             "tools.keyboard_shortcuts": self.on_open_keyboard_shortcuts,
             "tools.settings": self.on_settings,
@@ -3650,6 +3666,216 @@ class MainFrame(wx.Frame):
             dlg.Destroy()
         except Exception:
             log.exception("Failed to open keyboard shortcuts dialog")
+
+    # --- YouTube account (core/youtube_account.py) ---------------------
+
+    def choose_category(self, parent, current: str = "", title: str = "", prompt: str = "") -> str:
+        """Category picker with a New Category button; "" when cancelled."""
+        from .dialogs import ChooseCategoryDialog
+
+        try:
+            categories = list(self.provider.get_categories() or [])
+        except Exception:
+            categories = []
+        if UNCATEGORIZED not in categories:
+            categories.insert(0, UNCATEGORIZED)
+
+        def add_category(name: str) -> str:
+            try:
+                if not self.provider.add_category(name):
+                    return ""
+            except Exception:
+                log.exception("Could not add category")
+                return ""
+            self.refresh_feeds()
+            return name
+
+        dlg = ChooseCategoryDialog(
+            parent or self,
+            title or _("Choose Category"),
+            prompt or _("Category for your YouTube subscriptions:"),
+            categories,
+            current,
+            add_category,
+        )
+        try:
+            return dlg.GetCategory() if dlg.ShowModal() == wx.ID_OK else ""
+        finally:
+            dlg.Destroy()
+
+    def on_youtube_account(self, event=None) -> None:
+        from .dialogs import YouTubeAccountDialog
+
+        dlg = YouTubeAccountDialog(
+            self, self.config_manager, self.choose_category, self.sync_youtube_subscriptions
+        )
+        dlg.ShowModal()
+        dlg.Destroy()
+
+    def sync_youtube_subscriptions(self, on_done=None) -> None:
+        """Add newly subscribed YouTube channels as feeds, off the UI thread.
+
+        ``on_done(message)`` runs on the UI thread. Without it (the periodic
+        check) only additions are announced; failures are only logged.
+        """
+        lock = self.__dict__.setdefault("_youtube_sync_lock", threading.Lock())
+
+        def worker():
+            from core import youtube_account
+
+            if not lock.acquire(blocking=False):
+                return
+            try:
+                added = youtube_account.sync(self.config_manager, self.provider)
+                message = (
+                    _("Added {count} new YouTube channels.").format(count=added)
+                    if added
+                    else _("No new YouTube subscriptions to add.")
+                )
+            except youtube_account.SignInError as exc:
+                added = 0
+                message = _("YouTube sign-in is no longer valid ({error}). Sign in again from Tools, YouTube Account.").format(error=exc)
+                log.warning("YouTube subscription sync failed: %s", exc)
+            except Exception as exc:
+                added = 0
+                message = _("Could not check YouTube subscriptions: {error}").format(error=exc)
+                log.exception("YouTube subscription sync failed")
+            finally:
+                lock.release()
+            wx.CallAfter(self._youtube_sync_finished, added, message, on_done)
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _youtube_sync_finished(self, added: int, message: str, on_done) -> None:
+        if added:
+            self.refresh_feeds()
+        if on_done is not None:
+            on_done(message)
+        elif added:
+            self._announce_event("general", message)
+
+    # --- Backup and restore (core/backup.py) ---------------------------
+
+    def _backup_paths(self):
+        from core import db
+        from core.config import get_data_dir
+
+        return get_data_dir(), self.config_manager.config_path, db.DB_FILE
+
+    def on_backup_data(self, event=None) -> None:
+        import datetime
+
+        dlg = wx.FileDialog(
+            self,
+            _("Back Up Data"),
+            defaultFile=f"BlindRSS-backup-{datetime.date.today().isoformat()}.zip",
+            wildcard=f'{_("ZIP archives")} (*.zip)|*.zip',
+            style=wx.FD_SAVE | wx.FD_OVERWRITE_PROMPT,
+        )
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            path = dlg.GetPath()
+        finally:
+            dlg.Destroy()
+
+        def worker():
+            from core import backup
+
+            try:
+                backup.create_backup(path, *self._backup_paths())
+                error = ""
+            except Exception as exc:
+                error = str(exc) or exc.__class__.__name__
+                log.exception("Backup failed")
+            wx.CallAfter(self._backup_finished, path, error)
+
+        self._set_activity_status(_("Backing up data..."))
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _backup_finished(self, path: str, error: str) -> None:
+        self._set_activity_status("")
+        if error:
+            wx.MessageBox(_("Backup failed: {error}").format(error=error), _("Error"), wx.ICON_ERROR, self)
+            return
+        wx.MessageBox(
+            _(
+                "Backup saved to {path}\n\n"
+                "It contains your passwords, API keys and site cookies, so keep it private."
+            ).format(path=path),
+            _("Back Up Data"),
+            wx.OK | wx.ICON_INFORMATION,
+            self,
+        )
+
+    def on_restore_data(self, event=None) -> None:
+        from core import backup
+
+        dlg = wx.FileDialog(
+            self,
+            _("Restore Data"),
+            wildcard=f'{_("ZIP archives")} (*.zip)|*.zip',
+            style=wx.FD_OPEN | wx.FD_FILE_MUST_EXIST,
+        )
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            path = dlg.GetPath()
+        finally:
+            dlg.Destroy()
+        if wx.MessageBox(
+            _(
+                "Restoring replaces all current settings, subscriptions, read state and rules "
+                "with the ones in this backup. BlindRSS will restart. Continue?"
+            ),
+            _("Restore Data"),
+            wx.YES_NO | wx.NO_DEFAULT | wx.ICON_WARNING,
+            self,
+        ) != wx.YES:
+            return
+        data_dir, _config_path, _db_path = self._backup_paths()
+        try:
+            backup.stage_restore(path, data_dir)
+        except Exception as exc:
+            log.exception("Restore failed")
+            wx.MessageBox(_("Restore failed: {error}").format(error=exc), _("Error"), wx.ICON_ERROR, self)
+            return
+        import subprocess
+
+        args = [sys.executable] if getattr(sys, "frozen", False) else [
+            sys.executable, os.path.abspath(sys.argv[0])
+        ]
+        try:
+            subprocess.Popen(args + ["--blindrss-after-restore"], close_fds=True)
+        except Exception:
+            log.exception("Could not relaunch after restore")
+            wx.MessageBox(
+                _("The restore will finish the next time you start BlindRSS."),
+                _("Restore Data"), wx.OK | wx.ICON_INFORMATION, self,
+            )
+        self.real_close()
+
+    def _run_periodic_jobs(self) -> None:
+        """Daily backup and YouTube subscription check; called from refresh_loop."""
+        now = time.time()
+        try:
+            from core import backup, youtube_account
+
+            if youtube_account.sync_due(self.config_manager, now):
+                # Stamp first so a failing check retries in 6 hours, not every tick.
+                self.config_manager.set("youtube_account_last_sync", now)
+                self.sync_youtube_subscriptions()
+            if self.config_manager.get("auto_backup_enabled", False) and backup.auto_backup_due(
+                self.config_manager.get("auto_backup_last", 0), now
+            ):
+                self.config_manager.set("auto_backup_last", now)
+                data_dir, config_path, db_path = self._backup_paths()
+                folder = str(self.config_manager.get("auto_backup_dir", "") or "").strip() or os.path.join(
+                    data_dir, backup.AUTO_DIR
+                )
+                backup.run_auto_backup(folder, data_dir, config_path, db_path)
+        except Exception:
+            log.exception("Periodic job failed")
 
     def on_import_site_cookies(self, event=None) -> None:
         """Import browser cookies for challenge-protected sites (issue #79)."""
@@ -8060,6 +8286,7 @@ class MainFrame(wx.Frame):
                  return
 
         while not self.stop_event.is_set():
+            self._run_periodic_jobs()
             interval = self._scheduled_refresh_tick_seconds()
             is_startup_tick = startup_refresh_pending
             if interval <= 0 and not is_startup_tick:

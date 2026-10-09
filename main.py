@@ -302,6 +302,13 @@ class RSSApp(wx.App):
         _install_wx_log_filter()
 
         self.instance_checker = wx.SingleInstanceChecker("BlindRSS-Instance-Lock")
+        if "--blindrss-after-restore" in sys.argv[1:]:
+            # Launched by Restore Data while the old copy shuts down.
+            import time
+
+            deadline = time.monotonic() + 60
+            while self.instance_checker.IsAnotherRunning() and time.monotonic() < deadline:
+                time.sleep(0.25)
         if self.instance_checker.IsAnotherRunning():
             # A relaunch (desktop shortcut hotkey, Start menu) means "show me
             # BlindRSS": bring the running window forward instead of erroring.
@@ -311,6 +318,22 @@ class RSSApp(wx.App):
                 return False
             wx.MessageBox(_("BlindRSS is already running."), "BlindRSS", wx.ICON_ERROR)
             return False
+
+        # A staged Restore Data lands here: only one copy is running and the
+        # database is not open yet.
+        try:
+            from core import backup
+            from core.config import get_data_dir
+
+            if backup.apply_pending_restore(get_data_dir()):
+                self.config_manager = ConfigManager()
+                try:
+                    from core import i18n
+                    i18n.setup(self.config_manager.get("language", "auto"))
+                except Exception:
+                    log.debug("Failed to reinitialize translations", exc_info=True)
+        except Exception:
+            log.exception("Applying the staged restore failed")
 
         try:
             set_user_tool_paths({

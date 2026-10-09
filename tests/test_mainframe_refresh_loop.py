@@ -53,6 +53,9 @@ class _RefreshLoopHost:
     refresh_loop = mainframe.MainFrame.refresh_loop
     _scheduled_refresh_tick_seconds = mainframe.MainFrame._scheduled_refresh_tick_seconds
 
+    def _run_periodic_jobs(self):
+        pass
+
     def __init__(self, *, refresh_on_startup=True, interval=30, wait_results=None, provider_tick=None):
         self.config_manager = _Config(
             {

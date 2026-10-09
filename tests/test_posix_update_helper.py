@@ -85,6 +85,8 @@ def test_linux_restores_install_local_runtime_state():
         "youtube_browser_profile",
         "feed_browser_runtime",
         "ytplay_cache",
+        "backups",
+        "restore_pending",
         "site_cookies.txt",
         "site_cookies_ua.txt",
         "site_cookies_ua_hosts.json",

@@ -1605,6 +1605,28 @@ class SettingsDialog(wx.Dialog):
         )
         youtube_sizer.Add(self.prompt_missing_deps_chk, 0, wx.ALL, 5)
 
+        from core import sponsorblock
+
+        self.sponsorblock_chk = wx.CheckBox(
+            youtube_panel,
+            label=_("Skip SponsorBlock segments in YouTube videos (crowdsourced)"),
+        )
+        self.sponsorblock_chk.SetValue(bool(config.get("sponsorblock_enabled", True)))
+        youtube_sizer.Add(self.sponsorblock_chk, 0, wx.ALL, 5)
+        youtube_sizer.Add(
+            wx.StaticText(youtube_panel, label=_("SponsorBlock segments to skip (Space checks or unchecks):")),
+            0, wx.LEFT | wx.TOP, 5,
+        )
+        self._sponsorblock_ids = list(sponsorblock.CATEGORIES)
+        self.sponsorblock_categories_ctrl = CheckListCtrl(youtube_panel)
+        self.sponsorblock_categories_ctrl.SetName(_("SponsorBlock segments to skip"))
+        self.sponsorblock_categories_ctrl.SetMinSize((-1, 170))
+        self.sponsorblock_categories_ctrl.Set([_(label) for label in sponsorblock.CATEGORIES.values()])
+        chosen = config.get("sponsorblock_categories", list(sponsorblock.DEFAULT_SKIP)) or []
+        for index, category in enumerate(self._sponsorblock_ids):
+            self.sponsorblock_categories_ctrl.Check(index, category in chosen)
+        youtube_sizer.Add(self.sponsorblock_categories_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
+
         self.start_on_login_chk = wx.CheckBox(startup_panel, label=windows_integration.startup_setting_label())
         self.start_on_login_chk.SetValue(bool(config.get("start_on_windows_login", False)))
         if not windows_integration.startup_supported():
@@ -1779,6 +1801,33 @@ class SettingsDialog(wx.Dialog):
         )
         startup_group.Add(startup_panel, 1, wx.EXPAND)
         general_sizer.Add(startup_group, 0, wx.EXPAND | wx.ALL, 8)
+
+        backup_group = wx.StaticBoxSizer(
+            wx.StaticBox(general_panel, label=_("Backup")), wx.VERTICAL
+        )
+        backup_box = backup_group.GetStaticBox()
+        self.auto_backup_chk = wx.CheckBox(
+            backup_box,
+            label=_("Back up BlindRSS data automatically once a day (keeps the last 7)"),
+        )
+        self.auto_backup_chk.SetValue(bool(config.get("auto_backup_enabled", False)))
+        backup_group.Add(self.auto_backup_chk, 0, wx.ALL, 5)
+        backup_group.Add(
+            wx.StaticText(backup_box, label=_("Automatic backup folder (blank = Backups beside your data):")),
+            0, wx.LEFT | wx.TOP, 5,
+        )
+        backup_row = wx.BoxSizer(wx.HORIZONTAL)
+        self.auto_backup_dir_ctrl = wx.TextCtrl(
+            backup_box, value=str(config.get("auto_backup_dir", "") or "")
+        )
+        self.auto_backup_dir_ctrl.SetName(_("Automatic backup folder"))
+        backup_row.Add(self.auto_backup_dir_ctrl, 1, wx.EXPAND | wx.RIGHT, 5)
+        backup_browse = wx.Button(backup_box, label=_("Browse..."))
+        backup_browse.SetName(_("Browse for automatic backup folder"))
+        backup_browse.Bind(wx.EVT_BUTTON, self._on_browse_auto_backup_dir)
+        backup_row.Add(backup_browse, 0)
+        backup_group.Add(backup_row, 0, wx.EXPAND | wx.ALL, 5)
+        general_sizer.Add(backup_group, 0, wx.EXPAND | wx.ALL, 8)
 
         general_panel.SetSizer(general_sizer)
         notebook.AddPage(general_panel, _("General"))
@@ -2742,6 +2791,17 @@ class SettingsDialog(wx.Dialog):
         from core import play_cache
         loc = (self.youtube_play_cache_dir_ctrl.GetValue() or "").strip()
         return loc or play_cache.default_cache_dir()
+
+    def _on_browse_auto_backup_dir(self, event):
+        dlg = wx.DirDialog(
+            self,
+            _("Choose automatic backup folder"),
+            self.auto_backup_dir_ctrl.GetValue(),
+            style=wx.DD_DEFAULT_STYLE,
+        )
+        if dlg.ShowModal() == wx.ID_OK:
+            self.auto_backup_dir_ctrl.SetValue(dlg.GetPath())
+        dlg.Destroy()
 
     def _on_browse_play_cache_dir(self, event):
         dlg = wx.DirDialog(
@@ -4237,6 +4297,14 @@ class SettingsDialog(wx.Dialog):
             "youtube_play_via_download": self.youtube_play_via_download_chk.GetValue(),
             "youtube_play_cache_dir": self.youtube_play_cache_dir_ctrl.GetValue().strip(),
             "youtube_play_cache_max_mb": int(self.youtube_play_cache_max_mb_ctrl.GetValue()),
+            "sponsorblock_enabled": self.sponsorblock_chk.GetValue(),
+            "sponsorblock_categories": [
+                category
+                for index, category in enumerate(self._sponsorblock_ids)
+                if self.sponsorblock_categories_ctrl.IsChecked(index)
+            ],
+            "auto_backup_enabled": self.auto_backup_chk.GetValue(),
+            "auto_backup_dir": self.auto_backup_dir_ctrl.GetValue().strip(),
             "custom_ffmpeg_path": self._media_tool_path_ctrls["custom_ffmpeg_path"].GetValue().strip(),
             "custom_ffprobe_path": self._media_tool_path_ctrls["custom_ffprobe_path"].GetValue().strip(),
             "custom_ytdlp_path": self._media_tool_path_ctrls["custom_ytdlp_path"].GetValue().strip(),
@@ -8961,3 +9029,272 @@ class EqualizerDialog(wx.Dialog):
             self._updating = False
         self._update_preset_buttons()
         self._collect_and_apply()
+
+
+class YouTubeAccountDialog(wx.Dialog):
+    """Sign in to YouTube and choose how new subscriptions become feeds.
+
+    Sign-in shows a code to enter at google.com/device in the user's own
+    browser (core.youtube_account); BlindRSS never sees the password. The
+    code sits in a read-only text field so a screen reader can review it
+    character by character.
+    """
+
+    def __init__(self, parent, config_manager, choose_category, on_sync_now):
+        super().__init__(parent, title=_("YouTube Account"))
+        self.config_manager = config_manager
+        self._choose_category = choose_category
+        self._on_sync_now = on_sync_now
+        self._sign_in_token = 0
+        self._user_code = ""
+        self._verification_url = "https://www.google.com/device"
+        sizer = wx.BoxSizer(wx.VERTICAL)
+
+        self.status_ctrl = wx.TextCtrl(
+            self, style=wx.TE_READONLY | wx.TE_MULTILINE | wx.TE_NO_VSCROLL, size=(520, 70)
+        )
+        self.status_ctrl.SetName(_("YouTube account status"))
+        sizer.Add(self.status_ctrl, 0, wx.EXPAND | wx.ALL, 10)
+
+        buttons = wx.BoxSizer(wx.HORIZONTAL)
+        self.sign_in_btn = wx.Button(self, label=_("&Sign In..."))
+        self.open_page_btn = wx.Button(self, label=_("&Open Sign-in Page"))
+        self.copy_code_btn = wx.Button(self, label=_("&Copy Code"))
+        self.sign_out_btn = wx.Button(self, label=_("Sign O&ut"))
+        for btn in (self.sign_in_btn, self.open_page_btn, self.copy_code_btn, self.sign_out_btn):
+            buttons.Add(btn, 0, wx.RIGHT, 5)
+        sizer.Add(buttons, 0, wx.LEFT | wx.RIGHT, 10)
+
+        self.auto_add_chk = wx.CheckBox(
+            self, label=_("&Add new YouTube subscriptions as feeds automatically (checked every 6 hours)")
+        )
+        self.auto_add_chk.SetValue(bool(config_manager.get("youtube_account_auto_add", True)))
+        sizer.Add(self.auto_add_chk, 0, wx.ALL, 10)
+
+        category_row = wx.BoxSizer(wx.HORIZONTAL)
+        self.category_ctrl = wx.TextCtrl(self, style=wx.TE_READONLY)
+        self.category_ctrl.SetName(_("Category for new channels"))
+        category_row.Add(self.category_ctrl, 1, wx.EXPAND | wx.RIGHT, 5)
+        change_category_btn = wx.Button(self, label=_("C&hange Category..."))
+        change_category_btn.Bind(wx.EVT_BUTTON, self._on_change_category)
+        category_row.Add(change_category_btn, 0)
+        sizer.Add(wx.StaticText(self, label=_("Category for new channels:")), 0, wx.LEFT | wx.RIGHT, 10)
+        sizer.Add(category_row, 0, wx.EXPAND | wx.ALL, 10)
+        self._set_category(str(config_manager.get("youtube_account_category", "YouTube") or "YouTube"))
+
+        bottom = wx.BoxSizer(wx.HORIZONTAL)
+        self.sync_btn = wx.Button(self, label=_("Add &New Subscriptions Now"))
+        close_btn = wx.Button(self, wx.ID_CLOSE, _("Close"))
+        bottom.Add(self.sync_btn, 0, wx.RIGHT, 5)
+        bottom.Add(close_btn, 0)
+        sizer.Add(bottom, 0, wx.ALL, 10)
+
+        self.sign_in_btn.Bind(wx.EVT_BUTTON, self._on_sign_in)
+        self.open_page_btn.Bind(wx.EVT_BUTTON, lambda e: webbrowser.open(self._verification_url))
+        self.copy_code_btn.Bind(wx.EVT_BUTTON, self._on_copy_code)
+        self.sign_out_btn.Bind(wx.EVT_BUTTON, self._on_sign_out)
+        self.sync_btn.Bind(wx.EVT_BUTTON, self._on_sync)
+        close_btn.Bind(wx.EVT_BUTTON, lambda e: self.Close())
+        self.Bind(wx.EVT_CLOSE, self._on_close)
+        self.SetEscapeId(wx.ID_CLOSE)
+
+        self.SetSizerAndFit(sizer)
+        self._refresh_state()
+        self.CentreOnParent()
+        wx.CallAfter(self.status_ctrl.SetFocus)
+
+    def _signed_in(self) -> bool:
+        return bool(self.config_manager.get("youtube_account_refresh_token", ""))
+
+    def _refresh_state(self, message: str = "") -> None:
+        signed_in = self._signed_in()
+        if not message:
+            message = (
+                _("Signed in to YouTube.")
+                if signed_in
+                else _("Not signed in. Choose Sign In to connect your YouTube account.")
+            )
+        self.status_ctrl.ChangeValue(message)
+        waiting = bool(self._user_code)
+        self.sign_in_btn.Enable(not signed_in and not waiting)
+        self.open_page_btn.Show(waiting)
+        self.copy_code_btn.Show(waiting)
+        self.sign_out_btn.Enable(signed_in)
+        self.sync_btn.Enable(signed_in)
+        self.Layout()
+
+    def _set_category(self, category: str) -> None:
+        from core.categories import category_display_name
+
+        self._category = category
+        self.category_ctrl.ChangeValue(category_display_name(category))
+
+    def _on_change_category(self, event):
+        chosen = self._choose_category(self, self._category)
+        if chosen:
+            self._set_category(chosen)
+            self._save_options()
+
+    def _save_options(self) -> None:
+        self.config_manager.set("youtube_account_auto_add", self.auto_add_chk.GetValue())
+        self.config_manager.set("youtube_account_category", self._category or "YouTube")
+
+    def _on_sign_in(self, event):
+        from core import youtube_account
+
+        self._sign_in_token += 1
+        token = self._sign_in_token
+        self.sign_in_btn.Disable()
+        self.status_ctrl.ChangeValue(_("Getting a sign-in code..."))
+
+        def worker():
+            try:
+                info = youtube_account.start_sign_in()
+            except Exception as exc:
+                wx.CallAfter(self._sign_in_failed, token, str(exc))
+                return
+            wx.CallAfter(self._show_code, token, info)
+            deadline = time.monotonic() + float(info.get("expires_in", 1800) or 1800)
+            interval = max(2.0, float(info.get("interval", 5) or 5))
+            while time.monotonic() < deadline and token == self._sign_in_token:
+                time.sleep(interval)
+                if token != self._sign_in_token:
+                    return
+                try:
+                    refresh = youtube_account.poll_sign_in(info["device_code"])
+                except Exception as exc:
+                    wx.CallAfter(self._sign_in_failed, token, str(exc))
+                    return
+                if refresh:
+                    wx.CallAfter(self._signed_in_ok, token, refresh)
+                    return
+            wx.CallAfter(self._sign_in_failed, token, _("The sign-in code expired."))
+
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _show_code(self, token, info) -> None:
+        if token != self._sign_in_token:
+            return
+        self._user_code = str(info.get("user_code", ""))
+        self._verification_url = str(info.get("verification_url") or self._verification_url)
+        self._refresh_state(
+            _(
+                "Go to {url} in your browser, sign in to YouTube if asked, and enter this code: {code}\n"
+                "Waiting for you to approve..."
+            ).format(url=self._verification_url, code=self._user_code)
+        )
+        self.status_ctrl.SetFocus()
+
+    def _on_copy_code(self, event):
+        if self._user_code and wx.TheClipboard.Open():
+            try:
+                wx.TheClipboard.SetData(wx.TextDataObject(self._user_code))
+            finally:
+                wx.TheClipboard.Close()
+
+    def _signed_in_ok(self, token, refresh) -> None:
+        if token != self._sign_in_token:
+            return
+        self._user_code = ""
+        self.config_manager.set("youtube_account_refresh_token", refresh)
+        self._refresh_state(_("Signed in to YouTube."))
+        # Ask where the subscriptions go before adding any of them.
+        chosen = self._choose_category(self, self._category)
+        if not chosen:
+            self._save_options()
+            self._refresh_state(
+                _("Signed in to YouTube. Choose Change Category, then Add New Subscriptions Now.")
+            )
+            self.status_ctrl.SetFocus()
+            return
+        self._set_category(chosen)
+        self._save_options()
+        self._refresh_state(_("Signed in to YouTube. Adding your subscriptions..."))
+        self.status_ctrl.SetFocus()
+        self._on_sync_now(self._sync_done)
+
+    def _sign_in_failed(self, token, error) -> None:
+        if token != self._sign_in_token:
+            return
+        self._user_code = ""
+        self._refresh_state(_("Sign-in failed: {error}").format(error=error))
+
+    def _on_sign_out(self, event):
+        self._sign_in_token += 1
+        self._user_code = ""
+        self.config_manager.set("youtube_account_refresh_token", "")
+        self._refresh_state(_("Signed out. Feeds already added stay in BlindRSS."))
+
+    def _on_sync(self, event):
+        self._save_options()
+        self.sync_btn.Disable()
+        self.status_ctrl.ChangeValue(_("Checking your YouTube subscriptions..."))
+        self._on_sync_now(self._sync_done)
+
+    def _sync_done(self, message: str) -> None:
+        try:
+            self._refresh_state(message)
+        except RuntimeError:
+            pass  # dialog closed while the sync ran
+
+    def _on_close(self, event):
+        self._sign_in_token += 1  # stops sign-in polling
+        self._save_options()
+        event.Skip()
+
+
+class ChooseCategoryDialog(wx.Dialog):
+    """Pick a category from a list, or create a new one without leaving.
+
+    ``add_category(name)`` creates the category through the provider and
+    returns its stored id (the full path), or "" on failure.
+    """
+
+    def __init__(self, parent, title, prompt, categories, current, add_category):
+        super().__init__(parent, title=title)
+        from core.categories import category_display_name
+
+        self._display = category_display_name
+        self._add_category = add_category
+        self._ids = list(dict.fromkeys(categories))
+        sizer = wx.BoxSizer(wx.VERTICAL)
+        sizer.Add(wx.StaticText(self, label=prompt), 0, wx.ALL, 10)
+        self.list_ctrl = wx.ListBox(self, choices=[self._display(c) for c in self._ids], size=(380, 220))
+        self.list_ctrl.SetName(prompt)
+        sizer.Add(self.list_ctrl, 1, wx.EXPAND | wx.LEFT | wx.RIGHT, 10)
+        new_btn = wx.Button(self, label=_("&New Category..."))
+        new_btn.Bind(wx.EVT_BUTTON, self._on_new)
+        sizer.Add(new_btn, 0, wx.ALL, 10)
+        sizer.Add(self.CreateStdDialogButtonSizer(wx.OK | wx.CANCEL), 0, wx.EXPAND | wx.ALL, 10)
+        self.list_ctrl.Bind(wx.EVT_LISTBOX_DCLICK, lambda e: self.EndModal(wx.ID_OK))
+        self.SetSizerAndFit(sizer)
+        if current in self._ids:
+            self.list_ctrl.SetSelection(self._ids.index(current))
+        elif self._ids:
+            self.list_ctrl.SetSelection(0)
+        self.CentreOnParent()
+        wx.CallAfter(self.list_ctrl.SetFocus)
+
+    def _on_new(self, event):
+        dlg = wx.TextEntryDialog(self, _("Category name:"), _("New Category"))
+        try:
+            if dlg.ShowModal() != wx.ID_OK:
+                return
+            name = dlg.GetValue().strip()
+        finally:
+            dlg.Destroy()
+        if not name:
+            return
+        category = self._add_category(name)
+        if not category:
+            wx.MessageBox(_("Could not add category."), _("Error"), wx.ICON_ERROR, self)
+            return
+        if category not in self._ids:
+            self._ids.append(category)
+            self.list_ctrl.Append(self._display(category))
+        self.list_ctrl.SetSelection(self._ids.index(category))
+        self.list_ctrl.SetFocus()
+
+    def GetCategory(self) -> str:
+        index = self.list_ctrl.GetSelection()
+        return self._ids[index] if 0 <= index < len(self._ids) else ""
