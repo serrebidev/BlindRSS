@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.3.0 - 2026-10-09
+
+- Add YouTube recommendations and automatic account updates.
+
 ## v2.2.0 - 2026-10-09
 
 - SponsorBlock skipping, YouTube account sync, and data backup.
