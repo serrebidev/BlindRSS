@@ -3711,9 +3711,10 @@ class MainFrame(wx.Frame):
         )
         dlg.ShowModal()
         dlg.Destroy()
+        self._youtube_sync_finished(0, "", None)
 
     def sync_youtube_subscriptions(self, on_done=None) -> None:
-        """Add newly subscribed YouTube channels as feeds, off the UI thread.
+        """Update YouTube subscriptions and recommendations off the UI thread.
 
         ``on_done(message)`` runs on the UI thread. Without it (the periodic
         check) only additions are announced; failures are only logged.
@@ -3724,21 +3725,19 @@ class MainFrame(wx.Frame):
             from core import youtube_account
 
             if not lock.acquire(blocking=False):
+                if on_done is not None:
+                    wx.CallAfter(on_done, _("A YouTube account update is already running."))
                 return
             try:
                 added = youtube_account.sync(self.config_manager, self.provider)
-                message = (
-                    _("Added {count} new YouTube channels.").format(count=added)
-                    if added
-                    else _("No new YouTube subscriptions to add.")
-                )
+                message = _("YouTube account updated. Added {count} new channels; recommendations refreshed.").format(count=added)
             except youtube_account.SignInError as exc:
                 added = 0
-                message = _("YouTube sign-in is no longer valid ({error}). Sign in again from Tools, YouTube Account.").format(error=exc)
+                message = _("Could not update YouTube account: {error}. If access was revoked, sign in again from Tools, YouTube Account.").format(error=exc)
                 log.warning("YouTube subscription sync failed: %s", exc)
             except Exception as exc:
                 added = 0
-                message = _("Could not check YouTube subscriptions: {error}").format(error=exc)
+                message = _("Could not update YouTube account: {error}").format(error=exc)
                 log.exception("YouTube subscription sync failed")
             finally:
                 lock.release()
@@ -3747,8 +3746,31 @@ class MainFrame(wx.Frame):
         threading.Thread(target=worker, daemon=True).start()
 
     def _youtube_sync_finished(self, added: int, message: str, on_done) -> None:
-        if added:
-            self.refresh_feeds()
+        with self._view_cache_lock:
+            for view, state in self.view_cache.items():
+                articles = state.get("articles") or []
+                updated = self.provider.merge_recommendations(view, articles)
+                if updated is not None:
+                    difference = len(updated) - len(articles)
+                    state["articles"] = updated
+                    state["id_set"] = {self._article_cache_id(a) for a in updated}
+                    if state.get("total") is not None:
+                        state["total"] += difference
+                    state["paged_offset"] = max(0, int(state.get("paged_offset", len(articles))) + difference)
+        self.refresh_feeds()
+        if self.current_feed_id:
+            base = self._get_base_articles_for_current_view()
+            updated = self.provider.merge_recommendations(self.current_feed_id, base)
+            if updated is not None:
+                selected = getattr(self, "selected_article_id", None)
+                if selected and not any(self._article_cache_id(a) == selected for a in updated):
+                    self.selected_article_id = None
+                    self._fulltext_token = int(getattr(self, "_fulltext_token", 0)) + 1
+                    self.content_ctrl.Clear()
+                    self._invalidate_reader_text_tracking()
+                    self._render_rich_html("")
+                self._set_base_articles(updated, self.current_feed_id)
+                self._refresh_articles_for_sort_change()
         if on_done is not None:
             on_done(message)
         elif added:
@@ -3856,13 +3878,13 @@ class MainFrame(wx.Frame):
         self.real_close()
 
     def _run_periodic_jobs(self) -> None:
-        """Daily backup and YouTube subscription check; called from refresh_loop."""
+        """Daily backup and YouTube account check; called from refresh_loop."""
         now = time.time()
         try:
             from core import backup, youtube_account
 
             if youtube_account.sync_due(self.config_manager, now):
-                # Stamp first so a failing check retries in 6 hours, not every tick.
+                # Stamp first so a failing check retries in 15 minutes, not every tick.
                 self.config_manager.set("youtube_account_last_sync", now)
                 self.sync_youtube_subscriptions()
             if self.config_manager.get("auto_backup_enabled", False) and backup.auto_backup_due(
@@ -8276,13 +8298,26 @@ class MainFrame(wx.Frame):
         except Exception:
             return global_interval
 
+    def _wait_for_refresh_tick(self, seconds):
+        """Keep account jobs running without shortening the RSS refresh interval."""
+        if seconds <= 60:
+            return self.stop_event.wait(seconds)
+        deadline = time.monotonic() + seconds
+        remaining = seconds
+        while remaining > 0:
+            if self.stop_event.wait(min(60, remaining)):
+                return True
+            self._run_periodic_jobs()
+            remaining = max(0, deadline - time.monotonic())
+        return False
+
     def refresh_loop(self):
         # If auto-refresh on startup is disabled, wait for one interval before the first check.
         startup_refresh_pending = bool(self.config_manager.get("refresh_on_startup", True))
         if not startup_refresh_pending:
              interval = self._scheduled_refresh_tick_seconds()
              log.info("Refresh loop startup refresh disabled; waiting interval_s=%s before first refresh", interval)
-             if self.stop_event.wait(interval):
+             if self._wait_for_refresh_tick(interval):
                  return
 
         while not self.stop_event.is_set():
@@ -8291,7 +8326,7 @@ class MainFrame(wx.Frame):
             is_startup_tick = startup_refresh_pending
             if interval <= 0 and not is_startup_tick:
                 # "Never" setting: wait 5s then check config/stop event again
-                if self.stop_event.wait(5):
+                if self._wait_for_refresh_tick(5):
                     return
                 continue
                 
@@ -8324,7 +8359,7 @@ class MainFrame(wx.Frame):
             # startup refresh above still runs once before we enter this wait.
             sleep_seconds = interval if interval > 0 else 5
             # Sleep in one shot but wake early if closing
-            if self.stop_event.wait(sleep_seconds):
+            if self._wait_for_refresh_tick(sleep_seconds):
                 return
 
     def refresh_feeds(self):

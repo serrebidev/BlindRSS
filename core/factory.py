@@ -10,6 +10,7 @@ from providers.miniflux import MinifluxProvider
 from providers.theoldreader import TheOldReaderProvider
 from providers.inoreader import InoreaderProvider
 from providers.bazqux import BazQuxProvider
+from providers.youtube_account import YouTubeAccountProvider
 
 
 def get_provider(config: Dict[str, Any]) -> RSSProvider:
@@ -18,13 +19,14 @@ def get_provider(config: Dict[str, Any]) -> RSSProvider:
     provider_name = config.get("active_provider", "local")
     
     if provider_name == "miniflux":
-        return MinifluxProvider(config)
+        provider = MinifluxProvider(config)
     elif provider_name == "theoldreader":
-        return TheOldReaderProvider(config)
+        provider = TheOldReaderProvider(config)
     elif provider_name == "inoreader":
-        return InoreaderProvider(config)
+        provider = InoreaderProvider(config)
     elif provider_name == "bazqux":
-        return BazQuxProvider(config)
+        provider = BazQuxProvider(config)
     else:
         # Default to local
-        return LocalProvider(config)
+        provider = LocalProvider(config)
+    return YouTubeAccountProvider(provider, config)

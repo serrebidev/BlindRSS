@@ -41,6 +41,43 @@ def test_parse_channels_dedupes_sorts_and_strips():
     assert youtube_account.parse_channels(RESPONSE) == [(CID_A, "alpha"), (CID_B, "Zed Channel")]
 
 
+def test_recommendations_parse_only_valid_video_tiles_in_document_order():
+    first = _tile("dQw4w9WgXcQ", "First", "TILE_CONTENT_TYPE_VIDEO")
+    second = _tile("abcdefghijk", "Second", "TILE_CONTENT_TYPE_VIDEO")
+    second["tileRenderer"]["metadata"]["tileMetadataRenderer"]["lines"] = [
+        {"lineRenderer": {"items": [{"lineItemRenderer": {"text": {"runs": [{"text": "Channel"}]}}}]}}
+    ]
+    data = {"items": [first, _tile(CID_A, "Not a video"), first, second,
+                      _tile("../bad", "Bad", "TILE_CONTENT_TYPE_VIDEO")]}
+    assert youtube_account.parse_recommendations(data) == [
+        ("dQw4w9WgXcQ", "First", ""), ("abcdefghijk", "Second", "Channel")
+    ]
+
+
+def test_recommendations_request_signed_in_home_and_fail_closed(monkeypatch):
+    monkeypatch.setattr(youtube_account, "access_token", lambda token: "access")
+    calls = []
+
+    class Response:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return RESPONSE
+
+    def post(*args, **kwargs):
+        calls.append(kwargs)
+        return Response()
+
+    monkeypatch.setattr(youtube_account.requests, "post", post)
+    assert youtube_account.list_recommendations("refresh")[0][0] == "dQw4w9WgXcQ"
+    assert calls[0]["json"]["browseId"] == "default"
+    assert calls[0]["headers"]["Authorization"] == "Bearer access"
+    monkeypatch.setattr(Response, "json", lambda self: {"changed": []})
+    with pytest.raises(youtube_account.SignInError, match="recommendations"):
+        youtube_account.list_recommendations("refresh")
+
+
 def test_plan_skips_known_and_existing():
     subs = [(CID_A, "A"), (CID_B, "B"), (CID_C, "C")]
     plan = youtube_account.plan_sync(subs, known=[CID_A], existing_channel_ids={CID_B})
@@ -54,6 +91,9 @@ class _Config(dict):
 
 def test_sync_imports_new_channels_and_remembers_all(monkeypatch, tmp_path):
     monkeypatch.setattr(youtube_account, "list_subscriptions", lambda token: [(CID_A, "A"), (CID_B, "B")])
+    saved = []
+    monkeypatch.setattr(youtube_account, "list_recommendations", lambda token: [("dQw4w9WgXcQ", "Video", "Channel")])
+    monkeypatch.setattr(youtube_account, "save_recommendations", lambda config, videos: saved.append(videos))
     imported = {}
 
     class Provider:
@@ -81,6 +121,7 @@ def test_sync_imports_new_channels_and_remembers_all(monkeypatch, tmp_path):
 
     assert youtube_account.sync(config, EmptyProvider()) == 0
     assert imported == {}
+    assert len(saved) == 2  # Recommendations update even without new subscriptions.
 
 
 def test_sync_requires_sign_in():

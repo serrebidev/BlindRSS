@@ -299,6 +299,19 @@ def init_db():
     conn = sqlite3.connect(db_path, timeout=30, check_same_thread=False)
     try:
         c = conn.cursor()
+        c.execute('''CREATE TABLE IF NOT EXISTS youtube_recommendations (
+            account TEXT NOT NULL,
+            video_id TEXT NOT NULL,
+            title TEXT NOT NULL,
+            author TEXT NOT NULL,
+            date TEXT NOT NULL,
+            position INTEGER NOT NULL,
+            current INTEGER NOT NULL DEFAULT 1,
+            is_read INTEGER NOT NULL DEFAULT 0,
+            is_favorite INTEGER NOT NULL DEFAULT 0,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (account, video_id)
+        )''')
         # Improve concurrent writer/readers when refresh runs in multiple threads
         try:
             c.execute("PRAGMA journal_mode=WAL")

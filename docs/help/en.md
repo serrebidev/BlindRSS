@@ -451,14 +451,21 @@ enter the code, and approve. You never type your password into BlindRSS.
 
 Once you approve, BlindRSS asks which category the channels go in. Pick one
 from the list, or choose New Category to create one there. Every channel you
-subscribe to is then added as a feed. After that BlindRSS checks every six
-hours and adds channels you have subscribed to since. Add New Subscriptions Now
-checks immediately, and Change Category picks a different category for channels
-added later.
+subscribe to is then added as a feed. A single Recommendations feed in the same
+category contains videos from your signed-in YouTube home page. After that
+BlindRSS updates the account every 15 minutes while the app is running: it adds
+new subscriptions and refreshes Recommendations. Update Account Now checks
+immediately, and Change Category picks a different category for new channels
+and the Recommendations feed. The automatic-update checkbox controls both.
+
+Recommendations stay on this computer, including with a hosted RSS account;
+they are not uploaded to your RSS server. Read states, favorites, and deleted
+videos survive refreshes. Favorites remain available when YouTube stops
+recommending a video. Recommendations disappear from the tree when you sign out.
 
 Each channel is added only once. If you remove a channel's feed from BlindRSS,
 it is not added back, and unsubscribing on YouTube does not remove its feed.
-Sign Out forgets the sign-in and leaves your feeds alone. To revoke access from
+Sign Out forgets the sign-in and leaves channel feeds alone. To revoke access from
 Google's side, remove "YouTube TV" under Your connections to third-party apps
 and services at myaccount.google.com.
 

@@ -2,7 +2,7 @@
 # This file is part of BlindRSS
 # SPDX-License-Identifier: MIT
 
-"""Sign in to YouTube and follow the account's channel subscriptions.
+"""Sign in to YouTube and refresh subscriptions and recommended videos.
 
 Sign-in is the device-code flow the YouTube TV app uses (the same one
 SmartTube uses): BlindRSS shows a short code, the user enters it at
@@ -22,10 +22,14 @@ in BlindRSS is not added back, and unsubscribing on YouTube removes nothing.
 from __future__ import annotations
 
 import logging
+import hashlib
 import os
+import re
 import tempfile
 import time
 import uuid
+from contextlib import closing
+from datetime import datetime, timedelta, timezone
 
 import requests
 
@@ -43,7 +47,8 @@ TOKEN_URL = "https://www.youtube.com/o/oauth2/token"
 BROWSE_URL = "https://www.youtube.com/youtubei/v1/browse"
 TV_CLIENT = {"clientName": "TVHTML5", "clientVersion": "7.20250101.00.00", "hl": "en", "gl": "US"}
 TIMEOUT = 20
-SYNC_INTERVAL_SECONDS = 6 * 3600
+SYNC_INTERVAL_SECONDS = 15 * 60
+RECOMMENDATIONS_FEED_ID = "youtube-account:recommendations"
 
 
 class SignInError(RuntimeError):
@@ -136,6 +141,73 @@ def list_subscriptions(refresh_token: str) -> list[tuple[str, str]]:
     return channels
 
 
+def parse_recommendations(data) -> list[tuple[str, str, str]]:
+    """Current TV home-page videos, preserving YouTube's order."""
+    found = {}
+    stack = [data]
+    while stack:
+        node = stack.pop()
+        if isinstance(node, dict):
+            tile = node.get("tileRenderer")
+            if isinstance(tile, dict) and tile.get("contentType") == "TILE_CONTENT_TYPE_VIDEO":
+                video_id = str(tile.get("contentId") or "")
+                metadata = (tile.get("metadata") or {}).get("tileMetadataRenderer") or {}
+                title = (metadata.get("title") or {}).get("simpleText", "").strip()
+                lines = metadata.get("lines") or []
+                items = ((lines[0].get("lineRenderer") or {}).get("items") or []) if lines else []
+                author = ""
+                if items:
+                    text = (items[0].get("lineItemRenderer") or {}).get("text") or {}
+                    author = text.get("simpleText") or "".join(r.get("text", "") for r in text.get("runs", []))
+                if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id) and title:
+                    found.setdefault(video_id, (video_id, title, author))
+            stack.extend(reversed(list(node.values())))
+        elif isinstance(node, list):
+            stack.extend(reversed(node))
+    return list(found.values())
+
+
+def list_recommendations(refresh_token: str) -> list[tuple[str, str, str]]:
+    token = access_token(refresh_token)
+    resp = requests.post(
+        BROWSE_URL,
+        json={"context": {"client": TV_CLIENT}, "browseId": "default"},
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=60,
+    )
+    resp.raise_for_status()
+    videos = parse_recommendations(resp.json())
+    if not videos:
+        raise SignInError("YouTube returned no recommendations")
+    # shortcut: current home-page shelves only; add continuations if YouTube
+    # stops returning recommended videos in the initial home response.
+    return videos
+
+
+def account_key(config) -> str:
+    token = str(config.get("youtube_account_refresh_token", "") or "")
+    return hashlib.sha256(token.encode()).hexdigest() if token else ""
+
+
+def save_recommendations(config, videos) -> None:
+    """Replace the visible snapshot atomically, retaining read/favorite/deletion state."""
+    from core.db import get_connection
+
+    account = account_key(config)
+    if not account:
+        raise SignInError("not signed in")
+    checked_at = datetime.now(timezone.utc)
+    with closing(get_connection()) as conn, conn:
+        conn.execute("UPDATE youtube_recommendations SET current = 0 WHERE account = ?", (account,))
+        conn.executemany(
+            "INSERT INTO youtube_recommendations (account, video_id, title, author, date, position) "
+            "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(account, video_id) DO UPDATE SET "
+            "title = excluded.title, author = excluded.author, date = excluded.date, position = excluded.position, current = 1",
+            [(account, vid, title, author, (checked_at - timedelta(microseconds=position)).isoformat(), position)
+             for position, (vid, title, author) in enumerate(videos)],
+        )
+
+
 def plan_sync(subscriptions, known, existing_channel_ids) -> TakeoutImport:
     """Channels to add: subscribed, never seen before, and not already a feed."""
     skip = set(known) | set(existing_channel_ids)
@@ -148,7 +220,7 @@ def plan_sync(subscriptions, known, existing_channel_ids) -> TakeoutImport:
 
 
 def sync(config, provider) -> int:
-    """Add newly subscribed channels to ``provider``; return how many were added.
+    """Update subscriptions and local recommendations; return new channel count.
 
     ``config`` is a ConfigManager. Runs network and provider calls, so call it
     off the UI thread.
@@ -160,6 +232,8 @@ def sync(config, provider) -> int:
     if not token:
         raise SignInError("not signed in")
     subscriptions = list_subscriptions(token)
+    if token != config.get("youtube_account_refresh_token"):
+        raise SignInError("YouTube account changed during the update")
     known = list(config.get("youtube_account_known_channels", []) or [])
     existing = set()
     for feed in provider.get_feeds() or []:
@@ -180,8 +254,11 @@ def sync(config, provider) -> int:
                 os.unlink(path)
             except OSError:
                 pass
-    config.set("youtube_account_known_channels", sorted(set(known) | {cid for cid, _title in subscriptions}))
-    config.set("youtube_account_last_sync", time.time())
+    if token == config.get("youtube_account_refresh_token"):
+        config.set("youtube_account_known_channels", sorted(set(known) | {cid for cid, _title in subscriptions}))
+    save_recommendations({"youtube_account_refresh_token": token}, list_recommendations(token))
+    if token == config.get("youtube_account_refresh_token"):
+        config.set("youtube_account_last_sync", time.time())
     return len(plan.feeds)
 
 

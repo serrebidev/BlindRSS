@@ -9066,24 +9066,25 @@ class YouTubeAccountDialog(wx.Dialog):
         sizer.Add(buttons, 0, wx.LEFT | wx.RIGHT, 10)
 
         self.auto_add_chk = wx.CheckBox(
-            self, label=_("&Add new YouTube subscriptions as feeds automatically (checked every 6 hours)")
+            self, label=_("&Update subscriptions and recommendations automatically (every 15 minutes)")
         )
         self.auto_add_chk.SetValue(bool(config_manager.get("youtube_account_auto_add", True)))
+        self.auto_add_chk.Bind(wx.EVT_CHECKBOX, lambda event: self._save_options())
         sizer.Add(self.auto_add_chk, 0, wx.ALL, 10)
 
         category_row = wx.BoxSizer(wx.HORIZONTAL)
+        sizer.Add(wx.StaticText(self, label=_("YouTube account category:")), 0, wx.LEFT | wx.RIGHT, 10)
         self.category_ctrl = wx.TextCtrl(self, style=wx.TE_READONLY)
-        self.category_ctrl.SetName(_("Category for new channels"))
+        self.category_ctrl.SetName(_("YouTube account category"))
         category_row.Add(self.category_ctrl, 1, wx.EXPAND | wx.RIGHT, 5)
         change_category_btn = wx.Button(self, label=_("C&hange Category..."))
         change_category_btn.Bind(wx.EVT_BUTTON, self._on_change_category)
         category_row.Add(change_category_btn, 0)
-        sizer.Add(wx.StaticText(self, label=_("Category for new channels:")), 0, wx.LEFT | wx.RIGHT, 10)
         sizer.Add(category_row, 0, wx.EXPAND | wx.ALL, 10)
         self._set_category(str(config_manager.get("youtube_account_category", "YouTube") or "YouTube"))
 
         bottom = wx.BoxSizer(wx.HORIZONTAL)
-        self.sync_btn = wx.Button(self, label=_("Add &New Subscriptions Now"))
+        self.sync_btn = wx.Button(self, label=_("&Update Account Now"))
         close_btn = wx.Button(self, wx.ID_CLOSE, _("Close"))
         bottom.Add(self.sync_btn, 0, wx.RIGHT, 5)
         bottom.Add(close_btn, 0)
@@ -9203,13 +9204,13 @@ class YouTubeAccountDialog(wx.Dialog):
         if not chosen:
             self._save_options()
             self._refresh_state(
-                _("Signed in to YouTube. Choose Change Category, then Add New Subscriptions Now.")
+                _("Signed in to YouTube. Choose Change Category, then Update Account Now.")
             )
             self.status_ctrl.SetFocus()
             return
         self._set_category(chosen)
         self._save_options()
-        self._refresh_state(_("Signed in to YouTube. Adding your subscriptions..."))
+        self._refresh_state(_("Signed in to YouTube. Updating subscriptions and recommendations..."))
         self.status_ctrl.SetFocus()
         self._on_sync_now(self._sync_done)
 
@@ -9228,7 +9229,7 @@ class YouTubeAccountDialog(wx.Dialog):
     def _on_sync(self, event):
         self._save_options()
         self.sync_btn.Disable()
-        self.status_ctrl.ChangeValue(_("Checking your YouTube subscriptions..."))
+        self.status_ctrl.ChangeValue(_("Updating your YouTube subscriptions and recommendations..."))
         self._on_sync_now(self._sync_done)
 
     def _sync_done(self, message: str) -> None:
@@ -9240,7 +9241,10 @@ class YouTubeAccountDialog(wx.Dialog):
     def _on_close(self, event):
         self._sign_in_token += 1  # stops sign-in polling
         self._save_options()
-        event.Skip()
+        if self.IsModal():
+            self.EndModal(wx.ID_CLOSE)
+        else:
+            self.Hide()
 
 
 class ChooseCategoryDialog(wx.Dialog):

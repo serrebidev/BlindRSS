@@ -52,6 +52,7 @@ class _TickProvider:
 class _RefreshLoopHost:
     refresh_loop = mainframe.MainFrame.refresh_loop
     _scheduled_refresh_tick_seconds = mainframe.MainFrame._scheduled_refresh_tick_seconds
+    _wait_for_refresh_tick = mainframe.MainFrame._wait_for_refresh_tick
 
     def _run_periodic_jobs(self):
         pass
@@ -132,6 +133,26 @@ def test_refresh_loop_falls_back_to_global_interval_without_provider_support():
     host.refresh_loop()
 
     assert host.stop_event.wait_intervals == [45]
+
+
+def test_account_jobs_wake_during_long_rss_wait_without_extra_rss_refresh(monkeypatch):
+    host = _RefreshLoopHost(interval=3600)
+    host.config_manager.values["youtube_account_refresh_token"] = "test"
+    now = [0]
+    jobs = []
+    monkeypatch.setattr(mainframe.time, "monotonic", lambda: now[0])
+    host._run_periodic_jobs = lambda: jobs.append(now[0])
+
+    def wait(seconds):
+        host.stop_event.wait_intervals.append(seconds)
+        now[0] += seconds
+        return now[0] >= 180
+
+    host.stop_event.wait = wait
+    host.refresh_loop()
+    assert host.stop_event.wait_intervals == [60, 60, 60]
+    assert jobs == [0, 60, 120]
+    assert len(host.refresh_calls) == 1
 
 
 class _StartupWorkHost:
