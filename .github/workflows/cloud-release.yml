@@ -2,8 +2,8 @@ name: Cloud Release
 
 # Full release on GitHub-hosted runners, for the Muse agent, cloud agents or any machine without
 # the Windows release host. Same versioning, notes and changelog as
-# `build.bat release` (tools/release.py); Windows is signed by SignPath
-# (release-signing for a real run, test-signing for a dry run). The release stays a draft until every
+# `build.bat release` (tools/release.py); Windows is signed from the
+# WINDOWS_CODESIGN_PFX/PASSWORD secrets. The release stays a draft until every
 # platform's assets and manifests are uploaded, so the updater never sees a
 # partial release.
 #
@@ -22,11 +22,8 @@ on:
         default: true
         type: boolean
 
-# A reusable workflow cannot be granted more than its caller has; SignPath
-# needs actions: read to fetch the uploaded artifact.
 permissions:
   contents: write
-  actions: read
 
 concurrency:
   group: blindrss-release
@@ -139,6 +136,37 @@ jobs:
       build_windows: true
       build_linux: true
       publish_assets: ${{ !inputs.dry_run }}
-      publish_release: ${{ !inputs.dry_run }}
-      signing_policy: ${{ inputs.dry_run && 'test-signing' || 'release-signing' }}
     secrets: inherit
+
+  publish:
+    name: Verify assets and publish as Latest
+    needs: [prepare, build]
+    if: ${{ !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.prepare.outputs.release_tag }}
+    steps:
+      - name: Verify every platform uploaded its assets
+        run: |
+          v="${TAG#v}"
+          have="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          missing=0
+          for want in "BlindRSS-v$v.zip" "BlindRSS-Setup-v$v.exe" BlindRSS-update.json \
+                      "BlindRSS-linux-v$v.tar.gz" BlindRSS-update-linux.json \
+                      "BlindRSS-macos-v$v.zip" BlindRSS-update-macos.json; do
+            if ! grep -qxF "$want" <<<"$have"; then echo "::error::Missing asset $want"; missing=1; fi
+          done
+          [ "$missing" = 0 ]
+
+      - name: Publish as Latest
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+      - name: Verify the updater will see it
+        run: |
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          if [ "$latest" != "$TAG" ]; then
+            echo "::error::/releases/latest is $latest, expected $TAG"
+            exit 1
+          fi
+          echo "Published $TAG as Latest."

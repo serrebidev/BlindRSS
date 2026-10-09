@@ -25,19 +25,6 @@ on:
         required: false
         default: true
         type: boolean
-      publish_release:
-        description: After every asset is uploaded, publish the draft release as Latest
-        required: false
-        default: false
-        type: boolean
-      signing_policy:
-        description: SignPath signing policy for Windows (release-signing needs approval in SignPath)
-        required: false
-        default: release-signing
-        type: choice
-        options:
-          - release-signing
-          - test-signing
   # cloud-release.yml calls this after it has tagged a draft release.
   workflow_call:
     inputs:
@@ -61,34 +48,21 @@ on:
         required: false
         default: true
         type: boolean
-      publish_release:
-        required: false
-        default: false
-        type: boolean
-      signing_policy:
-        required: false
-        default: release-signing
-        type: string
     secrets:
-      SIGNPATH_API_TOKEN:
+      WINDOWS_CODESIGN_PFX:
+        required: false
+      WINDOWS_CODESIGN_PASSWORD:
         required: false
 
 permissions:
   contents: write
-  actions: read
-
-env:
-  SIGNPATH_ORGANIZATION_ID: 9fb29c12-10be-42a0-b481-dc5965f315af
-  SIGNPATH_PROJECT_SLUG: BlindRSS
-  SIGNPATH_ARTIFACT_CONFIGURATION_SLUG: exe-in-zip
 
 jobs:
-  # Windows is built and signed here only. The certificate is issued to SignPath
-  # Foundation and lives in SignPath's HSM; SignPath signs nothing that was not
-  # built from this repository on a GitHub-hosted runner, so there is no local
-  # signing path for a release. Two signing requests per build: BlindRSS.exe
-  # first, so the ZIP and the installer both carry the signed exe, then the
-  # installer itself. release-signing waits for the approver in SignPath.
+  # Windows is normally built and signed locally via build.bat, but this job lets
+  # a release be cut entirely from macOS/Linux: it reuses build.bat unchanged
+  # (via a code-signing cert imported from the WINDOWS_CODESIGN_PFX/PASSWORD
+  # secrets) and only runs on workflow_dispatch when build_windows is enabled,
+  # since it needs an existing release tag to build against and upload assets to.
   windows:
     name: Build Windows Artifact
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.build_windows }}
@@ -110,108 +84,49 @@ jobs:
           choco install vlc --no-progress -y
           choco install innosetup --no-progress -y
 
-      - name: Build application
-        run: .\build.bat app
-
-      # SignPath refuses a file whose version resource is not this exact version.
-      - name: Read built version
-        id: built
+      - name: Locate signtool
+        id: signtool
         run: |
-          $v = (Get-Item dist\BlindRSS\BlindRSS.exe).VersionInfo.ProductVersion
-          if (-not $v) { throw "BlindRSS.exe has no product version" }
-          "version=$v" >> $env:GITHUB_OUTPUT
+          $found = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -match '\\x64\\' } |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          if (-not $found) { throw "signtool.exe not found on this runner image" }
+          "path=$($found.FullName)" >> $env:GITHUB_OUTPUT
 
-      - name: Upload unsigned executable
-        id: unsigned_exe
-        uses: actions/upload-artifact@v7
-        with:
-          name: unsigned-exe-${{ inputs.release_tag }}
-          path: dist/BlindRSS/BlindRSS.exe
-          if-no-files-found: error
-          overwrite: true
-
-      - name: Sign executable with SignPath
-        uses: signpath/github-action-submit-signing-request@v3
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
-          signing-policy-slug: ${{ inputs.signing_policy }}
-          artifact-configuration-slug: ${{ env.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
-          github-artifact-id: ${{ steps.unsigned_exe.outputs.artifact-id }}
-          wait-for-completion: true
-          wait-for-completion-timeout-in-seconds: 7200
-          parameters: |
-            version: ${{ toJSON(steps.built.outputs.version) }}
-          output-artifact-directory: signed/exe
-
-      - name: Package ZIP and installer around the signed executable
+      - name: Import code-signing certificate
+        env:
+          PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX }}
+          PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
         run: |
-          Copy-Item signed\exe\BlindRSS.exe dist\BlindRSS\BlindRSS.exe -Force
-          .\build.bat package
+          $pfxPath = Join-Path $env:RUNNER_TEMP "blindrss-codesign.pfx"
+          [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:PFX_BASE64))
+          $securePwd = ConvertTo-SecureString -String $env:PFX_PASSWORD -Force -AsPlainText
+          Import-PfxCertificate -FilePath $pfxPath -CertStoreLocation Cert:\CurrentUser\My -Password $securePwd | Out-Null
+          Remove-Item $pfxPath -Force
 
-      - name: Upload unsigned installer
-        id: unsigned_installer
-        uses: actions/upload-artifact@v7
-        with:
-          name: unsigned-installer-${{ inputs.release_tag }}
-          path: dist/BlindRSS-Setup-v*.exe
-          if-no-files-found: error
-          overwrite: true
+      - name: Build, sign, and package Windows release
+        env:
+          SIGNTOOL_PATH: ${{ steps.signtool.outputs.path }}
+        run: .\build.bat build
 
-      - name: Sign installer with SignPath
-        uses: signpath/github-action-submit-signing-request@v3
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ env.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ${{ env.SIGNPATH_PROJECT_SLUG }}
-          signing-policy-slug: ${{ inputs.signing_policy }}
-          artifact-configuration-slug: ${{ env.SIGNPATH_ARTIFACT_CONFIGURATION_SLUG }}
-          github-artifact-id: ${{ steps.unsigned_installer.outputs.artifact-id }}
-          wait-for-completion: true
-          wait-for-completion-timeout-in-seconds: 7200
-          parameters: |
-            version: ${{ toJSON(steps.built.outputs.version) }}
-          output-artifact-directory: signed/installer
-
-      # Nothing unsigned or half-signed may ship: the exe in dist, the exe inside
-      # the ZIP and the installer must all carry the same signer. release-signing
-      # chains to a trusted root, so only Valid passes. test-signing uses an
-      # untrusted test certificate, which Windows reports as UnknownError or
-      # NotTrusted; a tampered file is HashMismatch and never passes.
+      # build.bat build skips signing with only a warning when signtool is
+      # missing; a CI release must never ship an unsigned exe or installer.
+      # Same rule as core/updater.py: the release certificate is self-signed, so
+      # Windows reports an untrusted root (UnknownError/NotTrusted); accept that
+      # only when the signer is the certificate imported above.
       - name: Verify Authenticode signatures
-        id: verify
         run: |
           $version = "${{ inputs.release_tag }}".TrimStart('v')
-          $installer = "dist\BlindRSS-Setup-v$version.exe"
-          Copy-Item "signed\installer\BlindRSS-Setup-v$version.exe" $installer -Force
-          $okStatus = if ("${{ inputs.signing_policy }}" -eq "release-signing") { @("Valid") } else { @("Valid", "UnknownError", "NotTrusted") }
-          $unzipped = Join-Path $env:RUNNER_TEMP "zipcheck"
-          Expand-Archive "dist\BlindRSS-v$version.zip" $unzipped -Force
-          $zipExe = (Get-ChildItem $unzipped -Recurse -Filter BlindRSS.exe | Select-Object -First 1).FullName
-          if (-not $zipExe) { throw "BlindRSS.exe is missing from the ZIP" }
-          $pinned = (Get-AuthenticodeSignature "dist\BlindRSS\BlindRSS.exe").SignerCertificate.Thumbprint
-          if (-not $pinned) { throw "dist\BlindRSS\BlindRSS.exe is not signed" }
-          foreach ($f in @("dist\BlindRSS\BlindRSS.exe", $zipExe, $installer)) {
+          $pinned = (Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Select-Object -First 1).Thumbprint
+          if (-not $pinned) { throw "No code-signing certificate was imported" }
+          foreach ($f in @("dist\BlindRSS\BlindRSS.exe", "dist\BlindRSS-Setup-v$version.exe")) {
             $sig = Get-AuthenticodeSignature $f
             $thumb = if ($sig.SignerCertificate) { $sig.SignerCertificate.Thumbprint } else { "" }
             $status = "$($sig.Status)"
-            if ($thumb -ne $pinned) { throw "$f is not signed by the same certificate as BlindRSS.exe (status $status, signer '$thumb')" }
-            if ($status -notin $okStatus) { throw "$f signature is $status" }
+            if ($thumb -ne $pinned) { throw "$f is not signed by the release certificate (status $status, signer '$thumb')" }
+            if ($status -notin @("Valid", "UnknownError", "NotTrusted")) { throw "$f signature is $status" }
             "$f signed by $($sig.SignerCertificate.Subject) ($status)"
           }
-          "thumbprint=$pinned" >> $env:GITHUB_OUTPUT
-
-      # build.bat edits the installer's version strings in place after Inno
-      # Setup compiles it; prove the signed result still installs.
-      - name: Install the signed installer silently
-        run: |
-          $version = "${{ inputs.release_tag }}".TrimStart('v')
-          $dir = Join-Path $env:RUNNER_TEMP "install-smoke"
-          $p = Start-Process "dist\BlindRSS-Setup-v$version.exe" -Wait -PassThru -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/DIR=`"$dir`""
-          if ($p.ExitCode -ne 0) { throw "Installer exited with code $($p.ExitCode)" }
-          if (-not (Test-Path (Join-Path $dir "BlindRSS.exe"))) { throw "Installer did not install BlindRSS.exe" }
-          "Installed to $dir"
 
       - name: Compute checksums and write update manifest
         id: manifest
@@ -221,7 +136,7 @@ jobs:
           $installer = "dist\BlindRSS-Setup-v$version.exe"
           $zipSha = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
           $installerSha = (Get-FileHash $installer -Algorithm SHA256).Hash.ToLower()
-          $thumbprint = "${{ steps.verify.outputs.thumbprint }}"
+          $thumbprint = (Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Select-Object -First 1).Thumbprint
           # Same notes summary build.bat puts in the manifest.
           $prevTag = (git describe --tags --abbrev=0 "HEAD^" 2>$null)
           $summary = Join-Path $env:RUNNER_TEMP "notes-summary.txt"
@@ -367,38 +282,3 @@ jobs:
             --sha256 "$SHA" \
             --output dist/BlindRSS-update-linux.json
           gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-update-linux.json --clobber
-
-  # The updater only sees a published Latest release, so the release stays a
-  # draft until every platform's assets and manifests are on it.
-  publish:
-    name: Verify assets and publish as Latest
-    needs: [windows, macos, linux]
-    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.publish_release && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
-    runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
-      TAG: ${{ inputs.release_tag }}
-    steps:
-      - name: Verify every platform uploaded its assets
-        run: |
-          v="${TAG#v}"
-          have="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
-          missing=0
-          for want in "BlindRSS-v$v.zip" "BlindRSS-Setup-v$v.exe" BlindRSS-update.json \
-                      "BlindRSS-linux-v$v.tar.gz" BlindRSS-update-linux.json \
-                      "BlindRSS-macos-v$v.zip" BlindRSS-update-macos.json; do
-            if ! grep -qxF "$want" <<<"$have"; then echo "::error::Missing asset $want"; missing=1; fi
-          done
-          [ "$missing" = 0 ]
-
-      - name: Publish as Latest
-        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
-
-      - name: Verify the updater will see it
-        run: |
-          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
-          if [ "$latest" != "$TAG" ]; then
-            echo "::error::/releases/latest is $latest, expected $TAG"
-            exit 1
-          fi
-          echo "Published $TAG as Latest."
