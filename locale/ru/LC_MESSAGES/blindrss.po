@@ -2856,7 +2856,7 @@ msgid "Loading more"
 msgstr "Загрузка ещё"
 
 #: gui/dialogs.py:7862 gui/dialogs.py:5246 gui/player.py:1999
-#: gui/player.py:5980
+#: gui/player.py:5984
 msgid "Play"
 msgstr "Воспроизведение"
 
@@ -5866,8 +5866,8 @@ msgstr "Не удалось загрузить эпизоды: {error}"
 msgid "Google News: {topic} headlines"
 msgstr "Google Новости: заголовки {topic}"
 
-#: gui/dialogs.py:7964 gui/mainframe.py:1919 gui/player.py:4332
-#: gui/player.py:6945
+#: gui/dialogs.py:7964 gui/mainframe.py:1919 gui/player.py:4336
+#: gui/player.py:6949
 msgid "Playing"
 msgstr "Воспроизводимое"
 
@@ -5887,8 +5887,8 @@ msgstr ""
 msgid "Bing News: {term}"
 msgstr "Bing Новости: {term}"
 
-#: gui/dialogs.py:7966 gui/mainframe.py:1919 gui/player.py:7001
-#: gui/player.py:7018
+#: gui/dialogs.py:7966 gui/mainframe.py:1919 gui/player.py:7005
+#: gui/player.py:7022
 msgid "Paused"
 msgstr "Приостановлено"
 
@@ -5896,11 +5896,11 @@ msgstr "Приостановлено"
 msgid "Paused: {title}"
 msgstr "Приостановлен: {title}"
 
-#: gui/dialogs.py:7970 gui/player.py:4393 gui/player.py:4944
+#: gui/dialogs.py:7970 gui/player.py:4397 gui/player.py:4948
 msgid "Buffering..."
 msgstr "Буферизация..."
 
-#: gui/dialogs.py:7972 gui/player.py:4536
+#: gui/dialogs.py:7972 gui/player.py:4540
 msgid "Connecting..."
 msgstr "Подключение..."
 
@@ -7527,9 +7527,18 @@ msgstr "Обновление учётной записи YouTube уже запу
 
 #: gui/mainframe.py:3733
 msgid ""
+"YouTube account updated. Added {count} new channel; recommendations "
+"refreshed."
+msgid_plural ""
 "YouTube account updated. Added {count} new channels; recommendations "
 "refreshed."
-msgstr ""
+msgstr[0] ""
+"Обновлена учётная запись YouTube. Добавлено {count} новый канал; обновлены "
+"рекомендации."
+msgstr[1] ""
+"Обновлена учётная запись YouTube. Добавлено {count} новых канала; обновлены "
+"рекомендации."
+msgstr[2] ""
 "Обновлена учётная запись YouTube. Добавлено {count} новых каналов; обновлены "
 "рекомендации."
 
@@ -8114,7 +8123,7 @@ msgstr ""
 msgid "No Track Loaded"
 msgstr "Трек не загружен"
 
-#: gui/player.py:4661
+#: gui/player.py:4665
 msgid "download failed"
 msgstr "ошибка загрузки"
 
@@ -8174,19 +8183,19 @@ msgstr "&Отключить трансляцию"
 msgid "&Cast to Device..."
 msgstr "&Трансляция на устройство..."
 
-#: gui/player.py:3631 gui/player.py:4182 gui/player.py:4256 gui/player.py:4258
+#: gui/player.py:3635 gui/player.py:4186 gui/player.py:4260 gui/player.py:4262
 msgid "Playing Audio..."
 msgstr "Воспроизведение аудио..."
 
-#: gui/player.py:5859
+#: gui/player.py:5863
 msgid "Elapsed Time"
 msgstr "Прошло времени"
 
-#: gui/player.py:5862
+#: gui/player.py:5866
 msgid "Total Time"
 msgstr "Общее время"
 
-#: gui/player.py:7057 gui/player.py:7169 gui/player.py:4950
+#: gui/player.py:7061 gui/player.py:7173 gui/player.py:4954
 msgid "Stopped"
 msgstr "Остановлено"
 
@@ -8266,26 +8275,29 @@ msgstr ""
 "элемент требует входа в систему, либо у канала нет загружаемого вложения."
 
 #: gui/player.py:3261
-msgid "Skipped {category}, {seconds} seconds"
-msgstr "Пропущена {category}, {seconds} секунд"
+msgid "Skipped {category}, {seconds} second"
+msgid_plural "Skipped {category}, {seconds} seconds"
+msgstr[0] "Пропущена {category}, {seconds} секунда"
+msgstr[1] "Пропущена {category}, {seconds} секунды"
+msgstr[2] "Пропущена {category}, {seconds} секунд"
 
-#: gui/player.py:3594 gui/player.py:4247
+#: gui/player.py:3598 gui/player.py:4251
 msgid "Failed to load media"
 msgstr "Не удалось загрузить мультимедиа"
 
-#: gui/player.py:4249
+#: gui/player.py:4253
 msgid "VLC is not initialized. Playback is unavailable."
 msgstr "VLC не инициализирован. Воспроизведение недоступно."
 
-#: gui/player.py:4528 gui/player.py:4530 gui/player.py:4515
+#: gui/player.py:4532 gui/player.py:4534 gui/player.py:4519
 msgid "Loading media..."
 msgstr "Загрузка мультимедиа..."
 
-#: gui/player.py:4596
+#: gui/player.py:4600
 msgid "Downloading for playback..."
 msgstr "Загрузка для воспроизведения..."
 
-#: gui/player.py:5885
+#: gui/player.py:5889
 msgid "Elapsed {elapsed}, Remaining {remaining}, Total {total}"
 msgstr "Прошло {elapsed}, Осталось {remaining}, Всего {total}"
 
@@ -8321,27 +8333,27 @@ msgstr "Тайм-коды недоступны"
 msgid "Casting failed: {error}"
 msgstr "Не удалось выполнить трансляцию: {error}"
 
-#: gui/player.py:3610
+#: gui/player.py:3614
 msgid "Cannot play this item"
 msgstr "Не удаётся воспроизвести этот элемент"
 
-#: gui/player.py:5856
+#: gui/player.py:5860
 msgid "{name}: {value}"
 msgstr "{name}: {value}"
 
-#: gui/player.py:5883
+#: gui/player.py:5887
 msgid "Elapsed {elapsed}"
 msgstr "Прошло {elapsed}"
 
-#: gui/player.py:5995
+#: gui/player.py:5999
 msgid "Volume Level"
 msgstr "Уровень громкости"
 
-#: gui/player.py:6749
+#: gui/player.py:6753
 msgid "End of track"
 msgstr "Конец дорожки"
 
-#: gui/player.py:6749
+#: gui/player.py:6753
 msgid "Beginning of track"
 msgstr "Начало дорожки"
 
@@ -8349,29 +8361,29 @@ msgstr "Начало дорожки"
 msgid "{title} (Local)"
 msgstr "{title} (локально)"
 
-#: gui/player.py:3647 gui/player.py:4124 gui/player.py:4143 gui/player.py:4073
+#: gui/player.py:3651 gui/player.py:4128 gui/player.py:4147 gui/player.py:4077
 msgid "Media Stream"
 msgstr "Мультимедийный поток"
 
-#: gui/player.py:4728 gui/player.py:3994
+#: gui/player.py:4732 gui/player.py:3998
 msgid "Trying pytubefix..."
 msgstr "Попытка через pytubefix..."
 
-#: gui/player.py:4753 gui/player.py:4017
+#: gui/player.py:4757 gui/player.py:4021
 msgid "Preparing YouTube browser session..."
 msgstr "Подготовка браузерной сессии YouTube..."
 
-#: gui/player.py:4838
+#: gui/player.py:4842
 msgid "Could not play this YouTube item. yt-dlp could not fetch it: {error}"
 msgstr ""
 "Не получилось воспроизвести этот элемент с YouTube. yt-dlp не удалось его "
 "извлечь: {error}"
 
-#: gui/player.py:5980
+#: gui/player.py:5984
 msgid "Pause"
 msgstr "Пауза"
 
-#: gui/player.py:6778
+#: gui/player.py:6782
 msgid "Could not seek there. Position {position}"
 msgstr "Не удалось перейти. Позиция {position}"
 
@@ -8402,7 +8414,7 @@ msgstr "Открыть ссылку на {chapter}"
 msgid "{title} (Casting to {device})"
 msgstr "{title} (трансляция на {device})"
 
-#: gui/player.py:4160
+#: gui/player.py:4164
 msgid ""
 "Rokfin post is listed but not streamable right now: Rokfin returned an "
 "invalid playback ID for this post."
@@ -8411,7 +8423,7 @@ msgstr ""
 "воспроизведения: Rokfin вернул неверный идентификатор воспроизведения для "
 "этой записи."
 
-#: gui/player.py:5997
+#: gui/player.py:6001
 msgid "Volume: {percent}%"
 msgstr "Громкость: {percent}%"
 
@@ -8419,11 +8431,11 @@ msgstr "Громкость: {percent}%"
 msgid "[Current]"
 msgstr "[Текущий]"
 
-#: gui/player.py:4158
+#: gui/player.py:4162
 msgid "yt-dlp resolve failed: {error}"
 msgstr "Ошибка разрешения yt-dlp: {error}"
 
-#: gui/player.py:4165
+#: gui/player.py:4169
 msgid ""
 "Rokfin post is not anonymously streamable right now. Rokfin requires a login/"
 "cookies to play this post."
@@ -8431,7 +8443,7 @@ msgstr ""
 "Запись Rokfin сейчас недоступна для анонимного потокового воспроизведения. "
 "Rokfin требует входа/cookie-файла для воспроизведения этой записи."
 
-#: gui/player.py:4170
+#: gui/player.py:4174
 msgid ""
 "yt-dlp resolve failed: this media may require a login, but browser cookies "
 "could not be loaded on this Windows session (DPAPI). Try running BlindRSS as "
