@@ -3730,7 +3730,7 @@ class MainFrame(wx.Frame):
                 return
             try:
                 added = youtube_account.sync(self.config_manager, self.provider)
-                message = _("YouTube account updated. Added {count} new channels; recommendations refreshed.").format(count=added)
+                message = ngettext("YouTube account updated. Added {count} new channel; recommendations refreshed.", "YouTube account updated. Added {count} new channels; recommendations refreshed.", added).format(count=added)
             except youtube_account.SignInError as exc:
                 added = 0
                 message = _("Could not update YouTube account: {error}. If access was revoked, sign in again from Tools, YouTube Account.").format(error=exc)

@@ -21,7 +21,7 @@ from core import equalizer as equalizer_mod
 from core import playback_state
 from core.casting import CastingManager
 from core import vlc_instance as vlc_shared
-from core.i18n import _
+from core.i18n import _, ngettext
 from urllib.parse import urlparse
 from urllib.request import url2pathname
 from core.range_cache_proxy import get_range_cache_proxy
@@ -3258,7 +3258,11 @@ class PlayerFrame(wx.Frame):
         self._sponsor_done.add(seg["uuid"])
         self._apply_seek_time_ms(int(seg["end"] * 1000), force=True, reason="sponsorblock")
         label = _(sponsorblock.CATEGORIES.get(seg["category"], seg["category"]))
-        text = _("Skipped {category}, {seconds} seconds").format(
+        text = ngettext(
+            "Skipped {category}, {seconds} second",
+            "Skipped {category}, {seconds} seconds",
+            int(round(seg["end"] - seg["start"]))
+        ).format(
             category=label, seconds=int(round(seg["end"] - seg["start"]))
         )
         try:
