@@ -211,6 +211,32 @@ def test_direct_writes_invalidate_the_displayed_text_memo(monkeypatch):
     assert d.content_ctrl.value == SMALL
 
 
+def test_large_youtube_result_waits_until_reader_focus(monkeypatch):
+    d = _frame(monkeypatch)
+    d.list_ctrl = object()
+    d._focus["cur"] = d.list_ctrl
+    article = types.SimpleNamespace(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    d.content_ctrl.value = SMALL
+
+    assert MF._set_article_reader_text(d, article, BIG) == BIG
+    assert d.content_ctrl.value == SMALL
+    assert getattr(d, "_reader_displayed_text", None) is None
+
+    d._focus["cur"] = d.content_ctrl
+    MF._set_article_reader_text(d, article, BIG, reset_insertion=True)
+    assert d.content_ctrl.value == BIG
+
+
+def test_large_youtube_result_is_not_deferred_on_macos(monkeypatch):
+    d = _frame(monkeypatch)
+    monkeypatch.setattr(mainframe.sys, "platform", "darwin")
+    d.list_ctrl = object()
+    d._focus["cur"] = d.list_ctrl
+    article = types.SimpleNamespace(url="https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    MF._set_article_reader_text(d, article, BIG)
+    assert d.content_ctrl.value == BIG
+
+
 def test_small_text_skips_repeat_write_when_already_displayed(monkeypatch):
     """The memo still short-circuits genuine repeats (the optimisation works)."""
     d = _frame(monkeypatch)

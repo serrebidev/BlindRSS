@@ -6094,6 +6094,16 @@ class MainFrame(wx.Frame):
         """Set the main reader from chapter-free base text and return the displayed text."""
         displayed = self._compose_article_reader_text(base_text, article=article)
         try:
+            # Cache full YouTube results without laying out huge transcripts
+            # while arrowing; reader focus applies the cached document.
+            if (
+                sys.platform.startswith("win")
+                and len(displayed) >= LARGE_READER_TEXT_CHARS
+                and _article_is_youtube_video(article)
+                and getattr(self, "list_ctrl", None) is not None
+                and wx.Window.FindFocus() is self.list_ctrl
+            ):
+                return displayed
             same_tracked_text = getattr(self, "_reader_displayed_text", None) == displayed
             if same_tracked_text and self.content_ctrl.GetLastPosition() == len(displayed):
                 # Focus-triggered cache hits request reset_insertion so a newly
@@ -10564,7 +10574,7 @@ class MainFrame(wx.Frame):
         if self._is_load_more_row(idx):
             # Keep focus on placeholder; do not try to load content
             self.selected_article_id = None
-            self.content_ctrl.SetValue("")
+            replace_text_control_value(self.content_ctrl, "")
             self._invalidate_reader_text_tracking()
             return
         if 0 <= idx < len(self.current_articles):
@@ -10581,7 +10591,7 @@ class MainFrame(wx.Frame):
             self._fulltext_token += 1
             
             # Immediate feedback (fast)
-            self.content_ctrl.SetValue(_("Loading..."))
+            replace_text_control_value(self.content_ctrl, _("Loading..."))
             self._invalidate_reader_text_tracking()
 
             # Debounce heavy operations (HTML parsing, marking read, etc.)

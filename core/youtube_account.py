@@ -156,9 +156,21 @@ def parse_recommendations(data) -> list[tuple[str, str, str]]:
                 lines = metadata.get("lines") or []
                 items = ((lines[0].get("lineRenderer") or {}).get("items") or []) if lines else []
                 author = ""
+                overlays = ((tile.get("header") or {}).get("tileHeaderRenderer") or {}).get("thumbnailOverlays") or []
+                is_podcast = any(
+                    ((overlay.get("thumbnailOverlayTimeStatusRenderer") or {}).get("icon") or {}).get("iconType") == "BROADCAST"
+                    for overlay in overlays
+                )
                 if items:
                     text = (items[0].get("lineItemRenderer") or {}).get("text") or {}
                     author = text.get("simpleText") or "".join(r.get("text", "") for r in text.get("runs", []))
+                    # Podcast tiles show series, then episode, then channel.
+                    if is_podcast and len(lines) == 2 and len(items) == 1 and text.get("simpleText"):
+                        second = (lines[1].get("lineRenderer") or {}).get("items") or []
+                        if len(second) == 1:
+                            channel = ((second[0].get("lineItemRenderer") or {}).get("text") or {}).get("simpleText")
+                            if channel:
+                                title, author = author.strip(), channel.strip()
                 if re.fullmatch(r"[A-Za-z0-9_-]{11}", video_id) and title:
                     found.setdefault(video_id, (video_id, title, author))
             stack.extend(reversed(list(node.values())))

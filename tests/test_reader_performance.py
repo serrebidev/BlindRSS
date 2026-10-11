@@ -23,6 +23,9 @@ class _Control:
         self.get_calls += 1
         return self.value
 
+    def GetLastPosition(self):
+        return len(self.value)
+
     def SetValue(self, value):
         self.set_calls += 1
         self.value = value
@@ -67,6 +70,15 @@ def test_typical_youtube_length_uses_large_update_path():
     assert control.value == complete
     assert control.get_calls == 0
     assert control.change_calls == 1
+
+
+def test_leaving_large_reader_never_copies_the_old_document():
+    control = _Control("transcript\n" * LARGE_READER_TEXT_CHARS)
+    assert replace_text_control_value(control, "Loading...") is True
+    assert control.value == "Loading..."
+    assert control.get_calls == control.set_calls == 0
+    assert control.change_calls == 1
+    assert control.freeze_calls == control.thaw_calls == 1
 
 
 def test_large_webview_update_is_async_complete_and_atomic():

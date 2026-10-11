@@ -54,6 +54,30 @@ def test_recommendations_parse_only_valid_video_tiles_in_document_order():
     ]
 
 
+def test_podcast_recommendations_use_episode_title_and_channel():
+    tile = _tile("3sK3gSsZOmQ", "Daily Tech News Show", "TILE_CONTENT_TYPE_VIDEO")
+    tile["tileRenderer"]["header"] = {"tileHeaderRenderer": {"thumbnailOverlays": [
+        {"thumbnailOverlayTimeStatusRenderer": {"icon": {"iconType": "BROADCAST"},
+         "text": {"runs": [{"text": "745"}, {"text": " episodes"}]}}}
+    ]}}
+    tile["tileRenderer"]["metadata"]["tileMetadataRenderer"]["lines"] = [
+        {"lineRenderer": {"items": [{"lineItemRenderer": {"text": {"simpleText": text}}}]}}
+        for text in ("Social Engineering 101", "Daily Tech News Show")
+    ]
+    assert youtube_account.parse_recommendations(tile) == [
+        ("3sK3gSsZOmQ", "Social Engineering 101", "Daily Tech News Show")
+    ]
+
+
+def test_ordinary_singleton_metadata_lines_do_not_swap_title_and_author():
+    tile = _tile("abcdefghijk", "Video title", "TILE_CONTENT_TYPE_VIDEO")
+    tile["tileRenderer"]["metadata"]["tileMetadataRenderer"]["lines"] = [
+        {"lineRenderer": {"items": [{"lineItemRenderer": {"text": {"simpleText": text}}}]}}
+        for text in ("Channel", "1 hour ago")
+    ]
+    assert youtube_account.parse_recommendations(tile) == [("abcdefghijk", "Video title", "Channel")]
+
+
 def test_recommendations_request_signed_in_home_and_fail_closed(monkeypatch):
     monkeypatch.setattr(youtube_account, "access_token", lambda token: "access")
     calls = []

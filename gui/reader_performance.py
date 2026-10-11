@@ -48,12 +48,16 @@ def replace_text_control_value(control, value: str) -> bool:
     ``TextCtrl.GetValue`` allocates a second Python string and walks the entire
     native RichEdit buffer. For transcripts and complete discussions that can
     be the most expensive UI-thread operation before ``SetValue`` even starts.
-    Large values are known to be a completed asynchronous replacement, so use
-    ``ChangeValue`` (no EVT_TEXT round trip) inside Freeze/Thaw and never read
-    the old multi-megabyte buffer back. No content is shortened or omitted.
+    When either value is large, use ``ChangeValue`` (no EVT_TEXT round trip)
+    inside Freeze/Thaw and never read the old multi-megabyte buffer back.
+    No content is shortened or omitted.
     """
     text = str(value or "")
-    if len(text) < LARGE_READER_TEXT_CHARS:
+    try:
+        old_length = control.GetLastPosition()
+    except Exception:
+        old_length = 0
+    if max(len(text), old_length) < LARGE_READER_TEXT_CHARS:
         try:
             if control.GetValue() == text:
                 return False
