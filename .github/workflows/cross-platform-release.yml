@@ -314,7 +314,7 @@ jobs:
       - name: Verify every platform uploaded its assets
         run: |
           v="${TAG#v}"
-          have="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[].name')"
+          have="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
           missing=0
           for want in "BlindRSS-v$v.zip" "BlindRSS-Setup-v$v.exe" BlindRSS-update.json \
                       "BlindRSS-linux-v$v.tar.gz" BlindRSS-update-linux.json \
