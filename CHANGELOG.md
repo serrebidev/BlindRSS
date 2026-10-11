@@ -4,6 +4,11 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.3.4 - 2026-10-11
+
+- Restore complete publication with development signing.
+- Keep article navigation responsive and correct podcast titles.
+
 ## v2.3.3 - 2026-10-10
 
 - Add gettext plural forms and update Russian translation (#117).
