@@ -39,9 +39,9 @@ def test_cloud_release_pushes_and_publishes_only_for_real_runs():
     assert "--draft" in tag_step["run"] and "git push --atomic" in tag_step["run"]
     build = wf["jobs"]["build"]["with"]
     assert build["publish_assets"] == "${{ !inputs.dry_run }}"
-    assert build["publish_release"] == "${{ !inputs.dry_run }}"
-    # A dry run must never spend a release signature.
-    assert build["signing_policy"] == "${{ inputs.dry_run && 'test-signing' || 'release-signing' }}"
+    publish = wf["jobs"]["publish"]
+    assert "!inputs.dry_run" in publish["if"]
+    assert "signing_policy" not in build
 
 
 def test_release_verifies_every_asset_before_publishing_latest():
@@ -73,7 +73,7 @@ def test_cross_platform_workflow_is_reusable_and_gates_uploads():
     wf = _load("cross-platform-release.yml")
     call_inputs = wf["on"]["workflow_call"]["inputs"]
     assert {"release_tag", "ref", "build_windows", "build_linux", "publish_assets",
-            "publish_release", "signing_policy"} <= set(call_inputs)
+            "publish_release"} <= set(call_inputs)
     for job in ("windows", "macos", "linux"):
         for step in wf["jobs"][job]["steps"]:
             if "gh release upload" in str(step.get("run", "")):
@@ -82,22 +82,20 @@ def test_cross_platform_workflow_is_reusable_and_gates_uploads():
     assert win.index("Verify Authenticode signatures") < win.index("Upload release assets")
 
 
-def test_windows_is_signed_by_signpath_exe_first_then_installer():
+def test_windows_uses_authorized_development_signing_and_verifies_before_upload():
     wf = _load("cross-platform-release.yml")
     steps = wf["jobs"]["windows"]["steps"]
     names = [s["name"] for s in steps]
-    order = ["Build application", "Sign executable with SignPath",
-             "Package ZIP and installer around the signed executable",
-             "Sign installer with SignPath", "Verify Authenticode signatures",
+    order = ["Import code-signing certificate", "Build, sign, and package Windows release",
+             "Verify Authenticode signatures",
              "Install the signed installer silently", "Upload release assets"]
     assert [names.index(n) for n in order] == sorted(names.index(n) for n in order)
-    for step in steps:
-        if "signpath/" in str(step.get("uses", "")):
-            assert step["with"]["signing-policy-slug"] == "${{ inputs.signing_policy }}"
-            assert step["with"]["api-token"] == "${{ secrets.SIGNPATH_API_TOKEN }}"
-    # No certificate or private key ever reaches the repository or a runner.
     text = (WORKFLOWS / "cross-platform-release.yml").read_text(encoding="utf-8")
-    assert "PFX" not in text and "signtool" not in text.lower()
+    assert "secrets.WINDOWS_CODESIGN_PFX" in text
+    verify = next(s["run"] for s in steps if s["name"] == "Verify Authenticode signatures")
+    assert "Expand-Archive" in verify and "$zipExe" in verify
+    assert "$thumb -ne $pinned" in verify
+    assert '"Valid", "UnknownError", "NotTrusted"' in verify
 
 
 def test_local_release_never_builds_or_signs_windows():
@@ -106,14 +104,15 @@ def test_local_release_never_builds_or_signs_windows():
     for call in ("build_app", "sign_exe", "sign_installer", "build_installer"):
         assert f"call :{call}" not in release
     assert "call :dispatch_ci_release" in release
-    assert "--draft --verify-tag" in bat and "signing_policy=release-signing" in bat
+    assert "--draft --verify-tag" in bat and "-f publish_release=true" in bat
+    assert "-f signing_policy" not in bat
 
 
-def test_cloud_caller_grants_what_the_signing_job_needs():
+def test_cloud_caller_grants_what_the_build_needs():
     # A called workflow can only keep or reduce its caller's permissions.
     called = _load("cross-platform-release.yml")["permissions"]
     caller = _load("cloud-release.yml")["permissions"]
-    assert called == caller == {"contents": "write", "actions": "read"}
+    assert called == caller == {"contents": "write"}
 
 
 def test_dispatch_block_parentheses_balance():

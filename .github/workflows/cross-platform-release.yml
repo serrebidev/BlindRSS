@@ -25,6 +25,11 @@ on:
         required: false
         default: true
         type: boolean
+      publish_release:
+        description: Publish the draft as Latest after all seven assets are present
+        required: false
+        default: false
+        type: boolean
   # cloud-release.yml calls this after it has tagged a draft release.
   workflow_call:
     inputs:
@@ -47,6 +52,10 @@ on:
       publish_assets:
         required: false
         default: true
+        type: boolean
+      publish_release:
+        required: false
+        default: false
         type: boolean
     secrets:
       WINDOWS_CODESIGN_PFX:
@@ -119,7 +128,11 @@ jobs:
           $version = "${{ inputs.release_tag }}".TrimStart('v')
           $pinned = (Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert | Select-Object -First 1).Thumbprint
           if (-not $pinned) { throw "No code-signing certificate was imported" }
-          foreach ($f in @("dist\BlindRSS\BlindRSS.exe", "dist\BlindRSS-Setup-v$version.exe")) {
+          $unzipped = Join-Path $env:RUNNER_TEMP "zipcheck"
+          Expand-Archive "dist\BlindRSS-v$version.zip" $unzipped -Force
+          $zipExe = (Get-ChildItem $unzipped -Recurse -Filter BlindRSS.exe | Select-Object -First 1).FullName
+          if (-not $zipExe) { throw "BlindRSS.exe is missing from the ZIP" }
+          foreach ($f in @("dist\BlindRSS\BlindRSS.exe", $zipExe, "dist\BlindRSS-Setup-v$version.exe")) {
             $sig = Get-AuthenticodeSignature $f
             $thumb = if ($sig.SignerCertificate) { $sig.SignerCertificate.Thumbprint } else { "" }
             $status = "$($sig.Status)"
@@ -127,6 +140,12 @@ jobs:
             if ($status -notin @("Valid", "UnknownError", "NotTrusted")) { throw "$f signature is $status" }
             "$f signed by $($sig.SignerCertificate.Subject) ($status)"
           }
+
+      - name: Install the signed installer silently
+        run: |
+          $version = "${{ inputs.release_tag }}".TrimStart('v')
+          $process = Start-Process "dist\BlindRSS-Setup-v$version.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/SP-" -WindowStyle Hidden -PassThru -Wait
+          if ($process.ExitCode -ne 0) { throw "Installer failed with exit code $($process.ExitCode)" }
 
       - name: Compute checksums and write update manifest
         id: manifest
@@ -282,3 +301,35 @@ jobs:
             --sha256 "$SHA" \
             --output dist/BlindRSS-update-linux.json
           gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-update-linux.json --clobber
+
+  publish:
+    name: Verify assets and publish as Latest
+    needs: [windows, macos, linux]
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.publish_assets && inputs.publish_release && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ inputs.release_tag }}
+    steps:
+      - name: Verify every platform uploaded its assets
+        run: |
+          v="${TAG#v}"
+          have="$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" --jq '.assets[].name')"
+          missing=0
+          for want in "BlindRSS-v$v.zip" "BlindRSS-Setup-v$v.exe" BlindRSS-update.json \
+                      "BlindRSS-linux-v$v.tar.gz" BlindRSS-update-linux.json \
+                      "BlindRSS-macos-v$v.zip" BlindRSS-update-macos.json; do
+            if ! grep -qxF "$want" <<<"$have"; then echo "::error::Missing asset $want"; missing=1; fi
+          done
+          [ "$missing" = 0 ]
+
+      - name: Publish as Latest
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+
+      - name: Verify the updater will see it
+        run: |
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          if [ "$latest" != "$TAG" ]; then
+            echo "::error::/releases/latest is $latest, expected $TAG"
+            exit 1
+          fi

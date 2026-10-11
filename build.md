@@ -9,11 +9,12 @@ canonical release command. It bumps the version, tags, creates a draft GitHub
 release, builds Linux inside an Ubuntu 22.04 Docker container reached via
 `ssh root@serrebiradio.com`, copies the self-contained Linux tarball back and
 uploads it with its manifest, then dispatches GitHub Actions, which builds macOS
-and builds and signs Windows through SignPath, and publishes the release as
+and builds and signs Windows with the authorized BlindRSS Dev certificate, and publishes the release as
 Latest once every asset is uploaded. `build.bat` waits for that run.
 
-You must approve two signing requests in SignPath during every release:
-`BlindRSS.exe` first, then the installer. The run waits up to two hours for each.
+SignPath Foundation signing is pending. CI currently uses the authorized
+BlindRSS Dev certificate from repository signing secrets; no signing approval
+is needed during a release.
 
 `./build.sh release` without a tag is rejected. Only run
 `./build.sh release vX.Y.Z` to re-dispatch the macOS CI asset for an existing
@@ -23,7 +24,7 @@ release.
 
 - Official release from Windows:
   - Run `.\build.bat release`.
-  - Windows builds on a GitHub-hosted runner and is signed by SignPath
+  - Windows builds on a GitHub-hosted runner and is development-signed from repository secrets
     (see "Windows Code Signing"). Nothing is signed on this machine.
   - Linux builds on the user-controlled `root@serrebiradio.com` Docker host and
     is copied back, hashed, manifested, and uploaded by `build.bat`.
@@ -54,10 +55,10 @@ Use `.\build.bat release` on Windows to cut a release—never hand-assemble a Gi
   the executable and bundled Python runtime, uploads it and
   `BlindRSS-update-linux.json`, then dispatches GitHub Actions with Linux
   disabled so CI builds Windows and macOS.
-- The `windows` CI job builds the app, has SignPath sign `BlindRSS.exe`, builds
-  the ZIP and the Program Files installer around the signed exe, has SignPath
-  sign the installer, verifies all three signatures, and writes
-  `BlindRSS-update.json` with both SHA-256 hashes and the signing thumbprint.
+- The `windows` CI job imports the development signing certificate and runs
+  `build.bat build`, verifies the executable, executable inside the ZIP and
+  installer have the same signer, smoke-installs the signed installer, and
+  writes `BlindRSS-update.json` with both SHA-256 hashes and signing thumbprint.
 - Pushes to `main` also trigger GitHub Actions workflow builds for macOS and Linux as workflow artifacts so you can validate packaging without publishing a release. The Windows CI job only runs on `workflow_dispatch` (release cuts), not on every push, since it's a heavier build.
 - The release stays a draft until the workflow's `publish` job has seen all seven assets; it then publishes it as Latest. `build.bat release` waits for the run, then verifies there are no draft releases and that GitHub's `/releases/latest` endpoint points at the new tag before exiting. If the run fails, the draft stays: fix the cause and `gh run rerun <id> --failed`. Never leave draft releases behind. Do not automatically delete releases during this check; publish or delete drafts manually by exact tag if needed.
 
@@ -88,32 +89,23 @@ If this returns the previous tag, users will see "BlindRSS is up to date" for th
 `./build.sh release vX.Y.Z` re-dispatches the macOS CI build for an existing
 release. It does not bump the version or create a new release.
 
-## Windows Code Signing (SignPath)
+## Windows Code Signing (temporary development certificate)
 
-Release binaries are signed with a certificate issued to SignPath Foundation.
-The private key never leaves SignPath's HSM, and SignPath only signs artifacts
-that GitHub proves were built from this repository on a GitHub-hosted runner.
-That is why Windows cannot be built or signed locally for a release.
+Owner override dated 2026-10-09 remains active: SignPath Foundation's
+certificate is pending, so releases use the self-signed BlindRSS Dev certificate.
+The private key is stored in repository secrets `WINDOWS_CODESIGN_PFX` and
+`WINDOWS_CODESIGN_PASSWORD`; CI imports it into its temporary certificate store.
+Local `build` uses a development certificate already in the Windows store.
 
-- SignPath project `BlindRSS`, artifact configuration `exe-in-zip` (takes a `version` parameter): a ZIP holding
-  one `BlindRSS*.exe` whose version resource has product name `BlindRSS` and
-  product version equal to the release version.
-- Signing policy `release-signing`: the trusted certificate; every request needs
-  approval in SignPath. Used by real releases only.
-- Signing policy `test-signing`: an untrusted test certificate, no approval.
-  Used by `cloud-release.yml` dry runs.
-- Repo secret `SIGNPATH_API_TOKEN`: API token of the SignPath CI user, which is
-  a submitter on both policies. Set it with
-  `gh secret set SIGNPATH_API_TOKEN --repo serrebidev/BlindRSS` (reads stdin).
-- The organization ID, project slug and artifact configuration slug are not
-  secret and are set in `env:` at the top of `cross-platform-release.yml`.
+Verify the executable, executable inside the ZIP, and installer against that
+signer's thumbprint. Accept `Valid`, `UnknownError`, or `NotTrusted`; never
+accept `HashMismatch` or unsigned files. The manifest pins the same thumbprint.
+Do not use SignPath's test certificate for a release.
 
-Test the whole pipeline without publishing or spending a release signature
-(builds `main` as it is, signs with `test-signing`, uploads workflow artifacts only):
-
-```powershell
-gh workflow run cloud-release.yml -f dry_run=true
-```
+Cloud agents can validate packaging with `cloud-release.yml`'s default dry run;
+Windows-host releases always start with `build.bat release`. The cross-platform
+workflow defaults `publish_release` to false and only publishes after all seven
+assets are present when explicitly requested by the release script.
 
 The Linux CI job remains enabled on ordinary pushes as packaging validation and
 can be manually selected for an existing release, but it is not part of the
@@ -185,8 +177,8 @@ default release dispatch.
   makes them announce "Application unknown, version not detected".
 - Preserves `dist\BlindRSS` user data (`rss.db`, `rss.db-wal`, `rss.db-shm`, `podcasts\`) between iterative builds.
 - Signs with whatever local certificate `signtool /a` finds, when possible (or
-  skip with `SKIP_SIGN=1`). That is a development signature only; it is not the
-  release certificate and is never published.
+  skip with `SKIP_SIGN=1`). Releases currently use the authorized BlindRSS Dev
+  certificate; unsigned local builds must never be published.
 - Produces:
   - `dist\BlindRSS\`
   - `dist\BlindRSS-vX.Y.Z.zip`
@@ -207,7 +199,7 @@ default release dispatch.
 
 ### `app` and `package`
 
-The two halves of `build`, used by the `windows` CI job so SignPath can sign
+The two unsigned halves of `build`, available for staged packaging work to sign
 `BlindRSS.exe` in between. `app` runs PyInstaller only. `package` builds the ZIP
 and the installer from the existing `dist\BlindRSS`. Neither signs.
 

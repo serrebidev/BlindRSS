@@ -50,7 +50,7 @@ if /I "%MODE%"=="dry-run" (
     echo [Dry Run] Latest tag: !LATEST_TAG!
     echo [Dry Run] Next version: v!NEXT_VERSION! [!BUMP! bump]
     echo [Dry Run] Linux builder: %LINUX_BUILD_HOST% [Docker, Ubuntu 22.04]
-    echo [Dry Run] Would bump core/version.py, generate release notes, update CHANGELOG.md, tag, push to "%RELEASE_REMOTE%", create a draft GitHub release in "%GITHUB_REPO_SLUG%", build Linux over SSH on %LINUX_BUILD_HOST%, upload the Linux tarball and manifest, dispatch the GitHub Actions build that builds macOS and builds and SignPath-signs Windows, wait for it, and verify the release is published as Latest.
+    echo [Dry Run] Would bump core/version.py, generate release notes, update CHANGELOG.md, tag, push to "%RELEASE_REMOTE%", create a draft GitHub release in "%GITHUB_REPO_SLUG%", build Linux over SSH on %LINUX_BUILD_HOST%, upload the Linux tarball and manifest, dispatch GitHub Actions to build macOS and development-sign Windows, wait for it, and verify the release is published as Latest.
     goto :done
 )
 
@@ -92,9 +92,8 @@ if /I "%MODE%"=="release" (
     set "VERSION_NO_V=!CURRENT_VERSION!"
     set "VERSION_TAG=v!CURRENT_VERSION!"
 
-    rem app + package are the two halves of build, split so CI can have SignPath
-    rem sign BlindRSS.exe before it goes into the ZIP and the installer. They
-    rem never sign: a release is signed by SignPath in GitHub Actions only.
+    rem app + package are unsigned halves; build signs both Windows artifacts
+    rem with the authorized development certificate locally or in CI.
     if /I not "%MODE%"=="package" (
         call :build_app
         if errorlevel 1 exit /b 1
@@ -708,13 +707,12 @@ echo [BlindRSS Release] Linux assets uploaded for %VERSION_TAG%.
 exit /b 0
 
 :dispatch_ci_release
-rem Dispatched on the default branch, whose HEAD is the release commit just
-rem pushed: SignPath records the branch and commit the workflow ran on.
+rem Dispatched on the default branch; CI checks out the release tag.
 echo [BlindRSS Release] Dispatching GitHub Actions Windows and macOS build in %GITHUB_REPO_SLUG%...
 set "CI_RUN_LIST=gh run list --repo "%GITHUB_REPO_SLUG%" --workflow cross-platform-release.yml --event workflow_dispatch --limit 1 --json databaseId --jq .[].databaseId"
 set "PREVIOUS_RUN_ID="
 for /f "delims=" %%R in ('!CI_RUN_LIST! 2^>nul') do set "PREVIOUS_RUN_ID=%%R"
-gh workflow run "cross-platform-release.yml" --repo "%GITHUB_REPO_SLUG%" -f release_tag="%VERSION_TAG%" -f build_windows=true -f build_linux=false -f publish_assets=true -f publish_release=true -f signing_policy=release-signing
+gh workflow run "cross-platform-release.yml" --repo "%GITHUB_REPO_SLUG%" -f release_tag="%VERSION_TAG%" -f build_windows=true -f build_linux=false -f publish_assets=true -f publish_release=true
 if errorlevel 1 (
     echo [X] Failed to dispatch the GitHub Actions build.
     exit /b 1
@@ -734,7 +732,6 @@ if not defined CI_RUN_ID (
     exit /b 1
 )
 echo [BlindRSS Release] Watching run !CI_RUN_ID!.
-echo [BlindRSS Release] ACTION NEEDED: approve two signing requests at https://app.signpath.io when they appear - BlindRSS.exe first, then the installer.
 gh run watch !CI_RUN_ID! --repo "%GITHUB_REPO_SLUG%" --exit-status --interval 30 >nul
 if errorlevel 1 (
     echo [X] GitHub Actions run !CI_RUN_ID! failed. %VERSION_TAG% is still a draft.
