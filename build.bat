@@ -19,10 +19,12 @@ if /I "%MODE%"=="build" (
     rem ok
 ) else if /I "%MODE%"=="release" (
     rem ok
+) else if /I "%MODE%"=="linux" (
+    rem ok
 ) else if /I "%MODE%"=="dry-run" (
     rem ok
 ) else (
-    echo Usage: build.bat ^<build^|app^|package^|release^|dry-run^>
+    echo Usage: build.bat ^<build^|app^|package^|linux^|release^|dry-run^>
     exit /b 1
 )
 
@@ -34,8 +36,13 @@ if defined SIGNTOOL_PATH (
 )
 if not defined GITHUB_REPO_SLUG set "GITHUB_REPO_SLUG=serrebidev/BlindRSS"
 if not defined RELEASE_REMOTE set "RELEASE_REMOTE=origin"
-if not defined LINUX_BUILD_HOST set "LINUX_BUILD_HOST=root@serrebiradio.com"
-if not defined LINUX_BUILD_REPO_URL set "LINUX_BUILD_REPO_URL=https://github.com/%GITHUB_REPO_SLUG%.git"
+if /I "%MODE%"=="linux" (
+    call :detect_python
+    if errorlevel 1 exit /b 1
+    "!PYTHON_EXE!" tools\build_linux_wsl.py
+    if errorlevel 1 exit /b 1
+    goto :done
+)
 
 if /I "%MODE%"=="dry-run" (
     call :detect_python
@@ -49,8 +56,8 @@ if /I "%MODE%"=="dry-run" (
     if errorlevel 1 exit /b 1
     echo [Dry Run] Latest tag: !LATEST_TAG!
     echo [Dry Run] Next version: v!NEXT_VERSION! [!BUMP! bump]
-    echo [Dry Run] Linux builder: %LINUX_BUILD_HOST% [Docker, Ubuntu 22.04]
-    echo [Dry Run] Would bump core/version.py, generate release notes, update CHANGELOG.md, tag, push to "%RELEASE_REMOTE%", create a draft GitHub release in "%GITHUB_REPO_SLUG%", build Linux over SSH on %LINUX_BUILD_HOST%, upload the Linux tarball and manifest, dispatch GitHub Actions to build macOS and development-sign Windows, wait for it, and verify the release is published as Latest.
+    echo [Dry Run] Linux builder: local WSL [Docker, Ubuntu 22.04, persistent wheel cache]
+    echo [Dry Run] Would bump core/version.py, generate release notes, update CHANGELOG.md, tag, push to "%RELEASE_REMOTE%", create a draft GitHub release in "%GITHUB_REPO_SLUG%", build Linux in local WSL, upload the Linux tarball and manifest, dispatch GitHub Actions to build macOS and development-sign Windows, wait for it, and verify the release is published as Latest.
     goto :done
 )
 
@@ -627,61 +634,18 @@ echo [BlindRSS Release] GitHub latest release is %VERSION_TAG%.
 exit /b 0
 
 :verify_linux_builder
-where /q ssh
-if errorlevel 1 (
-    echo [X] OpenSSH ssh was not found in PATH.
-    exit /b 1
-)
-where /q scp
-if errorlevel 1 (
-    echo [X] OpenSSH scp was not found in PATH.
-    exit /b 1
-)
-echo [BlindRSS Release] Verifying Linux Docker builder %LINUX_BUILD_HOST%...
-ssh -o BatchMode=yes -o ConnectTimeout=15 "%LINUX_BUILD_HOST%" "command -v git >/dev/null && command -v docker >/dev/null && command -v mktemp >/dev/null && docker info >/dev/null"
-if errorlevel 1 (
-    echo [X] Linux builder verification failed for %LINUX_BUILD_HOST%.
-    exit /b 1
-)
-exit /b 0
+echo [BlindRSS Release] Verifying local WSL Docker builder...
+"%TOOL_PY%" tools\build_linux_wsl.py --verify
+exit /b %ERRORLEVEL%
 
 :build_linux_release
 call :verify_linux_builder
 if errorlevel 1 exit /b 1
-set "REMOTE_BUILD_DIR="
-set "REMOTE_BUILD_DIR_FILE=%TEMP%\BlindRSS_remote_build_dir_%RANDOM%.txt"
-ssh -o BatchMode=yes "%LINUX_BUILD_HOST%" "mktemp -d /tmp/blindrss-release-%VERSION_TAG%-XXXXXX" >"!REMOTE_BUILD_DIR_FILE!"
-if errorlevel 1 (
-    if exist "!REMOTE_BUILD_DIR_FILE!" del /f /q "!REMOTE_BUILD_DIR_FILE!" >nul 2>&1
-    echo [X] Failed to create a temporary Linux build directory on %LINUX_BUILD_HOST%.
-    exit /b 1
-)
-if exist "!REMOTE_BUILD_DIR_FILE!" set /p REMOTE_BUILD_DIR=<"!REMOTE_BUILD_DIR_FILE!"
-if exist "!REMOTE_BUILD_DIR_FILE!" del /f /q "!REMOTE_BUILD_DIR_FILE!" >nul 2>&1
-if not defined REMOTE_BUILD_DIR (
-    echo [X] Failed to create a temporary Linux build directory on %LINUX_BUILD_HOST%.
-    exit /b 1
-)
-echo [BlindRSS Release] Building Linux %VERSION_TAG% on %LINUX_BUILD_HOST% in !REMOTE_BUILD_DIR!...
-ssh -o BatchMode=yes "%LINUX_BUILD_HOST%" "git clone --quiet --depth 1 --branch '%VERSION_TAG%' '%LINUX_BUILD_REPO_URL%' '!REMOTE_BUILD_DIR!/source' && cd '!REMOTE_BUILD_DIR!/source' && chmod +x tools/build_linux_docker.sh && tools/build_linux_docker.sh"
-set "LINUX_BUILD_ERROR=!ERRORLEVEL!"
+echo [BlindRSS Release] Building Linux %VERSION_TAG% in local WSL...
+"%TOOL_PY%" tools\build_linux_wsl.py --ref "%VERSION_TAG%"
+if errorlevel 1 exit /b 1
 set "LINUX_ASSET_NAME=BlindRSS-linux-v%VERSION_NO_V%.tar.gz"
 set "LINUX_ASSET_PATH=%SCRIPT_DIR%dist\!LINUX_ASSET_NAME!"
-if "!LINUX_BUILD_ERROR!"=="0" (
-    echo [BlindRSS Release] Copying !LINUX_ASSET_NAME! from %LINUX_BUILD_HOST%...
-    scp -q "%LINUX_BUILD_HOST%:!REMOTE_BUILD_DIR!/source/dist/!LINUX_ASSET_NAME!" "!LINUX_ASSET_PATH!"
-    set "LINUX_BUILD_ERROR=!ERRORLEVEL!"
-)
-ssh -o BatchMode=yes "%LINUX_BUILD_HOST%" "case '!REMOTE_BUILD_DIR!' in /tmp/blindrss-release-%VERSION_TAG%-??????) rm -rf -- '!REMOTE_BUILD_DIR!' ;; *) echo 'Refusing unsafe cleanup path' >&2; exit 2 ;; esac" >nul 2>&1
-set "LINUX_CLEANUP_ERROR=!ERRORLEVEL!"
-if not "!LINUX_CLEANUP_ERROR!"=="0" (
-    echo [X] Refused or failed to clean the verified remote Linux build directory.
-    exit /b 1
-)
-if not "!LINUX_BUILD_ERROR!"=="0" (
-    echo [X] Linux release build or artifact copy failed.
-    exit /b 1
-)
 if not exist "!LINUX_ASSET_PATH!" (
     echo [X] Linux artifact was not copied to !LINUX_ASSET_PATH!.
     exit /b 1

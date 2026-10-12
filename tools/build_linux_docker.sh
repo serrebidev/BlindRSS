@@ -26,6 +26,7 @@ echo "[BlindRSS Linux Build] Preparing the Ubuntu 22.04 builder image..."
 docker build --pull --tag "$IMAGE_NAME" --file "$SCRIPT_DIR/linux-build.Dockerfile" "$SCRIPT_DIR"
 
 echo "[BlindRSS Linux Build] Building the self-contained Linux package..."
+# Limit CPU use so the Windows host and NVDA remain usable during WSL builds.
 # The source bind mount and uv cache are different filesystems on the release
 # host, so hardlinks cannot work. Select copy mode explicitly instead of making
 # uv warn before every otherwise-clean release build.
@@ -36,7 +37,9 @@ echo "[BlindRSS Linux Build] Building the self-contained Linux package..."
 # during dependency collection. Python does not expose a usable module name for
 # this compile-time warning, so a module-qualified filter cannot match it.
 docker run --rm \
+  --cpus=4 \
   --env UV_LINK_MODE=copy \
+  --volume "blindrss-linux-pip-cache:/root/.cache/pip" \
   --volume "$REPO_DIR:/src" \
   --workdir /src \
   "$IMAGE_NAME" \

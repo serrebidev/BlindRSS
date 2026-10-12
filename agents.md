@@ -37,11 +37,11 @@ The operational release command is `.\build.bat release` on this Windows host.
   Windows certificate store. It never bumps or publishes a version.
 
 ### Ship a release
-- Windows host: run `.\build.bat release`. It verifies origin and SSH/Docker,
+- Windows host: run `.\build.bat release`. It verifies origin and local WSL/Docker,
   computes the next version, updates `core/version.py`, notes and changelog,
   commits and tags, pushes, and creates a draft GitHub release.
 - Linux is built from that exact tag in the tracked Ubuntu 22.04 Docker image
-  on `root@serrebiradio.com`; its tarball and manifest are uploaded first.
+  inside the default local WSL distribution; its tarball and manifest are uploaded first.
 - The script dispatches `cross-platform-release.yml` on `main` with
   `build_windows=true build_linux=false publish_assets=true publish_release=true`.
   CI builds and development-signs Windows and builds macOS. Its publish job
@@ -63,7 +63,8 @@ The operational release command is `.\build.bat release` on this Windows host.
 
 ### Windows build modes
 - `release`: complete release above, with automatic versioning.
-- `build`: local signed build/ZIP/installer only; preserves `rss.db*` and podcasts.
+- `build`: local signed Windows build/ZIP/installer only; preserves `rss.db*` and podcasts.
+- `linux`: local Linux archive from tracked working files (including staged additions); no version bump, GitHub or release. Stage new source files first.
 - `app` / `package`: unsigned halves of `build`, for application or packaging work.
 - `dry-run`: verifies prerequisites and prints the computed version/plan; changes nothing.
 
@@ -89,13 +90,13 @@ The operational release command is `.\build.bat release` on this Windows host.
 - Post-release check: `gh api repos/serrebidev/BlindRSS/releases/latest --jq .tag_name` must print the new tag.
 
 ### Prerequisites & toggles
-- Windows release host: Python 3.14 (`py`/`python`), VLC 64-bit at `C:\Program Files\VideoLAN\VLC`, authenticated `gh`, OpenSSH `ssh`/`scp`, network access, and key-based root access to `root@serrebiradio.com`. VLC 64-bit, Inno Setup and Windows SDK `signtool.exe` are needed only for a local `build`.
-- Linux release host: `root@serrebiradio.com` with Git and a working Docker daemon. The tracked `tools/linux-build.Dockerfile` supplies a uv-managed Python 3.12, current wxPython compiled from source, VLC, ffmpeg, and GTK/WebKit build dependencies inside Ubuntu 22.04; do not install those desktop packages into the server host.
-- Pushes to `main` trigger `cross-platform-release.yml` to build macOS/Linux validation artifacts (no published release). A canonical release dispatch passes `build_windows=true` and `build_linux=false`; CI builds Windows and macOS because Linux has already been built on the user-controlled server.
+- Windows release host: Python 3.14 (`py`/`python`), VLC 64-bit at `C:\Program Files\VideoLAN\VLC`, authenticated `gh`, network access, and WSL 2 with Docker Engine/Buildx in the default distribution. VLC 64-bit, Inno Setup and Windows SDK `signtool.exe` are needed only for a local `build`.
+- Linux release builder: local WSL 2 (default Ubuntu, root user). `tools/build_linux_wsl.py` snapshots the exact tag for releases or tracked working files for `build.bat linux`, extracts on the Linux filesystem under `/root/.cache/blindrss-builds`, runs `tools/build_linux_docker.sh`, copies the verified archive to Windows `dist`, and safely cleans the temporary Linux source. Untracked/ignored data never enters the snapshot. The tracked Ubuntu 22.04 image supplies Python 3.12 and current wxPython built from source; volume `blindrss-linux-pip-cache` retains packages/wheels between containers. Four CPU cores leave Windows/NVDA headroom. Docker image, cache and daemon persist across WSL restarts. No SSH/SCP or server dependency.
+- Pushes to `main` trigger `cross-platform-release.yml` to build macOS/Linux validation artifacts (no published release). A canonical release dispatch passes `build_windows=true` and `build_linux=false`; CI builds Windows and macOS because Linux has already been built locally in WSL.
 - Linux packaging builds current wxPython from source. The Docker image and
   hosted workflow install GTK3, WebKit, GStreamer and image-library development
   packages; do not restore an old wheel URL or PIP_CONSTRAINT.
-- Env toggles (full list in `build.md`): `SKIP_SIGN=1` (build mode only), `SIGNTOOL_PATH`, `GITHUB_REPO_SLUG`, `RELEASE_REMOTE`, `LINUX_BUILD_HOST`, `LINUX_BUILD_REPO_URL`, `BLINDRSS_LINUX_BUILD_IMAGE`, `BLINDRSS_VLC_*`, `BLINDRSS_*CODESIGN*`.
+- Env toggles (full list in `build.md`): `SKIP_SIGN=1` (build mode only), `SIGNTOOL_PATH`, `GITHUB_REPO_SLUG`, `RELEASE_REMOTE`, `BLINDRSS_LINUX_BUILD_IMAGE`, `BLINDRSS_VLC_*`, `BLINDRSS_*CODESIGN*`.
 
 ## Casting
 Casting is Caster's code (github.com/serrebidev/Caster), not a re-implementation. `caster_engine.py` (the GUI-free top of Caster's `caster.py`: probing, HLS relay, TsSource, Device, LoopThread), `caster_extras.py`, `caster_devices.py` and `caster_config.py` are generated by `python tools/sync_caster.py` from a Caster checkout (default `../Caster`). Never edit them here: fix Caster, then sync.
@@ -453,7 +454,7 @@ Casting is Caster's code (github.com/serrebidev/Caster), not a re-implementation
 
 ### 6. Updates (packaged app, all platforms)
 - Checks latest GitHub release + a per-platform manifest (`BlindRSS-update.json` / `-macos.json` / `-linux.json`).
-- Each platform's manifest is published by the build flow that produces that platform's asset, so its SHA-256 always matches the asset on the same release. Windows writes its manifest locally, the SSH Linux build is copied back and manifested locally, and the dispatched GitHub Actions macOS job writes the macOS manifest. There can be a short window where the macOS manifest is not yet present (the client reports "manifest not found" until that workflow finishes).
+- Each platform's manifest is published by the build flow that produces that platform's asset, so its SHA-256 always matches the asset on the same release. Windows and macOS manifests are written in GitHub Actions; the local WSL Linux artifact is copied back and manifested locally. The release stays a draft until all seven assets are present, so the updater never sees a partial release.
 - Verifies asset SHA-256 before apply. Windows also verifies the signed executable (Authenticode); macOS does a best-effort `codesign --verify`; Linux relies on SHA-256.
 - Windows uses `update_helper.bat`; macOS/Linux use `update_helper.sh`.
 - Installed Windows copies use signed installer metadata from

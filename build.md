@@ -6,8 +6,8 @@ This is the only approved workflow for packaging and publishing BlindRSS.
 
 Run `.\build.bat release` on the Windows development machine. This is the one
 canonical release command. It bumps the version, tags, creates a draft GitHub
-release, builds Linux inside an Ubuntu 22.04 Docker container reached via
-`ssh root@serrebiradio.com`, copies the self-contained Linux tarball back and
+release, builds Linux inside an Ubuntu 22.04 Docker container in the default
+local WSL distribution, copies the self-contained Linux tarball to `dist`, and
 uploads it with its manifest, then dispatches GitHub Actions, which builds macOS
 and builds and signs Windows with the authorized BlindRSS Dev certificate, and publishes the release as
 Latest once every asset is uploaded. `build.bat` waits for that run.
@@ -26,7 +26,7 @@ release.
   - Run `.\build.bat release`.
   - Windows builds on a GitHub-hosted runner and is development-signed from repository secrets
     (see "Windows Code Signing"). Nothing is signed on this machine.
-  - Linux builds on the user-controlled `root@serrebiradio.com` Docker host and
+  - Linux builds in local WSL using the cached Ubuntu 22.04 Docker image and
     is copied back, hashed, manifested, and uploaded by `build.bat`.
   - GitHub Actions builds and uploads Windows and macOS, then publishes.
 - Local build from macOS or Linux:
@@ -39,7 +39,8 @@ release.
 
 ## Commands
 
-- Iterative local build: `.\build.bat build`
+- Iterative local Windows build: `.\build.bat build`
+- Local Linux build from Windows: `.\build.bat linux` (no version bump or publishing)
 - Official Windows release build: `.\build.bat release`
 - No-change preview: `.\build.bat dry-run`
 - Local macOS/Linux package build: `./build.sh build`
@@ -51,7 +52,7 @@ release.
 Use `.\build.bat release` on Windows to cut a release—never hand-assemble a GitHub release. It:
 
 - Bumps `core/version.py`, tags Git, pushes, and creates the GitHub release as a draft.
-- Builds Linux over SSH on `root@serrebiradio.com`, verifies the tarball includes
+- Builds the exact release tag in local WSL, verifies the tarball includes
   the executable and bundled Python runtime, uploads it and
   `BlindRSS-update-linux.json`, then dispatches GitHub Actions with Linux
   disabled so CI builds Windows and macOS.
@@ -73,8 +74,8 @@ BlindRSS auto-update does not look at Git tags, commits on `main`, or GitHub Act
 - macOS: `BlindRSS-update-macos.json` -> `BlindRSS-macos-vX.Y.Z.zip`
 - Linux: `BlindRSS-update-linux.json` -> `BlindRSS-linux-vX.Y.Z.tar.gz`
 
-`build.bat release` creates the Linux manifest after copying the server-built
-artifact back to Windows. The dispatched workflow creates the Windows and macOS
+`build.bat release` creates the Linux manifest after copying the WSL-built
+artifact into Windows `dist`. The dispatched workflow creates the Windows and macOS
 manifests and assets. Nothing is visible to the updater until the workflow
 publishes the draft.
 
@@ -121,22 +122,31 @@ default release dispatch.
   `%LOCALAPPDATA%\Programs\Inno Setup 6\ISCC.exe`, standard Program Files
   installs, and `ISCC.exe` on PATH. Set `INNO_SETUP_COMPILER` to override.
 - Network access (the script installs deps and can download `yt-dlp.exe` and `deno.exe`).
-- OpenSSH `ssh` and `scp`, with non-interactive key access to
-  `root@serrebiradio.com`.
+- WSL 2 with Docker Engine and Docker Buildx in the default Linux distribution.
+  This machine uses Ubuntu; Docker runs through systemd.
 
-## Remote Linux Release Prerequisites
+## Local WSL Linux Builds
 
-- `root@serrebiradio.com` must be reachable with key-based SSH authentication.
-- The host needs Git and a running Docker daemon. Its host Python, VLC, ffmpeg,
-  and GUI packages are irrelevant because the tracked Ubuntu 22.04 container
-  provisions Python 3.12 with `uv`, compiles current wxPython with GTK/WebKit development dependencies,
-  and supplies the remaining build/runtime dependencies.
-- `tools/build_linux_docker.sh` builds the current checkout, verifies the
-  tarball contains `BlindRSS/BlindRSS` and a bundled `libpython`, and leaves the
-  artifact in `dist/` for `build.bat` to copy.
-- `build.bat` clones the exact release tag into a `mktemp` directory under
-  `/tmp`, builds there, copies the artifact to Windows, and removes only that
-  resolved temporary directory.
+- `build.bat release` checks WSL Docker before bumping or publishing anything.
+  `tools/build_linux_wsl.py --ref <tag>` snapshots that exact Git commit.
+- `build.bat linux` builds tracked working files, including edits and staged
+  additions. Stage new source files first; unstaged/untracked files, ignored
+  config, databases and downloads are excluded. It never versions or publishes.
+- Source snapshots are extracted beneath `/root/.cache/blindrss-builds` on the
+  Linux filesystem, built, then safely removed. Only the finished archive is
+  copied to Windows `dist`; existing Windows app/data files remain intact.
+- The existing Ubuntu 22.04 Docker image supplies Python 3.12, current wxPython,
+  VLC, ffmpeg, GTK/WebKit and other dependencies. Do not build directly against
+  the newer WSL distribution's system libraries.
+- Docker volume `blindrss-linux-pip-cache` retains downloaded packages and
+  compiled wheels across containers. A new wxPython/Python version can still
+  require compilation; the first build is a cold build.
+- The container is capped at four CPU cores to leave headroom for Windows/NVDA.
+- Docker/Buildx installation, if setting up another machine:
+  `wsl -u root --exec apt-get update`, then
+  `wsl -u root --exec apt-get install -y docker.io docker-buildx`.
+- Cloud-agent releases and macOS CI remain unchanged; host releases no longer
+  need SSH, SCP, or the server's Docker daemon.
 
 ## macOS Local Build Prerequisites
 
@@ -192,8 +202,8 @@ default release dispatch.
 - Does not build Windows. Produces `dist\release-notes-vX.Y.Z.md` and the Linux
   tarball and manifest.
 - Updates `CHANGELOG.md`, commits the version bump + changelog entry, tags,
-  pushes, creates a draft GitHub release, builds/uploads Linux through
-  `root@serrebiradio.com`, then dispatches the `cross-platform-release.yml`
+  pushes, creates a draft GitHub release, builds/uploads Linux through local
+  WSL Docker, then dispatches the `cross-platform-release.yml`
   workflow to build and attach Windows and macOS, waits for it, and verifies the
   release is published as Latest.
 
@@ -277,10 +287,6 @@ and the installer from the existing `dist\BlindRSS`. Neither signs.
 - `BLINDRSS_SKIP_MACOS_CODESIGN=1`: skip ad-hoc signing in `build.sh`.
 - `BLINDRSS_VLC_LIB_DIR`: override the directory `build.sh`/`portable.spec` search for `libvlc.so*` on Linux.
 - `BLINDRSS_VLC_PLUGINS`: override the VLC plugins directory bundled on Linux.
-- `LINUX_BUILD_HOST`: SSH destination for release Linux builds. Default:
-  `root@serrebiradio.com`.
-- `LINUX_BUILD_REPO_URL`: Git URL cloned by the remote release builder. Default:
-  `https://github.com/serrebidev/BlindRSS.git`.
 - `BLINDRSS_LINUX_BUILD_IMAGE`: Docker image tag used/cached by
   `tools/build_linux_docker.sh`. Default:
   `blindrss-linux-builder:ubuntu-22.04`.
