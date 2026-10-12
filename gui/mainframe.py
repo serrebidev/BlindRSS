@@ -688,6 +688,9 @@ class MainFrame(wx.Frame):
         # Left: Tree (Feeds)
         self.tree = wx.TreeCtrl(splitter, style=wx.TR_DEFAULT_STYLE | wx.TR_HIDE_ROOT | wx.TR_HAS_BUTTONS)
         self.tree.SetName(_("Feeds and folders"))
+        # Suppress tooltips on the feed tree (BlindRSS#118): prevent wxWidgets
+        # from generating tooltip events that NVDA announces repeatedly.
+        self.tree.SetToolTip("")
         self.root = self.tree.AddRoot("Root")
         self.all_feeds_node = self.tree.AppendItem(self.root, _("All Feeds"))
         
@@ -717,6 +720,11 @@ class MainFrame(wx.Frame):
         # to extend a range) so bulk actions like Delete/Copy work on the whole selection.
         self.list_ctrl = wx.ListCtrl(right_splitter, style=wx.LC_REPORT)
         self.list_ctrl.SetName(_("Articles"))
+        # Suppress tooltips on the articles list (BlindRSS#118): NVDA was
+        # repeatedly announcing the feed name as a tooltip when moving through
+        # articles, even when idle. Explicitly clearing the tooltip prevents
+        # wxWidgets from generating infotip events for list items.
+        self.list_ctrl.SetToolTip("")
         # Columns are built from the configured layout rather than hardcoded, so
         # they can be reordered/hidden globally or per feed (article list columns).
         self._column_keys = []
