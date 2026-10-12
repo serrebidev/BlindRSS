@@ -4,6 +4,11 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.3.5 - 2026-10-12
+
+- Suppress tooltips on feed tree and articles list (#118).
+- Inspect draft assets before publishing.
+
 ## v2.3.4 - 2026-10-11
 
 - Restore complete publication with development signing.
