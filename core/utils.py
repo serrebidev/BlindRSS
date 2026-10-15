@@ -2524,6 +2524,8 @@ def fetch_and_store_chapters(
                     )
                 return parsed_chapters
         except Exception as e:
+            if type(e).__name__ == "ExtractionCancelled":
+                return []  # the user moved on; not a failure
             log.info("YouTube chapter extraction failed for %s: %s", media_url, e)
 
     if not allow_id3:

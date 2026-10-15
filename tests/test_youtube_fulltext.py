@@ -219,42 +219,216 @@ def test_youtube_chapters_use_the_normal_chapter_cache(monkeypatch):
     assert stored == {"article_id": "article-1", "chapters": chapters}
 
 
-def test_extraction_runs_in_the_ytdlp_cli_not_this_interpreter(monkeypatch):
-    # In-process yt-dlp held the GIL for seconds per video and lagged NVDA
-    # while arrowing over YouTube rows.
+
+
+class _FakePopen:
+    """Stands in for the yt-dlp CLI process."""
+
+    calls = []
+    results = []  # (returncode, stdout, stderr) per launch
+    hang = False
+
+    def __init__(self, cmd, **kwargs):
+        type(self).calls.append(cmd)
+        self.pid = 4242
+        self.killed = False
+        if self.results:
+            self.returncode, self._out, self._err = type(self).results.pop(0)
+        else:
+            self.returncode, self._out, self._err = 0, b"{}", b""
+
+    def communicate(self, timeout=None):
+        import subprocess
+
+        if type(self).hang and not self.killed:
+            raise subprocess.TimeoutExpired("yt-dlp", timeout)
+        return self._out, self._err
+
+    def kill(self):
+        self.killed = True
+
+
+@pytest.fixture
+def fake_cli(monkeypatch):
     import subprocess
     import sys
 
-    calls = []
-    payloads = [
-        (b'{"id": "abcDEF12345", "comments": [{"id": "one"}]}', b"WARNING: [youtube] Incomplete data received"),
-        (b'{"id": "abcDEF12345", "comments": [{"id": "two"}]}', b""),
+    _FakePopen.calls = []
+    _FakePopen.results = []
+    _FakePopen.hang = False
+    monkeypatch.setattr(subprocess, "Popen", _FakePopen)
+    killed = []
+    monkeypatch.setattr(youtube_fulltext, "_kill_process_tree", lambda proc: (killed.append(proc.pid), proc.kill()))
+    monkeypatch.setitem(sys.modules, "yt_dlp", None)  # an in-process import would fail the test
+    youtube_fulltext._chapter_memo.clear()
+    # The CLI tests below exercise the yt-dlp fallback, not watch-next.
+    monkeypatch.setattr(youtube_fulltext, "_chapters_from_watch_next", lambda *a, **k: None)
+    _FakePopen.killed = killed
+    return _FakePopen
+
+
+def test_extraction_runs_in_the_ytdlp_cli_not_this_interpreter(fake_cli):
+    # In-process yt-dlp held the GIL for seconds per video and lagged NVDA
+    # while arrowing over YouTube rows.
+    fake_cli.results = [
+        (0, b'{"id": "abcDEF12345", "comments": [{"id": "one"}]}', b"WARNING: [youtube] Incomplete data received"),
+        (0, b'{"id": "abcDEF12345", "comments": [{"id": "two"}]}', b""),
     ]
-
-    def _fake_run(cmd, **kwargs):
-        calls.append(cmd)
-        out, err = payloads[len(calls) - 1]
-        return subprocess.CompletedProcess(cmd, 0, out, err)
-
-    monkeypatch.setattr(subprocess, "run", _fake_run)
-    monkeypatch.setitem(sys.modules, "yt_dlp", None)  # importing it would fail the test
     info = youtube_fulltext.extract_video_info(URL + "&list=RDxyz&start_radio=1", include_comments=True)
 
     assert [c["id"] for c in info["comments"]] == ["one", "two"]
     assert not info.get("_blindrss_comments_incomplete")
-    cmd = calls[0]
+    cmd = fake_cli.calls[0]
     assert "--no-playlist" in cmd and "--write-comments" in cmd and "--ignore-config" in cmd
     assert cmd[-1] == "https://www.youtube.com/watch?v=abcDEF12345"
     assert any("max_comments=all,all,all,all,all" in part for part in cmd)
 
 
-def test_cli_failure_reports_the_ytdlp_error(monkeypatch):
-    import subprocess
-
-    monkeypatch.setattr(
-        subprocess,
-        "run",
-        lambda cmd, **k: subprocess.CompletedProcess(cmd, 1, b"", b"ERROR: [youtube] abcDEF12345: Video unavailable\n"),
-    )
+def test_cli_failure_reports_the_ytdlp_error(fake_cli):
+    fake_cli.results = [(1, b"", b"ERROR: [youtube] abcDEF12345: Video unavailable\n")]
     with pytest.raises(RuntimeError, match="Video unavailable"):
         youtube_fulltext.extract_video_info(URL, include_comments=False)
+
+
+def test_chapter_lookup_skips_player_js_and_is_shared(fake_cli):
+    fake_cli.results = [
+        (0, b'{"id": "abcDEF12345", "chapters": [{"start_time": 0, "title": "Intro"}]}', b""),
+    ]
+    first = youtube_fulltext.extract_chapters(URL)
+    assert [c["title"] for c in first] == ["Intro"]
+    cmd = fake_cli.calls[0]
+    assert any("player_skip=js" in part for part in cmd)
+    assert "--ignore-no-formats-error" in cmd and "--write-comments" not in cmd
+
+    # Revisiting the row (or opening the player) must not launch yt-dlp again.
+    assert youtube_fulltext.extract_chapters(URL) == first
+    assert len(fake_cli.calls) == 1
+
+
+def test_full_text_extraction_feeds_the_chapter_lookup(fake_cli):
+    fake_cli.results = [
+        (0, b'{"id": "abcDEF12345", "chapters": [{"start_time": 5, "title": "Part"}], "comments": []}', b""),
+    ]
+    youtube_fulltext.extract_video_info(URL, include_comments=True)
+    assert [c["title"] for c in youtube_fulltext.extract_chapters(URL)] == ["Part"]
+    assert len(fake_cli.calls) == 1
+
+
+def test_moving_on_kills_the_running_ytdlp(fake_cli):
+    fake_cli.hang = True
+    moved = []
+    with youtube_fulltext.cancel_when(lambda: bool(moved) or moved.append(True)):
+        with pytest.raises(youtube_fulltext.ExtractionCancelled):
+            youtube_fulltext.extract_video_info(URL, include_comments=True)
+    assert fake_cli.killed == [4242]
+    # Outside the scope nothing is cancelled any more.
+    assert youtube_fulltext._cancel_requested() is False
+
+
+class _FakeSession:
+    def __init__(self, payload, status=200):
+        self.payload, self.status, self.posts = payload, status, []
+
+    player = None  # videoDetails payload for the /player endpoint
+
+    def post(self, url, json=None, headers=None, timeout=None):
+        self.posts.append((url, json, timeout))
+        payload, status = self.payload, self.status
+        if "/player" in url:
+            payload = self.player or {}
+        return SimpleNamespace(status_code=status, json=lambda: payload)
+
+
+def _watch_next(markers=None, description=""):
+    return {
+        "contents": {"twoColumnWatchNextResults": {}},
+        "engagementPanels": [{"attributedDescription": {"content": description}}],
+        "playerOverlays": {"multiMarkersPlayerBarRenderer": {"markersMap": markers or []}},
+    }
+
+
+def _chapter(ms, title):
+    return {"chapterRenderer": {"timeRangeStartMillis": ms, "title": {"simpleText": title}}}
+
+
+@pytest.fixture
+def watch_next(monkeypatch):
+    youtube_fulltext._chapter_memo.clear()
+
+    def install(payload, status=200):
+        session = _FakeSession(payload, status)
+        monkeypatch.setattr(youtube_fulltext._http_local, "session", session, raising=False)
+        return session
+
+    def no_cli(*a, **k):
+        raise AssertionError("watch-next answered; yt-dlp must not run")
+
+    monkeypatch.setattr(youtube_fulltext, "extract_video_info", no_cli)
+    yield install
+    youtube_fulltext._chapter_memo.clear()
+
+
+def test_chapters_come_from_one_watch_next_request(watch_next):
+    session = watch_next(_watch_next([
+        {"key": "AUTO_CHAPTERS", "value": {"chapters": [_chapter(0, "Auto")]}},
+        {"key": "DESCRIPTION_CHAPTERS", "value": {"chapters": [_chapter(0, "Intro"), _chapter(95500, "Main")]}},
+    ]))
+    chapters = youtube_fulltext.extract_chapters(URL)
+    assert chapters == [
+        {"start": 0.0, "title": "Intro", "href": URL + "&t=0s"},
+        {"start": 95.5, "title": "Main", "href": URL + "&t=95s"},
+    ]
+    assert session.posts[0][1]["videoId"] == "abcDEF12345"
+    assert youtube_fulltext.extract_chapters(URL) == chapters
+    assert len(session.posts) == 1  # memoized
+
+
+def test_video_without_chapters_is_answered_without_ytdlp(watch_next):
+    watch_next(_watch_next(description="Just a plain description."))
+    assert youtube_fulltext.extract_chapters(URL) == []
+
+
+def test_unrendered_description_timestamps_fall_back_to_ytdlp(watch_next, monkeypatch):
+    watch_next(_watch_next(description="0:00 Intro\n2:15 Main part\n"))
+    monkeypatch.setattr(
+        youtube_fulltext,
+        "extract_video_info",
+        lambda *a, **k: {"id": "abcDEF12345", "chapters": [{"start_time": 0, "title": "Intro"}]},
+    )
+    assert [c["title"] for c in youtube_fulltext.extract_chapters(URL)] == ["Intro"]
+
+
+def test_refused_watch_next_falls_back_to_ytdlp(watch_next, monkeypatch):
+    watch_next({}, status=403)
+    monkeypatch.setattr(
+        youtube_fulltext,
+        "extract_video_info",
+        lambda *a, **k: {"id": "abcDEF12345", "chapters": [{"start_time": 3, "title": "Only"}]},
+    )
+    assert [c["title"] for c in youtube_fulltext.extract_chapters(URL)] == ["Only"]
+
+
+def test_chaptered_player_bar_and_key_moments_are_read(watch_next):
+    data = _watch_next()
+    data["playerOverlays"] = {"chapteredPlayerBarRenderer": {"chapters": [_chapter(0, "One"), _chapter(60000, "Two")]}}
+    watch_next(data)
+    assert [c["title"] for c in youtube_fulltext.extract_chapters(URL)] == ["One", "Two"]
+
+    youtube_fulltext._chapter_memo.clear()
+    data = _watch_next()
+    data["engagementPanels"] = [{"macroMarkersListRenderer": {"contents": [
+        {"macroMarkersListItemRenderer": {"title": {"simpleText": "Start"}, "timeDescription": {"simpleText": "0:00"}}},
+        {"macroMarkersListItemRenderer": {"title": {"simpleText": "Later"}, "timeDescription": {"simpleText": "1:02:03"}}},
+    ]}}]
+    watch_next(data)
+    chapters = youtube_fulltext.extract_chapters(URL)
+    assert [(c["start"], c["title"]) for c in chapters] == [(0, "Start"), (3723, "Later")]
+
+
+def test_description_chapters_are_checked_against_the_video_length(watch_next):
+    # Mirrors yt-dlp: description timestamps past the end are not chapters.
+    description = "00:00 Intro\n01:30 Middle\n2:00:00 Past the end\n"
+    session = watch_next(_watch_next(description=description))
+    session.player = {"videoDetails": {"lengthSeconds": "600", "shortDescription": description}}
+    chapters = youtube_fulltext.extract_chapters(URL)
+    assert [(c["start"], c["title"]) for c in chapters] == [(0, "Intro"), (90, "Middle")]

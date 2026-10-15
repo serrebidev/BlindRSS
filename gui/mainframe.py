@@ -808,7 +808,9 @@ class MainFrame(wx.Frame):
 
         # Debounce chapter loading too (selection changes can be rapid).
         self._chapters_debounce = None
-        self._chapters_debounce_ms = 500
+        # Short: YouTube neighbours' chapters are prefetched (_warm_reader_bodies),
+        # so the lookup after a pause is usually a memo hit.
+        self._chapters_debounce_ms = 250
 
         # Store article objects for the list
         self.current_articles = []
@@ -6591,6 +6593,25 @@ class MainFrame(wx.Frame):
             except Exception:
                 pass
             time.sleep(0.001)  # yield the GIL to the UI thread between parses
+        # Then the neighbours' YouTube chapters (one ~0.7 s request each, memoized
+        # in youtube_fulltext), so arriving on the row shows them at once.
+        from core import youtube_fulltext
+
+        for art, _include_images in jobs:
+            if token != int(getattr(self, "_fulltext_token", 0)):
+                return
+            if getattr(art, "chapters", None):
+                continue
+            url = str(getattr(art, "media_url", "") or getattr(art, "url", "") or "")
+            if not youtube_fulltext.is_youtube_video_url(url):
+                continue
+            try:
+                with youtube_fulltext.cancel_when(
+                    lambda: token != int(getattr(self, "_fulltext_token", 0))
+                ):
+                    youtube_fulltext.extract_chapters(url)
+            except Exception:
+                pass
 
     def _feed_language_for(self, feed_id):
         """The feed's declared language, or None when it isn't known.
@@ -6659,20 +6680,37 @@ class MainFrame(wx.Frame):
         threading.Thread(target=self._rich_load_worker, args=(req,), daemon=True).start()
 
     def _rich_load_worker(self, req: dict) -> None:
+        from core import youtube_fulltext
+
         html_body = None
+        cancelled = []
+
+        def _selection_moved(token=req.get("token")):
+            moved = token is not None and int(token) != int(getattr(self, "_fulltext_token", 0))
+            if moved:
+                cancelled.append(True)
+            return moved
+
         try:
-            html_body = article_html.render_full_article_html(
-                req.get("url", ""),
-                fallback_html=req.get("fallback_html", ""),
-                fallback_title=req.get("fallback_title", ""),
-                fallback_author=req.get("fallback_author", ""),
-                date=req.get("date", ""),
-                feed_item_lang=req.get("feed_item_lang", ""),
-                feed_lang=req.get("feed_lang", ""),
-            )
+            # A YouTube load runs yt-dlp for seconds; stop it once the user
+            # arrows to another row.
+            with youtube_fulltext.cancel_when(_selection_moved):
+                html_body = article_html.render_full_article_html(
+                    req.get("url", ""),
+                    fallback_html=req.get("fallback_html", ""),
+                    fallback_title=req.get("fallback_title", ""),
+                    fallback_author=req.get("fallback_author", ""),
+                    date=req.get("date", ""),
+                    feed_item_lang=req.get("feed_item_lang", ""),
+                    feed_lang=req.get("feed_lang", ""),
+                )
         except Exception:
             log.debug("Rich full-text render failed", exc_info=True)
             html_body = None
+        if cancelled:
+            # Whatever came back is a feed-content fallback for a cancelled
+            # extraction; caching it would hide the real full text later.
+            return
         try:
             wx.CallAfter(self._apply_rich_result, req.get("cache_key", ""), html_body, req.get("token"))
         except Exception:
@@ -11906,20 +11944,40 @@ class MainFrame(wx.Frame):
                                 encoding_kwargs["encoding"] = _enc
                     except Exception:
                         encoding_kwargs = {}
+                    from core import youtube_fulltext
+
+                    def _selection_moved(token=token_snapshot):
+                        return token is not None and token != int(getattr(self, "_fulltext_token", 0))
+
                     try:
-                        rendered = article_extractor.render_full_article(
-                            url,
-                            fallback_html=fallback_html if prefer_feed_first else "",
-                            fallback_title=fallback_title,
-                            fallback_author=fallback_author,
-                            prefer_feed_content=prefer_feed_first,
-                            metadata_sink=_metadata_sink,
-                            **encoding_kwargs,
-                        )
+                        # A YouTube load runs yt-dlp for seconds; stop it if the
+                        # user arrows to another row first.
+                        with youtube_fulltext.cancel_when(_selection_moved):
+                            rendered = article_extractor.render_full_article(
+                                url,
+                                fallback_html=fallback_html if prefer_feed_first else "",
+                                fallback_title=fallback_title,
+                                fallback_author=fallback_author,
+                                prefer_feed_content=prefer_feed_first,
+                                metadata_sink=_metadata_sink,
+                                **encoding_kwargs,
+                            )
                         render_source = "feed_preferred" if prefer_feed_first else "web"
                     except Exception as e:
                         err = str(e) or _("Unknown error")
                         rendered = None
+                    if not rendered and _selection_moved():
+                        # Nobody will see the fallbacks below; just release the
+                        # in-flight guard (nothing is cached for a cancelled load).
+                        if apply_to_ui:
+                            try:
+                                wx.CallAfter(
+                                    self._fulltext_apply_result,
+                                    cache_key, "", False, "cancelled", token_snapshot,
+                                )
+                            except Exception:
+                                pass
+                        continue
 
                 # If web extraction failed, try provider-side fetch.
                 if not rendered:
@@ -12074,8 +12132,15 @@ class MainFrame(wx.Frame):
     def _load_chapters_thread(self, article):
         chapters = getattr(article, "chapters", None)
         if not chapters and hasattr(self.provider, "get_article_chapters"):
+            from core import youtube_fulltext
+
+            cache_id = self._article_cache_id(article)
             try:
-                chapters = self.provider.get_article_chapters(article.id)
+                # A YouTube lookup runs yt-dlp; stop it once the user arrows on.
+                with youtube_fulltext.cancel_when(
+                    lambda: getattr(self, "selected_article_id", None) != cache_id
+                ):
+                    chapters = self.provider.get_article_chapters(article.id)
             except Exception:
                 chapters = None
         

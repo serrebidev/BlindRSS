@@ -15,8 +15,14 @@ from __future__ import annotations
 import html
 import json
 import logging
+import os
 import re
+import signal
+import subprocess
+import threading
+import time
 from collections import defaultdict
+from contextlib import contextmanager
 from urllib.parse import parse_qs, urlsplit
 
 from core import utils
@@ -82,8 +88,70 @@ class _YtdlpLogger:
 _CLI_TIMEOUT_WITH_COMMENTS_S = 900
 _CLI_TIMEOUT_S = 120
 
+# Chapters live in the watch page's initial data, so a chapters-only lookup
+# can skip the player JavaScript (the deno signature challenge) and the
+# DASH/HLS manifests. Measured: same chapters, about 30% faster.
+_CHAPTERS_ONLY_EXTRACTOR_ARGS = ";player_skip=js;skip=dash,hls,translated_subs"
 
-def _extract_info_via_cli(extract_url: str, *, timeout: int, include_comments: bool):
+
+class ExtractionCancelled(Exception):
+    """The caller no longer wants this extraction (the user moved on)."""
+
+
+_cancel_state = threading.local()
+
+
+@contextmanager
+def cancel_when(check):
+    """Kill yt-dlp CLI work started in this thread once ``check()`` is true.
+
+    Arrowing over YouTube rows starts a chapter lookup and a full-text load for
+    each row the user pauses on; without this, every abandoned row kept its
+    yt-dlp process running to the end.
+    """
+    previous = getattr(_cancel_state, "check", None)
+    _cancel_state.check = check
+    try:
+        yield
+    finally:
+        _cancel_state.check = previous
+
+
+def _cancel_requested() -> bool:
+    check = getattr(_cancel_state, "check", None)
+    try:
+        return bool(check is not None and check())
+    except Exception:
+        return False
+
+
+def _kill_process_tree(proc) -> None:
+    # yt-dlp release binaries are PyInstaller one-file executables: the process
+    # we started is a bootloader whose child does the work, so kill the tree.
+    try:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                timeout=10,
+            )
+        else:
+            os.killpg(proc.pid, signal.SIGKILL)
+    except Exception:
+        pass
+    try:
+        proc.kill()
+        proc.communicate(timeout=5)
+    except Exception:
+        pass
+
+
+def _extract_info_via_cli(
+    extract_url: str, *, timeout: int, include_comments: bool, chapters_only: bool = False
+):
     """Run one extraction in the yt-dlp CLI; ``None`` when no CLI can be launched.
 
     yt-dlp is pure Python: a video with a few hundred comments costs 2-5 s of
@@ -91,19 +159,22 @@ def _extract_info_via_cli(extract_url: str, *, timeout: int, include_comments: b
     NVDA sends the article list waits behind it, which is the arrowing lag
     on YouTube rows (selection triggers chapter and full-text loads). A child
     process does the same work without touching this interpreter.
-    Returns ``(info, incomplete_comment_data)``; raises on a failed extraction.
+    Returns ``(info, incomplete_comment_data)``; raises on a failed extraction
+    and ``ExtractionCancelled`` when the thread's ``cancel_when`` check fires.
     """
-    import subprocess
-
     from core.dependency_check import _get_startup_info
     from core.discovery import _resolve_ytdlp_cli_path, youtube_player_client_arg
 
+    if _cancel_requested():
+        raise ExtractionCancelled()
     extractor_args = youtube_player_client_arg()
     if include_comments:
         # Omitted max_comments values mean unlimited parents, replies,
         # per-thread replies and depth; spelled out so a future yt-dlp default
         # cannot silently collapse discussions.
         extractor_args += ";max_comments=all,all,all,all,all"
+    elif chapters_only:
+        extractor_args += _CHAPTERS_ONLY_EXTRACTOR_ARGS
     cmd = [
         _resolve_ytdlp_cli_path(),
         "-J",
@@ -118,27 +189,44 @@ def _extract_info_via_cli(extract_url: str, *, timeout: int, include_comments: b
     ]
     if include_comments:
         cmd.append("--write-comments")
+    elif chapters_only:
+        cmd.append("--ignore-no-formats-error")
     cmd += ["--", extract_url]
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             stdin=subprocess.DEVNULL,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             startupinfo=_get_startup_info(),
-            timeout=_CLI_TIMEOUT_WITH_COMMENTS_S if include_comments else _CLI_TIMEOUT_S,
+            start_new_session=(os.name != "nt"),
         )
     except OSError:
         return None
-    errors = (result.stderr or b"").decode("utf-8", "replace")
+    deadline = time.monotonic() + (
+        _CLI_TIMEOUT_WITH_COMMENTS_S if include_comments else _CLI_TIMEOUT_S
+    )
+    while True:
+        try:
+            # Retrying communicate() after a timeout loses no output.
+            stdout, stderr = proc.communicate(timeout=0.25)
+            break
+        except subprocess.TimeoutExpired:
+            if _cancel_requested():
+                _kill_process_tree(proc)
+                raise ExtractionCancelled()
+            if time.monotonic() > deadline:
+                _kill_process_tree(proc)
+                raise TimeoutError("yt-dlp did not finish in time")
+    errors = (stderr or b"").decode("utf-8", "replace")
     for line in errors.splitlines():
         if line.strip():
             LOG.debug("yt-dlp: %s", line)
-    if result.returncode != 0:
+    if proc.returncode != 0:
         lines = [line.strip() for line in errors.splitlines() if line.strip()]
-        raise RuntimeError(lines[-1] if lines else f"yt-dlp exited with code {result.returncode}")
-    info = json.loads(result.stdout or b"{}")
+        raise RuntimeError(lines[-1] if lines else f"yt-dlp exited with code {proc.returncode}")
+    info = json.loads(stdout or b"{}")
     return (info if isinstance(info, dict) else {}), "incomplete data received" in errors.lower()
 
 
@@ -151,10 +239,17 @@ def _extract_info_in_process(extract_url: str, options: dict):
     return info, logger.incomplete_data
 
 
-def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = True) -> dict:
-    """Extract current YouTube metadata; comment extraction expands all public replies."""
+def extract_video_info(
+    url: str, *, timeout: int = 20, include_comments: bool = True, chapters_only: bool = False
+) -> dict:
+    """Extract current YouTube metadata; comment extraction expands all public replies.
+
+    ``chapters_only`` (without comments) skips player and stream data that
+    chapters do not need; the result has no usable formats.
+    """
     if not is_youtube_video_url(url):
         return {}
+    chapters_only = bool(chapters_only and not include_comments)
 
     from core.discovery import (
         normalize_ytdlp_single_item_url,
@@ -184,10 +279,18 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
         },
         "getcomments": bool(include_comments),
     }
+    if chapters_only:
+        options["extractor_args"]["youtube"].update(
+            {"player_skip": ["js"], "skip": ["dash", "hls", "translated_subs"]}
+        )
+        options["ignore_no_formats_error"] = True
 
     def run():
         via_cli = _extract_info_via_cli(
-            extract_url, timeout=timeout, include_comments=include_comments
+            extract_url,
+            timeout=timeout,
+            include_comments=include_comments,
+            chapters_only=chapters_only,
         )
         if via_cli is not None:
             return via_cli
@@ -218,6 +321,8 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
                     merged.append(item)
                 retry_info["comments"] = merged
                 info = retry_info
+        except ExtractionCancelled:
+            raise
         except Exception:
             LOG.debug("YouTube comment completeness retry failed", exc_info=True)
         if incomplete:
@@ -226,7 +331,21 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
                 "YouTube returned an incomplete public-comment continuation after retry; "
                 "preserving all comments received"
             )
+    _remember_chapters(url, info)
     return info
+
+
+# Chapters seen by any recent extraction (full text included), so revisiting a
+# row or opening the player does not launch yt-dlp again. Expires so chapters
+# an uploader adds later are still picked up.
+_CHAPTER_MEMO_TTL_S = 30 * 60
+_chapter_memo = utils.LRUDict(512)
+
+
+def _remember_chapters(url: str, info: dict) -> None:
+    video_id = str(info.get("id") or video_id_from_url(url) or "").strip()
+    if video_id:
+        _chapter_memo[video_id] = (time.monotonic(), chapters_from_info(info, url))
 
 
 def chapters_from_info(info: dict, url: str = "") -> list[dict]:
@@ -449,6 +568,188 @@ def extract_article(url: str, *, timeout: int = 20) -> dict:
     return article_fields_from_info(info, url, timeout=timeout) if info else {}
 
 
+_INNERTUBE_URL = "https://www.youtube.com/youtubei/v1/{}?prettyPrint=false"
+# ponytail: pinned WEB client version; YouTube accepts old versions for years.
+# Bump it if watch-next starts refusing requests (the CLI fallback covers it).
+_INNERTUBE_CLIENT = {"clientName": "WEB", "clientVersion": "2.20251010.01.00", "hl": "en"}
+# yt-dlp's description-chapter grammar (common._extract_chapters_from_description).
+_DESCRIPTION_DURATION_RE = r"(?:\d+:)?\d{1,2}:\d{2}"
+_DESCRIPTION_LINE_RE = r"(?m)^\s*({})\b\W*\s({})\s*$"
+_http_local = threading.local()
+
+
+def _find_values(node, key: str, out: list) -> list:
+    if isinstance(node, dict):
+        for name, value in node.items():
+            if name == key:
+                out.append(value)
+            else:
+                _find_values(value, key, out)
+    elif isinstance(node, list):
+        for value in node:
+            _find_values(value, key, out)
+    return out
+
+
+def _runs_text(node) -> str:
+    if not isinstance(node, dict):
+        return ""
+    if "simpleText" in node:
+        return str(node.get("simpleText") or "")
+    return "".join(str(run.get("text") or "") for run in node.get("runs") or [] if isinstance(run, dict))
+
+
+def _parse_clock(text) -> float | None:
+    parts = str(text or "").strip().split(":")
+    try:
+        if not 1 <= len(parts) <= 3:
+            return None
+        seconds = 0.0
+        for part in parts:
+            seconds = seconds * 60 + int(part)
+        return seconds
+    except ValueError:
+        return None
+
+
+def _innertube(endpoint: str, video_id: str, timeout: int):
+    """One InnerTube JSON call (WEB client) on this thread's kept-alive session."""
+    import requests
+
+    session = getattr(_http_local, "session", None)
+    if session is None:
+        session = _http_local.session = requests.Session()
+    response = session.post(
+        _INNERTUBE_URL.format(endpoint),
+        json={"context": {"client": _INNERTUBE_CLIENT}, "videoId": video_id},
+        headers={
+            "User-Agent": utils.HEADERS.get("User-Agent", ""),
+            "Origin": "https://www.youtube.com",
+        },
+        timeout=max(3, min(int(timeout or 10), 15)),
+    )
+    if response.status_code != 200:
+        return None
+    data = response.json()
+    return data if isinstance(data, dict) else None
+
+
+def _valid_chapters(pairs, duration):
+    """yt-dlp's _extract_chapters_helper: ordered starts within the video."""
+    out = []
+    last = 0.0
+    for start, title in pairs:
+        if start is None:
+            continue
+        if last <= start and (duration is None or start <= duration):
+            out.append((start, title))
+            last = start
+    return out
+
+
+def _chapters_from_watch_next(video_id: str, *, timeout: int):
+    """Chapters without yt-dlp: one watch-next request, about 0.7 s.
+
+    The yt-dlp CLI needs 3-4 s for the same answer (process start plus player
+    requests). Mirrors yt-dlp's three sources in its order: player-bar chapter
+    markers, the "key moments" panel, then timestamps in the description
+    (validated against the length from one extra ``player`` request, only
+    when the description has timestamps). Returns ``None`` when YouTube's
+    responses cannot settle it, so the caller falls back to yt-dlp.
+    """
+    data = _innertube("next", video_id, timeout)
+    if not data or "contents" not in data:
+        return None
+
+    pairs = []
+    overlays = data.get("playerOverlays") or {}
+    lists = _find_values(overlays, "chapteredPlayerBarRenderer", [])
+    by_key = {}
+    for markers_map in _find_values(overlays, "markersMap", []):
+        for entry in markers_map if isinstance(markers_map, list) else []:
+            if isinstance(entry, dict) and (entry.get("value") or {}).get("chapters"):
+                by_key.setdefault(str(entry.get("key") or ""), entry["value"])
+    candidates = [*lists, by_key.get("DESCRIPTION_CHAPTERS"), by_key.get("AUTO_CHAPTERS"), *by_key.values()]
+    for candidate in candidates:
+        chapters = (candidate or {}).get("chapters") if isinstance(candidate, dict) else None
+        for chapter in chapters or []:
+            renderer = chapter.get("chapterRenderer") if isinstance(chapter, dict) else None
+            if not isinstance(renderer, dict):
+                continue
+            try:
+                start = int(renderer.get("timeRangeStartMillis") or 0) / 1000.0
+            except (TypeError, ValueError):
+                start = None
+            pairs.append((start, _runs_text(renderer.get("title"))))
+        if pairs:
+            break
+    chapters = _valid_chapters(pairs, None)
+
+    if not chapters:
+        for contents in _find_values(data.get("engagementPanels") or [], "macroMarkersListRenderer", []):
+            items = _find_values((contents or {}).get("contents") or [], "macroMarkersListItemRenderer", [])
+            chapters = _valid_chapters(
+                [(_parse_clock(_runs_text(i.get("timeDescription"))), _runs_text(i.get("title"))) for i in items],
+                None,
+            )
+            if chapters:
+                break
+
+    if not chapters:
+        descriptions = _find_values(data, "attributedDescription", [])
+        text = "\n".join(str(d.get("content") or "") for d in descriptions if isinstance(d, dict))
+        time_first = re.findall(_DESCRIPTION_LINE_RE.format(_DESCRIPTION_DURATION_RE, r".+?"), text)
+        title_first = re.findall(_DESCRIPTION_LINE_RE.format(r".+?", _DESCRIPTION_DURATION_RE), text)
+        if not time_first and not title_first:
+            return []
+        player = _innertube("player", video_id, timeout)
+        details = (player or {}).get("videoDetails") or {}
+        try:
+            duration = float(details.get("lengthSeconds") or 0)
+        except (TypeError, ValueError):
+            duration = 0
+        if not duration:
+            return None
+        text = str(details.get("shortDescription") or text)
+        for found, clock_index in (
+            (re.findall(_DESCRIPTION_LINE_RE.format(_DESCRIPTION_DURATION_RE, r".+?"), text), 0),
+            (re.findall(_DESCRIPTION_LINE_RE.format(r".+?", _DESCRIPTION_DURATION_RE), text), 1),
+        ):
+            pairs = sorted(
+                ((_parse_clock(m[clock_index]), m[1 - clock_index]) for m in found),
+                key=lambda pair: pair[0] or 0,
+            )
+            chapters = _valid_chapters(pairs, duration)
+            if chapters:
+                break
+
+    if chapters and chapters[0][0] > 0:
+        # yt-dlp's YoutubeDL fills the gap before a late first chapter the same way.
+        chapters.insert(0, (0.0, "<Untitled Chapter 1>"))
+    base_url = f"https://www.youtube.com/watch?v={video_id}"
+    return [
+        {"start": max(0.0, start), "title": str(title or "").strip() or "Chapter",
+         "href": f"{base_url}&t={int(start)}s"}
+        for start, title in chapters
+    ]
+
+
 def extract_chapters(url: str, *, timeout: int = 20) -> list[dict]:
-    info = extract_video_info(url, timeout=timeout, include_comments=False)
+    video_id = video_id_from_url(url)
+    if not video_id:
+        return []
+    remembered = _chapter_memo.get(video_id)
+    if remembered and time.monotonic() - remembered[0] < _CHAPTER_MEMO_TTL_S:
+        return list(remembered[1])
+    if _cancel_requested():
+        raise ExtractionCancelled()
+    try:
+        chapters = _chapters_from_watch_next(video_id, timeout=timeout)
+    except Exception:
+        LOG.debug("YouTube watch-next chapter lookup failed for %s", video_id, exc_info=True)
+        chapters = None
+    if chapters is not None:
+        _chapter_memo[video_id] = (time.monotonic(), chapters)
+        return list(chapters)
+    info = extract_video_info(url, timeout=timeout, include_comments=False, chapters_only=True)
     return chapters_from_info(info, url) if info else []
