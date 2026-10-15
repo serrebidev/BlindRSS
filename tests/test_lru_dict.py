@@ -18,3 +18,13 @@ def test_lru_dict_evicts_least_recently_used():
     d.pop("a")
     d.clear()
     assert len(d) == 0
+
+
+def test_lru_dict_char_budget_evicts_oldest_but_keeps_newest():
+    d = LRUDict(10, max_chars=10)
+    d["a"] = "xxxx"
+    d["b"] = "yyyy"
+    d["c"] = "zzzz"  # 12 chars > 10: "a" goes
+    assert list(d) == ["b", "c"]
+    d["huge"] = "w" * 50  # over budget alone: newest entry is still kept
+    assert list(d) == ["huge"]

@@ -10,6 +10,8 @@ import json
 
 
 LARGE_READER_TEXT_CHARS = 16_384
+# Character budget for each session reader cache (full text, rich HTML).
+READER_CACHE_MAX_CHARS = 8_000_000
 
 
 def notify_reader_content_changed(control, *, tree_changed: bool = False) -> bool:
@@ -101,11 +103,17 @@ def set_accessible_webview_content(webview, html_body: str) -> bool:
     view = getattr(webview, "view", None)
     ready = bool(getattr(webview, "_ready", False))
     runner = getattr(view, "RunScriptAsync", None) if view is not None else None
-    if len(body) < LARGE_READER_TEXT_CHARS or not ready or not callable(runner):
+    if not ready or not callable(runner):
         webview.set_content(body)
         return False
 
     payload = json.dumps(body)
+    if len(body) < LARGE_READER_TEXT_CHARS:
+        # Same innerHTML replacement the library's set_content performs, but
+        # queued: its synchronous RunScript spins a nested wx event loop until
+        # WebView2 answers, on every article the user arrows onto.
+        runner(f"window.__awv.set({payload});")
+        return True
     script = (
         "(function(h){"
         "var c=document.getElementById('content');"

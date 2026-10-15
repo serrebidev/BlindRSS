@@ -14,11 +14,26 @@ import threading
 import sys
 import os
 
+import pytest
+import requests
+
 # Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 
-def test_proxify_blocking():
+@pytest.fixture
+def slow_offline_network(monkeypatch):
+    """Every request stalls, then fails: proves the call under test never
+    waits on the network, without reaching a real host (offline suite)."""
+
+    def _slow_fail(self, method, url, *args, **kwargs):
+        time.sleep(2.0)
+        raise requests.ConnectionError("network disabled in tests")
+
+    monkeypatch.setattr(requests.Session, "request", _slow_fail)
+
+
+def test_proxify_blocking(slow_offline_network):
     """Test that proxify() doesn't block for network operations."""
     from core.range_cache_proxy import get_range_cache_proxy
     
@@ -42,7 +57,7 @@ def test_proxify_blocking():
     print(f"PASS: proxify() completed quickly ({elapsed:.3f}s)")
 
 
-def test_maybe_range_cache_url_nonblocking():
+def test_maybe_range_cache_url_nonblocking(slow_offline_network):
     """Test that _maybe_range_cache_url doesn't block the GUI thread."""
     import wx
     

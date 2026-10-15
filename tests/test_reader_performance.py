@@ -133,3 +133,32 @@ def test_accessibility_notification_reports_replaced_reader_tree(monkeypatch):
         (wx.ACC_EVENT_OBJECT_REORDER, parent, wx.OBJID_CLIENT, wx.ACC_SELF),
         (wx.ACC_EVENT_OBJECT_VALUECHANGE, reader, wx.OBJID_CLIENT, wx.ACC_SELF),
     ]
+
+
+def test_small_webview_update_is_queued_not_synchronous():
+    # Synchronous RunScript spins a nested event loop per arrowed-onto article.
+    class _View:
+        def __init__(self):
+            self.scripts = []
+
+        def RunScriptAsync(self, script):
+            self.scripts.append(script)
+
+    class _WebView:
+        def __init__(self, ready):
+            self.view = _View()
+            self._ready = ready
+            self.sync_calls = []
+
+        def set_content(self, body):
+            self.sync_calls.append(body)
+
+    ready = _WebView(ready=True)
+    assert set_accessible_webview_content(ready, "<p>short</p>") is True
+    assert not ready.sync_calls
+    assert ready.view.scripts == ['window.__awv.set("<p>short</p>");']
+
+    # Before the skeleton loads, the library's pending queue must be used.
+    loading = _WebView(ready=False)
+    assert set_accessible_webview_content(loading, "<p>short</p>") is False
+    assert loading.sync_calls == ["<p>short</p>"]

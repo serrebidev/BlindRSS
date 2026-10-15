@@ -2821,10 +2821,18 @@ class LRUDict(OrderedDict):
     read on the UI thread, hence the lock.
     """
 
-    def __init__(self, maxlen: int, *args, **kwargs):
+    def __init__(self, maxlen: int, *args, max_chars: int = 0, **kwargs):
         self.maxlen = max(1, int(maxlen))
+        # Optional size budget over str/bytes values. An entry count alone does
+        # not bound memory: one YouTube transcript-with-comments or Reddit
+        # thread can be megabytes, and the app lives in the tray for days.
+        self.max_chars = max(0, int(max_chars))
         self._lru_lock = threading.RLock()
         super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def _weight(value) -> int:
+        return len(value) if isinstance(value, (str, bytes)) else 0
 
     def __setitem__(self, key, value):
         with self._lru_lock:
@@ -2832,6 +2840,12 @@ class LRUDict(OrderedDict):
             self.move_to_end(key)
             while len(self) > self.maxlen:
                 self.popitem(last=False)
+            if self.max_chars:
+                # dict.values: the raw view, so no __getitem__ reordering mid-sum.
+                total = sum(self._weight(v) for v in dict.values(self))
+                while total > self.max_chars and len(self) > 1:
+                    _old_key, old = self.popitem(last=False)
+                    total -= self._weight(old)
 
     def __getitem__(self, key):
         with self._lru_lock:

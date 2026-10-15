@@ -71,6 +71,7 @@ from . import help_context
 from .widgets import STATUS_BAR_STYLE, force_ltr_reading
 from .reader_performance import (
     LARGE_READER_TEXT_CHARS,
+    READER_CACHE_MAX_CHARS,
     notify_reader_content_changed,
     replace_text_control_value,
     set_accessible_webview_content,
@@ -742,7 +743,7 @@ class MainFrame(wx.Frame):
         self.reader_panel.SetSizer(self._reader_sizer)
         self._rich_view = None            # AccessibleWebView, created on demand
         self._rich_view_unavailable = False
-        self._fulltext_html_cache = utils.LRUDict(100)    # cache_key -> rendered rich HTML
+        self._fulltext_html_cache = utils.LRUDict(100, max_chars=READER_CACHE_MAX_CHARS)    # cache_key -> rendered rich HTML
         self._rich_debounce = None
 
         right_splitter.SplitHorizontally(self.list_ctrl, self.reader_panel, 300)
@@ -780,8 +781,13 @@ class MainFrame(wx.Frame):
         self.search_ctrl.Bind(wx.EVT_SEARCHCTRL_CANCEL_BTN, self.on_search_clear)
 
         # Full-text extraction cache (url -> rendered text)
-        self._fulltext_cache = utils.LRUDict(300)
+        self._fulltext_cache = utils.LRUDict(300, max_chars=READER_CACHE_MAX_CHARS)
         self._fulltext_cache_source = utils.LRUDict(300)
+        # Feed content converted for the reader (plain text or cleaned rich
+        # HTML), warmed for neighbouring rows off the UI thread so arrowing
+        # never parses HTML in the selection path. See _reader_body.
+        self._reader_body_cache = utils.LRUDict(64, max_chars=READER_CACHE_MAX_CHARS)
+        self._reader_warm_pool = None
         # Last search term used by find-in-article (reading pane).
         self._content_find_term = ""
         self._fulltext_token = 0
@@ -6510,9 +6516,7 @@ class MainFrame(wx.Frame):
         date = utils.humanize_article_date(getattr(article, "date", "") or "")
         body = ""
         try:
-            body = article_html.clean_article_html(
-                getattr(article, "content", "") or "", url, use_traf_prune=False
-            )
+            body = self._reader_body(article, rich=True)
         except Exception:
             body = ""
         header = f"<h1>{html_stdlib.escape(title or url)}</h1>"
@@ -6532,6 +6536,61 @@ class MainFrame(wx.Frame):
         )
         safe_lang = html_stdlib.escape(lang, quote=True)
         return f'<article lang="{safe_lang}">{header}<hr>{body}</article>'
+
+    def _reader_body(self, article, *, rich: bool, include_images: bool = False) -> str:
+        """The article's feed content converted for the reader, memoized.
+
+        Plain text (BeautifulSoup) or cleaned rich HTML costs 1-170 ms per
+        article on the UI thread (measured on 300 real Miniflux entries), paid
+        on every row the user settles on while arrowing. Keyed by content
+        hash so a refresh that rebuilds Article objects still hits.
+        Thread-safe: _warm_reader_bodies fills it from a worker.
+        """
+        content = getattr(article, "content", "") or ""
+        key = (self._article_cache_id(article), bool(rich), bool(include_images), hash(content))
+        cache = getattr(self, "_reader_body_cache", None)
+        if cache is None:
+            cache = self._reader_body_cache = utils.LRUDict(64, max_chars=READER_CACHE_MAX_CHARS)
+        body = cache.get(key)
+        if body is None:
+            if rich:
+                body = article_html.clean_article_html(
+                    content, str(getattr(article, "url", "") or ""), use_traf_prune=False
+                )
+            else:
+                body = self._strip_html(content, include_images=include_images)
+            cache[key] = body
+        return body
+
+    def _warm_reader_bodies(self, idx: int, rich: bool) -> None:
+        """Convert the rows around ``idx`` in the background for the next arrow."""
+        articles = list(getattr(self, "current_articles", []) or [])
+        jobs = []
+        for j in (idx + 1, idx - 1, idx + 2):
+            if 0 <= j < len(articles):
+                art = articles[j]
+                include_images = False if rich else self._show_images_for_feed(getattr(art, "feed_id", None))
+                jobs.append((art, include_images))
+        if not jobs:
+            return
+        pool = getattr(self, "_reader_warm_pool", None)
+        if pool is None:
+            from concurrent.futures import ThreadPoolExecutor
+            pool = self._reader_warm_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="reader-warm")
+        pool.submit(
+            self._warm_reader_bodies_worker, jobs, rich, int(getattr(self, "_fulltext_token", 0))
+        )
+
+    def _warm_reader_bodies_worker(self, jobs, rich: bool, token: int) -> None:
+        for art, include_images in jobs:
+            # The user moved on: these neighbours are no longer the next arrow.
+            if token != int(getattr(self, "_fulltext_token", 0)):
+                return
+            try:
+                self._reader_body(art, rich=rich, include_images=include_images)
+            except Exception:
+                pass
+            time.sleep(0.001)  # yield the GIL to the UI thread between parses
 
     def _feed_language_for(self, feed_id):
         """The feed's declared language, or None when it isn't known.
@@ -10598,9 +10657,12 @@ class MainFrame(wx.Frame):
             self._fulltext_loading_url = None
             self._fulltext_token += 1
             
-            # Immediate feedback (fast)
-            replace_text_control_value(self.content_ctrl, _("Loading..."))
-            self._invalidate_reader_text_tracking()
+            # Immediate feedback (fast). The plain reader is hidden while the
+            # rich view is shown; writing it there only costs a native update
+            # and an accessibility event per arrow press.
+            if not self._rich_view_active():
+                replace_text_control_value(self.content_ctrl, _("Loading..."))
+                self._invalidate_reader_text_tracking()
 
             # Debounce heavy operations (HTML parsing, marking read, etc.)
             if getattr(self, "_content_debounce", None):
@@ -10616,22 +10678,19 @@ class MainFrame(wx.Frame):
         if getattr(self, "selected_article_id", None) != self._article_cache_id(article):
             return
 
-        # Prepare content (Heavy: BeautifulSoup)
-        header = f"{article.title}\n"
-        header += _("Date:") + f" {utils.humanize_article_date(article.date)}\n"
-        header += _("Author:") + f" {article.author}\n"
-        header += _("Link:") + f" {article.url}\n"
-        header += "-" * 40 + "\n\n"
-        
         use_rich = self._rich_view_active()
-        try:
-            include_images = self._show_images_for_feed(getattr(article, "feed_id", None))
-            content = self._strip_html(article.content, include_images=include_images)
-            full_text = header + content
-            if not use_rich:
-                self._set_article_reader_text(article, full_text)
-        except Exception:
-            pass
+        if not use_rich:
+            header = f"{article.title}\n"
+            header += _("Date:") + f" {utils.humanize_article_date(article.date)}\n"
+            header += _("Author:") + f" {article.author}\n"
+            header += _("Link:") + f" {article.url}\n"
+            header += "-" * 40 + "\n\n"
+            try:
+                include_images = self._show_images_for_feed(getattr(article, "feed_id", None))
+                content = self._reader_body(article, rich=False, include_images=include_images)
+                self._set_article_reader_text(article, header + content)
+            except Exception:
+                pass
 
         # Rich reader: show cleaned feed content instantly (no network); the full
         # web extraction is fetched when the reader gains focus, mirroring the
@@ -10649,6 +10708,11 @@ class MainFrame(wx.Frame):
             self._schedule_chapters_load(article)
         except Exception:
             pass
+
+        try:
+            self._warm_reader_bodies(idx, use_rich)
+        except Exception:
+            log.debug("Reader warm-up scheduling failed", exc_info=True)
 
         # When translation is enabled, automatically queue the async full-text pipeline so the
         # content pane is replaced with translated text without requiring an extra focus action.
@@ -12378,7 +12442,13 @@ class MainFrame(wx.Frame):
             return
         for cache_id, label in list(deferred.items()):
             i = by_id.get(cache_id)
-            if i is None or i == except_idx:
+            if i is None:
+                # Row left the view; its model already carries the status, so
+                # the next render shows it. Keeping the entry made every later
+                # arrow press rebuild this id map over the whole list.
+                deferred.pop(cache_id, None)
+                continue
+            if i == except_idx:
                 continue
             try:
                 if i < self.list_ctrl.GetItemCount():
