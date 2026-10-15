@@ -4,6 +4,11 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.3.8 - 2026-10-15
+
+- Instant YouTube chapters and cancel stale yt-dlp work.
+- Track yt-dlp nightly everywhere.
+
 ## v2.3.7 - 2026-10-15
 
 - Run YouTube extraction in the yt-dlp CLI, not the app process.
