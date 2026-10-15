@@ -64,10 +64,13 @@ def test_youtube_fulltext_extraction_never_walks_the_playlist():
 
     fake_mod = type("_FakeYtDlp", (), {"YoutubeDL": _FakeYDL})
     sys.modules["yt_dlp"] = fake_mod
+    real_cli = yft._extract_info_via_cli
+    yft._extract_info_via_cli = lambda *a, **k: None  # exercise the in-process fallback
     try:
         info = yft.extract_video_info(RADIO_URL, include_comments=False)
     finally:
         sys.modules.pop("yt_dlp", None)
+        yft._extract_info_via_cli = real_cli
 
     assert info["id"] == "A3TU_p5kLJI"
     assert captured["options"].get("noplaylist") is True

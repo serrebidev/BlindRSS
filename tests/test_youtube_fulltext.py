@@ -6,6 +6,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
 from bs4 import BeautifulSoup
 
 from core import article_extractor, article_html, utils, youtube_fulltext
@@ -114,6 +115,8 @@ def test_incomplete_comment_extraction_retries_and_unions_comments(monkeypatch):
             return payloads[index]
 
     monkeypatch.setattr(yt_dlp, "YoutubeDL", _FakeYoutubeDL)
+    # In-process fallback: no runnable yt-dlp CLI.
+    monkeypatch.setattr(youtube_fulltext, "_extract_info_via_cli", lambda *a, **k: None)
     info = youtube_fulltext.extract_video_info(URL, include_comments=True)
 
     assert attempts == [0, 1]
@@ -214,3 +217,44 @@ def test_youtube_chapters_use_the_normal_chapter_cache(monkeypatch):
 
     assert [chapter["title"] for chapter in chapters] == ["Opening", "Demonstration"]
     assert stored == {"article_id": "article-1", "chapters": chapters}
+
+
+def test_extraction_runs_in_the_ytdlp_cli_not_this_interpreter(monkeypatch):
+    # In-process yt-dlp held the GIL for seconds per video and lagged NVDA
+    # while arrowing over YouTube rows.
+    import subprocess
+    import sys
+
+    calls = []
+    payloads = [
+        (b'{"id": "abcDEF12345", "comments": [{"id": "one"}]}', b"WARNING: [youtube] Incomplete data received"),
+        (b'{"id": "abcDEF12345", "comments": [{"id": "two"}]}', b""),
+    ]
+
+    def _fake_run(cmd, **kwargs):
+        calls.append(cmd)
+        out, err = payloads[len(calls) - 1]
+        return subprocess.CompletedProcess(cmd, 0, out, err)
+
+    monkeypatch.setattr(subprocess, "run", _fake_run)
+    monkeypatch.setitem(sys.modules, "yt_dlp", None)  # importing it would fail the test
+    info = youtube_fulltext.extract_video_info(URL + "&list=RDxyz&start_radio=1", include_comments=True)
+
+    assert [c["id"] for c in info["comments"]] == ["one", "two"]
+    assert not info.get("_blindrss_comments_incomplete")
+    cmd = calls[0]
+    assert "--no-playlist" in cmd and "--write-comments" in cmd and "--ignore-config" in cmd
+    assert cmd[-1] == "https://www.youtube.com/watch?v=abcDEF12345"
+    assert any("max_comments=all,all,all,all,all" in part for part in cmd)
+
+
+def test_cli_failure_reports_the_ytdlp_error(monkeypatch):
+    import subprocess
+
+    monkeypatch.setattr(
+        subprocess,
+        "run",
+        lambda cmd, **k: subprocess.CompletedProcess(cmd, 1, b"", b"ERROR: [youtube] abcDEF12345: Video unavailable\n"),
+    )
+    with pytest.raises(RuntimeError, match="Video unavailable"):
+        youtube_fulltext.extract_video_info(URL, include_comments=False)

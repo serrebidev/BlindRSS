@@ -77,11 +77,84 @@ class _YtdlpLogger:
         LOG.warning("yt-dlp: %s", message)
 
 
+# ponytail: fixed ceilings, not progress-aware. Comment-heavy videos ("all"
+# comments) can take minutes; a hung CLI must still end eventually.
+_CLI_TIMEOUT_WITH_COMMENTS_S = 900
+_CLI_TIMEOUT_S = 120
+
+
+def _extract_info_via_cli(extract_url: str, *, timeout: int, include_comments: bool):
+    """Run one extraction in the yt-dlp CLI; ``None`` when no CLI can be launched.
+
+    yt-dlp is pure Python: a video with a few hundred comments costs 2-5 s of
+    CPU (measured). In-process that work holds the GIL, and every message
+    NVDA sends the article list waits behind it, which is the arrowing lag
+    on YouTube rows (selection triggers chapter and full-text loads). A child
+    process does the same work without touching this interpreter.
+    Returns ``(info, incomplete_comment_data)``; raises on a failed extraction.
+    """
+    import subprocess
+
+    from core.dependency_check import _get_startup_info
+    from core.discovery import _resolve_ytdlp_cli_path, youtube_player_client_arg
+
+    extractor_args = youtube_player_client_arg()
+    if include_comments:
+        # Omitted max_comments values mean unlimited parents, replies,
+        # per-thread replies and depth; spelled out so a future yt-dlp default
+        # cannot silently collapse discussions.
+        extractor_args += ";max_comments=all,all,all,all,all"
+    cmd = [
+        _resolve_ytdlp_cli_path(),
+        "-J",
+        "--ignore-config",
+        # A watch URL carrying &list= must still resolve to the one video.
+        "--no-playlist",
+        "--skip-download",
+        "--socket-timeout", str(max(5, int(timeout or 20))),
+        "--retries", "2",
+        "--extractor-retries", "6",
+        "--extractor-args", extractor_args,
+    ]
+    if include_comments:
+        cmd.append("--write-comments")
+    cmd += ["--", extract_url]
+    try:
+        result = subprocess.run(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            stdin=subprocess.DEVNULL,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            startupinfo=_get_startup_info(),
+            timeout=_CLI_TIMEOUT_WITH_COMMENTS_S if include_comments else _CLI_TIMEOUT_S,
+        )
+    except OSError:
+        return None
+    errors = (result.stderr or b"").decode("utf-8", "replace")
+    for line in errors.splitlines():
+        if line.strip():
+            LOG.debug("yt-dlp: %s", line)
+    if result.returncode != 0:
+        lines = [line.strip() for line in errors.splitlines() if line.strip()]
+        raise RuntimeError(lines[-1] if lines else f"yt-dlp exited with code {result.returncode}")
+    info = json.loads(result.stdout or b"{}")
+    return (info if isinstance(info, dict) else {}), "incomplete data received" in errors.lower()
+
+
+def _extract_info_in_process(extract_url: str, options: dict):
+    import yt_dlp
+
+    logger = _YtdlpLogger()
+    with yt_dlp.YoutubeDL(dict(options, logger=logger)) as ydl:
+        info = ydl.extract_info(extract_url, download=False)
+    return info, logger.incomplete_data
+
+
 def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = True) -> dict:
     """Extract current YouTube metadata; comment extraction expands all public replies."""
     if not is_youtube_video_url(url):
         return {}
-    import yt_dlp
 
     from core.discovery import (
         normalize_ytdlp_single_item_url,
@@ -90,7 +163,6 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
 
     extract_url = normalize_ytdlp_single_item_url(url)
 
-    logger = _YtdlpLogger()
     options = {
         "skip_download": True,
         "quiet": True,
@@ -111,10 +183,18 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
             }
         },
         "getcomments": bool(include_comments),
-        "logger": logger,
     }
-    with yt_dlp.YoutubeDL(options) as ydl:
-        info = ydl.extract_info(extract_url, download=False)
+
+    def run():
+        via_cli = _extract_info_via_cli(
+            extract_url, timeout=timeout, include_comments=include_comments
+        )
+        if via_cli is not None:
+            return via_cli
+        # No runnable CLI (e.g. a source checkout without yt-dlp on PATH).
+        return _extract_info_in_process(extract_url, options)
+
+    info, incomplete = run()
     if not isinstance(info, dict):
         return {}
 
@@ -122,13 +202,9 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
     # data received" while still returning a partial document. Retry the whole
     # extraction once and union comments by id so a transient failure does not
     # silently truncate the accessible discussion.
-    if include_comments and logger.incomplete_data:
-        retry_logger = _YtdlpLogger()
-        retry_options = dict(options)
-        retry_options["logger"] = retry_logger
+    if include_comments and incomplete:
         try:
-            with yt_dlp.YoutubeDL(retry_options) as ydl:
-                retry_info = ydl.extract_info(extract_url, download=False)
+            retry_info, incomplete = run()
             if isinstance(retry_info, dict):
                 merged = []
                 seen = set()
@@ -142,10 +218,9 @@ def extract_video_info(url: str, *, timeout: int = 20, include_comments: bool = 
                     merged.append(item)
                 retry_info["comments"] = merged
                 info = retry_info
-                logger = retry_logger
         except Exception:
             LOG.debug("YouTube comment completeness retry failed", exc_info=True)
-        if logger.incomplete_data:
+        if incomplete:
             info["_blindrss_comments_incomplete"] = True
             LOG.warning(
                 "YouTube returned an incomplete public-comment continuation after retry; "
