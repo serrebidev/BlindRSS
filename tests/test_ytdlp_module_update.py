@@ -35,6 +35,49 @@ def _make_wheel(top_package, version=None, extra=None):
     return buf.getvalue()
 
 
+class TestNightlyChannel:
+    def test_nightly_pypi_and_binary_spellings_compare_equal(self):
+        assert dc._ytdlp_version_key("2026.10.10.233141.dev0") == dc._ytdlp_version_key(
+            "2026.10.10.233141"
+        )
+        assert dc._ytdlp_version_key("2026.10.10.233141") > dc._ytdlp_version_key("2026.08.19")
+
+    def test_pre_release_wheel_beats_stale_stable(self, monkeypatch):
+        def wheel(name):
+            return [{"packagetype": "bdist_wheel", "filename": name, "url": "https://x/" + name,
+                     "digests": {"sha256": "abc"}}]
+
+        payload = {
+            "info": {"version": "2026.8.19"},
+            "urls": wheel("yt_dlp-2026.8.19-py3-none-any.whl"),
+            "releases": {
+                "2026.8.19": wheel("yt_dlp-2026.8.19-py3-none-any.whl"),
+                "2026.10.10.233141.dev0": wheel("yt_dlp-2026.10.10.233141.dev0-py3-none-any.whl"),
+                "2026.10.11.1.dev0": [{"packagetype": "sdist", "filename": "x.tar.gz", "url": "u"}],
+            },
+        }
+
+        class _Resp:
+            def raise_for_status(self):
+                pass
+
+            def json(self):
+                return payload
+
+        from core import utils
+
+        monkeypatch.setattr(utils, "safe_requests_get", lambda *a, **k: _Resp())
+        version, url, _sha = dc._pypi_latest_wheel("yt-dlp", pre=True)
+        assert version == "2026.10.10.233141.dev0"
+        assert url.endswith("2026.10.10.233141.dev0-py3-none-any.whl")
+        assert dc._pypi_latest_wheel("yt-dlp")[0] == "2026.8.19"
+
+    def test_cli_updates_and_downloads_track_nightly(self):
+        assert "yt-dlp-nightly-builds" in dc.YTDLP_LATEST_EXE_URL
+        assert "yt-dlp-nightly-builds" in dc._YTDLP_LATEST_API_URL
+        assert dc.YTDLP_UPDATE_CHANNEL == "nightly"
+
+
 class TestVersionHelpers:
     def test_version_key_compares_date_versions(self):
         assert dc._ytdlp_version_key("2026.07.04") == (2026, 7, 4)
@@ -141,7 +184,7 @@ class TestEnsureYtdlpModuleUpdated:
         monkeypatch.setattr(
             dc,
             "_pypi_latest_wheel",
-            lambda name, timeout=15: (wheels[name][0], f"https://x/{name}.whl", ""),
+            lambda name, timeout=15, **k: (wheels[name][0], f"https://x/{name}.whl", ""),
         )
 
         def fake_download(url, dest):
@@ -159,7 +202,7 @@ class TestEnsureYtdlpModuleUpdated:
         with open(version_file, encoding="utf-8") as f:
             assert "2099.01.01" in f.read()
         assert os.path.isfile(os.path.join(frozen_env, "yt_dlp_ejs", "__init__.py"))
-        assert marked == ["ytdlp_module_update"]
+        assert marked == ["ytdlp_module_update_nightly"]
         # No staging leftovers.
         assert not os.path.exists(frozen_env + ".new")
 
@@ -173,7 +216,7 @@ class TestEnsureYtdlpModuleUpdated:
         monkeypatch.setattr(
             dc,
             "_pypi_latest_wheel",
-            lambda name, timeout=15: ("2026.07.04", "https://x/y.whl", ""),
+            lambda name, timeout=15, **k: ("2026.07.04", "https://x/y.whl", ""),
         )
 
         def fail_download(url, dest):
@@ -183,7 +226,7 @@ class TestEnsureYtdlpModuleUpdated:
 
         dc.ensure_ytdlp_module_updated()
 
-        assert marked == ["ytdlp_module_update"]
+        assert marked == ["ytdlp_module_update_nightly"]
         assert not os.path.exists(frozen_env)
 
     def test_failed_update_does_not_burn_the_throttle_window(
@@ -194,7 +237,7 @@ class TestEnsureYtdlpModuleUpdated:
         monkeypatch.setattr(dc, "_mark_update_checked", lambda name: marked.append(name))
         monkeypatch.setattr(dc, "_installed_dist_version", lambda _n: "2026.07.04")
         # PyPI unreachable -> no info -> no update, no marker.
-        monkeypatch.setattr(dc, "_pypi_latest_wheel", lambda name, timeout=15: None)
+        monkeypatch.setattr(dc, "_pypi_latest_wheel", lambda name, timeout=15, **k: None)
 
         dc.ensure_ytdlp_module_updated()
 

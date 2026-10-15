@@ -1269,8 +1269,15 @@ def _ytdlp_runtime_bin_dir():
     return os.path.join(base_dir, "bin")
 
 
-YTDLP_LATEST_EXE_URL = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-_YTDLP_LATEST_API_URL = "https://api.github.com/repos/yt-dlp/yt-dlp/releases/latest"
+# yt-dlp runs on the nightly channel everywhere (bundled CLI, runtime CLI
+# updates, embedded module). Stable releases trail YouTube's changes by weeks
+# (2026-10: stable 2026.08.19 vs nightly 2026.10.10); nightlies carry the
+# extractor fixes yt-dlp itself recommends for YouTube.
+YTDLP_UPDATE_CHANNEL = "nightly"
+YTDLP_LATEST_EXE_URL = (
+    "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp.exe"
+)
+_YTDLP_LATEST_API_URL = "https://api.github.com/repos/yt-dlp/yt-dlp-nightly-builds/releases/latest"
 
 
 def ytdlp_version(path, timeout=10):
@@ -1366,9 +1373,15 @@ _YTDLP_PKG_VERSION_RE = re.compile(r"__version__\s*=\s*['\"]([^'\"]+)['\"]")
 
 
 def _ytdlp_version_key(version):
-    """Comparable tuple for yt-dlp's date-like versions ("2026.07.04")."""
+    """Comparable tuple for yt-dlp's date-like versions ("2026.07.04").
+
+    Nightlies read "2026.10.10.233141" from the binary and version.py but
+    "2026.10.10.233141.dev0" on PyPI; the ".devN" suffix is dropped so both
+    spellings of one build compare equal.
+    """
     try:
-        return tuple(int(p) for p in re.findall(r"\d+", str(version or "")))
+        text = re.sub(r"\.?dev\d*$", "", str(version or "").strip())
+        return tuple(int(p) for p in re.findall(r"\d+", text))
     except Exception:
         return ()
 
@@ -1426,8 +1439,12 @@ def prefer_updated_ytdlp_module():
         return False
 
 
-def _pypi_latest_wheel(dist_name, timeout=15):
-    """(version, wheel URL, sha256) for the latest wheel on PyPI, or None."""
+def _pypi_latest_wheel(dist_name, timeout=15, *, pre=False):
+    """(version, wheel URL, sha256) for the latest wheel on PyPI, or None.
+
+    ``pre`` includes pre-releases: yt-dlp publishes its nightlies to PyPI as
+    ``.devN`` versions, which ``info.version`` (latest stable) never reports.
+    """
     try:
         from core import utils
 
@@ -1437,7 +1454,18 @@ def _pypi_latest_wheel(dist_name, timeout=15):
         resp.raise_for_status()
         data = resp.json() or {}
         version = str((data.get("info") or {}).get("version") or "").strip()
-        for f in data.get("urls") or []:
+        files = data.get("urls") or []
+        if pre:
+            def has_wheel(item):
+                return any(
+                    str(f.get("packagetype") or "") == "bdist_wheel" and not f.get("yanked")
+                    for f in (item[1] or [])
+                )
+
+            candidates = [item for item in (data.get("releases") or {}).items() if has_wheel(item)]
+            if candidates:
+                version, files = max(candidates, key=lambda item: _ytdlp_version_key(item[0]))
+        for f in files:
             if (
                 str(f.get("packagetype") or "") == "bdist_wheel"
                 and str(f.get("filename") or "").endswith(".whl")
@@ -1483,7 +1511,7 @@ def ensure_ytdlp_module_updated():
     """
     if not getattr(sys, "frozen", False):
         return
-    if not _should_check_updates("ytdlp_module_update", mark=False):
+    if not _should_check_updates("ytdlp_module_update_nightly", mark=False):
         return
     staging = ""
     try:
@@ -1496,12 +1524,12 @@ def ensure_ytdlp_module_updated():
             not active or _ytdlp_version_key(runtime) > _ytdlp_version_key(active)
         ):
             active = runtime
-        latest_info = _pypi_latest_wheel("yt-dlp")
+        latest_info = _pypi_latest_wheel("yt-dlp", pre=True)
         if not latest_info:
             return  # "don't know" is never "up to date"; retry next launch
         latest, _url, _sha = latest_info
         if active and _ytdlp_version_key(active) >= _ytdlp_version_key(latest):
-            _mark_update_checked("ytdlp_module_update")
+            _mark_update_checked("ytdlp_module_update_nightly")
             return
         _log(
             f"Updating embedded yt_dlp module (have {active or 'unknown'}, "
@@ -1553,7 +1581,7 @@ def ensure_ytdlp_module_updated():
                     f"Embedded yt_dlp module updated to {new_version}; "
                     "active next launch."
                 )
-                _mark_update_checked("ytdlp_module_update")
+                _mark_update_checked("ytdlp_module_update_nightly")
             except Exception as e:
                 _log(f"Could not install updated yt_dlp module: {e}")
     except Exception as e:
@@ -1566,7 +1594,7 @@ def ensure_ytdlp_module_updated():
 def _update_managed_ytdlp(local_exe, works):
     """Bring our own yt-dlp copy up to the newest release. True if now current.
 
-    ``yt-dlp -U`` is tried first (small patch download), but its exit code is not
+    ``yt-dlp --update-to nightly`` is tried first (small patch download), but its exit code is not
     trusted: a copy that cannot replace itself reports success in some cases and
     silently stays behind in others. The version is re-read afterwards and, if
     still not the newest, the full binary is fetched. YouTube breaks extraction
@@ -1580,15 +1608,15 @@ def _update_managed_ytdlp(local_exe, works):
         return True
 
     _log(f"Updating yt-dlp (have {before or 'unknown'}, latest {latest or 'unknown'})...")
-    _run_quiet([local_exe, "-U"], timeout=300)
+    _run_quiet([local_exe, "--update-to", YTDLP_UPDATE_CHANNEL], timeout=300)
 
     after = ytdlp_version(local_exe)
     if latest and after == latest:
         _log(f"yt-dlp updated to {after}.")
         return True
 
-    # -U did not get us there (read-only copy, blocked network, or it lied).
-    _log(f"yt-dlp -U left version {after or 'unknown'}; downloading the latest build.")
+    # --update-to did not get us there (read-only copy, blocked network, or it lied).
+    _log(f"yt-dlp --update-to left version {after or 'unknown'}; downloading the latest build.")
     if not download_latest_ytdlp(local_exe, works=works):
         return False
 
@@ -1626,7 +1654,7 @@ def _ensure_yt_dlp_cli():
     # Check for working yt-dlp
     exe = None
     # The copy we own and may overwrite. Anything else (a system/PATH install)
-    # only ever gets offered "-U".
+    # only ever gets offered "--update-to nightly".
     managed_exes = {local_exe}
 
     # 0. Bundled copy shipped with the app (sys._MEIPASS/bin/yt-dlp.exe).
@@ -1682,16 +1710,16 @@ def _ensure_yt_dlp_cli():
         # copy that fails to update retries on the next launch instead of
         # sitting stale for a day at a time (which is how it fell a month
         # behind and started failing YouTube extraction outright).
-        if _should_check_updates("ytdlp_cli_update", mark=False):
+        if _should_check_updates("ytdlp_cli_update_nightly", mark=False):
             if exe in managed_exes:
                 if _update_managed_ytdlp(exe, works):
-                    _mark_update_checked("ytdlp_cli_update")
+                    _mark_update_checked("ytdlp_cli_update_nightly")
             else:
-                # Someone else's yt-dlp (system/PATH install): offer -U but never
+                # Someone else's yt-dlp (system/PATH install): offer --update-to but never
                 # overwrite a binary we do not manage.
                 _log("Updating system yt-dlp CLI...")
-                if _run_quiet([exe, "-U"], timeout=300) == 0:
-                    _mark_update_checked("ytdlp_cli_update")
+                if _run_quiet([exe, "--update-to", YTDLP_UPDATE_CHANNEL], timeout=300) == 0:
+                    _mark_update_checked("ytdlp_cli_update_nightly")
         # When using our own managed copy, make sure its bin dir is searched first.
         if exe == local_exe:
             current = os.environ.get("PATH", "")
@@ -1703,8 +1731,7 @@ def _ensure_yt_dlp_cli():
     # Download if missing
     _log("No working yt-dlp CLI found. Downloading standalone...")
     try:
-        url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe"
-        if not _download_file(url, local_exe):
+        if not _download_file(YTDLP_LATEST_EXE_URL, local_exe):
             raise RuntimeError("yt-dlp download failed")
         _log(f"Downloaded yt-dlp to {local_exe}")
     except Exception as e:

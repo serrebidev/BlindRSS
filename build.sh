@@ -24,7 +24,7 @@ UNAME_M="$(uname -m)"
 case "$UNAME_S" in
   Darwin)
     PLATFORM_ID="macos"
-    YTDLP_URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos"
+    YTDLP_URL="https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_macos"
     case "$UNAME_M" in
       arm64|aarch64) DENO_ASSET="deno-aarch64-apple-darwin.zip" ;;
       x86_64) DENO_ASSET="deno-x86_64-apple-darwin.zip" ;;
@@ -38,11 +38,11 @@ case "$UNAME_S" in
     PLATFORM_ID="linux"
     case "$UNAME_M" in
       arm64|aarch64)
-        YTDLP_URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux_aarch64"
+        YTDLP_URL="https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_linux_aarch64"
         DENO_ASSET="deno-aarch64-unknown-linux-gnu.zip"
         ;;
       x86_64)
-        YTDLP_URL="https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
+        YTDLP_URL="https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_linux"
         DENO_ASSET="deno-x86_64-unknown-linux-gnu.zip"
         ;;
       *)
@@ -96,6 +96,12 @@ setup_venv() {
     "$VENV_PYTHON" -m pip install -r "$req_tmp"
     rm -f "$req_tmp"
   fi
+
+  # The embedded yt_dlp module is frozen into the bundle; ship the newest
+  # nightly (published to PyPI as a pre-release), never a stale stable.
+  echo "[BlindRSS Build] Upgrading the embedded yt-dlp module to the latest nightly..."
+  "$VENV_PYTHON" -m pip install --upgrade --pre "yt-dlp[default]"
+  "$VENV_PYTHON" -c "import yt_dlp; print('embedded yt_dlp:', yt_dlp.version.__version__)"
 }
 
 ensure_bin_dir() {
