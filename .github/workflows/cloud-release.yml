@@ -128,6 +128,9 @@ jobs:
             echo "::error::Release PR $pr_url did not merge; refusing to tag a commit that is not on main."
             exit 1
           fi
+          # Auto-merge does not reliably trigger delete-branch-on-merge for
+          # bot PRs; remove the spent release branch here.
+          git push origin --delete "$branch" || true
           git tag -a "$NEXT_TAG" -m "Release $NEXT_TAG" "$merge_sha"
           git push origin "refs/tags/$NEXT_TAG"
           gh release create "$NEXT_TAG" --draft --verify-tag --title "$NEXT_TAG" \
