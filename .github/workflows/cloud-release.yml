@@ -115,7 +115,10 @@ jobs:
           pr_url="$(gh pr create --base main --head "$branch" \
             --title "Release $NEXT_TAG" \
             --body "Automated release commit for $NEXT_TAG from the Cloud Release workflow (version bump and changelog).")"
-          gh pr merge "$pr_url" --auto --squash
+          # A PR with nothing to wait for can be "clean" instantly, and
+          # GitHub then refuses to enable auto-merge; fall back to a direct
+          # merge in that case.
+          gh pr merge "$pr_url" --auto --squash || gh pr merge "$pr_url" --squash
           merge_sha=""
           for i in $(seq 1 30); do
             if [ "$(gh pr view "$pr_url" --json state --jq .state)" = "MERGED" ]; then
