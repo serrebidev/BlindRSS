@@ -24,6 +24,7 @@ on:
 
 permissions:
   contents: write
+  pull-requests: write
 
 concurrency:
   group: blindrss-release
@@ -105,8 +106,30 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add core/version.py CHANGELOG.md
           git commit -m "Release $NEXT_TAG"
-          git tag -a "$NEXT_TAG" -m "Release $NEXT_TAG"
-          git push --atomic origin HEAD:main "refs/tags/$NEXT_TAG"
+          # Branch protection rejects direct bot pushes to main (GH006), so
+          # the release commit lands via a short-lived branch and an
+          # auto-merging PR; the tag is then created on the merged commit.
+          branch="release/$NEXT_TAG"
+          git branch "$branch"
+          git push origin "$branch"
+          pr_url="$(gh pr create --base main --head "$branch" \
+            --title "Release $NEXT_TAG" \
+            --body "Automated release commit for $NEXT_TAG from the Cloud Release workflow (version bump and changelog).")"
+          gh pr merge "$pr_url" --auto --squash
+          merge_sha=""
+          for i in $(seq 1 30); do
+            if [ "$(gh pr view "$pr_url" --json state --jq .state)" = "MERGED" ]; then
+              merge_sha="$(gh pr view "$pr_url" --json mergeCommit --jq .mergeCommit.oid)"
+              break
+            fi
+            sleep 10
+          done
+          if [ -z "$merge_sha" ]; then
+            echo "::error::Release PR $pr_url did not merge; refusing to tag a commit that is not on main."
+            exit 1
+          fi
+          git tag -a "$NEXT_TAG" -m "Release $NEXT_TAG" "$merge_sha"
+          git push origin "refs/tags/$NEXT_TAG"
           gh release create "$NEXT_TAG" --draft --verify-tag --title "$NEXT_TAG" \
             --notes-file "dist/release-notes-$NEXT_TAG.md"
 
