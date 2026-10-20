@@ -4,6 +4,13 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.3.9 - 2026-10-20
+
+- Stop silent data loss in config, restore, categories and hosted writes.
+- Fall back to a direct merge when the release PR is already clean.
+- Delete the spent release branch after its PR merges.
+- Land the release commit via an auto-merged PR instead of a direct push.
+
 ## v2.3.8 - 2026-10-15
 
 - Instant YouTube chapters and cancel stale yt-dlp work.
