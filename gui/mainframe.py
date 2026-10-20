@@ -8065,8 +8065,10 @@ class MainFrame(wx.Frame):
         try:
             new_state = self.provider.toggle_favorite(article.id)
         except Exception:
-            return
+            new_state = None
         if new_state is None:
+            # A rejected server write must not be silent for a screen-reader user.
+            self._announce_event("favorite_toggle", _("Could not update favorite."))
             return
 
         article.is_favorite = bool(new_state)

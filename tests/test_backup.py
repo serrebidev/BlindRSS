@@ -69,3 +69,37 @@ def test_auto_backup_keeps_newest(tmp_path):
 def test_auto_backup_due():
     assert backup.auto_backup_due(0, 100000)
     assert not backup.auto_backup_due(100000, 100000 + 3600)
+
+
+def test_rejected_database_is_never_applied_on_restart(tmp_path):
+    data, conn = _make_data(tmp_path)
+    conn.close()
+    zpath = tmp_path / "damaged.zip"
+    with zipfile.ZipFile(zpath, "w") as zf:
+        zf.writestr("rss.db", b"not a SQLite database")
+    with pytest.raises((backup.BackupError, sqlite3.DatabaseError)):
+        backup.stage_restore(str(zpath), str(data))
+    assert backup.apply_pending_restore(str(data)) is False
+    conn = sqlite3.connect(data / "rss.db")
+    try:
+        assert conn.execute("SELECT url FROM feeds").fetchall() == [("https://example.com/feed",)]
+    finally:
+        conn.close()
+
+
+@pytest.mark.parametrize("config", ["{broken", "[]", "null"])
+def test_restore_rejects_invalid_settings(tmp_path, config):
+    zpath = tmp_path / "bad-settings.zip"
+    with zipfile.ZipFile(zpath, "w") as zf:
+        zf.writestr("config.json", config)
+    with pytest.raises(backup.BackupError):
+        backup.stage_restore(str(zpath), str(tmp_path))
+    assert backup.apply_pending_restore(str(tmp_path)) is False
+
+
+def test_restore_keeps_not_a_backup_message(tmp_path):
+    zpath = tmp_path / "other.zip"
+    with zipfile.ZipFile(zpath, "w") as zf:
+        zf.writestr("readme.txt", "hello")
+    with pytest.raises(backup.BackupError, match="not a BlindRSS backup"):
+        backup.stage_restore(str(zpath), str(tmp_path))

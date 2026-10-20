@@ -70,6 +70,85 @@ def test_article_labels_roundtrip(provider):
     assert db.get_article_labels("a2") == []
 
 
+@pytest.mark.parametrize("operation,expected", [
+    ("rename", "Renamed / Child"),
+    ("move", "Destination / Source / Child"),
+    ("delete_parent", "Child"),
+    ("delete_leaf", "Uncategorized"),
+    ("delete_collision", "Uncategorized"),
+])
+def test_category_changes_preserve_article_membership(provider, operation, expected):
+    assert provider.add_category("Source")
+    assert provider.add_category("Child", parent_title="Source")
+    assert provider.add_category("Destination")
+    assert db.set_article_category_override("a1", "Source / Child")
+    assert db.add_article_label("a2", "Source / Child")
+    rule_id = db.create_filter_rule("File articles", {}, {"move": "Source / Child"})
+    assert db.set_feed_delete_behavior(FEED_ID, "category:Source / Child")
+    provider.config["delete_behavior"] = "category:Source / Child"
+    # A fallback may merge into a category the article already carries.
+    assert db.add_article_label("a2", "Uncategorized")
+    if operation == "rename":
+        assert provider.rename_category("Source", "Renamed")
+    elif operation == "move":
+        assert provider.move_category("Source", "Destination")
+    elif operation == "delete_leaf":
+        assert provider.delete_category("Source / Child")
+    else:
+        if operation == "delete_collision":
+            assert provider.add_category("Child")
+        assert provider.delete_category("Source")
+    assert {a.id for a in provider.get_articles(f"category:{expected}")} >= {"a1", "a2"}
+    assert "Source / Child" not in db.get_article_labels("a2")
+    assert db.get_filter_rule(rule_id)["actions"]["move"] == expected
+    assert db.get_feed_delete_behavior(FEED_ID) == f"category:{expected}"
+    assert provider.config.get("delete_behavior") == f"category:{expected}"
+
+
+def test_category_rename_keeps_rule_and_delete_targets(provider):
+    assert provider.add_category("Source")
+    assert provider.add_category("Child", parent_title="Source")
+    rule_id = db.create_filter_rule("File articles", {}, {"move": "Source / Child", "label": "Source"})
+    assert db.set_feed_delete_behavior(FEED_ID, "category:Source / Child")
+    provider.config["delete_behavior"] = "category:Source"
+    assert provider.rename_category("Source", "Renamed")
+    assert db.get_filter_rule(rule_id)["actions"] == {"move": "Renamed / Child", "label": "Renamed"}
+    assert db.get_feed_delete_behavior(FEED_ID) == "category:Renamed / Child"
+    assert provider.config.get("delete_behavior") == "category:Renamed"
+
+
+def test_category_rename_saves_global_delete_target(provider, tmp_path, monkeypatch):
+    from core import config
+
+    monkeypatch.setattr(config, "CONFIG_FILE", str(tmp_path / "config.json"))
+    manager = config.ConfigManager()
+    manager.set("delete_behavior", "category:Source")
+    provider.config = manager
+    assert provider.add_category("Source")
+    assert provider.rename_category("Source", "Renamed")
+    assert config.ConfigManager().get("delete_behavior") == "category:Renamed"
+
+
+def test_delete_parent_with_same_named_child_keeps_child_assignments(provider):
+    assert provider.add_category("Source")
+    assert provider.add_category("Source", parent_title="Source")
+    conn = db.get_connection()
+    try:
+        conn.execute("UPDATE feeds SET category = 'Source' WHERE id = ?", (FEED_ID,))
+        conn.execute("UPDATE feeds SET category = 'Source / Source' WHERE id = ?", (FEED2_ID,))
+        conn.commit()
+    finally:
+        conn.close()
+    assert db.set_article_category_override("a1", "Source / Source")
+    assert db.add_article_label("a2", "Source / Source")
+    assert provider.delete_category("Source")
+    assert {a.id for a in provider.get_articles("category:Source")} == {"a1", "a2"}
+    assert {a.id for a in provider.get_articles("category:Uncategorized")} == {"a2", "a3"}
+    categories = {feed.id: feed.category for feed in provider.get_feeds()}
+    assert categories[FEED_ID] == "Uncategorized"
+    assert categories[FEED2_ID] == "Source"
+
+
 def test_category_override_moves_article_between_category_views(provider):
     # a1 lives in Feed A (category "News"). Move it to "Tech".
     assert db.set_article_category_override("a1", "Tech") is True

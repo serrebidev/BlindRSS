@@ -961,8 +961,7 @@ class InoreaderProvider(HostedPodcastArchiveMixin, RSSProvider):
                     cats = items[0].get("categories", [])
                     is_fav = any("starred" in c for c in cats)
                     new_state = not is_fav
-                    self.set_favorite(article_id, new_state)
-                    return new_state
+                    return new_state if self.set_favorite(article_id, new_state) else None
         except:
             pass
         return None

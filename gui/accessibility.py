@@ -742,8 +742,12 @@ class AccessibleBrowserFrame(wx.Frame):
             new_state = self.mainframe.provider.toggle_favorite(article.id)
         except Exception:
             log.exception("Toggle favorite failed")
-            return
+            new_state = None
         if new_state is None:
+            try:
+                self.mainframe._announce_event("favorite_toggle", _("Could not update favorite."))
+            except Exception:
+                pass
             return
         article.is_favorite = bool(new_state)
         try:

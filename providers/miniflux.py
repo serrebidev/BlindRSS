@@ -2597,19 +2597,15 @@ class MinifluxProvider(RSSProvider):
         return True
 
     def toggle_favorite(self, article_id: str):
-        # Miniflux: PUT /v1/entries/{id}/bookmark
-        res = self._req("PUT", f"/v1/entries/{article_id}/bookmark")
-        # Returns None on success (204) usually? Or updated entry?
-        # Actually Miniflux toggle endpoint "bookmark" toggles it.
-        # But wait, does it toggle or just set?
-        # API docs: "Toggle "bookmark" status for an entry." -> PUT /v1/entries/{entryID}/bookmark
-        if res is None: # 204 or success
-             # We need to know the new state to return it.
-             # Fetch entry to check?
-             entry = self._req("GET", f"/v1/entries/{article_id}")
-             if entry:
-                 return entry.get("starred", False)
-        return True # Assume toggled if we can't check? Or maybe we should use set_favorite if we want explicit control.
+        # Miniflux: PUT /v1/entries/{id}/bookmark toggles and answers 204, which
+        # _req also returns as None on failure -- check the request outcome.
+        self._req("PUT", f"/v1/entries/{article_id}/bookmark")
+        if not (self._last_request_info or {}).get("ok"):
+            return None
+        entry = self._req("GET", f"/v1/entries/{article_id}")
+        if entry:
+            return bool(entry.get("starred", False))
+        return None
 
     def set_favorite(self, article_id: str, is_favorite: bool) -> bool:
         # Miniflux doesn't have explicit set-favorite, only toggle.
@@ -2620,6 +2616,7 @@ class MinifluxProvider(RSSProvider):
         current = entry.get("starred", False)
         if current != is_favorite:
             self._req("PUT", f"/v1/entries/{article_id}/bookmark")
+            return bool((self._last_request_info or {}).get("ok"))
         return True
 
     def add_feed(self, url: str, category: str = UNCATEGORIZED) -> bool:
@@ -2736,8 +2733,9 @@ class MinifluxProvider(RSSProvider):
         return False
 
     def remove_feed(self, feed_id: str) -> bool:
+        # DELETE answers 204 (None from _req) on success and failure alike.
         self._req("DELETE", f"/v1/feeds/{feed_id}")
-        return True
+        return bool((self._last_request_info or {}).get("ok"))
 
     def supports_feed_edit(self) -> bool:
         return True

@@ -164,6 +164,25 @@ def test_smart_query_unread(provider):
     assert _ids(provider, {"match": "all", "conditions": [{"field": "read", "op": "is", "value": False}]}) == ["a1", "a3"]
 
 
+@pytest.mark.parametrize("op,value,want", [
+    ("equals", "", ["a1"]),
+    ("starts_with", "", ["a1", "a2", "a3"]),
+    ("contains", "", ["a1", "a2", "a3"]),
+    ("not_contains", "", []),
+    ("not_contains", "z", ["a1", "a2", "a3"]),
+])
+def test_smart_query_missing_text_matches_python(provider, op, value, want):
+    conn = db.get_connection()
+    try:
+        conn.execute("UPDATE articles SET author = NULL WHERE id = 'a1'")
+        conn.commit()
+    finally:
+        conn.close()
+    rule = {"match": "all", "conditions": [{"field": "author", "op": op, "value": value}]}
+    assert rule_matches(rule, _art(author=None)) == ("a1" in want)
+    assert _ids(provider, rule) == want
+
+
 def test_smart_query_or_author_or_favorite(provider):
     rule = {"match": "any", "conditions": [
         {"field": "author", "op": "equals", "value": "bob"},

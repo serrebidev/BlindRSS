@@ -7,6 +7,7 @@ import json
 import os
 import shutil
 import sys
+import time
 import logging
 from functools import lru_cache
 from core.i18n import _
@@ -655,6 +656,12 @@ class ConfigManager:
                         return self._apply_defaults(loaded)
             except Exception as e:
                 log.error(f"Error loading config: {e}")
+                # The next save would overwrite the unreadable file with
+                # defaults (provider keys included); keep a copy to recover.
+                try:
+                    shutil.copy2(self.config_path, f"{self.config_path}.corrupt-{int(time.time())}")
+                except Exception:
+                    log.exception("Could not keep a copy of the unreadable config")
                 return copy.deepcopy(DEFAULT_CONFIG)
         return copy.deepcopy(DEFAULT_CONFIG)
 
@@ -782,9 +789,25 @@ class ConfigManager:
     def save_config(self):
         try:
             with self._lock:
+                # Serialize fully before touching the file: json.dump streamed
+                # into an already-truncated config.json, so a worker thread
+                # mutating the dict mid-dump ("dictionary changed size") or a
+                # crash left a half-written file that the next load reset to
+                # defaults. Retry the snapshot if another thread races it.
+                for attempt in range(3):
+                    try:
+                        data = json.dumps(self.config, indent=4)
+                        break
+                    except RuntimeError:
+                        if attempt == 2:
+                            raise
                 _ensure_parent_dir(self.config_path)
-                with open(self.config_path, 'w', encoding='utf-8') as f:
-                    json.dump(self.config, f, indent=4)
+                temp_path = f"{self.config_path}.tmp"
+                with open(temp_path, 'w', encoding='utf-8') as f:
+                    f.write(data)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(temp_path, self.config_path)
         except Exception as e:
             log.error(f"Error saving config: {e}")
 

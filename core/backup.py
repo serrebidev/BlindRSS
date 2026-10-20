@@ -17,6 +17,7 @@ files into place at the next start, before the database is opened.
 from __future__ import annotations
 
 import datetime
+import json
 import os
 import shutil
 import sqlite3
@@ -47,6 +48,7 @@ class BackupError(ValueError):
 def create_backup(dest_zip: str, data_dir: str, config_path: str, db_path: str) -> None:
     """Write a backup ZIP to ``dest_zip`` (atomically: no half-written file)."""
     tmp_dir = tempfile.mkdtemp(prefix="blindrss-backup-")
+    partial = dest_zip + ".partial"
     try:
         snapshot = os.path.join(tmp_dir, DB_NAME)
         if os.path.exists(db_path):
@@ -57,7 +59,6 @@ def create_backup(dest_zip: str, data_dir: str, config_path: str, db_path: str) 
             finally:
                 dst.close()
                 src.close()
-        partial = dest_zip + ".partial"
         with zipfile.ZipFile(partial, "w", zipfile.ZIP_DEFLATED) as zf:
             if os.path.exists(config_path):
                 zf.write(config_path, CONFIG_NAME)
@@ -70,6 +71,8 @@ def create_backup(dest_zip: str, data_dir: str, config_path: str, db_path: str) 
         os.replace(partial, dest_zip)
     finally:
         shutil.rmtree(tmp_dir, ignore_errors=True)
+        if os.path.exists(partial):  # failed write: no stray half-ZIP
+            os.remove(partial)
 
 
 def _validate(zf: zipfile.ZipFile) -> list[str]:
@@ -82,29 +85,37 @@ def _validate(zf: zipfile.ZipFile) -> list[str]:
 def stage_restore(backup_zip: str, data_dir: str) -> None:
     """Unpack a backup into ``restore_pending/`` for the next start to apply."""
     pending = os.path.join(data_dir, PENDING_DIR)
-    shutil.rmtree(pending, ignore_errors=True)
+    staging = tempfile.mkdtemp(prefix="restore-", dir=data_dir)
     try:
         with zipfile.ZipFile(backup_zip) as zf:
             names = _validate(zf)
-            os.makedirs(pending)
             for name in names:  # only known flat names: no path traversal
-                with zf.open(name) as src, open(os.path.join(pending, name), "wb") as dst:
+                with zf.open(name) as src, open(os.path.join(staging, name), "wb") as dst:
                     shutil.copyfileobj(src, dst)
+        config = os.path.join(staging, CONFIG_NAME)
+        if os.path.exists(config):
+            with open(config, encoding="utf-8") as src:
+                if not isinstance(json.load(src), dict):
+                    raise BackupError("The settings in this backup are damaged.")
+        db = os.path.join(staging, DB_NAME)
+        if os.path.exists(db):
+            conn = sqlite3.connect(db)
+            try:
+                ok = conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
+            finally:
+                conn.close()
+            if not ok:
+                raise BackupError("The database in this backup is damaged.")
+        shutil.rmtree(pending, ignore_errors=True)
+        os.replace(staging, pending)
     except zipfile.BadZipFile as exc:
         raise BackupError("This file is not a BlindRSS backup.") from exc
-    except Exception:
-        shutil.rmtree(pending, ignore_errors=True)
-        raise
-    db = os.path.join(pending, DB_NAME)
-    if os.path.exists(db):
-        conn = sqlite3.connect(db)
-        try:
-            ok = conn.execute("PRAGMA integrity_check").fetchone()[0] == "ok"
-        finally:
-            conn.close()
-        if not ok:
-            shutil.rmtree(pending, ignore_errors=True)
-            raise BackupError("The database in this backup is damaged.")
+    except BackupError:
+        raise  # a ValueError too; keep its specific message
+    except (ValueError, UnicodeError, sqlite3.DatabaseError) as exc:
+        raise BackupError("The settings or database in this backup are damaged.") from exc
+    finally:
+        shutil.rmtree(staging, ignore_errors=True)
 
 
 def apply_pending_restore(data_dir: str) -> bool:

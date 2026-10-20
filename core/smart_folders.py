@@ -89,7 +89,7 @@ def _compile_leaf(cond):
         return f"{col} = ?", [1 if want else 0]
 
     if field in _TEXT_COLS:
-        col = _TEXT_COLS[field]
+        col = f"COALESCE({_TEXT_COLS[field]}, '')"
         low = str(value or "").lower()
         # py_lower (registered in db.get_connection) is Unicode-aware; SQLite's
         # built-in LOWER() only folds ASCII, which would diverge from the

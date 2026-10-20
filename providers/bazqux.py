@@ -543,11 +543,11 @@ class BazQuxProvider(HostedPodcastArchiveMixin, RSSProvider):
     def mark_read(self, article_id: str) -> bool:
         if not self._login(): return False
         try:
-            self.session.post(f"{self.base_url}/edit-tag", headers=self._headers(), data={
+            resp = self.session.post(f"{self.base_url}/edit-tag", headers=self._headers(), data={
                 "i": article_id,
                 "a": "user/-/state/com.google/read"
             }, timeout=self._timeout_s())
-            return True
+            return resp.ok
         except Exception as e:
             log.error(f"BazQux Mark Read Error: {e}")
             return False
@@ -555,11 +555,11 @@ class BazQuxProvider(HostedPodcastArchiveMixin, RSSProvider):
     def mark_unread(self, article_id: str) -> bool:
         if not self._login(): return False
         try:
-            self.session.post(f"{self.base_url}/edit-tag", headers=self._headers(), data={
+            resp = self.session.post(f"{self.base_url}/edit-tag", headers=self._headers(), data={
                 "i": article_id,
                 "r": "user/-/state/com.google/read"
             }, timeout=self._timeout_s())
-            return True
+            return resp.ok
         except Exception as e:
             log.error(f"BazQux Mark Unread Error: {e}")
             return False
@@ -605,11 +605,11 @@ class BazQuxProvider(HostedPodcastArchiveMixin, RSSProvider):
         if not self._login(): return False
         try:
             action = "a" if is_favorite else "r"
-            self.session.post(f"{self.base_url}/edit-tag", headers=self._headers(), data={
+            resp = self.session.post(f"{self.base_url}/edit-tag", headers=self._headers(), data={
                 "i": article_id,
                 action: "user/-/state/com.google/starred"
             }, timeout=self._timeout_s())
-            return True
+            return resp.ok
         except Exception as e:
             log.error(f"BazQux Set Favorite Error: {e}")
             return False
@@ -628,8 +628,7 @@ class BazQuxProvider(HostedPodcastArchiveMixin, RSSProvider):
                     cats = items[0].get("categories", [])
                     is_fav = any("starred" in c for c in cats)
                     new_state = not is_fav
-                    self.set_favorite(article_id, new_state)
-                    return new_state
+                    return new_state if self.set_favorite(article_id, new_state) else None
         except:
             pass
         return None
@@ -661,11 +660,11 @@ class BazQuxProvider(HostedPodcastArchiveMixin, RSSProvider):
     def remove_feed(self, feed_id: str) -> bool:
         if not self._login(): return False
         try:
-            self.session.post(f"{self.base_url}/subscription/edit", headers=self._headers(), data={
+            resp = self.session.post(f"{self.base_url}/subscription/edit", headers=self._headers(), data={
                 "s": feed_id,
                 "ac": "unsubscribe"
             }, timeout=self._timeout_s())
-            return True
+            return resp.ok
         except Exception as e:
             log.error(f"BazQux Remove Feed Error: {e}")
             return False
@@ -762,10 +761,10 @@ class BazQuxProvider(HostedPodcastArchiveMixin, RSSProvider):
         if not self._login(): return False
         try:
             tag = f"user/-/label/{title}"
-            self.session.post(f"{self.base_url}/disable-tag", headers=self._headers(), data={
+            resp = self.session.post(f"{self.base_url}/disable-tag", headers=self._headers(), data={
                 "s": tag
             }, timeout=self._timeout_s())
-            return True
+            return resp.ok
         except Exception as e:
             log.error(f"BazQux Delete Category Error: {e}")
             return False

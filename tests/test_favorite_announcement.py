@@ -114,13 +114,15 @@ def test_removal_announces_before_the_row_disappears():
     assert host.current_articles == []  # row really was removed
 
 
-def test_no_announcement_when_the_provider_refuses():
-    """A failed toggle must stay silent rather than claim a state change."""
-    host = _Host(new_state=None)
+def test_failure_is_announced_when_the_provider_refuses():
+    """A failed toggle must not claim a state change, but silence is
+    indistinguishable from success for a screen-reader user (issue #70)."""
+    host = _Host(new_state=None, article=_Article(is_favorite=False))
 
     host.on_toggle_favorite()
 
-    assert host.announced == []
+    assert host.announced == [("favorite_toggle", "Could not update favorite.")]
+    assert host.current_articles[0].is_favorite is False
 
 
 def test_no_announcement_without_favorites_support():

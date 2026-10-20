@@ -540,22 +540,22 @@ class TheOldReaderProvider(HostedPodcastArchiveMixin, RSSProvider):
     def mark_read(self, article_id: str) -> bool:
         if not self._login(): return False
         try:
-            requests.post(f"{self.base_url}/edit-tag", headers=self._headers(), data={
+            resp = requests.post(f"{self.base_url}/edit-tag", headers=self._headers(), data={
                 "i": article_id,
                 "a": "user/-/state/com.google/read"
             }, timeout=self._timeout_s())
-            return True
+            return resp.ok
         except:
             return False
 
     def mark_unread(self, article_id: str) -> bool:
         if not self._login(): return False
         try:
-            requests.post(f"{self.base_url}/edit-tag", headers=self._headers(), data={
+            resp = requests.post(f"{self.base_url}/edit-tag", headers=self._headers(), data={
                 "i": article_id,
                 "r": "user/-/state/com.google/read"
             }, timeout=self._timeout_s())
-            return True
+            return resp.ok
         except:
             return False
 
@@ -600,11 +600,11 @@ class TheOldReaderProvider(HostedPodcastArchiveMixin, RSSProvider):
         if not self._login(): return False
         try:
             action = "a" if is_favorite else "r"
-            requests.post(f"{self.base_url}/edit-tag", headers=self._headers(), data={
+            resp = requests.post(f"{self.base_url}/edit-tag", headers=self._headers(), data={
                 "i": article_id,
                 action: "user/-/state/com.google/starred"
             }, timeout=self._timeout_s())
-            return True
+            return resp.ok
         except Exception as e:
             log.error(f"TheOldReader Set Favorite Error: {e}")
             return False
@@ -625,8 +625,7 @@ class TheOldReaderProvider(HostedPodcastArchiveMixin, RSSProvider):
                     cats = items[0].get("categories", [])
                     is_fav = any("starred" in c for c in cats)
                     new_state = not is_fav
-                    self.set_favorite(article_id, new_state)
-                    return new_state
+                    return new_state if self.set_favorite(article_id, new_state) else None
         except:
             pass
         return None
@@ -636,23 +635,23 @@ class TheOldReaderProvider(HostedPodcastArchiveMixin, RSSProvider):
         from core.discovery import get_ytdlp_feed_url, discover_feed
         real_url = get_ytdlp_feed_url(url) or discover_feed(url) or url
         try:
-            requests.post(f"{self.base_url}/subscription/edit", headers=self._headers(), data={
+            resp = requests.post(f"{self.base_url}/subscription/edit", headers=self._headers(), data={
                 "s": f"feed/{real_url}",
                 "ac": "subscribe",
                 "t": category or ""
             }, timeout=self._timeout_s())
-            return True
+            return resp.ok
         except:
             return False
 
     def remove_feed(self, feed_id: str) -> bool:
         if not self._login(): return False
         try:
-            requests.post(f"{self.base_url}/subscription/edit", headers=self._headers(), data={
+            resp = requests.post(f"{self.base_url}/subscription/edit", headers=self._headers(), data={
                 "s": feed_id,
                 "ac": "unsubscribe"
             }, timeout=self._timeout_s())
-            return True
+            return resp.ok
         except:
             return False
 
@@ -741,10 +740,10 @@ class TheOldReaderProvider(HostedPodcastArchiveMixin, RSSProvider):
         if not self._login(): return False
         try:
             tag = f"user/-/label/{title}"
-            requests.post(f"{self.base_url}/disable-tag", headers=self._headers(), data={
+            resp = requests.post(f"{self.base_url}/disable-tag", headers=self._headers(), data={
                 "s": tag
             }, timeout=self._timeout_s())
-            return True
+            return resp.ok
         except Exception as e:
             log.exception(f"TheOldReader Delete Category Error: {e}")
             return False

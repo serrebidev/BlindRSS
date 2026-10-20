@@ -29,6 +29,7 @@ from core.db import (
     get_feed_errors,
     deleted_article_tombstones_for_feed,
     remember_deleted_article,
+    rewrite_category_references,
     list_deleted_articles,
     restore_deleted_article,
     purge_deleted_article,
@@ -5822,6 +5823,15 @@ class LocalProvider(RSSProvider):
         finally:
             conn.close()
 
+    def _update_category_delete_behavior(self, mapping):
+        kind, category = filters_mod.parse_delete_behavior(self.config.get("delete_behavior"))
+        if kind == "category" and category in mapping:
+            behavior = f"category:{mapping[category]}"
+            if isinstance(self.config, dict):
+                self.config["delete_behavior"] = behavior
+            else:
+                self.config.set("delete_behavior", behavior)
+
     def rename_category(self, old_title: str, new_title: str) -> bool:
         # `old_title` is the existing full path; `new_title` is the new leaf.
         # Renaming a node changes its path, so its descendants' paths and every
@@ -5856,11 +5866,13 @@ class LocalProvider(RSSProvider):
             c.execute("SELECT title FROM categories")
             affected = [r[0] for r in c.fetchall()
                         if r[0] == old_path or r[0].startswith(prefix)]
-            for old_p in affected:
-                new_p = new_path + old_p[len(old_path):]
+            mapping = {old_p: new_path + old_p[len(old_path):] for old_p in affected}
+            for old_p, new_p in mapping.items():
                 c.execute("UPDATE categories SET title = ? WHERE title = ?", (new_p, old_p))
                 c.execute("UPDATE feeds SET category = ? WHERE category = ?", (new_p, old_p))
+                rewrite_category_references(c, old_p, new_p)
             conn.commit()
+            self._update_category_delete_behavior(mapping)
             return True
         except Exception as e:
             conn.rollback()
@@ -5917,14 +5929,16 @@ class LocalProvider(RSSProvider):
             c.execute("SELECT title FROM categories")
             affected = [r[0] for r in c.fetchall()
                         if r[0] == old_path or r[0].startswith(prefix)]
-            for old_p in affected:
-                new_p = new_path + old_p[len(old_path):]
+            mapping = {old_p: new_path + old_p[len(old_path):] for old_p in affected}
+            for old_p, new_p in mapping.items():
                 c.execute("UPDATE categories SET title = ? WHERE title = ?", (new_p, old_p))
                 c.execute("UPDATE feeds SET category = ? WHERE category = ?", (new_p, old_p))
+                rewrite_category_references(c, old_p, new_p)
             # Only the moved node changes parent; its descendants keep pointing
             # at their own parents by id, so their links survive the rewrite.
             c.execute("UPDATE categories SET parent_id = ? WHERE id = ?", (new_parent_id, cat_id))
             conn.commit()
+            self._update_category_delete_behavior(mapping)
             return True
         except Exception as e:
             conn.rollback()
@@ -5978,19 +5992,25 @@ class LocalProvider(RSSProvider):
                 # Safe fallback: drop the whole subtree, feeds go to Uncategorized.
                 for sp in [path] + descendants:
                     c.execute("UPDATE feeds SET category = ? WHERE category = ?", (UNCATEGORIZED, sp))
+                    rewrite_category_references(c, sp, UNCATEGORIZED)
                     c.execute("DELETE FROM categories WHERE title = ?", (sp,))
                 conn.commit()
+                self._update_category_delete_behavior(dict.fromkeys([path] + descendants, UNCATEGORIZED))
                 return True
 
             # Reparent direct children (parent_id is by id, so deeper links hold).
             c.execute("UPDATE categories SET parent_id = ? WHERE parent_id = ?", (cat_parent_id, cat_id))
-            for old_p, new_p in mapping:
-                c.execute("UPDATE categories SET title = ? WHERE title = ?", (new_p, old_p))
-                c.execute("UPDATE feeds SET category = ? WHERE category = ?", (new_p, old_p))
             # Feeds directly in the deleted category fall back to Uncategorized.
             c.execute("UPDATE feeds SET category = ? WHERE category = ?", (UNCATEGORIZED, path))
+            rewrite_category_references(c, path, UNCATEGORIZED)
+            # Free the old path before a same-named child inherits it.
             c.execute("DELETE FROM categories WHERE id = ?", (cat_id,))
+            for old_p, new_p in sorted(mapping, key=lambda pair: len(pair[0])):
+                c.execute("UPDATE categories SET title = ? WHERE title = ?", (new_p, old_p))
+                c.execute("UPDATE feeds SET category = ? WHERE category = ?", (new_p, old_p))
+                rewrite_category_references(c, old_p, new_p)
             conn.commit()
+            self._update_category_delete_behavior(dict(mapping) | {path: UNCATEGORIZED})
             return True
         except Exception as e:
             try:

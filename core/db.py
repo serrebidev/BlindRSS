@@ -1927,6 +1927,36 @@ def reorder_filter_rules(ordered_ids, cursor=None) -> bool:
 
 # ── Article category assignment (move) and labels (also-show) ────────────────
 
+def rewrite_category_references(cursor, old_category, new_category):
+    """Keep article assignments and rule targets attached to category paths."""
+    cursor.execute(
+        "UPDATE articles SET category_override = ? WHERE category_override = ?",
+        (new_category, old_category),
+    )
+    cursor.execute(
+        "INSERT OR IGNORE INTO article_labels (article_id, category) "
+        "SELECT article_id, ? FROM article_labels WHERE category = ?",
+        (new_category, old_category),
+    )
+    cursor.execute("DELETE FROM article_labels WHERE category = ?", (old_category,))
+    cursor.execute(
+        "UPDATE feeds SET delete_behavior = ? WHERE delete_behavior = ?",
+        (f"category:{new_category}", f"category:{old_category}"),
+    )
+    for rule_id, raw in cursor.execute("SELECT id, actions_json FROM filter_rules").fetchall():
+        actions = _parse_actions_json(raw)
+        changed = False
+        for key in ("move", "label"):
+            if actions.get(key) == old_category:
+                actions[key] = new_category
+                changed = True
+        if changed:
+            cursor.execute(
+                "UPDATE filter_rules SET actions_json = ? WHERE id = ?",
+                (json.dumps(actions), rule_id),
+            )
+
+
 def set_article_category_override(article_id, category, cursor=None) -> bool:
     """MOVE an article to `category` (full path string), or clear with None."""
     aid = str(article_id or "").strip()
