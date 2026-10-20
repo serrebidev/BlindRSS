@@ -680,9 +680,12 @@ class MainFrame(wx.Frame):
         # mid-read (issue: status bar shows nothing while work is happening).
         # Field 2 is dedicated to live playback status (now-playing title plus
         # elapsed/remaining time) so it never fights the refresh/filter fields.
-        self.CreateStatusBar(3, style=STATUS_BAR_STYLE)
-        self.SetStatusWidths([-2, -1, -1])
+        # Field 3 shows the reading position ("Line 3 of 64") only while the
+        # article reader has focus.
+        self.CreateStatusBar(4, style=STATUS_BAR_STYLE)
+        self.SetStatusWidths([-2, -1, -1, -1])
         self._playback_status_field = 2
+        self._reading_status_field = 3
         # Main Splitter: Tree vs Content Area
         splitter = wx.SplitterWindow(self)
         
@@ -5991,11 +5994,48 @@ class MainFrame(wx.Frame):
         )
         ctrl.SetName(_("Article text"))
         ctrl.Bind(wx.EVT_SET_FOCUS, self.on_content_focus)
+        ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_content_kill_focus)
         ctrl.Bind(wx.EVT_TEXT_COPY, self.on_content_copy)
         ctrl.Bind(wx.EVT_CONTEXT_MENU, self.on_content_context_menu)
         ctrl.Bind(wx.EVT_KEY_DOWN, self.on_content_key_down)
+        ctrl.Bind(wx.EVT_KEY_UP, self._on_content_caret_moved)
+        ctrl.Bind(wx.EVT_LEFT_UP, self._on_content_caret_moved)
         ctrl.Bind(wx.EVT_RIGHT_UP, self.on_content_right_up)
         return ctrl
+
+    def _set_reading_status(self, text: str) -> None:
+        try:
+            self.SetStatusText(text or "", int(getattr(self, "_reading_status_field", 3)))
+        except Exception:
+            log.debug("Failed to set reading position status", exc_info=True)
+
+    def _update_reading_position(self, ctrl=None) -> None:
+        """Show "Line N of M" for the focused classic reader on the status bar.
+
+        Lines are the control's display lines, the same lines Up/Down moves
+        through. RichEdit lays a large article out once on the first query
+        (about 30 ms for 2 MB), after which each update is a fraction of a ms.
+        """
+        ctrl = ctrl or self.content_ctrl
+        try:
+            if wx.Window.FindFocus() is not ctrl:
+                return
+            ok, _col, line = ctrl.PositionToXY(ctrl.GetInsertionPoint())
+            total = ctrl.GetNumberOfLines()
+        except Exception:
+            return
+        if ok and total > 0:
+            self._set_reading_status(
+                _("Line {line} of {total}").format(line=min(line + 1, total), total=total)
+            )
+
+    def _on_content_caret_moved(self, event):
+        event.Skip()
+        self._update_reading_position(event.GetEventObject())
+
+    def _on_content_kill_focus(self, event):
+        event.Skip()
+        self._set_reading_status("")
 
     def _swap_focused_large_reader(self, displayed: str, reset_insertion: bool) -> bool:
         """Expose a fully populated RichEdit to NVDA in one focus transition."""
@@ -6293,6 +6333,22 @@ class MainFrame(wx.Frame):
       }
     }
   }, true);
+  // Reading position for the status bar. The page has no caret a screen
+  // reader moves, but NVDA scrolls its browse-mode cursor into view, so the
+  // scroll position follows reading.
+  var lastPct = null;
+  function readingPos(){
+    if(!document.hasFocus()) return;
+    var d = document.scrollingElement || document.documentElement;
+    var range = d.scrollHeight - d.clientHeight;
+    var pct = range > 0 ? Math.round(100 * d.scrollTop / range) : -1;
+    if(pct === lastPct) return;
+    lastPct = pct;
+    try{ if(window.awv&&window.awv.postMessage){ window.awv.postMessage(JSON.stringify({type:'__reading_pos', percent:pct})); } }catch(e){}
+  }
+  window.addEventListener('scroll', readingPos, true);
+  window.addEventListener('focus', function(){ lastPct = null; readingPos(); });
+  window.addEventListener('blur', function(){ lastPct = null; post('__reader_blur'); });
 })();
 """
 
@@ -6334,6 +6390,17 @@ class MainFrame(wx.Frame):
                 self.list_ctrl.SetFocus()
             except Exception:
                 pass
+        elif kind == "__reading_pos":
+            try:
+                percent = int(data.get("percent"))
+            except Exception:
+                percent = -1
+            # -1: the article fits without scrolling, so there is no position.
+            self._set_reading_status(
+                _("{percent}% read").format(percent=percent) if 0 <= percent <= 100 else ""
+            )
+        elif kind == "__reader_blur":
+            self._set_reading_status("")
 
     def _open_menu_bar_from_rich_view(self) -> None:
         """Open the native menu bar from the focused WebView (ALT/F10).
@@ -10882,6 +10949,10 @@ class MainFrame(wx.Frame):
         """When the content field receives focus, force an immediate full-text load for the selected article."""
         try:
             event.Skip()
+        except Exception:
+            pass
+        try:
+            wx.CallAfter(self._update_reading_position, event.GetEventObject())
         except Exception:
             pass
 

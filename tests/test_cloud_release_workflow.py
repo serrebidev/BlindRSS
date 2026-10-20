@@ -36,7 +36,11 @@ def test_cloud_release_pushes_and_publishes_only_for_real_runs():
     prepare = {s["name"]: s for s in wf["jobs"]["prepare"]["steps"]}
     tag_step = prepare["Commit, tag and create draft release"]
     assert tag_step["if"] == "${{ !inputs.dry_run }}"
-    assert "--draft" in tag_step["run"] and "git push --atomic" in tag_step["run"]
+    run = tag_step["run"]
+    # Main is protected: the release commit lands through a merged PR and the
+    # tag goes on that merge commit, never on an unmerged branch head.
+    assert "--draft" in run and "gh pr merge" in run
+    assert '"$merge_sha"' in run and 'git push origin "refs/tags/$NEXT_TAG"' in run
     build = wf["jobs"]["build"]["with"]
     assert build["publish_assets"] == "${{ !inputs.dry_run }}"
     publish = wf["jobs"]["publish"]
@@ -115,7 +119,9 @@ def test_cloud_caller_grants_what_the_build_needs():
     # A called workflow can only keep or reduce its caller's permissions.
     called = _load("cross-platform-release.yml")["permissions"]
     caller = _load("cloud-release.yml")["permissions"]
-    assert called == caller == {"contents": "write"}
+    assert called == {"contents": "write"}
+    # The release commit lands through a PR, so the caller also needs PRs.
+    assert caller == {"contents": "write", "pull-requests": "write"}
 
 
 def test_dispatch_block_parentheses_balance():

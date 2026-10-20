@@ -92,6 +92,12 @@ class _Host:
     def _search_lemmy(self, term, queue):
         _ = (term, queue)
 
+    def _search_awesome(self, term, queue):
+        _ = (term, queue)
+
+    def _search_newsapis(self, term, queue):
+        _ = (term, queue)
+
 
 def _target_names(targets):
     return [name for name, _ in targets]
@@ -115,6 +121,7 @@ def test_feed_search_all_sources_excludes_url_only_targets_for_keyword():
         "Mixcloud",
         "Reddit",
         "Fediverse",
+        "Publisher Catalogue",
     ]
 
 
@@ -146,6 +153,7 @@ def test_feed_search_all_sources_includes_url_only_targets_for_url_like_terms():
         "Fediverse",
         "Feedsearch",
         "BlindRSS",
+        "Publisher Catalogue",
     ]
 
 
@@ -170,6 +178,7 @@ def test_feed_search_all_rss_sources_group_excludes_url_only_targets_for_keyword
         "Mixcloud",
         "Reddit",
         "Fediverse",
+        "Publisher Catalogue",
     ]
 
 
@@ -189,6 +198,7 @@ def test_feed_search_all_rss_sources_group_includes_url_only_targets_for_url_lik
         "Fediverse",
         "Feedsearch",
         "BlindRSS",
+        "Publisher Catalogue",
     ]
 
 
