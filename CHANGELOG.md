@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.3.10 - 2026-10-20
+
+- Add publisher discovery: Awesome RSS catalogue, localized Google News, News APIs.
+
 ## v2.3.9 - 2026-10-20
 
 - Stop silent data loss in config, restore, categories and hosted writes.
