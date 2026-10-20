@@ -5588,7 +5588,7 @@ class FeedSearchDialog(wx.Dialog):
     # but is no longer one of the aggregated default sources, so no single
     # directory is relied on. Feedsearch + the local website scan cover
     # domain/site-name discovery.
-    _RSS_SOURCE_KEYS = ["newsblur", "feedspot", "googlenews", "bingnews", "youtube", "soundcloud", "mixcloud", "reddit", "groupsio", "fediverse", "feedsearch", "blindrss"]
+    _RSS_SOURCE_KEYS = ["newsblur", "feedspot", "googlenews", "awesome", "bingnews", "youtube", "soundcloud", "mixcloud", "reddit", "groupsio", "fediverse", "feedsearch", "blindrss"]
     _SOURCE_CHOICES = [
         ("All sources", _SOURCE_ALL),
         ("All podcast sources", _SOURCE_ALL_PODCAST),
@@ -5605,6 +5605,8 @@ class FeedSearchDialog(wx.Dialog):
         ("SoundCloud", "soundcloud"),
         ("Mixcloud", "mixcloud"),
         ("Feedly", "feedly"),
+        ("Publisher Catalogue (Awesome RSS)", "awesome"),
+        ("News APIs — key required (NewsAPI.org, The News API)", "newsapis"),
         ("Reddit", "reddit"),
         ("Groups.io", "groupsio"),
         ("Fediverse (all)", "fediverse"),
@@ -5767,6 +5769,7 @@ class FeedSearchDialog(wx.Dialog):
             ("Fediverse", "fediverse", self._search_fediverse),
             ("Feedsearch", "feedsearch", self._search_feedsearch),
             ("BlindRSS", "blindrss", self._search_blindrss),
+            ("Publisher Catalogue", "awesome", self._search_awesome),
         ))
         # Feedly is still selectable on its own but excluded from the "all"
         # groups (NewsBlur is the primary directory now). Fediverse per-network
@@ -5777,6 +5780,7 @@ class FeedSearchDialog(wx.Dialog):
             "bluesky": ("Bluesky", "bluesky", self._search_bluesky),
             "piefed": ("PieFed", "piefed", self._search_piefed),
             "lemmy": ("Lemmy/Kbin", "lemmy", self._search_lemmy),
+            "newsapis": ("News APIs", "newsapis", self._search_newsapis),
         }
 
         by_key = {key: (name, key, fn) for name, key, fn in all_targets}
@@ -6081,28 +6085,12 @@ class FeedSearchDialog(wx.Dialog):
     }
 
     def _search_googlenews(self, term, queue):
-        # Google News serves keyless RSS feeds for any query (and for its
-        # topic sections), so offer them as subscribable results directly.
+        # Locale-aware Google News feeds (country/language/city from config).
         try:
-            import urllib.parse
-            t = str(term or "").strip()
-            if not t:
-                return
-            results = [{
-                "title": _("Google News: {term}").format(term=t),
-                "detail": _("News search feed"),
-                "url": "https://news.google.com/rss/search?q="
-                       + urllib.parse.quote(t) + "&hl=en-US&gl=US&ceid=US:en",
-            }]
-            topic = self._GOOGLE_NEWS_TOPICS.get(t.lower())
-            if topic:
-                results.append({
-                    "title": _("Google News: {topic} headlines").format(topic=topic.capitalize()),
-                    "detail": _("News topic feed"),
-                    "url": f"https://news.google.com/rss/headlines/section/topic/{topic}"
-                           "?hl=en-US&gl=US&ceid=US:en",
-                })
-            queue.put(("Google News", results))
+            from core.discovery import search_google_news_localized
+            results = search_google_news_localized(term)
+            if results:
+                queue.put(("Google News", results))
         except Exception:
             pass
 
@@ -6140,6 +6128,24 @@ class FeedSearchDialog(wx.Dialog):
                             "url": feed_id[5:]
                         })
                 queue.put(("Feedly", results))
+        except Exception:
+            pass
+
+    def _search_awesome(self, term, queue):
+        try:
+            from core.discovery import search_awesome_rss_feeds
+            results = search_awesome_rss_feeds(term, timeout=20)
+            if results:
+                queue.put(("Publisher Catalogue", results))
+        except Exception:
+            pass
+
+    def _search_newsapis(self, term, queue):
+        try:
+            from core.discovery import search_newsapi_publishers
+            results = search_newsapi_publishers(term, timeout=12)
+            if results:
+                queue.put(("News APIs", results))
         except Exception:
             pass
 

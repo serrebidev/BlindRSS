@@ -150,6 +150,13 @@ DEFAULT_CONFIG = {
     "podcast_archive_max_snapshots": 5000,
     "podcast_archive_rescan_days": 30,
     "refresh_interval": 300,  # seconds
+    # News publisher discovery (Feed > Find a Podcast or RSS Feed).
+    "discovery_country": "CA",  # ISO country code for Google News / catalogue filtering
+    "discovery_language": "en",  # language code paired with discovery_country
+    "discovery_city": "",  # manual local-news city (no GPS); e.g. "Maple Ridge"
+    "discovery_region": "",  # province/state for local news; e.g. "BC"
+    "newsapi_api_key": "",  # optional NewsAPI.org key for publisher discovery
+    "thenewsapi_api_key": "",  # optional The News API token for publisher discovery
     # How long Stop Refresh keeps the periodic refresh loop quiet. Without a
     # pause, a short refresh_interval starts another batch seconds after the
     # user stopped one, so "Stop Refresh" appears to do nothing. Any refresh the

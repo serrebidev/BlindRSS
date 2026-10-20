@@ -5270,3 +5270,261 @@ def detect_media(url: str, timeout: int = 20) -> tuple[str | None, str | None]:
         pass
         
     return None, None
+
+
+# ---------------------------------------------------------------------------
+# News publisher discovery (Awesome RSS catalogue, Google News locales,
+# optional key-based publisher directories). Mirrors the Android discovery
+# feature; results use the dialog shape {title, detail, url}.
+# ---------------------------------------------------------------------------
+
+def _discovery_setting(key, default=""):
+    """Read one discovery setting from the user config without importing GUI."""
+    try:
+        from core import config as _cfg
+        for path in (getattr(_cfg, "USER_CONFIG_PATH", ""), getattr(_cfg, "APP_CONFIG_PATH", "")):
+            if path and os.path.exists(path):
+                with open(path, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                if isinstance(data, dict) and key in data:
+                    return data[key]
+    except Exception:
+        pass
+    return default
+
+
+def google_news_url(kind="headlines", term="", country="CA", language="en", topic=""):
+    """Build a Google News RSS URL. kind: headlines | topic | search."""
+    gl = str(country or "CA").upper()
+    lang = str(language or "en").lower()
+    hl = f"{lang}-{gl}"
+    ceid = f"{gl}:{lang}"
+    if kind == "topic" and topic:
+        return f"https://news.google.com/rss/headlines/section/topic/{quote(str(topic), safe='')}?hl={hl}&gl={gl}&ceid={ceid}"
+    if kind == "search" or term:
+        return f"https://news.google.com/rss/search?q={quote_plus(str(term))}&hl={hl}&gl={gl}&ceid={ceid}"
+    return f"https://news.google.com/rss?hl={hl}&gl={gl}&ceid={ceid}"
+
+
+GOOGLE_NEWS_TOPIC_IDS = {
+    "world": "WORLD", "politics": "NATION", "business": "BUSINESS",
+    "technology": "TECHNOLOGY", "science": "SCIENCE", "health": "HEALTH",
+    "entertainment": "ENTERTAINMENT", "sports": "SPORTS", "gaming": "TECHNOLOGY",
+}
+
+
+def search_google_news_localized(term, country=None, language=None):
+    """Locale-aware Google News result dicts for the feed search dialog."""
+    country = country or _discovery_setting("discovery_country", "CA") or "CA"
+    language = language or _discovery_setting("discovery_language", "en") or "en"
+    city = _discovery_setting("discovery_city", "")
+    region = _discovery_setting("discovery_region", "")
+    t = str(term or "").strip()
+    results = []
+    if t:
+        results.append({
+            "title": f"Google News: {t}",
+            "detail": "News search feed (not a single publisher)",
+            "url": google_news_url("search", t, country, language),
+        })
+        topic = GOOGLE_NEWS_TOPIC_IDS.get(t.lower())
+        if topic:
+            results.append({
+                "title": f"Google News: {t.capitalize()} headlines",
+                "detail": "News topic feed",
+                "url": google_news_url("topic", country=country, language=language, topic=topic),
+            })
+    place = " ".join(x for x in (city, region) if x).strip()
+    if place:
+        results.append({
+            "title": f"Google News: {place} local news",
+            "detail": "Local news search feed (not a single publisher)",
+            "url": google_news_url("search", place, country, language),
+        })
+    results.append({
+        "title": f"Google News: {country} headlines",
+        "detail": "National headlines feed",
+        "url": google_news_url("headlines", country=country, language=language),
+    })
+    return results
+
+
+_AWESOME_BASE = "https://raw.githubusercontent.com/plenaryapp/awesome-rss-feeds/master"
+_AWESOME_COUNTRY_FILES = ["Canada", "United States", "United Kingdom", "Australia", "France", "Germany", "India", "Ireland", "Italy", "Japan", "Mexico", "Poland", "Spain", "Ukraine", "Brazil", "South Africa"]
+_AWESOME_TOPIC_FILES = ["Android", "Apple", "Business & Economy", "Cyber security", "Environment", "Food", "Football", "Gaming", "History", "Movies", "Music"]
+_AWESOME_TTL_S = 7 * 24 * 3600
+
+
+def _awesome_cache_path():
+    try:
+        from core import config as _cfg
+        base = getattr(_cfg, "USER_DATA_DIR", "") or _cfg._user_data_dir()
+    except Exception:
+        base = os.path.expanduser("~/.config/BlindRSS")
+    return os.path.join(base, "awesome_rss_catalogue.json")
+
+
+def _parse_opml_outlines(opml_text, country="", fallback_category=""):
+    """Parse OPML outlines into result dicts.
+
+    Some published OPML files are not well-formed XML (unescaped & in URLs),
+    so fall back to a tolerant outline tokenizer when ET fails.
+    """
+    results = []
+    text = opml_text.decode("utf-8", "ignore") if isinstance(opml_text, bytes) else str(opml_text or "")
+    try:
+        root = ET.fromstring(text.encode("utf-8", "ignore"))
+    except Exception:
+        root = None
+    if root is not None:
+        def walk(elem, path):
+            for child in elem:
+                if child.tag != "outline":
+                    walk(child, path)
+                    continue
+                url = (child.get("xmlUrl") or "").strip()
+                title = (child.get("title") or child.get("text") or "").strip()
+                if url:
+                    results.append({
+                        "title": title or url,
+                        "detail": (child.get("description") or "").strip(),
+                        "url": url,
+                        "category": " / ".join(path) if path else fallback_category,
+                        "country": country,
+                    })
+                else:
+                    walk(child, path + [title] if title else path)
+        walk(root, [])
+        return results
+    # Tolerant fallback: scan outline tags in document order with a stack.
+    stack = []
+    tag_re = re.compile(r"<(/?)outline\b([^>]*?)(/?)>", re.I | re.S)
+    attr_re = re.compile(r"(\w+)\s*=\s*\"([^\"]*)\"|(\w+)\s*=\s*'([^']*)'")
+    def attrs(raw):
+        out = {}
+        for m in attr_re.finditer(raw or ""):
+            key = m.group(1) or m.group(3)
+            val = m.group(2) if m.group(2) is not None else m.group(4)
+            out[key.lower()] = (val or "").replace("&amp;", "&").strip()
+        return out
+    for m in tag_re.finditer(text):
+        closing, raw, selfclose = m.group(1), m.group(2), m.group(3)
+        if closing:
+            if stack:
+                stack.pop()
+            continue
+        a = attrs(raw)
+        url = a.get("xmlurl", "")
+        title = a.get("title") or a.get("text") or ""
+        if url:
+            results.append({
+                "title": title or url,
+                "detail": a.get("description", ""),
+                "url": url,
+                "category": " / ".join(stack) if stack else fallback_category,
+                "country": country,
+            })
+        elif not selfclose and title:
+            stack.append(title)
+    return results
+
+
+def load_awesome_rss_catalogue(timeout=15, force_refresh=False):
+    """Fetch (and disk-cache) the Plenary awesome-rss-feeds OPML catalogue."""
+    cache = _awesome_cache_path()
+    if not force_refresh:
+        try:
+            if os.path.exists(cache) and (time.time() - os.path.getmtime(cache)) < _AWESOME_TTL_S:
+                with open(cache, "r", encoding="utf-8") as fh:
+                    data = json.load(fh)
+                if isinstance(data, list) and data:
+                    return data
+        except Exception:
+            pass
+    out, seen = [], set()
+    def add(entry):
+        u = (entry.get("url") or "").strip().lower().rstrip("/")
+        if u and u not in seen:
+            seen.add(u)
+            out.append(entry)
+    for country in _AWESOME_COUNTRY_FILES:
+        try:
+            resp = utils.safe_requests_get(f"{_AWESOME_BASE}/countries/with_category/{quote(country)}.opml", timeout=timeout)
+            if int(getattr(resp, "status_code", 0) or 0) == 200:
+                for e in _parse_opml_outlines(resp.text or "", country=country):
+                    add(e)
+        except Exception:
+            continue
+    for topic in _AWESOME_TOPIC_FILES:
+        try:
+            resp = utils.safe_requests_get(f"{_AWESOME_BASE}/recommended/without_category/{quote(topic)}.opml", timeout=timeout)
+            if int(getattr(resp, "status_code", 0) or 0) == 200:
+                for e in _parse_opml_outlines(resp.text or "", fallback_category=topic):
+                    if not e.get("category"):
+                        e["category"] = topic
+                    add(e)
+        except Exception:
+            continue
+    if out:
+        try:
+            os.makedirs(os.path.dirname(cache), exist_ok=True)
+            with open(cache, "w", encoding="utf-8") as fh:
+                json.dump(out, fh)
+        except Exception:
+            pass
+    return out
+
+
+def search_awesome_rss_feeds(term, timeout=15):
+    """Search the cached Awesome RSS catalogue by name, category, or country."""
+    t = str(term or "").strip().lower()
+    out = []
+    for e in load_awesome_rss_catalogue(timeout=timeout):
+        hay = f"{e.get('title','')} {e.get('detail','')} {e.get('category','')} {e.get('country','')} {e.get('url','')}".lower()
+        if not t or t in hay or any(w in hay for w in t.split() if len(w) > 3):
+            out.append({"title": e.get("title") or e.get("url"), "detail": (e.get("detail") or e.get("category") or "Publisher catalogue"), "url": e.get("url")})
+    return out
+
+
+def search_newsapi_publishers(term, timeout=10):
+    """Optional NewsAPI.org / The News API publisher lookup.
+
+    These directories return publisher metadata without RSS URLs, so each
+    result is only offered once discover_feeds() verifies a feed on the
+    publisher's own website. Returns [] when no API key is configured.
+    """
+    newsapi_key = str(_discovery_setting("newsapi_api_key", "") or "").strip()
+    thenewsapi_key = str(_discovery_setting("thenewsapi_api_key", "") or "").strip()
+    t = str(term or "").strip().lower()
+    out, seen = [], set()
+    def add_publisher(name, site, detail):
+        if not site:
+            return
+        for feed in discover_feeds(site if site.startswith("http") else f"https://{site}"):
+            key = feed.lower().rstrip("/")
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append({"title": name or feed, "detail": detail or "Publisher feed (verified on website)", "url": feed})
+    if newsapi_key:
+        try:
+            resp = utils.safe_requests_get(f"https://newsapi.org/v2/top-headlines/sources?apiKey={quote_plus(newsapi_key)}", timeout=timeout)
+            if int(getattr(resp, "status_code", 0) or 0) == 200:
+                for src in (resp.json() or {}).get("sources", []) or []:
+                    name = str(src.get("name") or "")
+                    if t and t not in name.lower() and t not in str(src.get("description") or "").lower():
+                        continue
+                    add_publisher(name, str(src.get("url") or ""), str(src.get("description") or ""))
+        except Exception:
+            pass
+    if thenewsapi_key:
+        try:
+            resp = utils.safe_requests_get(f"https://api.thenewsapi.com/v1/news/sources?api_token={quote_plus(thenewsapi_key)}&search={quote_plus(str(term or ''))}&limit=10", timeout=timeout)
+            if int(getattr(resp, "status_code", 0) or 0) == 200:
+                for src in (resp.json() or {}).get("data", []) or []:
+                    domain = str(src.get("domain") or "")
+                    if domain:
+                        add_publisher(str(src.get("name") or ""), domain, str(src.get("description") or ""))
+        except Exception:
+            pass
+    return out
