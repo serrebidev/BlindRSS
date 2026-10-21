@@ -799,6 +799,17 @@ class AccessibleBrowserFrame(wx.Frame):
             ]
         except Exception:
             pass
+        # Keep the main window's feed-tree counts in step (they otherwise
+        # only catch up at the next refresh).
+        try:
+            if not getattr(article, "is_read", False) and not self.mainframe._is_deleted_view(
+                getattr(self, "current_view_id", "") or ""
+            ):
+                self.mainframe._note_articles_removed_from_feeds(
+                    {getattr(article, "feed_id", None): 1}
+                )
+        except Exception:
+            pass
         self._apply_filter()
         try:
             self.mainframe._announce_event("general", _("Article deleted."))

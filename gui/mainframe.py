@@ -7971,6 +7971,13 @@ class MainFrame(wx.Frame):
     def _post_delete_articles(self, results, anchor_idx: int = 0) -> None:
         deleted_any = False
         failures = []
+        # Unread removals per feed, applied after the loop so the tree label,
+        # category totals and tray update in the same pass as the row removal
+        # instead of waiting for the next refresh. Purging from the Deleted
+        # view must not count: those tombstones already sit outside every
+        # feed's unread total.
+        in_deleted_view = self._is_deleted_view(getattr(self, "current_feed_id", "") or "")
+        unread_removed_by_feed = {}
         for article_id, article_cache_id, cache_key, ok, err in results:
             if not ok:
                 failures.append((article_id, err))
@@ -7991,8 +7998,17 @@ class MainFrame(wx.Frame):
                     idx = i
                     break
             if idx is not None:
+                if not in_deleted_view:
+                    removed_article = self.current_articles[idx]
+                    if not getattr(removed_article, "is_read", False):
+                        fid = getattr(removed_article, "feed_id", None)
+                        if fid:
+                            unread_removed_by_feed[fid] = unread_removed_by_feed.get(fid, 0) + 1
                 self._remove_article_from_current_list(idx)
             self._remove_article_from_cached_views(article_cache_id)
+
+        if unread_removed_by_feed:
+            self._note_articles_removed_from_feeds(unread_removed_by_feed)
 
         if failures:
             n = len(failures)
@@ -12466,6 +12482,29 @@ class MainFrame(wx.Frame):
             wx.CallAfter(self._focus_default_control)
         except Exception:
             pass
+
+    def _note_articles_removed_from_feeds(self, unread_removed_by_feed) -> None:
+        """Apply unread-count drops after articles were deleted locally.
+
+        Deletion only reaches the tree labels at the next refresh otherwise,
+        so a feed emptied by hand kept showing its old "(N)" until then. The
+        per-feed delta goes through the same helper the mark-read path uses,
+        keeping the feed label, category totals and tray in step. A feed whose
+        delete behavior is "move to category" keeps its articles (they are
+        refiled, not removed), so its count must not drop.
+        """
+        for feed_id, removed in (unread_removed_by_feed or {}).items():
+            if not feed_id or not removed:
+                continue
+            try:
+                resolver = getattr(self.provider, "_resolve_delete_behavior", None)
+                if callable(resolver):
+                    kind, _category = filters_mod.parse_delete_behavior(resolver(feed_id))
+                    if kind == "category":
+                        continue
+            except Exception:
+                pass
+            self._update_feed_unread_count_ui(feed_id, -int(removed))
 
     def _update_feed_unread_count_ui(self, feed_id: str, delta: int) -> None:
         if not feed_id or delta == 0:
