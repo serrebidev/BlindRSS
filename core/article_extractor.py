@@ -2877,21 +2877,52 @@ class _FetchResult:
 # Inlining link/image syntax reduces nav entries to their short labels, which that filter then
 # drops, leaving the article sentences.
 _MD_IMAGE_RE = re.compile(r"!\[[^\]]*\]\([^)]*\)")
-_MD_LINK_RE = re.compile(r"\[([^\]]*)\]\([^)]*\)")
+_MD_LINK_RE = re.compile(r"\[([^\]]*)\]\((?:[^()]|\([^()]*\))+\)")
+_MD_REFLINK_RE = re.compile(r"\[([^\]]+)\]\[[^\]]*\]")
+_MD_LINKDEF_RE = re.compile(r"(?m)^\s*\[[^\]]+\]:\s*\S+.*$")
 _MD_BULLET_RE = re.compile(r"(?m)^\s*[*+-]\s+")
 _MD_HEADING_RE = re.compile(r"(?m)^#{1,6}\s*")
+_MD_QUOTE_RE = re.compile(r"(?m)^\s*>\s?")
+_MD_HR_RE = re.compile(r"(?m)^\s*(?:[*_-]\s*){3,}$")
+_MD_STRONG_STAR_RE = re.compile(r"\*\*([^*\n]+)\*\*")
+_MD_STRONG_UNDER_RE = re.compile(r"(?<![A-Za-z0-9])__([^_\n]+)__(?![A-Za-z0-9])")
+_MD_EM_STAR_RE = re.compile(r"\*([^*\n]+)\*")
+_MD_EM_UNDER_RE = re.compile(r"(?<![A-Za-z0-9])_([^_\n]+)_(?![A-Za-z0-9])")
+_MD_STRIKE_RE = re.compile(r"~~([^~\n]+)~~")
 
 
 def _markdown_links_to_text(md: str) -> str:
     """Inline read-proxy markdown links/images/bullets so nav noise reduces to droppable lines.
 
-    Also drops emphasis/heading/code markers so a screen reader never hears the raw syntax.
+    Also drops emphasis/heading/code markers so a screen reader never hears the raw syntax:
+    '**Why it matters:**' lead-in labels become 'Why it matters:', '*item*' stress becomes
+    'item', and a '[text](url)' link becomes just its text. Underscore emphasis is only
+    unwrapped at word boundaries, so snake_case names in prose survive.
     """
     text = _MD_IMAGE_RE.sub("", md or "")
     text = _MD_LINK_RE.sub(lambda m: m.group(1), text)
+    text = _MD_REFLINK_RE.sub(lambda m: m.group(1), text)
+    text = _MD_LINKDEF_RE.sub("", text)
+    text = _MD_HR_RE.sub("", text)
     text = _MD_BULLET_RE.sub("", text)
     text = _MD_HEADING_RE.sub("", text)
-    return text.replace("**", "").replace("`", "")
+    text = _MD_QUOTE_RE.sub("", text)
+    # Strong before emphasis: '**x**' must not be half-eaten by the single-marker pass.
+    text = _MD_STRONG_STAR_RE.sub(r"\1", text)
+    text = _MD_STRONG_UNDER_RE.sub(r"\1", text)
+    text = _MD_EM_STAR_RE.sub(r"\1", text)
+    text = _MD_EM_UNDER_RE.sub(r"\1", text)
+    text = _MD_STRIKE_RE.sub(r"\1", text)
+    # Leftover unbalanced markers and the proxy's own escapes for literal markers in
+    # prose ('\\*' is a real asterisk the author typed, not syntax): drop the syntax
+    # characters, keep the words.
+    text = text.replace("**", "").replace("`", "")
+    return (
+        text.replace("\\*", "*")
+        .replace("\\_", "_")
+        .replace("\\[", "[")
+        .replace("\\]", "]")
+    )
 
 
 # Whole-page renderings can carry the site's cookie-consent modal as trailing sentences that
@@ -2959,6 +2990,22 @@ def _download_via_jina(target_url: str, timeout: int) -> Optional[str]:
     except Exception:
         return None
     return None
+
+
+def _download_via_jina_as_text(target_url: str, timeout: int) -> Optional[str]:
+    """Jina read-proxy content converted to plain text, for the gate-fallback chain.
+
+    The proxy answers in markdown, not HTML. Returned raw, it used to flow into
+    _extract_text_any as if it were page HTML, and the HTML extractors passed the
+    syntax straight through to the reader: '**Why it matters:**' labels wrapped in
+    stars, '*   ' list bullets leading paragraphs, and '[text](url)' links spoken
+    with their URLs (Axios hits this on every gated article). The Google News
+    path converts proxy markdown before use; the gate fallback must too.
+    """
+    md = _download_via_jina(target_url, timeout)
+    if not md:
+        return None
+    return _markdown_links_to_text(md)
 
 
 # Fallback fetchers (full-text extraction should survive dead links and hard blocks).
@@ -4034,7 +4081,7 @@ def _fetch_page(url: str, timeout: int = 20, encoding_override: str = "") -> _Fe
         if not tried_impersonation_first or dropped_stale_clearance:
             candidates.append(lambda: _download_via_impersonation(url, timeout))
         if gate_seen:
-            candidates.append(lambda: _download_via_jina(url, timeout))
+            candidates.append(lambda: _download_via_jina_as_text(url, timeout))
         candidates.append(lambda: _download_via_smry(url, timeout))
         candidates.append(lambda: _download_via_wayback(url, timeout))
         host = (urlsplit(url).hostname or "").lower()
