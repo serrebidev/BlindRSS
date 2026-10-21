@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.4.1 - 2026-10-21
+
+- Strip read-proxy markdown from gate-fallback full text.
+
 ## v2.4.0 - 2026-10-20
 
 - Show reading position on the status bar while the reader has focus.
