@@ -76,10 +76,16 @@ log = logging.getLogger(__name__)
 # load. Per-host limits stay comparatively low to keep single-server politeness
 # (the actual anti-bot/rate-limit concern, see issue #29) independent of the
 # overall worker ceiling.
-_REFRESH_WORKERS_CPU_1_2 = 8
-_REFRESH_WORKERS_CPU_3_4 = 16
-_REFRESH_WORKERS_CPU_5_8 = 24
-_REFRESH_WORKERS_CPU_9_PLUS = 32
+# Worker caps are deliberately modest: per-feed refresh work is CPU-bound
+# Python (feedparser + HTML handling) running under the GIL, so workers past
+# a handful buy almost no throughput -- the parse bursts serialize anyway --
+# while every extra runnable thread starves the UI thread and makes the app
+# feel hung, worst during the startup refresh on large collections. The caps
+# still leave enough overlap for network latency on real (remote) feeds.
+_REFRESH_WORKERS_CPU_1_2 = 4
+_REFRESH_WORKERS_CPU_3_4 = 6
+_REFRESH_WORKERS_CPU_5_8 = 8
+_REFRESH_WORKERS_CPU_9_PLUS = 12
 _REFRESH_PER_HOST_LOW_CPU = 2
 _REFRESH_PER_HOST_NORMAL = 4
 _REFRESH_PER_HOST_HIGH_CPU = 4
@@ -4127,7 +4133,13 @@ class LocalProvider(RSSProvider):
                         "existing_article_id": existing_article_id,
                         "existing_stored_url": str((existing_metadata or {}).get("url") or ""),
                         "existing_stored_description": str((existing_metadata or {}).get("description") or ""),
-                        "notify_preview": _preview_for_notification(content),
+                        # No "notify_preview" here on purpose: the preview is a
+                        # full HTML->text parse of the entry body and is only
+                        # used when phase 2 actually inserts the article as
+                        # new, so it is computed lazily at the insert sites.
+                        # Parsing one for every already-known entry made each
+                        # steady-state refresh burn ~a second of worker CPU
+                        # per feed for text that was then thrown away.
                         "archive_recovered": bool(entry.get("blindrss_archive_recovered")),
                     })
 
@@ -4178,7 +4190,10 @@ class LocalProvider(RSSProvider):
                     chapter_url = prep["chapter_url"]
                     inline_chapters = prep["inline_chapters"]
                     existing_article_id = prep["existing_article_id"]
-                    notify_preview = prep["notify_preview"]
+                    # The notification preview is computed at the insert
+                    # sites below, not here (see the note where
+                    # prepared_entries is built): existing articles never
+                    # need one.
                     archive_recovered = prep["archive_recovered"]
 
                     if _article_matches_deleted_tombstone(
@@ -4268,7 +4283,7 @@ class LocalProvider(RSSProvider):
                                 article_id,
                                 title,
                                 author,
-                                notify_preview,
+                                _preview_for_notification(content),
                                 url=url,
                                 media_url=media_url,
                                 media_type=media_type,
@@ -4339,7 +4354,7 @@ class LocalProvider(RSSProvider):
                                             article_id,
                                             title,
                                             author,
-                                            notify_preview,
+                                            _preview_for_notification(content),
                                             url=url,
                                             media_url=media_url,
                                             media_type=media_type,
