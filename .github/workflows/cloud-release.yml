@@ -134,6 +134,10 @@ jobs:
           # Auto-merge does not reliably trigger delete-branch-on-merge for
           # bot PRs; remove the spent release branch here.
           git push origin --delete "$branch" || true
+          # The merge commit was created by GitHub when the PR merged, so
+          # this checkout does not have the object yet: fetch it (it is
+          # main's new tip) or git tag fails with "bad object type".
+          git fetch origin main
           git tag -a "$NEXT_TAG" -m "Release $NEXT_TAG" "$merge_sha"
           git push origin "refs/tags/$NEXT_TAG"
           gh release create "$NEXT_TAG" --draft --verify-tag --title "$NEXT_TAG" \
