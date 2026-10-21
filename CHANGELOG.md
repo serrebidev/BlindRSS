@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.4.3 - 2026-10-21
+
+- Update feed tree counts immediately when articles are deleted.
+
 ## v2.4.2 - 2026-10-21
 
 - Stop the startup refresh from starving the UI thread.
