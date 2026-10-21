@@ -4,6 +4,13 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.4.1 - 2026-10-21
+
+- Fetch the release merge commit before tagging it in cloud release.
+- Strip read-proxy markdown from gate-fallback full text.
+- Revert "Release v2.4.1 (#119)".
+- Release v2.4.1 (#119).
+
 ## v2.4.0 - 2026-10-20
 
 - Show reading position on the status bar while the reader has focus.
