@@ -502,3 +502,17 @@ Casting is Caster's code (github.com/serrebidev/Caster), not a re-implementation
 9. Release publication: a release MUST end up published and Latest or the updater never sees it. Do not remove the `build.bat release` guards (`--draft=false --latest`, no-drafts check, `/releases/latest` verify) or auto-delete releases. See **Build & Release** > Updater visibility.
 10. Tests: add/extend tests in `tests/` for behavior changes and regressions.
 11. Secrets: never print, log, commit, or include API keys/cookies/Authorization headers in tests or diagnostics.
+
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in this repo's GitHub Issues, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
