@@ -217,11 +217,13 @@ if exist "requirements.txt" (
     if errorlevel 1 exit /b 1
 )
 
-echo [BlindRSS Build] Upgrading the text-extraction stack to latest releases...
+echo [BlindRSS Build] Upgrading the text-extraction stack (trafilatura: git master)...
 REM requirements.txt installs satisfy ">=" pins without ever upgrading, so the
 REM venv would stay on whatever trafilatura it first got. Full-text quality
-REM tracks these packages, so pull their latest releases on every build.
-"%VENV_PYTHON%" -m pip install --upgrade trafilatura htmldate justext courlan
+REM tracks these packages, so pull their latest on every build. trafilatura
+REM itself is bleeding edge: reinstall it from upstream git master (a plain
+REM name upgrade would silently replace it with the last PyPI release).
+"%VENV_PYTHON%" -m pip install --upgrade "trafilatura@git+https://github.com/adbar/trafilatura.git@master" htmldate justext courlan
 if errorlevel 1 (
     echo [WARN] Extraction-stack upgrade failed; continuing with the pinned versions.
 )

@@ -97,6 +97,16 @@ setup_venv() {
     rm -f "$req_tmp"
   fi
 
+  # Same trap as build.bat: requirements.txt ">=" pins are satisfied by
+  # whatever the venv already holds and never upgrade on their own.
+  # trafilatura is bleeding edge — reinstall it from upstream git master
+  # (a plain name upgrade would silently use the last PyPI release) — and
+  # pull the newest htmldate/justext/courlan alongside it.
+  echo "[BlindRSS Build] Upgrading the text-extraction stack (trafilatura from git master)..."
+  if ! "$VENV_PYTHON" -m pip install --upgrade "trafilatura@git+https://github.com/adbar/trafilatura.git@master" htmldate justext courlan; then
+    echo "[WARN] Extraction-stack upgrade failed; continuing with the requirements versions."
+  fi
+
   # The embedded yt_dlp module is frozen into the bundle; ship the newest
   # nightly (published to PyPI as a pre-release), never a stale stable.
   echo "[BlindRSS Build] Upgrading the embedded yt-dlp module to the latest nightly..."

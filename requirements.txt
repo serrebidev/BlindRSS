@@ -23,7 +23,13 @@ python-vlc>=3.0.21203
 pychromecast>=14.0.10
 pyatv>=0.18.0
 soco>=0.31.4
-trafilatura>=2.3.0
+# Bleeding edge (owner rule): trafilatura is tracked from upstream git
+# master, not PyPI releases — extraction fixes land on master weeks before
+# a release (14 fix commits in the two days after v2.3.1). pip records the
+# exact commit in the installed dist-info/direct_url.json; the version
+# string still reports the last release number. Guard:
+# tests/test_trafilatura_bleeding_edge.py.
+trafilatura@git+https://github.com/adbar/trafilatura.git@master
 Markdown>=3.11
 # Structured-metadata extraction (JSON-LD/microdata/OpenGraph) for article
 # author/tags/section enrichment used by Filter Rules categorization.
