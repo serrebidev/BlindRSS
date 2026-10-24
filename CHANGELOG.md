@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.4.5 - 2026-10-24
+
+- Play refresh-complete sound for Miniflux refreshes.
+
 ## v2.4.4 - 2026-10-23
 
 - Track trafilatura from upstream git master (bleeding edge).
