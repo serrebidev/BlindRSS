@@ -2026,38 +2026,48 @@ class MainFrame(wx.Frame):
             pass
         return snapshot
 
-    def _extract_new_items(self, state, unread_snapshot, seen_ids):
+    def _extract_new_items(self, state, unread_snapshot, counted):
+        """Return the new items this state adds for its feed.
+
+        A feed can report more than once per refresh: Miniflux emits each
+        feed's pre-refresh counts as its targeted refresh returns, then the
+        fresh counts at the end. ``counted`` (feed id -> items already counted)
+        keeps only the increase, so the later, real report is not discarded
+        and no feed is counted twice.
+        """
         if not isinstance(state, dict):
             return 0
         feed_id = state.get("id")
         if feed_id is None:
             return 0
         feed_id = str(feed_id)
-        if seen_ids is not None:
-            if feed_id in seen_ids:
-                return 0
-            seen_ids.add(feed_id)
 
+        total = 0
         new_items = state.get("new_items")
         if new_items is not None:
             try:
-                return max(0, int(new_items))
+                total = max(0, int(new_items))
             except Exception:
-                return 0
-
-        try:
-            unread_now = int(state.get("unread_count") or 0)
-        except Exception:
-            unread_now = 0
-        if unread_snapshot:
+                total = 0
+        else:
             try:
-                unread_before = int(unread_snapshot.get(feed_id, 0) or 0)
+                unread_now = int(state.get("unread_count") or 0)
             except Exception:
-                unread_before = 0
-            delta = unread_now - unread_before
-            if delta > 0:
-                return delta
-        return 0
+                unread_now = 0
+            if unread_snapshot:
+                try:
+                    unread_before = int(unread_snapshot.get(feed_id, 0) or 0)
+                except Exception:
+                    unread_before = 0
+                total = max(0, unread_now - unread_before)
+
+        if counted is None:
+            return total
+        already = int(counted.get(feed_id, 0) or 0)
+        if total <= already:
+            return 0
+        counted[feed_id] = total
+        return total - already
 
     def _ensure_view_state(self, view_id: str):
         """Return a mutable cache dict for a view, creating it if needed.
@@ -4829,7 +4839,7 @@ class MainFrame(wx.Frame):
         try:
             unread_snapshot = self._capture_unread_snapshot()
             new_items_total = 0
-            seen_ids = set()
+            counted_new = {}
             notified_ids = set()
             max_notifications = max(0, int(self.config_manager.get("windows_notifications_max_per_refresh", 0) or 0))
             notify_budget = {
@@ -4841,7 +4851,7 @@ class MainFrame(wx.Frame):
             def progress_cb(state):
                 nonlocal new_items_total
                 with progress_lock:
-                    detected_new_items = self._extract_new_items(state, unread_snapshot, seen_ids)
+                    detected_new_items = self._extract_new_items(state, unread_snapshot, counted_new)
                     new_items_total += detected_new_items
                     self._queue_new_article_notifications_from_state(
                         state,
@@ -5010,7 +5020,7 @@ class MainFrame(wx.Frame):
             
             unread_snapshot = self._capture_unread_snapshot()
             new_items_total = 0
-            seen_ids = set()
+            counted_new = {}
             notified_ids = set()
             max_notifications = max(0, int(self.config_manager.get("windows_notifications_max_per_refresh", 0) or 0))
             notify_budget = {
@@ -5022,7 +5032,7 @@ class MainFrame(wx.Frame):
             def progress_cb(state):
                 nonlocal new_items_total
                 with progress_lock:
-                    detected_new_items = self._extract_new_items(state, unread_snapshot, seen_ids)
+                    detected_new_items = self._extract_new_items(state, unread_snapshot, counted_new)
                     new_items_total += detected_new_items
                     self._queue_new_article_notifications_from_state(
                         state,
