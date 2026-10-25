@@ -664,6 +664,36 @@ def media_type_is_audio_video_or_podcast(media_type: str | None) -> bool:
     return mt.startswith(("audio/", "video/")) or "podcast" in mt
 
 
+def playable_enclosure(enclosures) -> tuple[str | None, str | None]:
+    """``(url, type)`` of a hosted entry's playable enclosure, skipping covers and chapters.
+
+    Hosted readers list every enclosure the feed carried, in feed order (Miniflux
+    ``url``/``mime_type``, Google Reader APIs ``href``/``type``), so the first one is
+    often a cover image (Sky News) or a Podcasting 2.0 chapters file rather than the
+    audio. An enclosure of unknown type is kept only when nothing is recognizably media.
+    """
+    import mimetypes
+
+    fallback = (None, None)
+    for enclosure in enclosures if isinstance(enclosures, (list, tuple)) else []:
+        if not isinstance(enclosure, Mapping):
+            continue
+        url = str(enclosure.get("url") or enclosure.get("href") or "").strip()
+        if not url:
+            continue
+        mime = canonical_media_type(enclosure.get("mime_type") or enclosure.get("type"))
+        if media_type_is_audio_video_or_podcast(mime):
+            return url, mime
+        guessed = canonical_media_type(mimetypes.guess_type(url.split("?", 1)[0])[0])
+        if media_type_is_audio_video_or_podcast(guessed):
+            return url, guessed
+        if mime.startswith("image/") or guessed.startswith("image/") or "json" in mime:
+            continue
+        if fallback[0] is None:
+            fallback = (url, mime or None)
+    return fallback
+
+
 def _activity_title_norm_space(text: str) -> str:
     return re.sub(r"\s+", " ", str(text or "")).strip()
 

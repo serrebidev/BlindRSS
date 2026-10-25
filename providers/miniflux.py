@@ -16,7 +16,7 @@ from xml.etree import ElementTree as ET
 from typing import List, Dict, Any
 from datetime import datetime, timezone, timedelta
 from dateutil import parser as dateparser
-from .base import RSSProvider
+from .base import HostedArticleMediaMixin, RSSProvider
 from core.models import Feed, Article
 from core.categories import UNCATEGORIZED
 from core import db, podcast_archive, utils
@@ -47,7 +47,7 @@ class _SystemTrustHTTPAdapter(HTTPAdapter):
         return super().proxy_manager_for(proxy, **proxy_kwargs)
 
 
-class MinifluxProvider(RSSProvider):
+class MinifluxProvider(HostedArticleMediaMixin, RSSProvider):
     refresh_reports_feed_changes = True
 
     # Short connect timeout so an unreachable address (e.g. a dead IPv6 AAAA whose
@@ -1731,12 +1731,9 @@ class MinifluxProvider(RSSProvider):
             entry_content = entry.get("content") or entry_summary or ""
             display_title = utils.enhance_activity_entry_title(entry.get("title") or "", entry_url, entry_content) or "Untitled"
 
-            enclosures = entry.get("enclosures", []) or []
-            if enclosures:
-                media_url = (enclosures[0] or {}).get("url")
-                media_type = (enclosures[0] or {}).get("mime_type")
+            media_url, media_type = utils.playable_enclosure(entry.get("enclosures"))
 
-            date = self._normalize_entry_date(entry, display_title, entry_content, entry_url)
+            date =self._normalize_entry_date(entry, display_title, entry_content, entry_url)
 
             article_id = str(entry.get("id"))
             feed_id = str(entry.get("feed_id") or fallback_feed_id or "")
@@ -1759,6 +1756,7 @@ class MinifluxProvider(RSSProvider):
                 cache_id=cache_id,
                 description=entry_summary or None,
             ))
+        self._attach_hosted_media(articles)
         return articles
 
     def _is_placeholder_entry(self, entry: Dict[str, Any]) -> bool:
@@ -2538,7 +2536,18 @@ class MinifluxProvider(RSSProvider):
                 return resp.status_code in (200, 204)
 
             if real_feed_id == "all":
-                return False
+                # Without this the caller pages the account's entire stored
+                # history (read entries too) just to collect the unread IDs.
+                me = self._req("GET", "/v1/me")
+                user_id = me.get("id") if isinstance(me, dict) else None
+                if user_id is None:
+                    return False
+                resp = self._session.put(
+                    f"{self.base_url}/v1/users/{user_id}/mark-all-as-read",
+                    headers=self.headers,
+                    timeout=(self.CONNECT_TIMEOUT_SECONDS, 15),
+                )
+                return resp.status_code in (200, 204)
 
             resp = self._session.put(
                 f"{self.base_url}/v1/feeds/{real_feed_id}/mark-all-as-read",

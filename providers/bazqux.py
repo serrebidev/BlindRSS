@@ -7,7 +7,7 @@ import hashlib
 import logging
 import time
 from typing import List, Dict, Any
-from .base import RSSProvider
+from .base import HostedArticleMediaMixin, RSSProvider
 from .hosted_podcast_archive import HostedPodcastArchiveMixin
 from core.models import Feed, Article
 from core.categories import UNCATEGORIZED
@@ -15,7 +15,7 @@ from core import utils
 
 log = logging.getLogger(__name__)
 
-class BazQuxProvider(HostedPodcastArchiveMixin, RSSProvider):
+class BazQuxProvider(HostedPodcastArchiveMixin, HostedArticleMediaMixin, RSSProvider):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.conf = config.get("providers", {}).get("bazqux", {})
@@ -409,13 +409,7 @@ class BazQuxProvider(HostedPodcastArchiveMixin, RSSProvider):
                     content = summary_content
                 if "content" in item: content = item["content"]["content"]
                 
-                media_url = None
-                media_type = None
-                if "enclosure" in item and item["enclosure"]:
-                    encs = item["enclosure"]
-                    if isinstance(encs, list) and encs:
-                        media_url = encs[0].get("href")
-                        media_type = encs[0].get("type")
+                media_url, media_type = utils.playable_enclosure(item.get("enclosure"))
                 
                 article_id = str(item["id"])
                 article_feed_id = self._resolve_item_feed_id(item, fallback_feed_id)
@@ -465,6 +459,7 @@ class BazQuxProvider(HostedPodcastArchiveMixin, RSSProvider):
                     description=summary_content or None,
                 ))
 
+            self._attach_hosted_media(articles)
             return articles
         except Exception as e:
             log.error(f"BazQux Articles Error: {e}")

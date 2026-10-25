@@ -10,7 +10,7 @@ import threading
 import urllib.parse
 from email.utils import parsedate_to_datetime
 from typing import List, Dict, Any
-from .base import RSSProvider
+from .base import HostedArticleMediaMixin, RSSProvider
 from .hosted_podcast_archive import HostedPodcastArchiveMixin
 from core.models import Feed, Article
 from core.categories import UNCATEGORIZED
@@ -24,7 +24,7 @@ class RateLimitError(RuntimeError):
         super().__init__(message)
         self.retry_after = retry_after
 
-class InoreaderProvider(HostedPodcastArchiveMixin, RSSProvider):
+class InoreaderProvider(HostedPodcastArchiveMixin, HostedArticleMediaMixin, RSSProvider):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.config = config
@@ -440,13 +440,7 @@ class InoreaderProvider(HostedPodcastArchiveMixin, RSSProvider):
             if "content" in item:
                 content = (item.get("content") or {}).get("content", "")
 
-            media_url = None
-            media_type = None
-            if "enclosure" in item and item["enclosure"]:
-                encs = item["enclosure"]
-                if isinstance(encs, list) and encs:
-                    media_url = (encs[0] or {}).get("href")
-                    media_type = (encs[0] or {}).get("type")
+            media_url, media_type = utils.playable_enclosure(item.get("enclosure"))
 
             article_id = item.get("id")
             if article_id is None:
@@ -503,6 +497,7 @@ class InoreaderProvider(HostedPodcastArchiveMixin, RSSProvider):
                 description=summary_content or None,
             ))
 
+        self._attach_hosted_media(articles)
         return articles
 
     def _new_article_view_state(self, feed_id: str) -> Dict[str, Any]:

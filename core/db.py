@@ -417,6 +417,16 @@ def init_db():
             error TEXT,
             PRIMARY KEY (provider_scope, feed_id)
         )''')
+        # Media a hosted entry's feed does not carry: NPR audio resolved from
+        # its syndication player, or a Detect Audio result. Keyed by the same
+        # provider/account-scoped key as chapter_cache. A NULL media_url is a
+        # remembered miss, retried after its checked_at ages out.
+        c.execute('''CREATE TABLE IF NOT EXISTS hosted_article_media (
+            cache_key TEXT PRIMARY KEY,
+            media_url TEXT,
+            media_type TEXT,
+            checked_at REAL NOT NULL
+        )''')
 
         # deleted_articles doubles as the tombstone list (so refresh never
         # recreates a user-deleted item) AND the backing store for the "Deleted
@@ -1235,6 +1245,51 @@ def get_hosted_podcast_archive_entries(provider_scope: str, feed_id: str) -> lis
         }
         for row in rows
     ]
+
+
+HOSTED_ARTICLE_MEDIA_MAX_AGE_S = 90 * 86400
+
+
+def get_hosted_article_media(cache_keys) -> dict[str, tuple[str | None, str | None, float]]:
+    """``{cache_key: (media_url, media_type, checked_at)}`` for the stored keys."""
+    keys = [str(k) for k in (cache_keys or []) if k]
+    result: dict[str, tuple[str | None, str | None, float]] = {}
+    if not keys:
+        return result
+    conn = get_connection()
+    try:
+        for i in range(0, len(keys), 500):
+            chunk = keys[i:i + 500]
+            rows = conn.execute(
+                "SELECT cache_key, media_url, media_type, checked_at FROM hosted_article_media "
+                f"WHERE cache_key IN ({','.join('?' * len(chunk))})",
+                chunk,
+            ).fetchall()
+            for row in rows:
+                result[row[0]] = (row[1] or None, row[2] or None, float(row[3] or 0))
+    finally:
+        conn.close()
+    return result
+
+
+def set_hosted_article_media(cache_key: str, media_url: str | None, media_type: str | None) -> None:
+    if not cache_key:
+        return
+    now = time.time()
+    conn = get_connection()
+    try:
+        conn.execute(
+            "INSERT OR REPLACE INTO hosted_article_media (cache_key, media_url, media_type, checked_at) "
+            "VALUES (?, ?, ?, ?)",
+            (str(cache_key), media_url or None, media_type or None, now),
+        )
+        conn.execute(
+            "DELETE FROM hosted_article_media WHERE checked_at < ?",
+            (now - HOSTED_ARTICLE_MEDIA_MAX_AGE_S,),
+        )
+        conn.commit()
+    finally:
+        conn.close()
 
 
 def _bool_or_none(value):

@@ -35,6 +35,9 @@ import re
 import html as html_module
 import json
 import logging
+import threading
+import time
+from concurrent.futures import Future, ThreadPoolExecutor, wait
 from urllib.parse import urlsplit
 from bs4 import BeautifulSoup, NavigableString
 from core import utils
@@ -303,3 +306,73 @@ def extract_npr_audio(url: str, timeout_s: float = 10.0) -> tuple[str | None, st
         log.warning(f"NPR audio extraction failed for {url}: {e}")
 
     return None, None
+
+
+# Hosted readers (Miniflux etc.) only relay the feed, and NPR's program feeds
+# (Morning Edition is feeds.npr.org/3/rss.xml) carry no enclosure at all, so the
+# audio the local provider finds at refresh time has to be found client-side.
+# Results persist in db.hosted_article_media; a miss is retried after this long
+# because a story's audio can be posted after the story itself.
+_MISS_RETRY_S = 6 * 3600
+_resolve_pool = ThreadPoolExecutor(max_workers=4, thread_name_prefix="npr-audio")
+_inflight: dict[str, Future] = {}
+_inflight_lock = threading.Lock()
+
+
+def _resolve_and_store(cache_key: str, url: str, timeout_s: float):
+    from core import db
+
+    try:
+        media_url, media_type = extract_npr_audio(url, timeout_s=timeout_s)
+        db.set_hosted_article_media(cache_key, media_url, media_type)
+        return media_url, media_type
+    finally:
+        with _inflight_lock:
+            _inflight.pop(cache_key, None)
+
+
+def attach_hosted_media(articles, cache_key_for, *, timeout_s: float = 10.0,
+                        wait_s: float = 3.0, max_new: int = 40) -> None:
+    """Fill media on hosted articles whose feed entry had no usable enclosure.
+
+    Stored media (NPR audio, Detect Audio results) applies immediately to any
+    article. NPR stories with nothing stored are resolved in the background,
+    newest first, waiting at most ``wait_s`` so a page of articles is never held
+    up for long; whatever finishes later is picked up on the next load. Runs on
+    article-loader threads, never the UI thread.
+    """
+    from core import db
+
+    targets = [(a, cache_key_for(a.id)) for a in articles if not getattr(a, "media_url", None)]
+    targets = [(a, key) for a, key in targets if key]
+    if not targets:
+        return
+    stored = db.get_hosted_article_media([key for _a, key in targets])
+    now = time.time()
+    pending: list[tuple[object, Future]] = []
+    for article, key in targets:
+        row = stored.get(key)
+        if row and row[0]:
+            article.media_url, article.media_type = row[0], row[1] or "audio/mpeg"
+            continue
+        if not story_id_from_url(getattr(article, "url", "")):
+            continue
+        if row and now - row[2] < _MISS_RETRY_S:
+            continue
+        # ponytail: per-call cap, not a priority queue; older stories resolve on later loads.
+        if len(pending) >= max_new:
+            continue
+        with _inflight_lock:
+            future = _inflight.get(key)
+            if future is None:
+                future = _resolve_pool.submit(_resolve_and_store, key, article.url, timeout_s)
+                _inflight[key] = future
+        pending.append((article, future))
+    if not pending:
+        return
+    wait([f for _a, f in pending], timeout=wait_s)
+    for article, future in pending:
+        if future.done() and not future.cancelled() and future.exception() is None:
+            media_url, media_type = future.result()
+            if media_url:
+                article.media_url, article.media_type = media_url, media_type or "audio/mpeg"

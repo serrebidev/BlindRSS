@@ -9,7 +9,7 @@ import urllib.parse
 import logging
 from typing import List, Dict, Any
 from datetime import datetime, timezone
-from .base import RSSProvider
+from .base import HostedArticleMediaMixin, RSSProvider
 from .hosted_podcast_archive import HostedPodcastArchiveMixin
 from core.models import Feed, Article
 from core.categories import UNCATEGORIZED
@@ -17,7 +17,7 @@ from core import utils
 
 log = logging.getLogger(__name__)
 
-class TheOldReaderProvider(HostedPodcastArchiveMixin, RSSProvider):
+class TheOldReaderProvider(HostedPodcastArchiveMixin, HostedArticleMediaMixin, RSSProvider):
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self.conf = config.get("providers", {}).get("theoldreader", {})
@@ -404,13 +404,7 @@ class TheOldReaderProvider(HostedPodcastArchiveMixin, RSSProvider):
                     content = summary_content
                 if "content" in item: content = item["content"]["content"]
                 
-                media_url = None
-                media_type = None
-                if "enclosure" in item and item["enclosure"]:
-                    encs = item["enclosure"]
-                    if isinstance(encs, list) and encs:
-                        media_url = encs[0].get("href")
-                        media_type = encs[0].get("type")
+                media_url, media_type = utils.playable_enclosure(item.get("enclosure"))
                 
                 article_id = str(item["id"])
                 article_feed_id = self._resolve_item_feed_id(item, fallback_feed_id)
@@ -471,6 +465,7 @@ class TheOldReaderProvider(HostedPodcastArchiveMixin, RSSProvider):
                     cache_id=cache_id,
                     description=summary_content or None,
                 ))
+            self._attach_hosted_media(articles)
             log.info(f"TheOldReader: Returning {len(articles)} processed articles.")
             return articles
         except requests.exceptions.HTTPError as he:

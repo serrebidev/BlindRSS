@@ -360,3 +360,31 @@ class RSSProvider(abc.ABC):
 
     def delete_smart_folder(self, folder_id):
         return False
+
+
+class HostedArticleMediaMixin:
+    """Media a hosted reader cannot carry: NPR player audio and Detect Audio results.
+
+    Hosted services only relay the feed's enclosures and cannot store new ones, so
+    both live in the local ``hosted_article_media`` sidecar, keyed by the provider's
+    account-scoped ``_chapter_cache_key``. Call ``_attach_hosted_media`` on every
+    freshly built page of articles (from loader threads, never the UI thread).
+    """
+
+    def _attach_hosted_media(self, articles) -> None:
+        from core import npr
+
+        try:
+            timeout_s = float(self.config.get("feed_timeout_seconds", 15) or 15)
+            npr.attach_hosted_media(articles, self._chapter_cache_key, timeout_s=timeout_s)
+        except Exception:
+            log.debug("%s stored/NPR media lookup failed", self.get_name(), exc_info=True)
+
+    def update_article_media(self, article_id: str, media_url: str, media_type: str) -> bool:
+        from core import db
+
+        key = self._chapter_cache_key(str(article_id))
+        if not key or not media_url:
+            return False
+        db.set_hosted_article_media(key, media_url, media_type)
+        return True
