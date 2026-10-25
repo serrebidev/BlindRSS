@@ -2332,8 +2332,9 @@ class MainFrame(wx.Frame):
         self._shortcut_menu_items = {}
 
         file_menu = wx.Menu()
+        feeds_menu = wx.Menu()
         add_feed_item = self._append_shortcut_menu_item(
-            file_menu, "feeds.add", _("&Add Feed"), _("Add a new RSS feed"))
+            feeds_menu, "feeds.add", _("&Add Feed"), _("Add a new RSS feed"))
         open_article_item = self._append_shortcut_menu_item(
             file_menu, "article.open_url", _("&Open Article..."),
             _("Read any web page in the BlindRSS article reader"))
@@ -2341,21 +2342,21 @@ class MainFrame(wx.Frame):
             file_menu, "media.open_url", _("Open Media &URL..."),
             _("Stream or download media from any supported link"))
         detect_feeds_item = self._append_shortcut_menu_item(
-            file_menu, "feeds.detect_page", _("Detect Feeds on &Page..."),
+            feeds_menu, "feeds.detect_page", _("Detect Feeds on &Page..."),
             _("Scan a webpage for RSS, Atom, or JSON feed links"))
         remove_feed_item = self._append_shortcut_menu_item(
-            file_menu, "feeds.remove", _("&Remove Feed"), _("Remove selected feed"))
+            feeds_menu, "feeds.remove", _("&Remove Feed"), _("Remove selected feed"))
         refresh_item = self._append_shortcut_menu_item(
-            file_menu, "feeds.refresh_all", _("&Refresh Feeds"), _("Refresh all feeds"),
+            feeds_menu, "feeds.refresh_all", _("&Refresh Feeds"), _("Refresh all feeds"),
             item_id=wx.ID_REFRESH)
         stop_refresh_item = self._append_shortcut_menu_item(
-            file_menu, "feeds.stop_refresh", _("S&top Refresh"),
+            feeds_menu, "feeds.stop_refresh", _("S&top Refresh"),
             _("Stop the feed refresh currently in progress"))
         mark_all_read_item = self._append_shortcut_menu_item(
             file_menu, "feeds.mark_all_read", _("Mark All Items as &Read"),
             _("Mark all items in all feeds as read"))
         view_errors_item = self._append_shortcut_menu_item(
-            file_menu, "feeds.view_errors", _("View Feed &Errors..."),
+            feeds_menu, "feeds.view_errors", _("View Feed &Errors..."),
             _("View feeds that failed to update"))
         file_menu.AppendSeparator()
         add_cat_item = self._append_shortcut_menu_item(
@@ -2363,13 +2364,14 @@ class MainFrame(wx.Frame):
         remove_cat_item = self._append_shortcut_menu_item(
             file_menu, "feeds.remove_category", _("Remove C&ategory"), _("Remove selected category"))
         file_menu.AppendSeparator()
+        feeds_menu.AppendSeparator()
         import_opml_item = self._append_shortcut_menu_item(
-            file_menu, "feeds.import_opml", _("&Import OPML..."), _("Import feeds from OPML"))
+            feeds_menu, "feeds.import_opml", _("&Import OPML..."), _("Import feeds from OPML"))
         import_youtube_takeout_item = self._append_shortcut_menu_item(
-            file_menu, "feeds.import_youtube_takeout", _("Import &YouTube Takeout..."),
+            feeds_menu, "feeds.import_youtube_takeout", _("Import &YouTube Takeout..."),
             _("Import YouTube subscriptions, playlists, channels, and watch-history channels"))
         export_opml_item = self._append_shortcut_menu_item(
-            file_menu, "feeds.export_opml", _("E&xport OPML..."), _("Export feeds to OPML"))
+            feeds_menu, "feeds.export_opml", _("E&xport OPML..."), _("Export feeds to OPML"))
         backup_data_item = self._append_shortcut_menu_item(
             file_menu, "tools.backup_data", _("&Back Up Data..."),
             _("Save settings, subscriptions, read state, rules and saved cookies to one file"))
@@ -2619,6 +2621,7 @@ class MainFrame(wx.Frame):
         about_item = help_menu.Append(wx.ID_ABOUT, _("&About"), _("About BlindRSS"))
 
         menubar.Append(file_menu, _("&File"))
+        menubar.Append(feeds_menu, _("Fee&ds"))
         menubar.Append(edit_menu, _("&Edit"))
         menubar.Append(view_menu, _("&View"))
         menubar.Append(player_menu, _("&Player"))
