@@ -1217,7 +1217,9 @@ class AccessibleBrowserFrame(wx.Frame):
             pass
 
     def on_refresh_feeds(self, _event):
-        self.mainframe.refresh_feeds()
+        # The main window's manual refresh: refresh_feeds() only reloads the
+        # cached tree and would fetch nothing.
+        self.mainframe.on_refresh_feeds()
         self.status_lbl.SetLabel(_("Refreshing feeds..."))
 
     def on_view_selected(self, _event):

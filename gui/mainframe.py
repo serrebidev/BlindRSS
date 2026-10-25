@@ -4939,7 +4939,9 @@ class MainFrame(wx.Frame):
         except Exception as e:
             log.error(f"Hosted chapter cache cleanup failed: {e}")
 
-    def _run_refresh(self, block: bool, force: bool = False, scheduled: bool = False) -> bool:
+    def _run_refresh(
+        self, block: bool, force: bool = False, scheduled: bool = False, manual: bool = False
+    ) -> bool:
         """Run provider.refresh with optional blocking guard to avoid overlap.
         
         Performs retention cleanup BEFORE the refresh to avoid the following bug:
@@ -5093,7 +5095,13 @@ class MainFrame(wx.Frame):
                         hidden,
                     ).format(count=hidden),
                 )
-            if new_items_total > 0:
+            # A refresh the user asked for always chimes when it completes, like
+            # the single-feed refresh. Hosted servers (Miniflux) poll feeds on
+            # their own, so the background tick usually delivers the new
+            # articles first and the manual refresh then finds none. Background
+            # ticks chime only for new items, never every interval.
+            stopped = int(getattr(self, "_refresh_stop_epoch", 0) or 0) != stop_epoch
+            if not stopped and (manual or new_items_total > 0):
                 self._play_sound("sound_refresh_complete")
             log.info(
                 "Refresh run finished provider=%s force=%s duration_s=%.2f new_items=%s",
@@ -5135,7 +5143,7 @@ class MainFrame(wx.Frame):
     def _manual_refresh_thread(self):
         # Manual refresh should wait for any in-flight refresh to finish.
         log.info("Manual full refresh thread started")
-        ran = self._run_refresh(block=True, force=True)
+        ran = self._run_refresh(block=True, force=True, manual=True)
         if not ran:
             print("Manual refresh skipped: another refresh is running.")
             log.info("Manual full refresh did not run because another refresh was active")
@@ -14667,6 +14675,7 @@ class MainFrame(wx.Frame):
             threading.Thread(target=self._manual_refresh_thread, daemon=True).start()
             return
 
+        stop_epoch = int(getattr(self, "_refresh_stop_epoch", 0) or 0)
         acquired = False
         try:
             acquired = self._refresh_guard.acquire(blocking=True)
@@ -14709,6 +14718,9 @@ class MainFrame(wx.Frame):
             except Exception:
                 pass
 
+        # User-requested, like a full or single-feed refresh: chime on completion.
+        if int(getattr(self, "_refresh_stop_epoch", 0) or 0) == stop_epoch:
+            self._play_sound("sound_refresh_complete")
         wx.CallAfter(self._flush_feed_refresh_progress)
         wx.CallAfter(self.refresh_feeds)
 

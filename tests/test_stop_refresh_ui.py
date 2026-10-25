@@ -295,3 +295,43 @@ def test_end_of_a_stopped_batch_reports_stopped_not_complete():
     # A later, normal batch is unaffected.
     host._end_refresh_activity()
     assert host.statuses[-1] == "Refresh complete"
+
+
+def _record_sounds(host):
+    sounds = []
+    host._play_sound = sounds.append
+    return sounds
+
+
+def test_manual_refresh_chimes_even_without_new_items():
+    # Miniflux polls feeds on its own server, so the background tick usually
+    # shows new articles before the user refreshes; the manual refresh then
+    # finds none, and used to finish silently with only "Refresh complete".
+    host = _Host()
+    sounds = _record_sounds(host)
+    host.provider.release.set()
+
+    assert host._run_refresh(block=True, force=True, manual=True) is True
+    assert sounds == ["sound_refresh_complete"]
+
+
+def test_scheduled_refresh_without_new_items_stays_silent():
+    host = _Host()
+    sounds = _record_sounds(host)
+    host.provider.release.set()
+
+    assert host._run_refresh(block=False, scheduled=True) is True
+    assert sounds == []
+
+
+def test_manual_refresh_stopped_by_user_does_not_chime_complete():
+    host = _Host()
+    sounds = _record_sounds(host)
+
+    def refresh(progress_cb=None, **kwargs):
+        host.on_stop_refresh()
+        return True
+
+    host.provider.refresh = refresh
+    host._run_refresh(block=True, force=True, manual=True)
+    assert "sound_refresh_complete" not in sounds

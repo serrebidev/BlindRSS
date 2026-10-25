@@ -39,6 +39,7 @@ class _DummyMain:
         self.flush_calls = 0
         self.refresh_feeds_calls = 0
         self.activity_status_updates = []
+        self.sounds = []
 
     def _resume_auto_refresh(self):
         # No-op for the refresh-activity stub (real MainFrame manages its own
@@ -53,6 +54,9 @@ class _DummyMain:
 
     def refresh_feeds(self):
         self.refresh_feeds_calls += 1
+
+    def _play_sound(self, key):
+        self.sounds.append(key)
 
     def SetStatusText(self, text, number=0):
         if number == 1:
@@ -134,6 +138,7 @@ def test_refresh_category_thread_uses_batch_provider(monkeypatch):
     assert host.flush_calls == 1
     assert host.refresh_feeds_calls == 1
     assert host.activity_status_updates == ["Refreshing category: Podcasts...", "Refresh complete"]
+    assert host.sounds == ["sound_refresh_complete"]
 
 
 def test_export_category_opml_to_path_uses_filtered_feeds(monkeypatch):

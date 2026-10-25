@@ -86,6 +86,9 @@ class _StubMainFrame(wx.Frame):
     def refresh_feeds(self):
         self.calls.append(("refresh_feeds",))
 
+    def on_refresh_feeds(self, event=None):
+        self.calls.append(("network_refresh",))
+
     def on_refresh_category(self, event=None, category_title=None):
         self.calls.append(("refresh_category", category_title))
 
@@ -328,5 +331,16 @@ def test_f2_key_event_reaches_the_editor_and_is_not_skipped(wxapp, monkeypatch):
 
         assert ("edit_category", "News") in mf.calls
         assert skipped == []
+    finally:
+        _destroy(mf, frame)
+
+
+def test_refresh_feeds_runs_a_network_refresh(wxapp):
+    # Ctrl+R / the Refresh button used to only reload the cached tree, so
+    # nothing was fetched and the refresh-complete sound never played.
+    mf, frame = _make(wxapp)
+    try:
+        frame.on_refresh_feeds(None)
+        assert ("network_refresh",) in mf.calls
     finally:
         _destroy(mf, frame)
