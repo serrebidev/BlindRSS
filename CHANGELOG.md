@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.4.7 - 2026-10-25
+
+- Give hosted providers NPR audio and the right enclosure.
+
 ## v2.4.6 - 2026-10-25
 
 - Chime when a manual Miniflux refresh completes.
