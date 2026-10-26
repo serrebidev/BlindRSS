@@ -555,6 +555,44 @@ def _socast_reconstruct(soup, url: str):
     return container
 
 
+def _publisher_body_reconstruct(soup, url: str):
+    """Keep verified publisher body containers instead of heuristic excerpts."""
+    try:
+        host = (urlsplit(url).hostname or "").lower().removeprefix("www.")
+    except ValueError:
+        return None
+    selector = {
+        "arstechnica.com": "div.post-content",
+        "theregister.com": ".bodytext",
+        "theregister.co.uk": ".bodytext",
+        "macrumors.com": ".js-content",
+        "zdnet.com": ".entry-content",
+    }.get(host)
+    if selector is None:
+        return None
+    article = soup.find("article")
+    if article is None:
+        return None
+    parts = article.select(selector)
+    if not parts:
+        return None
+    container = soup.new_tag("article")
+    # Nested body wrappers belong to their outer section; move each only once.
+    parts = [part for part in parts if not any(parent in parts for parent in part.parents)]
+    for part in parts:
+        container.append(part.extract())
+    for junk in container.select(
+        ".ars-interlude-container, .page-anchor-wrapper, .articlesByTag, .google-ad, "
+        ".wp-block-ziff-davis-exco-video, .zd-disqus, .articleAuthorBioFooter-container, "
+        ".zd-post-footer-pattern"
+    ):
+        junk.decompose()
+    # ZDNET wraps real prose alongside a related-video widget in this container.
+    for wrapper in container.select(".zd-related-stories-flow"):
+        wrapper.unwrap()
+    return container if container.get_text(strip=True) else None
+
+
 def clean_article_html(html: str, url: str = "", *, use_traf_prune: bool = True) -> str:
     """Return a sanitized article-body HTML fragment, or '' if none is usable.
 
@@ -579,6 +617,8 @@ def clean_article_html(html: str, url: str = "", *, use_traf_prune: bool = True)
     reconstructed = False
     node = None
     for detect, rebuild in (
+        (any(host in url.lower() for host in ("arstechnica.com", "theregister.", "macrumors.com", "zdnet.com")),
+         _publisher_body_reconstruct),
         (_looks_socast(str(html)), _socast_reconstruct),
         (_is_forum_thread_host(url), _forum_reconstruct),
     ):

@@ -2031,6 +2031,13 @@ def _extract_socast_text(html: str, url: str) -> str:
 
 def _extract_site_specific_text(html: str, url: str) -> str:
     """Site-specific structured body extraction that outranks generic heuristics."""
+    if _host_matches(url, "arstechnica.com") or _host_matches(url, "zdnet.com"):
+        from core.article_html import _publisher_body_reconstruct
+
+        soup = _parse_html_soup(html, context="publisher body")
+        body = _publisher_body_reconstruct(soup, url) if soup is not None else None
+        if body is not None:
+            return _normalize_whitespace(utils.html_to_text(str(body)))
     if _is_bloomberg_video_url(url):
         return _extract_bloomberg_video_text(html, url)
     if _host_matches(url, "axios.com"):
