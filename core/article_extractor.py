@@ -2330,8 +2330,49 @@ def _strip_axios_boilerplate(text: str) -> str:
     kept = [p for p in paras if not any(rx.search(p) for rx in _AXIOS_BOILERPLATE_PATTERNS)]
     return "\n\n".join(kept).strip()
 
-def _strip_bbc_boilerplate(text: str) -> str:
+# BBC bylines extract as a bare "- Published" line at the top of the body:
+# the label survives as a list item, but the date next to it is rendered
+# outside the extracted tree, so the line dangles with no date.
+_BBC_LEAD_PUBLISHED_RE = re.compile(r"\A\s*-\s*Published\s*\n")
+
+
+def _published_date_label(html_text: str) -> str:
+    """'30 October 2026' from a page's structured data, or ''.
+
+    JSON-LD ``datePublished`` first, then the article:published_time
+    meta tag. Trafilatura's metadata date is NOT used: on BBC pages it
+    picks up unrelated dates (it read 2026-10-01 for an article the
+    page's own JSON-LD dates 2026-10-30).
+    """
+    if not html_text:
+        return ""
+    raw = ""
+    m = re.search(r'"datePublished"\s*:\s*"([^"]+)"', html_text)
+    if m:
+        raw = m.group(1)
+    else:
+        m = re.search(
+            r"<meta[^>]+(?:property|name)=[\"']article:published_time[\"'][^>]+content=[\"']([^\"']+)",
+            html_text,
+        )
+        if m:
+            raw = m.group(1)
+    if not raw:
+        return ""
+    try:
+        dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return ""
+    return f"{dt.day} {dt:%B %Y}"
+
+
+def _strip_bbc_boilerplate(text: str, published: str = "") -> str:
     t = re.sub(r"(?i)ShareSave", "", text)
+    # Complete the dangling byline with the publish date when the page
+    # carried one; drop the line when it did not.
+    if _BBC_LEAD_PUBLISHED_RE.match(t):
+        lead = f"- Published {published}\n" if published else ""
+        t = _BBC_LEAD_PUBLISHED_RE.sub(lead, t, count=1)
     return t
 
 def _strip_wsj_boilerplate(text: str) -> str:
@@ -2669,7 +2710,7 @@ def _strip_embedded_script_code(text: str) -> str:
     return out or text
 
 
-def _postprocess_extracted_text(text: str, url: str) -> str:
+def _postprocess_extracted_text(text: str, url: str, published: str = "") -> str:
     t = _normalize_whitespace(text or "")
     if not t:
         return ""
@@ -2699,7 +2740,7 @@ def _postprocess_extracted_text(text: str, url: str) -> str:
     elif "axios.com" in netloc:
         t = _strip_axios_boilerplate(t)
     elif "bbc.com" in netloc or "bbc.co.uk" in netloc:
-        t = _strip_bbc_boilerplate(t)
+        t = _strip_bbc_boilerplate(t, published)
     elif "wsj.com" in netloc:
         t = _strip_wsj_boilerplate(t)
     elif "techradar.com" in netloc:
@@ -4760,6 +4801,7 @@ def extract_full_article(
     blocked = False
     used_proxy_text = False
     metered_preview = False
+    first_html = ""
 
     # Not `for _ in ...`: that rebinds the gettext `_` to an int for the whole
     # function, so every _( ) error message below raised instead of translating.
@@ -4793,6 +4835,8 @@ def extract_full_article(
             except Exception:
                 pass
         if not downloaded_any:
+            first_html = html
+        if not downloaded_any:
             metered_preview = _looks_like_metered_preview(html)
         downloaded_any = True
 
@@ -4821,7 +4865,9 @@ def extract_full_article(
     # ate real content (plain short headings and their standalone lines) from the
     # classic full-text view — e.g. Android Authority's "Sofascore" h3.
     merged = _merge_texts(page_texts, drop_short_paragraphs=used_proxy_text)
-    merged = _postprocess_extracted_text(merged, extraction_url)
+    merged = _postprocess_extracted_text(
+        merged, extraction_url, _published_date_label(first_html)
+    )
     # Guard against gate text that slipped through extraction (e.g. a short verification body).
     if merged and len(merged) < _BOT_INTERSTITIAL_MAX_BODY_LEN and _looks_like_bot_interstitial(merged):
         raise ExtractionError(_blocked_interstitial_message(extraction_url))
@@ -4856,7 +4902,9 @@ def extract_from_html(html: str, source_url: str = "", title: str = "", author: 
     if not html:
         return None
     text = _extract_text_any(html, source_url or "")
-    text = _postprocess_extracted_text(text, source_url or "")
+    text = _postprocess_extracted_text(
+        text, source_url or "", _published_date_label(html)
+    )
     if not text:
         return None
 

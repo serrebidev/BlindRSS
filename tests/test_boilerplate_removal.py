@@ -8,6 +8,51 @@ import os
 sys.path.append(os.getcwd())
 from core import article_extractor
 
+class TestBbcPublishedLine(unittest.TestCase):
+    URL = "https://www.bbc.co.uk/news/articles/cwg7xp8kx4v5o"
+    BODY = "- Published\nCryptocurrency giant Binance said on Thursday."
+
+    def test_bare_line_completed_with_date(self):
+        cleaned = article_extractor._postprocess_extracted_text(
+            self.BODY, self.URL, "30 October 2026"
+        )
+        self.assertEqual(
+            cleaned,
+            "- Published 30 October 2026\nCryptocurrency giant Binance said on Thursday.",
+        )
+
+    def test_bare_line_dropped_without_date(self):
+        cleaned = article_extractor._postprocess_extracted_text(self.BODY, self.URL)
+        self.assertEqual(
+            cleaned, "Cryptocurrency giant Binance said on Thursday."
+        )
+
+    def test_completed_line_untouched(self):
+        text = "- Published 29 October 2026\nBody."
+        cleaned = article_extractor._postprocess_extracted_text(text, self.URL)
+        self.assertEqual(cleaned, text)
+
+    def test_other_sites_untouched(self):
+        cleaned = article_extractor._postprocess_extracted_text(
+            self.BODY, "https://example.com/story", "30 October 2026"
+        )
+        self.assertEqual(cleaned, self.BODY)
+
+    def test_published_date_label_sources(self):
+        label = article_extractor._published_date_label
+        self.assertEqual(
+            label('<script>{"datePublished":"2026-10-30T00:37:59.699Z"}</script>'),
+            "30 October 2026",
+        )
+        self.assertEqual(
+            label('<meta property="article:published_time" content="2025-01-05T10:00:00Z">'),
+            "5 January 2025",
+        )
+        self.assertEqual(label("<html><body>no dates</body></html>"), "")
+        self.assertEqual(label(""), "")
+        self.assertEqual(label('{"datePublished":"not a date"}'), "")
+
+
 class TestBoilerplateRemoval(unittest.TestCase):
     def test_9to5mac(self):
         text = """
