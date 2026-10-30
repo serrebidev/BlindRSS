@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.5.4 - 2026-10-30
+
+- Update Polish translation (#128).
+
 ## v2.5.3 - 2026-10-30
 
 - Complete the BBC byline date instead of a bare '- Published' line.
