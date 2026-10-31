@@ -33,6 +33,18 @@ class _ListCtrl:
     def SetItem(self, idx, col, text):
         self.rows[idx][col] = text
 
+    def GetItemCount(self):
+        return len(self.rows)
+
+    def GetFirstSelected(self):
+        return -1
+
+    def GetFocusedItem(self):
+        return getattr(self, "focused", -1)
+
+    def SetItemState(self, idx, state, mask):
+        self.focused = idx
+
     def Freeze(self):
         self.frozen = True
 
@@ -42,6 +54,8 @@ class _ListCtrl:
 
 class _Host:
     _render_articles_list = mainframe.MainFrame._render_articles_list
+    _focus_first_row_if_unvisited = mainframe.MainFrame._focus_first_row_if_unvisited
+    _window_is_or_child = mainframe.MainFrame._window_is_or_child
     _insert_article_row = mainframe.MainFrame._insert_article_row
     _article_media_label = mainframe.MainFrame._article_media_label
     _should_play_in_player = mainframe.MainFrame._should_play_in_player
@@ -66,6 +80,9 @@ class _Host:
 
     def _get_display_title(self, article):
         return article.title
+
+    def _get_focused_window(self):
+        return None  # keyboard focus is outside the article list
 
     def _show_images_for_feed(self, _feed_id):
         return False

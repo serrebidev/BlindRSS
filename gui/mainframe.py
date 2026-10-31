@@ -1321,7 +1321,7 @@ class MainFrame(wx.Frame):
         return filtered
 
     def _capture_list_view_state(self):
-        focused_idx = self.list_ctrl.GetFocusedItem()
+        focused_idx = self._user_focused_row()
         selected_idx = self.list_ctrl.GetFirstSelected()
         focused_on_load_more = self._is_load_more_row(focused_idx)
         selected_on_load_more = self._is_load_more_row(selected_idx)
@@ -1380,6 +1380,7 @@ class MainFrame(wx.Frame):
                 self._insert_article_row(i, articles[i])
         finally:
             self.list_ctrl.Thaw()
+        self._focus_first_row_if_unvisited()
 
         if first_count < len(articles):
             self._article_render_inflight = True
@@ -7151,7 +7152,7 @@ class MainFrame(wx.Frame):
             idx = wx.NOT_FOUND
         if idx == wx.NOT_FOUND:
             try:
-                idx = self.list_ctrl.GetFocusedItem()
+                idx = self._user_focused_row()
             except Exception:
                 idx = wx.NOT_FOUND
         return idx
@@ -10191,7 +10192,7 @@ class MainFrame(wx.Frame):
             return
 
         # Capture state before update to restore position
-        focused_idx = self.list_ctrl.GetFocusedItem()
+        focused_idx = self._user_focused_row()
         selected_idx = self.list_ctrl.GetFirstSelected()
         focused_on_load_more = self._is_load_more_row(focused_idx)
         selected_on_load_more = self._is_load_more_row(selected_idx)
@@ -10347,6 +10348,11 @@ class MainFrame(wx.Frame):
                 if count > 0 and not already_top:
                     self.list_ctrl.EnsureVisible(count - 1)
                     self.list_ctrl.EnsureVisible(target_idx)
+
+        # Search, sort and filter changes render while the old article id is
+        # still remembered, then drop it when the article is gone: nothing was
+        # restored, so give the list its placeholder row focus now.
+        self._focus_first_row_if_unvisited()
 
     def _restore_load_more_focus(self):
         """Keep focus on the Load More row after paging for screen readers."""
@@ -10604,7 +10610,7 @@ class MainFrame(wx.Frame):
         # Remember selection and focus by article id
         selected_id = getattr(self, "selected_article_id", None)
 
-        focused_idx = self.list_ctrl.GetFocusedItem()
+        focused_idx = self._user_focused_row()
         selected_idx = self.list_ctrl.GetFirstSelected()
         focused_on_load_more = self._is_load_more_row(focused_idx)
         selected_on_load_more = self._is_load_more_row(selected_idx)
@@ -10731,6 +10737,7 @@ class MainFrame(wx.Frame):
                             self._insert_article_row(idx, art)
                     finally:
                         self.list_ctrl.Thaw()
+                    self._focus_first_row_if_unvisited()
                 if more:
                     self._add_loading_more_placeholder()
                 else:
@@ -10798,6 +10805,55 @@ class MainFrame(wx.Frame):
             self._queue_fulltext_prefetch(visible_new)
         except Exception:
             pass
+
+    def _focus_first_row_if_unvisited(self) -> None:
+        """Keep row 0 the list's focused row until a row is selected.
+
+        With no focused row, Tab into the list made NVDA say only "list". Set
+        the state only while the list does NOT have keyboard focus (after a
+        render, merge or restore): it fires no event then, and on entry the
+        listview announces the row itself, right after user32's list focus
+        event, so NVDA normally reads it once. (Python work between those two
+        events, e.g. the app's event filters under refresh load, can still
+        split them and cause a double read, as in v2.5.4.) Doing it in
+        EVT_SET_FOCUS puts Python between them and fires a second item focus
+        event; NVDA pumps every focus event at once and never drops a repeated
+        list-item focus, so it reads the row twice. Only the focused state:
+        selecting loads the article. Skipped while a selected article is
+        remembered: the pending restore focuses that row.
+        """
+        ctrl = self.list_ctrl
+        try:
+            if getattr(self, "selected_article_id", None):
+                return
+            if ctrl.GetItemCount() <= 0 or ctrl.GetFirstSelected() != wx.NOT_FOUND:
+                return
+            # The generic ListCtrl (GTK/macOS) keeps keyboard focus on an
+            # inner child window, so test the focused window's ancestry.
+            if self._window_is_or_child(self._get_focused_window(), ctrl):
+                return
+            if ctrl.GetFocusedItem() != 0:
+                ctrl.SetItemState(0, wx.LIST_STATE_FOCUSED, wx.LIST_STATE_FOCUSED)
+        except (RuntimeError, AssertionError):
+            # A list being destroyed, or a wx assertion: the row stays unfocused.
+            log.debug("Could not focus the first article row", exc_info=True)
+
+    def _user_focused_row(self) -> int:
+        """The list's focused row, or NOT_FOUND for the placeholder focus.
+
+        With nothing selected and the list not focused, the focused row is the
+        one _focus_first_row_if_unvisited set, not one the user picked: it must
+        not anchor merges/restores or become the target of article commands.
+        """
+        ctrl = self.list_ctrl
+        idx = ctrl.GetFocusedItem()
+        if (
+            idx != wx.NOT_FOUND
+            and ctrl.GetFirstSelected() == wx.NOT_FOUND
+            and not self._window_is_or_child(self._get_focused_window(), ctrl)
+        ):
+            return wx.NOT_FOUND
+        return idx
 
     def on_article_select(self, event):
         if self._updating_list:

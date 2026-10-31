@@ -13,6 +13,7 @@ tests/test_mainframe_issue22_shortcuts.py).
 
 import os
 import sys
+from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -54,10 +55,20 @@ class _FakeListCtrl:
         self.selected = -1
         self.top = 0
         self.columns = []  # list of header labels, in display order
+        self.state_calls = []
 
     def DeleteAllItems(self):
         self.delete_all_calls += 1
         self.rows = []
+        self.focused = -1
+        self.selected = -1
+
+    def SetItemState(self, index, state, mask):
+        self.state_calls.append((index, state, mask))
+        if mask & mainframe.wx.LIST_STATE_FOCUSED:
+            self.focused = index if state & mainframe.wx.LIST_STATE_FOCUSED else -1
+        if mask & mainframe.wx.LIST_STATE_SELECTED:
+            self.selected = index if state & mainframe.wx.LIST_STATE_SELECTED else -1
 
     def DeleteAllColumns(self):
         self.columns = []
@@ -110,6 +121,9 @@ class _FakeListCtrl:
     def GetTopItem(self):
         return self.top
 
+    def EnsureVisible(self, index):
+        self.ensure_visible_calls = getattr(self, "ensure_visible_calls", []) + [index]
+
     def Freeze(self):
         self.freeze_depth += 1
 
@@ -149,6 +163,10 @@ class _RenderHost:
     _col = mainframe.MainFrame._col
     _set_col = mainframe.MainFrame._set_col
     _clear_non_title_cells = mainframe.MainFrame._clear_non_title_cells
+    _focus_first_row_if_unvisited = mainframe.MainFrame._focus_first_row_if_unvisited
+    _user_focused_row = mainframe.MainFrame._user_focused_row
+    _get_selected_article_index = mainframe.MainFrame._get_selected_article_index
+    _window_is_or_child = mainframe.MainFrame._window_is_or_child
 
     def __init__(self, *, first_chunk=2, batch_size=2, feed_map=None, columns=None):
         self.list_ctrl = _FakeListCtrl()
@@ -169,6 +187,10 @@ class _RenderHost:
         self._loading_label = "Loading more..."
         # Spy: count builder calls per article id so memoization is observable.
         self.desc_text_calls = {}
+        self.focus_window = None  # the window with keyboard focus
+
+    def _get_focused_window(self):
+        return self.focus_window
 
     def _article_description_text(self, article, include_images=None):
         _ = include_images
@@ -541,6 +563,209 @@ def test_deferred_quick_merge_is_dropped_by_a_newer_request(monkeypatch):
     _drain(captured)
 
     assert host.list_ctrl.titles() == [*(a.title for a in old), host._load_more_label]
+
+
+def _rendered_host(monkeypatch, *, focus_list=False, remembered_id=None):
+    captured = _install_capturing_call_after(monkeypatch)
+    host = _RenderHost(first_chunk=2, batch_size=2)
+    host.selected_article_id = remembered_id
+    if focus_list:
+        host.focus_window = host.list_ctrl
+    host._render_articles_list([_make_article(i) for i in range(5)])
+    _drain(captured)
+    return host
+
+
+def test_render_gives_an_unfocused_list_a_focused_first_row_without_selecting(monkeypatch):
+    # Tab into a fresh list said only "list": no row had the focused state.
+    # It is set while the list is NOT focused, so it fires no event and the
+    # listview announces the row itself on entry. Never selected: selecting
+    # loads the article.
+    host = _rendered_host(monkeypatch)
+
+    assert (host.list_ctrl.focused, host.list_ctrl.selected) == (0, -1)
+    assert all(not (mask & mainframe.wx.LIST_STATE_SELECTED) for _i, _s, mask in host.list_ctrl.state_calls)
+
+
+def test_render_leaves_row_focus_alone_while_the_list_has_keyboard_focus(monkeypatch):
+    # Focusing row 0 then would make NVDA read it during a background rebuild.
+    host = _rendered_host(monkeypatch, focus_list=True)
+
+    assert host.list_ctrl.state_calls == []
+
+
+def test_render_leaves_row_focus_to_the_restore_of_a_remembered_article(monkeypatch):
+    # Mid-rebuild the pending restore focuses the user's article; row 0 first
+    # would be read before it.
+    host = _rendered_host(monkeypatch, remembered_id="feed-1:article-3")
+
+    assert host.list_ctrl.state_calls == []
+
+
+def test_placeholder_focus_is_no_command_target_or_merge_anchor(monkeypatch):
+    host = _rendered_host(monkeypatch)
+
+    assert host._user_focused_row() == mainframe.wx.NOT_FOUND
+    assert host._get_selected_article_index() == mainframe.wx.NOT_FOUND
+    host.focus_window = host.list_ctrl  # the user tabbed in: now it is theirs
+    assert host._user_focused_row() == 0
+    assert host._get_selected_article_index() == 0
+
+
+def test_incremental_merge_returns_the_placeholder_focus_to_the_newest_row(monkeypatch):
+    # Rows inserted above shift the native focus down; Tab must still land on
+    # the newest article, not on the old first row.
+    captured = _install_capturing_call_after(monkeypatch)
+    host = _MergeHost()
+    old = [_make_article(i) for i in range(4)]
+    for timestamp, article in zip((4, 3, 2, 1), old):
+        article.timestamp = timestamp
+    host._base_articles = list(old)
+    host.current_articles = list(old)
+    host._render_articles_list(host.current_articles)
+    host._add_loading_more_placeholder()
+    _drain(captured)
+    assert (host.list_ctrl.focused, host.list_ctrl.selected) == (0, -1)
+    fresh = _make_article(9)
+    fresh.timestamp = 5
+
+    host._quick_merge_articles([fresh, *old[:3]], 1, "all")
+
+    assert host.list_ctrl.titles()[0] == fresh.title
+    assert (host.list_ctrl.focused, host.list_ctrl.selected) == (0, -1)
+
+
+class _FocusedChildWindow:
+    """The generic ListCtrl (GTK/macOS) keeps keyboard focus on an inner window."""
+
+    def __init__(self, parent):
+        self._parent = parent
+
+    def GetParent(self):
+        return self._parent
+
+
+def test_focus_on_the_generic_lists_inner_window_counts_as_list_focus(monkeypatch):
+    host = _rendered_host(monkeypatch)
+    assert (host.list_ctrl.focused, host.list_ctrl.selected) == (0, -1)
+
+    host.focus_window = _FocusedChildWindow(host.list_ctrl)
+    assert host._user_focused_row() == 0
+    calls_before = list(host.list_ctrl.state_calls)
+    host._render_articles_list([_make_article(i) for i in range(3)])
+    assert host.list_ctrl.state_calls == calls_before
+    assert host.list_ctrl.focused == -1
+
+
+class _SearchMergeHost(_MergeHost):
+    """Search is active, so every merge takes the full path; restores are real."""
+
+    def __init__(self):
+        super().__init__()
+        self._search_query = ""
+        self.restores = []
+
+    def _is_search_active(self):
+        return True
+
+    def _filter_articles(self, articles, _query):
+        return list(articles)
+
+    def SetStatusText(self, *_args):
+        return None
+
+    def _restore_list_view(self, focused_id, top_id, selected_id=None):
+        self.restores.append((focused_id, top_id, selected_id))
+        mainframe.MainFrame._restore_list_view(self, focused_id, top_id, selected_id)
+
+
+def _host_with_placeholder_focus(monkeypatch, host_cls):
+    captured = _install_capturing_call_after(monkeypatch)
+    host = host_cls()
+    old = [_make_article(i) for i in range(4)]
+    for timestamp, article in zip((4, 3, 2, 1), old):
+        article.timestamp = timestamp
+    host._base_articles = list(old)
+    host.current_articles = list(old)
+    host._render_articles_list(host.current_articles)
+    _drain(captured)
+    assert (host.list_ctrl.focused, host.list_ctrl.selected) == (0, -1)
+    return captured, host, old
+
+
+def test_full_path_merge_does_not_anchor_the_placeholder_focus(monkeypatch):
+    # Anchoring it restored focus (and the scroll top) to the old first row,
+    # now below the new one.
+    captured, host, old = _host_with_placeholder_focus(monkeypatch, _SearchMergeHost)
+    fresh = _make_article(9)
+    fresh.timestamp = 5
+
+    host._quick_merge_articles([fresh, *old[:3]], 1, "all")
+    _drain(captured)
+
+    assert host.restores == [(None, None, None)]
+    assert host.list_ctrl.titles()[0] == fresh.title
+    assert (host.list_ctrl.focused, host.list_ctrl.selected) == (0, -1)
+
+
+def test_captured_view_state_ignores_the_placeholder_focus(monkeypatch):
+    _captured, host, _old = _host_with_placeholder_focus(monkeypatch, _MergeHost)
+    host._capture_list_view_state = mainframe.MainFrame._capture_list_view_state.__get__(host)
+
+    assert host._capture_list_view_state() == (None, None, None, False)
+
+
+class _ViewChangeHost(_MergeHost):
+    """Sort/media-filter change that drops the selected article from the view."""
+
+    _restore_list_view = mainframe.MainFrame._restore_list_view
+    _capture_list_view_state = mainframe.MainFrame._capture_list_view_state
+    _refresh_articles_for_sort_change = mainframe.MainFrame._refresh_articles_for_sort_change
+
+    def __init__(self):
+        super().__init__()
+        self.hidden_id = None
+        self.content_ctrl = SimpleNamespace(SetValue=lambda _value: None)
+
+    def _get_base_articles_for_current_view(self):
+        return list(self._base_articles)
+
+    def _sort_articles_for_display(self, articles):
+        kept = [a for a in articles if a.cache_id != self.hidden_id]
+        return super()._sort_articles_for_display(kept)
+
+    def _should_show_load_more_placeholder(self, _base_count=None):
+        return False
+
+    def _invalidate_reader_text_tracking(self):
+        return None
+
+
+def test_view_change_that_drops_the_selected_article_leaves_a_focused_row(monkeypatch):
+    # The render runs while the old article id is still remembered, then the
+    # id is dropped and the restore finds nothing: the list was left with no
+    # focused row and Tab said only "list" again.
+    captured, host, old = _host_with_placeholder_focus(monkeypatch, _ViewChangeHost)
+    state = mainframe.wx.LIST_STATE_FOCUSED | mainframe.wx.LIST_STATE_SELECTED
+    host.list_ctrl.SetItemState(2, state, state)
+    host.selected_article_id = old[2].cache_id
+    host.hidden_id = old[2].cache_id
+
+    host._refresh_articles_for_sort_change()
+    _drain(captured)
+
+    assert host.selected_article_id is None
+    assert old[2].title not in host.list_ctrl.titles()
+    assert (host.list_ctrl.focused, host.list_ctrl.selected) == (0, -1)
+
+
+def test_article_list_has_no_focus_time_handler():
+    # Python in the list's EVT_SET_FOCUS runs between user32's list focus event
+    # and the listview's item focus event; NVDA then read the row twice.
+    import inspect
+
+    source = inspect.getsource(mainframe.MainFrame.init_ui)
+    assert "self.list_ctrl.Bind(wx.EVT_SET_FOCUS" not in source
 
 
 # --- Column layout (article list columns) ----------------------------------------------
