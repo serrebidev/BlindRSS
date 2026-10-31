@@ -710,6 +710,12 @@ def _find_executable_path(exe_name, extra_dirs=None):
     if user_override:
         return user_override
 
+    # 1.1 The yt-dlp copy _ensure_yt_dlp_cli verified and keeps on the nightly
+    #     channel beats PATH, where _maybe_add_windows_path puts WinGet/pip
+    #     installs (often stale) first.
+    if _canon_tool_name(exe_base) == "yt-dlp" and _managed_ytdlp_exe and os.path.isfile(_managed_ytdlp_exe):
+        return _managed_ytdlp_exe
+
     try:
         _maybe_add_windows_path()
     except Exception:
@@ -1646,8 +1652,16 @@ def _update_managed_ytdlp(local_exe, works):
     return bool(final) and (not latest or final == latest)
 
 
+# The yt-dlp.exe _ensure_yt_dlp_cli ran successfully and keeps updated: the
+# _ytdlp_runtime_bin_dir() copy (%LOCALAPPDATA%\BlindRSS\bin for installed
+# builds, <repo>\bin for source runs) or a portable build's bundled copy.
+# _find_executable_path prefers it over PATH.
+_managed_ytdlp_exe = None
+
+
 def _ensure_yt_dlp_cli():
     """Throttled update/install of yt-dlp binary. Prioritizes working version."""
+    global _managed_ytdlp_exe
     if platform.system().lower() != "windows":
         return
 
@@ -1725,6 +1739,10 @@ def _ensure_yt_dlp_cli():
             _log(f"Using system yt-dlp at {exe}")
 
     if exe:
+        if exe in managed_exes:
+            # Before the update below (up to minutes): lookups meanwhile must
+            # not fall back to PATH. An in-place update keeps this path.
+            _managed_ytdlp_exe = exe
         # Only start the 24h throttle once the update has actually landed, so a
         # copy that fails to update retries on the next launch instead of
         # sitting stale for a day at a time (which is how it fell a month
@@ -1756,6 +1774,8 @@ def _ensure_yt_dlp_cli():
     except Exception as e:
         _log(f"Failed to download yt-dlp: {e}")
         return
+    if works(local_exe):
+        _managed_ytdlp_exe = local_exe
     
     current = os.environ.get("PATH", "")
     if bin_dir not in current.split(os.pathsep):
