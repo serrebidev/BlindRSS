@@ -132,71 +132,72 @@ msgstr ""
 msgid "Status"
 msgstr ""
 
-#: core/article_extractor.py:214
+#: core/article_extractor.py:223
 msgid "This page is behind an anti-bot / human-verification check (e.g. Cloudflare or a \"you're not a robot\" page), so the full text can't be fetched automatically. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:241
+#: core/article_extractor.py:250
 msgid "The page has no readable article text — only navigation or related-story links were found (common for video-only pages). Open the original link in your browser to view it."
 msgstr ""
 
-#: core/article_extractor.py:333
+#: core/article_extractor.py:342
 msgid "This article is behind a paywall (subscription required), so the full text can't be fetched automatically. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:368
+#: core/article_extractor.py:377
 msgid "Only the free preview of this article is published on the page — the rest requires a subscription. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:3104
+#: core/article_extractor.py:3120
 msgid "Google News could not resolve the original publisher link. Open the original link in your browser to read it."
 msgstr ""
 
-#: core/article_extractor.py:4946
+#: core/article_extractor.py:4966
 #: core/open_article.py:89
 #: gui/dialogs.py:5026
 msgid "(unknown)"
 msgstr ""
 
-#: core/article_extractor.py:5018
+#: core/article_extractor.py:5038
 msgid "Could not extract full text from the webpage or from feed content."
 msgstr ""
 
-#: core/article_extractor.py:4767
-msgid "trafilatura is not installed or failed to import. Reinstall requirements."
-msgstr ""
-
-#: core/article_extractor.py:4864
-msgid "Download failed (site blocked, offline, or connection problem)."
-msgstr ""
-
-#: core/article_extractor.py:4890
+#: core/article_extractor.py:4738
+#: core/article_extractor.py:4910
 msgid "Downloaded page, but could not extract readable text (empty result)."
 msgstr ""
 
-#: core/article_extractor.py:208
+#: core/article_extractor.py:4786
+msgid "trafilatura is not installed or failed to import. Reinstall requirements."
+msgstr ""
+
+#: core/article_extractor.py:4883
+msgid "Download failed (site blocked, offline, or connection problem)."
+msgstr ""
+
+#: core/article_extractor.py:217
 msgid "This page is behind an anti-bot / human-verification check, and the access BlindRSS had for this site has expired — these checks only stay valid for a short time. Open the page in {browser} and BlindRSS will pick the access back up automatically within a minute."
 msgstr ""
 
-#: core/article_extractor.py:4947
+#: core/article_extractor.py:4967
 #: core/open_article.py:85
 #: gui/dialogs.py:4393
 msgid "Title:"
 msgstr ""
 
-#: core/article_extractor.py:4948
-#: gui/accessibility.py:1527
+#: core/article_extractor.py:4968
+#: gui/accessibility.py:1528
 #: gui/mainframe.py:6887
 #: gui/mainframe.py:10833
 msgid "Author:"
 msgstr ""
 
-#: core/article_extractor.py:4751
-#: core/article_extractor.py:4764
+#: core/article_extractor.py:4770
+#: core/article_extractor.py:4783
 msgid "Could not retrieve YouTube video details."
 msgstr ""
 
-#: core/article_extractor.py:5009
+#: core/article_extractor.py:5029
 msgid "Unknown extraction error"
 msgstr ""
 
@@ -446,13 +447,13 @@ msgid "Read and Unread Articles"
 msgstr ""
 
 #: core/help_topics.py:92
-#: gui/accessibility.py:264
+#: gui/accessibility.py:265
 #: gui/mainframe.py:9529
 msgid "Favorites"
 msgstr ""
 
 #: core/help_topics.py:93
-#: gui/accessibility.py:1186
+#: gui/accessibility.py:1187
 #: gui/mainframe.py:9537
 msgid "Deleted Articles"
 msgstr ""
@@ -463,7 +464,7 @@ msgstr ""
 
 #: core/help_topics.py:95
 #: core/shortcuts.py:193
-#: gui/accessibility.py:476
+#: gui/accessibility.py:477
 msgid "Rich Full-Text View"
 msgstr ""
 
@@ -755,7 +756,7 @@ msgid "Feeds"
 msgstr ""
 
 #: core/shortcuts.py:151
-#: gui/accessibility.py:519
+#: gui/accessibility.py:520
 #: gui/mainframe.py:728
 msgid "Articles"
 msgstr ""
@@ -799,8 +800,8 @@ msgid "Remove Feed"
 msgstr ""
 
 #: core/shortcuts.py:165
+#: gui/accessibility.py:452
 #: gui/accessibility.py:451
-#: gui/accessibility.py:450
 #: gui/mainframe.py:3392
 msgid "Refresh Feeds"
 msgstr ""
@@ -901,12 +902,12 @@ msgid "Add to or Remove from Favorites"
 msgstr ""
 
 #: core/shortcuts.py:186
-#: gui/accessibility.py:781
+#: gui/accessibility.py:782
 msgid "Delete Article"
 msgstr ""
 
 #: core/shortcuts.py:187
-#: gui/accessibility.py:471
+#: gui/accessibility.py:472
 #: gui/mainframe.py:13437
 #: gui/mainframe.py:13456
 msgid "Download"
@@ -939,7 +940,7 @@ msgid "Open Accessible Browser"
 msgstr ""
 
 #: core/shortcuts.py:195
-#: gui/accessibility.py:259
+#: gui/accessibility.py:260
 #: gui/mainframe.py:9520
 msgid "All Articles"
 msgstr ""
@@ -1471,11 +1472,11 @@ msgstr ""
 msgid "Could not update Windows startup setting: {error}"
 msgstr ""
 
-#: gui/accessibility.py:377
+#: gui/accessibility.py:378
 msgid "expanded"
 msgstr ""
 
-#: gui/accessibility.py:377
+#: gui/accessibility.py:378
 msgid "collapsed"
 msgstr ""
 
@@ -1485,352 +1486,352 @@ msgstr ""
 msgid "Untitled chapter"
 msgstr ""
 
-#: gui/accessibility.py:260
+#: gui/accessibility.py:261
 msgid "Unread Articles"
 msgstr ""
 
-#: gui/accessibility.py:261
+#: gui/accessibility.py:262
 msgid "Read Articles"
 msgstr ""
 
+#: gui/accessibility.py:455
 #: gui/accessibility.py:454
-#: gui/accessibility.py:453
 msgid "Load More Articles"
 msgstr ""
 
+#: gui/accessibility.py:458
 #: gui/accessibility.py:457
-#: gui/accessibility.py:456
 msgid "Expand Category"
 msgstr ""
 
+#: gui/accessibility.py:461
 #: gui/accessibility.py:460
-#: gui/accessibility.py:459
 msgid "Collapse Category"
 msgstr ""
 
+#: gui/accessibility.py:464
 #: gui/accessibility.py:463
-#: gui/accessibility.py:462
 msgid "Open or Play Article"
 msgstr ""
 
+#: gui/accessibility.py:467
 #: gui/accessibility.py:466
-#: gui/accessibility.py:465
 msgid "Mark Read"
 msgstr ""
 
+#: gui/accessibility.py:470
 #: gui/accessibility.py:469
-#: gui/accessibility.py:468
 msgid "Mark Unread"
 msgstr ""
 
-#: gui/accessibility.py:472
+#: gui/accessibility.py:473
 msgid "Download Article"
 msgstr ""
 
-#: gui/accessibility.py:485
+#: gui/accessibility.py:486
 msgid "Accessible Article Filter"
 msgstr ""
 
-#: gui/accessibility.py:499
+#: gui/accessibility.py:500
 msgid "Accessible Views"
 msgstr ""
 
-#: gui/accessibility.py:522
+#: gui/accessibility.py:523
 msgid "Accessible Articles"
 msgstr ""
 
-#: gui/accessibility.py:540
-#: gui/accessibility.py:1563
+#: gui/accessibility.py:541
+#: gui/accessibility.py:1564
 msgid "Accessible Article Content"
 msgstr ""
 
-#: gui/accessibility.py:618
+#: gui/accessibility.py:619
 msgid "&Add Feed...	Ctrl+N"
 msgstr ""
 
-#: gui/accessibility.py:619
+#: gui/accessibility.py:620
 #: gui/mainframe.py:2342
 msgid "&Open Article..."
 msgstr ""
 
-#: gui/accessibility.py:620
+#: gui/accessibility.py:621
 #: gui/mainframe.py:2348
 msgid "Detect Feeds on &Page..."
 msgstr ""
 
-#: gui/accessibility.py:621
+#: gui/accessibility.py:622
 msgid "Add &Category..."
 msgstr ""
 
-#: gui/accessibility.py:622
+#: gui/accessibility.py:623
 msgid "New Smart F&older..."
 msgstr ""
 
-#: gui/accessibility.py:623
+#: gui/accessibility.py:624
 #: gui/mainframe.py:2372
 msgid "&Import OPML..."
 msgstr ""
 
-#: gui/accessibility.py:624
+#: gui/accessibility.py:625
 #: gui/mainframe.py:2374
 msgid "Import &YouTube Takeout..."
 msgstr ""
 
-#: gui/accessibility.py:625
+#: gui/accessibility.py:626
 msgid "&Export OPML..."
 msgstr ""
 
-#: gui/accessibility.py:627
+#: gui/accessibility.py:628
 msgid "&Refresh Feeds	Ctrl+R"
 msgstr ""
 
-#: gui/accessibility.py:628
+#: gui/accessibility.py:629
 msgid "&Stop Refresh"
 msgstr ""
 
-#: gui/accessibility.py:629
+#: gui/accessibility.py:630
 msgid "Mark All in Current View as R&ead"
 msgstr ""
 
-#: gui/accessibility.py:631
+#: gui/accessibility.py:632
 #: gui/mainframe.py:2606
 msgid "&Settings..."
 msgstr ""
 
-#: gui/accessibility.py:632
+#: gui/accessibility.py:633
 #: gui/article_window.py:287
 msgid "Close &Window	Ctrl+W"
 msgstr ""
 
-#: gui/accessibility.py:633
+#: gui/accessibility.py:634
 #: gui/article_window.py:290
 #: gui/mainframe.py:2626
 msgid "&File"
 msgstr ""
 
-#: gui/accessibility.py:636
-#: gui/accessibility.py:885
+#: gui/accessibility.py:637
+#: gui/accessibility.py:886
 msgid "&Open or Play"
 msgstr ""
 
-#: gui/accessibility.py:637
-#: gui/accessibility.py:886
+#: gui/accessibility.py:638
+#: gui/accessibility.py:887
 #: gui/article_window.py:279
 msgid "Open in &Browser"
 msgstr ""
 
-#: gui/accessibility.py:639
-#: gui/accessibility.py:888
+#: gui/accessibility.py:640
+#: gui/accessibility.py:889
 #: gui/article_window.py:298
 msgid "Copy &Link"
 msgstr ""
 
-#: gui/accessibility.py:640
-#: gui/accessibility.py:889
+#: gui/accessibility.py:641
+#: gui/accessibility.py:890
 msgid "Copy &Text"
 msgstr ""
 
-#: gui/accessibility.py:641
-#: gui/accessibility.py:890
+#: gui/accessibility.py:642
+#: gui/accessibility.py:891
 msgid "Copy &Media Link"
 msgstr ""
 
-#: gui/accessibility.py:643
-msgid "Toggle &Favorite	Ctrl+D"
-msgstr ""
-
 #: gui/accessibility.py:644
-#: gui/accessibility.py:894
-msgid "Mark &Read"
+msgid "Toggle &Favorite	Ctrl+D"
 msgstr ""
 
 #: gui/accessibility.py:645
 #: gui/accessibility.py:895
-msgid "Mark &Unread"
+msgid "Mark &Read"
 msgstr ""
 
 #: gui/accessibility.py:646
+#: gui/accessibility.py:896
+msgid "Mark &Unread"
+msgstr ""
+
+#: gui/accessibility.py:647
 #: gui/mainframe.py:16067
 msgid "De&lete"
 msgstr ""
 
-#: gui/accessibility.py:648
-#: gui/accessibility.py:901
+#: gui/accessibility.py:649
+#: gui/accessibility.py:902
 msgid "&Download"
 msgstr ""
 
-#: gui/accessibility.py:649
-#: gui/accessibility.py:902
+#: gui/accessibility.py:650
+#: gui/accessibility.py:903
 msgid "Detect &Audio"
 msgstr ""
 
-#: gui/accessibility.py:650
-msgid "&Find in Article...	Ctrl+F"
-msgstr ""
-
 #: gui/accessibility.py:651
-#: gui/accessibility.py:904
-msgid "View &History..."
+msgid "&Find in Article...	Ctrl+F"
 msgstr ""
 
 #: gui/accessibility.py:652
 #: gui/accessibility.py:905
-msgid "View Feed De&scription..."
+msgid "View &History..."
 msgstr ""
 
 #: gui/accessibility.py:653
+#: gui/accessibility.py:906
+msgid "View Feed De&scription..."
+msgstr ""
+
+#: gui/accessibility.py:654
 msgid "&Article"
 msgstr ""
 
-#: gui/accessibility.py:656
+#: gui/accessibility.py:657
 msgid "&Show or Hide Player"
 msgstr ""
 
-#: gui/accessibility.py:657
+#: gui/accessibility.py:658
 msgid "Open Play &Queue..."
 msgstr ""
 
-#: gui/accessibility.py:658
+#: gui/accessibility.py:659
 msgid "Play &Next in Queue"
 msgstr ""
 
-#: gui/accessibility.py:659
+#: gui/accessibility.py:660
 msgid "Play &Previous in Queue"
 msgstr ""
 
-#: gui/accessibility.py:660
+#: gui/accessibility.py:661
 #: gui/mainframe.py:2550
 msgid "&Equalizer..."
 msgstr ""
 
-#: gui/accessibility.py:661
+#: gui/accessibility.py:662
 #: gui/mainframe.py:2630
 msgid "&Player"
 msgstr ""
 
-#: gui/accessibility.py:664
+#: gui/accessibility.py:665
 msgid "&Persistent Search..."
 msgstr ""
 
-#: gui/accessibility.py:665
+#: gui/accessibility.py:666
 msgid "&Filter Rules..."
 msgstr ""
 
-#: gui/accessibility.py:666
+#: gui/accessibility.py:667
 msgid "Find a Podcast or &RSS..."
 msgstr ""
 
-#: gui/accessibility.py:667
+#: gui/accessibility.py:668
 #: gui/mainframe.py:2580
 msgid "Podcast &Archive..."
 msgstr ""
 
-#: gui/accessibility.py:668
+#: gui/accessibility.py:669
 #: gui/mainframe.py:2584
 msgid "&Video Search..."
 msgstr ""
 
-#: gui/accessibility.py:669
+#: gui/accessibility.py:670
 #: gui/mainframe.py:2593
 msgid "Import Site &Cookies..."
 msgstr ""
 
-#: gui/accessibility.py:670
+#: gui/accessibility.py:671
 #: gui/mainframe.py:2631
 msgid "&Tools"
 msgstr ""
 
-#: gui/accessibility.py:673
+#: gui/accessibility.py:674
 #: gui/mainframe.py:2602
 msgid "&Keyboard Shortcuts..."
 msgstr ""
 
-#: gui/accessibility.py:674
+#: gui/accessibility.py:675
 #: gui/mainframe.py:2362
 msgid "View Feed &Errors..."
 msgstr ""
 
-#: gui/accessibility.py:675
+#: gui/accessibility.py:676
 #: gui/mainframe.py:2617
 msgid "Check for &Updates..."
 msgstr ""
 
-#: gui/accessibility.py:676
+#: gui/accessibility.py:677
 #: gui/mainframe.py:2624
 msgid "&About"
 msgstr ""
 
-#: gui/accessibility.py:677
+#: gui/accessibility.py:678
 #: gui/mainframe.py:2632
 msgid "&Help"
 msgstr ""
 
-#: gui/accessibility.py:833
+#: gui/accessibility.py:834
 #: gui/mainframe.py:5951
 msgid "No feed description is available for this item."
 msgstr ""
 
-#: gui/accessibility.py:848
+#: gui/accessibility.py:849
 #: gui/mainframe.py:11245
 msgid "Find in article:"
 msgstr ""
 
-#: gui/accessibility.py:848
+#: gui/accessibility.py:849
 #: gui/mainframe.py:11245
 msgid "Find"
 msgstr ""
 
-#: gui/accessibility.py:892
+#: gui/accessibility.py:893
 msgid "Remove from &Favorites"
 msgstr ""
 
-#: gui/accessibility.py:892
+#: gui/accessibility.py:893
 msgid "Add to &Favorites"
 msgstr ""
 
-#: gui/accessibility.py:903
+#: gui/accessibility.py:904
 msgid "&Find in Article..."
 msgstr ""
 
-#: gui/accessibility.py:980
+#: gui/accessibility.py:981
 msgid "&Add Feed..."
 msgstr ""
 
-#: gui/accessibility.py:981
+#: gui/accessibility.py:982
 msgid "Add Cate&gory..."
 msgstr ""
 
-#: gui/accessibility.py:982
+#: gui/accessibility.py:983
 msgid "New Smart &Folder..."
 msgstr ""
 
-#: gui/accessibility.py:1223
+#: gui/accessibility.py:1224
 #: gui/mainframe.py:8766
 msgid "Refreshing feeds..."
 msgstr ""
 
-#: gui/accessibility.py:1391
-#: gui/accessibility.py:1389
+#: gui/accessibility.py:1392
+#: gui/accessibility.py:1390
 msgid "Loading articles..."
 msgstr ""
 
-#: gui/accessibility.py:1539
+#: gui/accessibility.py:1540
 msgid "Chapter availability: Loading."
 msgstr ""
 
-#: gui/accessibility.py:2133
-#: gui/accessibility.py:1748
+#: gui/accessibility.py:2134
+#: gui/accessibility.py:1749
 #: gui/mainframe.py:6851
 #: gui/mainframe.py:6596
 msgid "Full text loaded."
 msgstr ""
 
-#: gui/accessibility.py:2135
+#: gui/accessibility.py:2136
 #: gui/mainframe.py:6853
 msgid "Full text unavailable. Showing feed content."
 msgstr ""
 
-#: gui/accessibility.py:2355
+#: gui/accessibility.py:2356
 msgid "Loading more articles..."
 msgstr ""
 
@@ -1842,137 +1843,137 @@ msgstr ""
 msgid "Chapter {index}: {timestamp}, {title}."
 msgstr ""
 
-#: gui/accessibility.py:383
+#: gui/accessibility.py:384
 msgid "BlindRSS Accessible Browser"
 msgstr ""
 
-#: gui/accessibility.py:442
+#: gui/accessibility.py:443
 msgid "VoiceOver-friendly browser for feeds, articles, and content. Use the lists below to choose a view and article."
 msgstr ""
 
-#: gui/accessibility.py:475
+#: gui/accessibility.py:476
 msgid "Rich View"
 msgstr ""
 
-#: gui/accessibility.py:482
+#: gui/accessibility.py:483
 msgid "Filter Articles:"
 msgstr ""
 
-#: gui/accessibility.py:496
+#: gui/accessibility.py:497
 msgid "Views"
 msgstr ""
 
-#: gui/accessibility.py:510
+#: gui/accessibility.py:511
 msgid "Categories can be expanded or collapsed. Use the buttons, or use Right Arrow to expand and Left Arrow to collapse."
 msgstr ""
 
-#: gui/accessibility.py:529
+#: gui/accessibility.py:530
 msgid "Choose a view to load articles."
 msgstr ""
 
-#: gui/accessibility.py:534
+#: gui/accessibility.py:535
 msgid "Article Content"
 msgstr ""
 
-#: gui/accessibility.py:727
-#: gui/accessibility.py:1002
+#: gui/accessibility.py:728
+#: gui/accessibility.py:1003
 msgid "Mark all items in this view as read?"
 msgstr ""
 
-#: gui/accessibility.py:754
+#: gui/accessibility.py:755
 msgid "Added to favorites."
 msgstr ""
 
-#: gui/accessibility.py:754
+#: gui/accessibility.py:755
 msgid "Removed from favorites."
 msgstr ""
 
-#: gui/accessibility.py:815
+#: gui/accessibility.py:816
 msgid "Article deleted."
 msgstr ""
 
-#: gui/accessibility.py:835
+#: gui/accessibility.py:836
 #: gui/mainframe.py:5953
 msgid "Feed Description"
 msgstr ""
 
-#: gui/accessibility.py:897
+#: gui/accessibility.py:898
 msgid "&Restore"
 msgstr ""
 
-#: gui/accessibility.py:899
+#: gui/accessibility.py:900
 msgid "&Delete"
 msgstr ""
 
-#: gui/accessibility.py:941
+#: gui/accessibility.py:942
 msgid "Article restored."
 msgstr ""
 
-#: gui/accessibility.py:955
+#: gui/accessibility.py:956
 msgid "&Refresh Feed"
 msgstr ""
 
-#: gui/accessibility.py:956
-#: gui/accessibility.py:974
+#: gui/accessibility.py:957
+#: gui/accessibility.py:975
 msgid "Mark All as &Read"
 msgstr ""
 
-#: gui/accessibility.py:957
+#: gui/accessibility.py:958
 msgid "&Copy Feed URL"
 msgstr ""
 
-#: gui/accessibility.py:958
+#: gui/accessibility.py:959
 msgid "&Notifications for This Feed"
 msgstr ""
 
-#: gui/accessibility.py:965
+#: gui/accessibility.py:966
 #: gui/mainframe.py:5390
 msgid "Use default setting"
 msgstr ""
 
-#: gui/accessibility.py:966
+#: gui/accessibility.py:967
 #: gui/mainframe.py:5391
 msgid "Always show image alt text"
 msgstr ""
 
-#: gui/accessibility.py:967
+#: gui/accessibility.py:968
 #: gui/mainframe.py:5392
 msgid "Never show image alt text"
 msgstr ""
 
-#: gui/accessibility.py:968
+#: gui/accessibility.py:969
 #: gui/mainframe.py:5399
 msgid "Image Alt Text"
 msgstr ""
 
-#: gui/accessibility.py:970
+#: gui/accessibility.py:971
 msgid "Remove &Feed"
 msgstr ""
 
-#: gui/accessibility.py:1055
+#: gui/accessibility.py:1056
 #: gui/mainframe.py:8419
 #: gui/mainframe.py:8391
 msgid "The Uncategorized folder cannot be removed."
 msgstr ""
 
-#: gui/accessibility.py:1055
+#: gui/accessibility.py:1056
 #: gui/mainframe.py:8257
 #: gui/mainframe.py:8414
 #: gui/mainframe.py:8419
 msgid "Info"
 msgstr ""
 
-#: gui/accessibility.py:1420
+#: gui/accessibility.py:1421
 msgid "Failed to load articles."
 msgstr ""
 
-#: gui/accessibility.py:1526
+#: gui/accessibility.py:1527
 #: gui/mainframe.py:6886
 #: gui/mainframe.py:10832
 msgid "Date:"
 msgstr ""
 
-#: gui/accessibility.py:1528
+#: gui/accessibility.py:1529
 #: gui/mainframe.py:6888
 #: gui/mainframe.py:10834
 msgid "Link:"
@@ -1982,113 +1983,113 @@ msgstr ""
 msgid " Link: {url}"
 msgstr ""
 
-#: gui/accessibility.py:323
+#: gui/accessibility.py:324
 msgid "Feed:"
 msgstr ""
 
-#: gui/accessibility.py:748
+#: gui/accessibility.py:749
 #: gui/mainframe.py:8179
 msgid "Could not update favorite."
 msgstr ""
 
-#: gui/accessibility.py:973
+#: gui/accessibility.py:974
 msgid "&Refresh Category"
 msgstr ""
 
-#: gui/accessibility.py:975
+#: gui/accessibility.py:976
 msgid "&Edit Category"
 msgstr ""
 
-#: gui/accessibility.py:976
+#: gui/accessibility.py:977
 msgid "Add &Subcategory"
 msgstr ""
 
-#: gui/accessibility.py:978
+#: gui/accessibility.py:979
 msgid "Remove &Category"
 msgstr ""
 
-#: gui/accessibility.py:1032
+#: gui/accessibility.py:1033
 msgid "Remove this feed?"
 msgstr ""
 
-#: gui/accessibility.py:1032
-#: gui/accessibility.py:1062
+#: gui/accessibility.py:1033
+#: gui/accessibility.py:1063
 #: gui/mainframe.py:8442
 #: gui/mainframe.py:8397
 msgid "Confirm"
 msgstr ""
 
-#: gui/accessibility.py:1061
+#: gui/accessibility.py:1062
 msgid "Remove this category? Feeds will be moved to Uncategorized."
 msgstr ""
 
-#: gui/accessibility.py:1072
+#: gui/accessibility.py:1073
 #: gui/mainframe.py:8404
 msgid "Could not remove category."
 msgstr ""
 
-#: gui/accessibility.py:1072
+#: gui/accessibility.py:1073
 #: gui/dialogs.py:4919
 #: gui/dialogs.py:9300
 #: gui/mainframe.py:14420
 msgid "Error"
 msgstr ""
 
-#: gui/accessibility.py:1345
-#: gui/accessibility.py:304
+#: gui/accessibility.py:1346
+#: gui/accessibility.py:305
 #: gui/dialogs.py:251
 #: gui/dialogs.py:4411
 msgid "Category:"
 msgstr ""
 
-#: gui/accessibility.py:1347
+#: gui/accessibility.py:1348
 msgid "Expanded category: {label}"
 msgstr ""
 
-#: gui/accessibility.py:1349
+#: gui/accessibility.py:1350
 msgid "Collapsed category: {label}"
 msgstr ""
 
-#: gui/accessibility.py:1421
+#: gui/accessibility.py:1422
 msgid "Failed to load articles: {error}"
 msgstr ""
 
-#: gui/accessibility.py:1466
+#: gui/accessibility.py:1467
 #: gui/mainframe.py:1341
 #: gui/mainframe.py:1741
 #: gui/mainframe.py:1785
 msgid "No articles found."
 msgstr ""
 
-#: gui/accessibility.py:1673
+#: gui/accessibility.py:1674
 #: gui/article_window.py:70
 #: gui/article_window.py:101
 #: gui/mainframe.py:6019
 msgid "Article text"
 msgstr ""
 
-#: gui/accessibility.py:325
+#: gui/accessibility.py:326
 msgid ", unread: {unread}"
 msgstr ""
 
-#: gui/accessibility.py:781
+#: gui/accessibility.py:782
 msgid "Delete this article?"
 msgstr ""
 
-#: gui/accessibility.py:1443
+#: gui/accessibility.py:1444
 msgid "Articles loaded: {count}."
 msgstr ""
 
-#: gui/accessibility.py:1446
+#: gui/accessibility.py:1447
 msgid "Articles loaded: {count} of {total}."
 msgstr ""
 
-#: gui/accessibility.py:1784
+#: gui/accessibility.py:1785
 #: gui/mainframe.py:6624
 msgid "Loading full text..."
 msgstr ""
 
-#: gui/accessibility.py:871
+#: gui/accessibility.py:872
 #: gui/mainframe.py:11035
 msgid "\"{term}\" was not found."
 msgstr ""

@@ -118,7 +118,8 @@ def extract_article_body(
     - ``body_text`` is the cleaned body, or ``None`` when nothing readable was produced.
     - ``cacheable`` is True when the body is authoritative — web/provider full text, or the
       feed for an item with no web target. A feed fallback for a *web* article after a total
-      web+provider failure is NOT cached, so the next visit retries.
+      web+provider failure is NOT cached, so the next visit retries (a page that downloaded
+      but held no readable text answers from article_extractor's 15-minute memo).
     """
     url = (getattr(article, "url", "") or "").strip()
     fallback_html = getattr(article, "content", "") or ""

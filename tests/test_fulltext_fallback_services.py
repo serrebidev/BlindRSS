@@ -12,6 +12,8 @@ CAPTCHA, Google Cache, 12ft.io) must NOT be part of the chain.
 import json
 import types
 
+import pytest
+
 import core.article_extractor as article_extractor
 import core.utils as utils
 
@@ -195,6 +197,100 @@ def test_json_ld_article_body_html_is_rendered_as_plain_text():
     assert "important details" in text
     assert "<p>" not in text
     assert "<strong>" not in text
+
+
+def test_entity_escaped_json_ld_markup_is_not_read_as_text():
+    # A Nuxt-based news site entity-escapes the articleBody markup and leaves Vue
+    # component tags in it; screen readers read "<h2>", "<p>" and those tags aloud.
+    body = (
+        "<h2>How the little lamp works</h2>\n<p>The gadget looks like any other one at first, "
+        "<strong>but a small lamp on the front</strong> shows when it is busy.</p>"
+        '<RelatedLinks :post="post" />\n<InlineBanner />\n'
+        "<p>The second paragraph walks through the settings menu one step at a time, "
+        "and AT&amp;T has nothing to do with any of it.</p>"
+    )
+    escaped = body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+    payload = json.dumps({"@type": "NewsArticle", "articleBody": escaped})
+    html = f'<html><script type="application/ld+json">{payload}</script></html>'
+
+    text = article_extractor._extract_json_ld_text(html)
+
+    assert "How the little lamp works" in text
+    assert "but a small lamp on the front shows when it is busy" in text
+    assert "AT&T has nothing" in text
+    assert "<" not in text and "&lt;" not in text
+    assert "RelatedLinks" not in text and "InlineBanner" not in text
+
+
+def test_tag_stripped_json_ld_keeps_tag_names_in_prose():
+    # Tag-stripped bodies (mashable) only need unescaping; a story that
+    # mentions an HTML tag keeps it.
+    prose = "Wrap the heading in a &lt;div&gt; element, then run sudo a &amp;&amp; b. " * 4
+    payload = json.dumps({"@type": "NewsArticle", "articleBody": prose})
+    html = f'<html><script type="application/ld+json">{payload}</script></html>'
+
+    text = article_extractor._extract_json_ld_text(html)
+
+    assert "a <div> element" in text
+    assert "sudo a && b" in text
+
+    # Even an escaped open/close pair in the prose is not markup.
+    prose = "Open each paragraph with &lt;p&gt; and close it with &lt;/p&gt; in the template. " + (
+        "The rest of the tutorial explains how the engine renders lists and headings. " * 3
+    )
+    payload = json.dumps({"@type": "NewsArticle", "articleBody": prose})
+    text = article_extractor._extract_json_ld_text(
+        f'<html><script type="application/ld+json">{payload}</script></html>'
+    )
+    assert "close it with </p> in the template" in text
+
+
+def test_empty_extraction_is_remembered_for_a_while(monkeypatch):
+    # A JavaScript-only page: every revisit of an article re-downloaded and
+    # re-extracted it for the same empty result.
+    shell = (
+        '<!doctype html><html lang="en"><head><meta charset="UTF-8"></head>'
+        '<body><div id="app"></div><script src="/static/js/app.js"></script></body></html>'
+    )
+    fetches = []
+
+    def fake_fetch(*_args, **_kwargs):
+        fetches.append(1)
+        return article_extractor._FetchResult(html=shell)
+
+    monkeypatch.setattr(article_extractor, "_fetch_page", fake_fetch)
+    url = "https://science.example/articles/12345"
+    for _ in range(2):
+        with pytest.raises(article_extractor.ExtractionError, match="empty result"):
+            article_extractor.extract_full_article(url)
+    assert len(fetches) == 1
+
+    # The entry expires, so a page that was only briefly empty can recover.
+    expired = article_extractor.time.monotonic() - article_extractor._EMPTY_EXTRACTION_TTL_S - 1
+    article_extractor._EMPTY_EXTRACTION_URLS[(url, "")] = expired
+    with pytest.raises(article_extractor.ExtractionError, match="empty result"):
+        article_extractor.extract_full_article(url)
+    assert len(fetches) == 2
+
+
+@pytest.mark.parametrize(
+    "result",
+    [article_extractor._FetchResult(html=None), article_extractor._FetchResult(blocked=True)],
+    ids=["failed", "blocked"],
+)
+def test_failed_or_blocked_download_is_not_remembered(monkeypatch, result):
+    fetches = []
+
+    def fake_fetch(*_args, **_kwargs):
+        fetches.append(1)
+        return result
+
+    monkeypatch.setattr(article_extractor, "_fetch_page", fake_fetch)
+    for _ in range(2):
+        with pytest.raises(article_extractor.ExtractionError):
+            article_extractor.extract_full_article("https://example.com/story")
+    assert len(fetches) == 2
+    assert not article_extractor._EMPTY_EXTRACTION_URLS
 
 
 def test_normalize_whitespace_removes_invisible_word_break_characters():
