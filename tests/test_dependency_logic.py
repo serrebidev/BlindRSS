@@ -7,6 +7,7 @@ import sys
 import os
 import platform
 import tempfile
+import threading
 from unittest.mock import MagicMock, patch, call
 
 # Mock winreg before importing dependency_check
@@ -256,6 +257,112 @@ class TestDependencyLogic(unittest.TestCase):
             finally:
                 dep_check.set_user_tool_paths({})
 
+    @patch('core.dependency_check.platform.system', return_value='Windows')
+    def test_managed_ytdlp_beats_stale_path_install(self, _mock_platform):
+        # The app updates its own copy nightly; a WinGet stable build that
+        # _maybe_add_windows_path put first on PATH used to be run instead.
+        with tempfile.TemporaryDirectory() as tmp:
+            managed = os.path.join(tmp, "yt-dlp.exe")
+            with open(managed, "w", encoding="utf-8") as handle:
+                handle.write("")
+            with patch.object(dep_check, "_managed_ytdlp_exe", managed), \
+                 patch.object(dep_check, "_maybe_add_windows_path"), \
+                 patch("core.dependency_check.shutil.which", return_value=__file__):
+                self.assertEqual(dep_check._find_executable_path("yt-dlp"), managed)
+                # A Settings override still beats the managed copy.
+                override = os.path.join(tmp, "custom", "yt-dlp.exe")
+                os.makedirs(os.path.dirname(override))
+                with open(override, "w", encoding="utf-8") as handle:
+                    handle.write("")
+                dep_check.set_user_tool_paths({"yt-dlp": override})
+                self.assertEqual(dep_check._find_executable_path("yt-dlp"), override)
+                dep_check.set_user_tool_paths({})
+                # Gone from disk, or never verified: PATH as before.
+                os.remove(managed)
+                self.assertEqual(dep_check._find_executable_path("yt-dlp"), __file__)
+            with patch.object(dep_check, "_managed_ytdlp_exe", None), \
+                 patch.object(dep_check, "_maybe_add_windows_path"), \
+                 patch("core.dependency_check.shutil.which", return_value=__file__):
+                self.assertEqual(dep_check._find_executable_path("yt-dlp"), __file__)
+
+    @patch('core.dependency_check._add_bin_to_user_path')
+    @patch('core.dependency_check._should_check_updates', return_value=False)
+    @patch('core.dependency_check.platform.system', return_value='Windows')
+    def test_only_a_working_managed_ytdlp_is_recorded(self, _mock_platform, _mock_updates, _mock_user_path):
+        with tempfile.TemporaryDirectory() as tmp:
+            local_exe = os.path.join(tmp, "yt-dlp.exe")
+            with open(local_exe, "w", encoding="utf-8") as handle:
+                handle.write("")
+            system_exe = os.path.join(tmp, "winget", "yt-dlp.exe")
+            os.makedirs(os.path.dirname(system_exe))
+            with open(system_exe, "w", encoding="utf-8") as handle:
+                handle.write("")
+            working = {local_exe, system_exe}
+
+            def fake_run(cmd, **_kwargs):
+                return MagicMock(returncode=0 if cmd[0] in working else 1)
+
+            with patch.object(dep_check, "_managed_ytdlp_exe", None), \
+                 patch.object(dep_check, "_ytdlp_runtime_bin_dir", return_value=tmp), \
+                 patch.object(dep_check, "_maybe_add_windows_path"), \
+                 patch("core.dependency_check.subprocess.run", side_effect=fake_run), \
+                 patch("core.dependency_check.shutil.which", return_value=system_exe):
+                dep_check._ensure_yt_dlp_cli()
+                self.assertEqual(dep_check._managed_ytdlp_exe, local_exe)
+                self.assertEqual(dep_check._find_executable_path("yt-dlp"), local_exe)
+
+                # A truncated copy that does not run must not hide the working one.
+                dep_check._managed_ytdlp_exe = None
+                working.discard(local_exe)
+                dep_check._ensure_yt_dlp_cli()
+                self.assertIsNone(dep_check._managed_ytdlp_exe)
+                self.assertEqual(dep_check._find_executable_path("yt-dlp"), system_exe)
+
+    @patch('core.dependency_check._mark_update_checked')
+    @patch('core.dependency_check._add_bin_to_user_path')
+    @patch('core.dependency_check._should_check_updates', return_value=True)
+    @patch('core.dependency_check.platform.system', return_value='Windows')
+    def test_managed_ytdlp_is_used_while_the_update_runs(self, _mock_platform, _mock_updates, _mock_user_path,
+                                                          _mock_mark):
+        # The nightly update can take minutes on the first launch of a day;
+        # lookups meanwhile used to fall back to PATH (WinGet first).
+        with tempfile.TemporaryDirectory() as tmp:
+            local_exe = os.path.join(tmp, "yt-dlp.exe")
+            with open(local_exe, "w", encoding="utf-8") as handle:
+                handle.write("")
+            seen_during_update = []
+
+            def slow_update(exe, _works):
+                seen_during_update.append(dep_check._find_executable_path("yt-dlp"))
+                return True
+
+            with patch.object(dep_check, "_managed_ytdlp_exe", None), \
+                 patch.object(dep_check, "_ytdlp_runtime_bin_dir", return_value=tmp), \
+                 patch.object(dep_check, "_maybe_add_windows_path"), \
+                 patch.object(dep_check, "_update_managed_ytdlp", side_effect=slow_update), \
+                 patch("core.dependency_check.subprocess.run", return_value=MagicMock(returncode=0)), \
+                 patch("core.dependency_check.shutil.which", return_value=__file__):
+                dep_check._ensure_yt_dlp_cli()
+            self.assertEqual(seen_during_update, [local_exe])
+
+    def test_resolved_ytdlp_cli_is_logged_once_per_path(self):
+        from core import discovery
+
+        with patch.object(discovery, "_logged_ytdlp_cli_path", None), \
+             patch.object(dep_check, "_find_executable_path", return_value=r"C:\winget\yt-dlp.exe") as find, \
+             self.assertLogs("core.discovery", level="DEBUG") as logs:
+            discovery._resolve_ytdlp_cli_path()
+            discovery._resolve_ytdlp_cli_path()
+            find.return_value = r"C:\app\bin\yt-dlp.exe"
+            discovery._resolve_ytdlp_cli_path()
+        self.assertEqual(
+            logs.output,
+            [
+                r"DEBUG:core.discovery:yt-dlp CLI: C:\winget\yt-dlp.exe",
+                r"DEBUG:core.discovery:yt-dlp CLI: C:\app\bin\yt-dlp.exe",
+            ],
+        )
+
     def test_user_override_directory_resolves_executable(self):
         with tempfile.TemporaryDirectory() as tmp:
             # Create both names so the test is platform-agnostic.
@@ -331,6 +438,47 @@ class TestDependencyLogic(unittest.TestCase):
         }
         # ffprobe detection should be told to look beside the found ffmpeg first.
         self.assertEqual(extras["ffprobe"], [r"C:\ff"])
+
+    @patch('core.dependency_check.platform.system', return_value='windows')
+    def test_windows_path_search_runs_once_unless_forced(self, _mock_platform):
+        # Every yt-dlp/ffmpeg lookup and silence scan calls this; it used to
+        # redo the whole registry/disk scan each time (log spam during playback).
+        def searches():
+            return sum(1 for c in dep_check._log.call_args_list
+                       if "meticulous Windows path search" in str(c.args[0]))
+
+        with patch.object(dep_check, "_windows_path_searched", False), \
+             patch.dict(os.environ, {"LOCALAPPDATA": "", "USERPROFILE": ""}), \
+             patch.object(os, "add_dll_directory", MagicMock(), create=True):
+            dep_check._maybe_add_windows_path()
+            dep_check._maybe_add_windows_path()
+            dep_check._maybe_add_windows_path()
+            self.assertEqual(searches(), 1)
+            dep_check._maybe_add_windows_path(force=True)
+            self.assertEqual(searches(), 2)
+
+    @patch('core.dependency_check.platform.system', return_value='windows')
+    def test_concurrent_first_calls_share_one_windows_path_search(self, _mock_platform):
+        # Startup ran two scans at once: the flag is only set after a full pass.
+        started, release, scans = threading.Event(), threading.Event(), []
+
+        def slow_scan():
+            scans.append(1)
+            started.set()
+            release.wait(5)
+
+        with patch.object(dep_check, "_windows_path_searched", False), \
+             patch.object(dep_check, "_scan_windows_path", side_effect=slow_scan):
+            first = threading.Thread(target=dep_check._maybe_add_windows_path)
+            first.start()
+            self.assertTrue(started.wait(5))
+            second = threading.Thread(target=dep_check._maybe_add_windows_path)
+            second.start()
+            second.join(0.2)  # let it reach the check while the first scan runs
+            release.set()
+            first.join(5)
+            second.join(5)
+        self.assertEqual(len(scans), 1)
 
 if __name__ == '__main__':
     unittest.main()

@@ -14,6 +14,7 @@ import ctypes
 import re
 import time
 import tempfile
+import threading
 import zipfile
 from pathlib import Path
 
@@ -192,13 +193,27 @@ def _candidate_vlc_lib_paths():
             )
     return [str(path) for path in candidates if path and path.is_file()]
 
-def _maybe_add_windows_path():
+# Set after one full scan (PATH additions, PYTHON_VLC_LIB_PATH, DLL dir); later
+# calls are no-ops. Only install flows, Settings detection and a silence scan
+# that cannot find ffmpeg pass force=True. The lock makes concurrent callers
+# wait for a running scan instead of starting their own.
+_windows_path_searched = False
+_windows_path_lock = threading.Lock()
+
+def _maybe_add_windows_path(force=False):
     """Meticulously find VLC/ffmpeg/yt-dlp and add to PATH for this process."""
+    global _windows_path_searched
     if platform.system().lower() != "windows":
         return
     if winreg is None:
         return
-    
+    with _windows_path_lock:
+        if _windows_path_searched and not force:
+            return
+        _scan_windows_path()
+        _windows_path_searched = True
+
+def _scan_windows_path():
     _log("Starting meticulous Windows path search...")
     candidates = set()
     to_add_front = []
@@ -695,6 +710,12 @@ def _find_executable_path(exe_name, extra_dirs=None):
     if user_override:
         return user_override
 
+    # 1.1 The yt-dlp copy _ensure_yt_dlp_cli verified and keeps on the nightly
+    #     channel beats PATH, where _maybe_add_windows_path puts WinGet/pip
+    #     installs (often stale) first.
+    if _canon_tool_name(exe_base) == "yt-dlp" and _managed_ytdlp_exe and os.path.isfile(_managed_ytdlp_exe):
+        return _managed_ytdlp_exe
+
     try:
         _maybe_add_windows_path()
     except Exception:
@@ -1093,7 +1114,7 @@ def detect_media_tool_paths(validate=True, tools=("ffmpeg", "ffprobe", "yt-dlp")
     Uses only the bounded candidate search — it never blind-scans the drive.
     """
     try:
-        _maybe_add_windows_path()
+        _maybe_add_windows_path(force=True)
     except Exception:
         pass
     result = {}
@@ -1117,6 +1138,10 @@ def detect_media_tool_paths(validate=True, tools=("ffmpeg", "ffprobe", "yt-dlp")
 
 def _wait_for_executable(tool_name, timeout=30):
     """Polls for the executable to appear on the system."""
+    try:
+        _maybe_add_windows_path(force=True)  # pick up PATH entries an install just added
+    except Exception:
+        pass
     start = time.time()
     while (time.time() - start) < timeout:
         if _find_executable_path(tool_name):
@@ -1234,7 +1259,7 @@ def install_media_tools(vlc=True, ffmpeg=True, ytdlp=False):
         if not _wait_for_executable("yt-dlp"):
              _log("yt-dlp installation verification failed.")
 
-    _maybe_add_windows_path()
+    _maybe_add_windows_path(force=True)
 
     if vlc:
         _ensure_tool_on_path("vlc")
@@ -1627,8 +1652,16 @@ def _update_managed_ytdlp(local_exe, works):
     return bool(final) and (not latest or final == latest)
 
 
+# The yt-dlp.exe _ensure_yt_dlp_cli ran successfully and keeps updated: the
+# _ytdlp_runtime_bin_dir() copy (%LOCALAPPDATA%\BlindRSS\bin for installed
+# builds, <repo>\bin for source runs) or a portable build's bundled copy.
+# _find_executable_path prefers it over PATH.
+_managed_ytdlp_exe = None
+
+
 def _ensure_yt_dlp_cli():
     """Throttled update/install of yt-dlp binary. Prioritizes working version."""
+    global _managed_ytdlp_exe
     if platform.system().lower() != "windows":
         return
 
@@ -1706,6 +1739,10 @@ def _ensure_yt_dlp_cli():
             _log(f"Using system yt-dlp at {exe}")
 
     if exe:
+        if exe in managed_exes:
+            # Before the update below (up to minutes): lookups meanwhile must
+            # not fall back to PATH. An in-place update keeps this path.
+            _managed_ytdlp_exe = exe
         # Only start the 24h throttle once the update has actually landed, so a
         # copy that fails to update retries on the next launch instead of
         # sitting stale for a day at a time (which is how it fell a month
@@ -1737,6 +1774,8 @@ def _ensure_yt_dlp_cli():
     except Exception as e:
         _log(f"Failed to download yt-dlp: {e}")
         return
+    if works(local_exe):
+        _managed_ytdlp_exe = local_exe
     
     current = os.environ.get("PATH", "")
     if bin_dir not in current.split(os.pathsep):

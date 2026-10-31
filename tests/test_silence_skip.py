@@ -79,6 +79,21 @@ class SilenceDetectionTests(unittest.TestCase):
         self.assertTrue(ranges)
         self.assertLess(abs(ranges[0][1] - 400), 80)
 
+    def test_scan_rescans_path_when_ffmpeg_is_missing(self):
+        """The Windows PATH scan is cached; ffmpeg added after startup must still be found."""
+        proc = mock.MagicMock(returncode=0, stdout=io.BytesIO(b""), stderr=io.BytesIO(b""))
+        proc.poll.return_value = 0
+        with (
+            mock.patch("core.dependency_check._maybe_add_windows_path") as rescan,
+            mock.patch("core.dependency_check._log"),
+            mock.patch("core.audio_silence.shutil.which", side_effect=[None, "ffmpeg"]),
+            mock.patch("core.audio_silence.subprocess.Popen", return_value=proc) as popen,
+        ):
+            self.assertEqual(scan_audio_for_silence("episode.mp3", detection_mode="rms"), [])
+
+        rescan.assert_called_with(force=True)
+        popen.assert_called_once()
+
     def test_detect_silence_from_pcm(self):
         # 0-400ms silence, 400-1100ms tone, 1100-2000ms silence, 2000-2600ms tone
         pcm = _build_pcm([

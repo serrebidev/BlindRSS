@@ -10,6 +10,7 @@ import re
 import time
 import io
 import contextlib
+import logging
 import threading
 import concurrent.futures
 import xml.etree.ElementTree as ET
@@ -256,16 +257,24 @@ def youtube_single_item_recovery_urls(url: str) -> list[str]:
         return []
 
 
+_logged_ytdlp_cli_path = None
+
+
 def _resolve_ytdlp_cli_path() -> str:
+    global _logged_ytdlp_cli_path
+    cli_path = "yt-dlp"
     try:
         from core.dependency_check import _find_executable_path
 
-        cli_path = _find_executable_path("yt-dlp")
-        if cli_path:
-            return str(cli_path)
+        cli_path = str(_find_executable_path("yt-dlp") or "yt-dlp")
     except Exception:
         pass
-    return "yt-dlp"
+    if cli_path != _logged_ytdlp_cli_path:
+        # Once per session, again only if it changes (the managed copy is
+        # recorded by the startup dependency check).
+        _logged_ytdlp_cli_path = cli_path
+        logging.getLogger(__name__).debug("yt-dlp CLI: %s", cli_path)
+    return cli_path
 
 
 def _load_ytdlp_extractors():
