@@ -80,3 +80,15 @@ def test_jaws_success_requires_successful_saystring(monkeypatch):
         ("pywin32", "not found", False),
         ("comtypes", "not found", False),
     ]
+
+
+def test_nvda_is_running_asks_the_controller_and_fails_closed(monkeypatch):
+    monkeypatch.setattr(sra.sys, "platform", "win32")
+    monkeypatch.setattr(sra, "_load_nvda_controller", lambda: _FakeNvdaDll(running_rc=0))
+    assert sra.nvda_is_running() is True
+    monkeypatch.setattr(sra, "_load_nvda_controller", lambda: _FakeNvdaDll(running_rc=1))
+    assert sra.nvda_is_running() is False
+    monkeypatch.setattr(sra, "_load_nvda_controller", lambda: None)
+    assert sra.nvda_is_running() is False
+    monkeypatch.setattr(sra.sys, "platform", "darwin")
+    assert sra.nvda_is_running() is False

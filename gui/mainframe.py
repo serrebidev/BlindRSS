@@ -3198,7 +3198,7 @@ class MainFrame(wx.Frame):
                 _("End of play queue.") if delta >= 0 else _("Start of play queue."),
             )
             return
-        if self.play_queue_index(target):
+        if self.play_queue_index(target, announce=False):  # says the title below
             try:
                 title = str(queue[target].get("title") or "").strip()
             except Exception:
@@ -7600,7 +7600,7 @@ class MainFrame(wx.Frame):
         self._save_play_queue([])
         self._current_queue_index = None
 
-    def play_queue_index(self, index: int) -> bool:
+    def play_queue_index(self, index: int, announce: bool = True) -> bool:
         queue = self._get_play_queue()
         if not (0 <= index < len(queue)):
             return False
@@ -7622,6 +7622,7 @@ class MainFrame(wx.Frame):
                 [],
                 title=entry.get("title"),
                 article_id=entry.get("article_id"),
+                announce=announce,
             )
         except Exception:
             log.exception("Failed to play queue item")
@@ -7725,7 +7726,7 @@ class MainFrame(wx.Frame):
         queue = self._get_play_queue()
         nxt = int(idx) + 1
         if 0 <= nxt < len(queue):
-            self.play_queue_index(nxt)
+            self.play_queue_index(nxt, announce=False)  # nobody asked: no speech
         else:
             self._current_queue_index = None
 
@@ -11120,13 +11121,16 @@ class MainFrame(wx.Frame):
         )
         self._announce(template.format(term=term))
 
-    def _announce_event(self, event_id: str, message: str) -> None:
+    def _announce_event(self, event_id: str, message: str, interrupt: bool = True) -> None:
         """Announce a key-event message (issue #67) via the configured mode.
 
-        Routes through the per-event announcer (speech and/or Braille through
-        accessible-output2, falling back to the direct NVDA/JAWS adapters). The
-        message is also mirrored to transient status field 0 for sighted users.
-        Fully guarded and non-blocking; a disabled event ("none") is a no-op.
+        Routes through the per-event announcer (speech and/or Braille: the NVDA
+        controller client while NVDA runs, else accessible-output2 with the
+        direct NVDA/JAWS adapters as fallback). ``interrupt=False`` lets the
+        screen reader finish what it is saying first; use it for news the user
+        did not just ask for. The message is also mirrored to transient status
+        field 0 for sighted users. Fully guarded and non-blocking; a disabled
+        event ("none") is a no-op.
         """
         message = str(message or "").strip()
         if not message:
@@ -11136,7 +11140,7 @@ class MainFrame(wx.Frame):
         except Exception:
             pass
         try:
-            self.announcer.announce(event_id, message)
+            self.announcer.announce(event_id, message, interrupt=interrupt)
         except Exception:
             log.debug("Announcement for %s failed", event_id, exc_info=True)
 

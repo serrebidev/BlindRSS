@@ -59,6 +59,15 @@ def test_speak_status_interrupt_terminates_previous(monkeypatch):
     assert first.terminated is True
 
 
+def test_non_interrupting_status_still_replaces_say_instead_of_overlapping(monkeypatch):
+    sra._reset_for_tests()
+    _install_fake_say(monkeypatch)
+    sra.speak_status("Loading media...")
+    first = sra._SAY_PROC
+    sra.speak_status("Playing", interrupt=False)
+    assert first.terminated is True
+
+
 def test_speak_status_no_say_binary(monkeypatch):
     sra._reset_for_tests()
     monkeypatch.setattr(sra.sys, "platform", "darwin", raising=False)
