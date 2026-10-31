@@ -63,6 +63,11 @@ _PROBE_RESOLVE_WAIT_S = 20.0
 # Larger amounts still happen via background download.
 _INLINE_PREFETCH_CAP_BYTES = 16 * 1024 * 1024
 
+# Largest single background range request. googlevideo serves ranges up to
+# ~10 MiB at 1.5-4 MB/s but larger ones at ~31 KB/s after a 2 s delay
+# (measured 2026-10); yt-dlp downloads in 10 MiB chunks for the same reason.
+_BG_MAX_REQUEST_BYTES = 10 * 1024 * 1024
+
 _RANGE_RE = re.compile(r"^bytes=(\d+)-(\d+)?$")
 _CONTENT_RANGE_RE = re.compile(r"^\s*bytes\s+(\d+)-(\d+)/(\d+|\*)\s*$", re.IGNORECASE)
 
@@ -1082,6 +1087,7 @@ class _Entry:
                             continue
 
                         chunk_target = bootstrap_bytes if first else int(self.background_chunk_bytes)
+                        chunk_target = min(int(chunk_target), _BG_MAX_REQUEST_BYTES)
                         end = start + int(chunk_target) - 1
                         if self.total_length is not None:
                             end = min(end, self.total_length - 1)

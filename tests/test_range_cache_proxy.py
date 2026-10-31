@@ -141,3 +141,48 @@ def test_head_waits_for_probe_metadata_before_reporting_media():
             proxy.stop()
         except Exception:
             pass
+
+
+def test_background_download_caps_each_origin_request_at_10_mib(tmp_path):
+    """googlevideo answers ranges over ~10 MiB at ~31 KB/s, so the 64 MB
+    bootstrap must be fetched in <= 10 MiB requests, still from byte 0."""
+    from core import range_cache_proxy as rcp
+
+    mib = 1024 * 1024
+    total = 40 * mib
+    ent = _Entry(
+        url="https://rr1---sn-x.googlevideo.com/videoplayback?id=1",
+        headers={},
+        cache_dir=str(tmp_path),
+        prefetch_bytes=16 * mib,
+        initial_burst_bytes=64 * mib,
+        initial_inline_prefetch_bytes=0,
+        background_download=True,
+        background_chunk_bytes=8 * mib,
+    )
+    ent.total_length = total
+    ent.range_supported = True
+    ent._probe_done.set()
+
+    requested = []
+    done = threading.Event()
+
+    def _fake_fetch_range(start, end, check_abort=None):
+        requested.append((start, end))
+        with ent.lock:
+            ent.segments = rcp._normalize_segments(ent.segments + [(start, end)])
+        if end >= total - 1:
+            done.set()
+        return True
+
+    ent._fetch_range = _fake_fetch_range
+    ent.maybe_start_background_download()
+    try:
+        assert done.wait(timeout=10.0), f"background download stalled: {requested}"
+    finally:
+        ent.stop_background()
+
+    assert requested[0][0] == 0
+    assert all((e - s + 1) <= 10 * mib for s, e in requested), requested
+    covered = sum(e - s + 1 for s, e in requested)
+    assert covered == total
