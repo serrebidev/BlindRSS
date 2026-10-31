@@ -106,6 +106,91 @@ def force_ltr_reading(ctrl) -> None:
         pass
 
 
+_msaa_name_api = None
+
+
+def _get_msaa_name_api():
+    """ctypes GUIDs and COM method prototypes for ``set_msaa_name``, built once.
+
+    ctypes caches every WINFUNCTYPE prototype by its argument types for the
+    life of the process, so declaring them (and a fresh GUID class) per call
+    added a cache entry on every call.
+    """
+    global _msaa_name_api
+    if _msaa_name_api is None:
+        import ctypes
+        from ctypes import wintypes
+
+        class GUID(ctypes.Structure):
+            _fields_ = [
+                ("Data1", ctypes.c_uint32),
+                ("Data2", ctypes.c_uint16),
+                ("Data3", ctypes.c_uint16),
+                ("Data4", ctypes.c_ubyte * 8),
+            ]
+
+        def guid(text):
+            value = GUID()
+            ctypes.oledll.ole32.CLSIDFromString(ctypes.c_wchar_p(text), ctypes.byref(value))
+            return value
+
+        _msaa_name_api = (
+            guid("{b5f8350b-0548-48b1-a6ee-88bd00b4a5e7}"),  # CLSID_AccPropServices
+            guid("{6e26e776-04f0-495d-80e4-3330352e3169}"),  # IID_IAccPropServices
+            guid("{608d3df8-8128-4aa7-a428-f55e49267291}"),  # PROPID_ACC_NAME
+            ctypes.WINFUNCTYPE(ctypes.c_ulong, ctypes.c_void_p),  # IUnknown::Release
+            ctypes.WINFUNCTYPE(  # IAccPropServices::SetHwndPropStr
+                ctypes.HRESULT, ctypes.c_void_p, wintypes.HWND, wintypes.DWORD, wintypes.DWORD, GUID, wintypes.LPCWSTR
+            ),
+        )
+    return _msaa_name_api
+
+
+def set_msaa_name(ctrl) -> None:
+    """Make a control's wx name (``SetName``) reach NVDA/JAWS on Windows.
+
+    wx's ``SetName`` only sets wx's own name and MSAA never sees it, so NVDA
+    announced the feed tree, search box, article list and reader with no
+    name at all. This annotates the name on the control's HWND
+    (MSAA Direct Annotation: ``IAccPropServices::SetHwndPropStr`` for
+    OBJID_CLIENT/CHILDID_SELF). Only the name changes; role, states, value and
+    the tree/list items still come from the native control.
+
+    Do not use ``wx.Window.SetAccessibleName`` (wx 3.3) or any other
+    ``wx.Accessible`` for this: it replaces the native object with a
+    ``wx.Accessible``, so the RichEdit reader becomes a generic "client" role
+    and loses its value and read-only state, and a ComboBox's dropdown list
+    child changes role and takes the combo's name.
+
+    ``wx.SearchCtrl`` is a composite on Windows whose inner Edit takes the
+    focus, so that Edit is named too. Call again after each ``SetName``.
+    No-op off Windows or on failure.
+    """
+    if not sys.platform.startswith("win"):
+        return
+    try:
+        import ctypes
+
+        clsid, iid, name_prop, release_type, set_hwnd_prop_str_type = _get_msaa_name_api()
+        services = ctypes.c_void_p()
+        ctypes.oledll.ole32.CoCreateInstance(
+            ctypes.byref(clsid), None, 1, ctypes.byref(iid), ctypes.byref(services)  # 1 = CLSCTX_INPROC_SERVER
+        )
+        vtable = ctypes.cast(services, ctypes.POINTER(ctypes.POINTER(ctypes.c_void_p))).contents
+        try:
+            text = str(ctrl.GetName())
+            windows = [ctrl]
+            if isinstance(ctrl, wx.SearchCtrl):
+                windows += [c for c in ctrl.GetChildren() if isinstance(c, wx.TextCtrl)]
+            for window in windows:
+                # 0xFFFFFFFC = OBJID_CLIENT, 0 = CHILDID_SELF
+                set_hwnd_prop_str_type(vtable[7])(services, int(window.GetHandle()), 0xFFFFFFFC, 0, name_prop, text)
+        finally:
+            release_type(vtable[2])(services)
+    except Exception:
+        pass
+
+
 class CheckListCtrl(wx.ListCtrl):
     """Single-column checkable list with a CheckListBox-like API.
 

@@ -31,6 +31,7 @@ from core.audio_silence import merge_ranges, merge_ranges_with_gap, scan_audio_f
 from core.dependency_check import _log
 from .hotkeys import HoldRepeatHotkeys, resolve_media_action
 from .menu_mnemonics import apply_menu_mnemonics
+from .widgets import set_msaa_name
 
 log = logging.getLogger(__name__)
 
@@ -1955,6 +1956,7 @@ class PlayerFrame(wx.Frame):
         # Slider
         self.slider = wx.Slider(panel, value=0, minValue=0, maxValue=1000)
         self.slider.SetName(_("Playback Position"))
+        set_msaa_name(self.slider)
         # FIX: Separate tracking (dragging) from release (seeking)
         self.slider.Bind(wx.EVT_SCROLL_THUMBTRACK, self.on_slider_track)
         self.slider.Bind(wx.EVT_SCROLL_THUMBRELEASE, self.on_slider_release)
@@ -1984,6 +1986,7 @@ class PlayerFrame(wx.Frame):
             style=wx.TE_READONLY | wx.TE_CENTER,
         )
         self.time_info_ctrl.SetName(_("Playback Time"))
+        set_msaa_name(self.time_info_ctrl)
         sizer.Add(self.time_info_ctrl, 0, wx.EXPAND | wx.LEFT | wx.RIGHT | wx.BOTTOM, 5)
         
         # Controls
@@ -1992,6 +1995,7 @@ class PlayerFrame(wx.Frame):
         # Rewind 10s
         rewind_btn = wx.Button(panel, label=_("-10s"))
         rewind_btn.SetName(_("Rewind 10 seconds"))
+        set_msaa_name(rewind_btn)
         rewind_btn.Bind(wx.EVT_BUTTON, self.on_rewind)
         btn_sizer.Add(rewind_btn, 0, wx.ALL, 5)
         
@@ -2008,6 +2012,7 @@ class PlayerFrame(wx.Frame):
         # Forward 10s
         forward_btn = wx.Button(panel, label=_("+10s"))
         forward_btn.SetName(_("Fast Forward 10 seconds"))
+        set_msaa_name(forward_btn)
         forward_btn.Bind(wx.EVT_BUTTON, self.on_forward)
         btn_sizer.Add(forward_btn, 0, wx.ALL, 5)
         
@@ -2015,6 +2020,7 @@ class PlayerFrame(wx.Frame):
         speeds = utils.build_playback_speeds()
         self.speed_combo = wx.ComboBox(panel, choices=[f"{s}x" for s in speeds], style=wx.CB_READONLY)
         self.speed_combo.SetName(_("Playback Speed"))
+        set_msaa_name(self.speed_combo)
         self.speed_combo.Bind(wx.EVT_COMBOBOX, self.on_speed_select)
         btn_sizer.Add(self.speed_combo, 0, wx.ALL, 5)
         
@@ -2026,6 +2032,7 @@ class PlayerFrame(wx.Frame):
         # Chapters menu
         self.chapters_btn = wx.Button(panel, label=_("Chapters"))
         self.chapters_btn.SetName(_("Chapters Menu"))
+        set_msaa_name(self.chapters_btn)
         self.chapters_btn.Bind(wx.EVT_BUTTON, self.on_show_chapters_menu)
         btn_sizer.Add(self.chapters_btn, 0, wx.ALL, 5)
         
@@ -2050,6 +2057,9 @@ class PlayerFrame(wx.Frame):
         # Chapters
         self.chapter_choice = wx.ComboBox(panel, style=wx.CB_READONLY)
         self.chapter_choice.SetName(_("Chapters"))
+        # Windows keeps this short name: NVDA reads the current chapter as the value,
+        # so the longer names _update_chapter_accessibility_label sets would repeat it.
+        set_msaa_name(self.chapter_choice)
         self.chapter_choice.Bind(wx.EVT_COMBOBOX, self.on_chapter_select)
         if hasattr(wx, "EVT_COMBOBOX_CLOSEUP"):
             try:

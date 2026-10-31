@@ -68,7 +68,7 @@ import core.discovery
 from .shortcut_keys import event_to_accel
 from .menu_mnemonics import apply_menu_mnemonics, apply_menubar_mnemonics
 from . import help_context
-from .widgets import STATUS_BAR_STYLE, force_ltr_reading
+from .widgets import STATUS_BAR_STYLE, force_ltr_reading, set_msaa_name
 from .reader_performance import (
     LARGE_READER_TEXT_CHARS,
     READER_CACHE_MAX_CHARS,
@@ -692,6 +692,7 @@ class MainFrame(wx.Frame):
         # Left: Tree (Feeds)
         self.tree = wx.TreeCtrl(splitter, style=wx.TR_DEFAULT_STYLE | wx.TR_HIDE_ROOT | wx.TR_HAS_BUTTONS)
         self.tree.SetName(_("Feeds and folders"))
+        set_msaa_name(self.tree)
         # Suppress tooltips on the feed tree (BlindRSS#118): prevent wxWidgets
         # from generating tooltip events that NVDA announces repeatedly.
         self.tree.SetToolTip("")
@@ -704,6 +705,7 @@ class MainFrame(wx.Frame):
 
         self.search_ctrl = wx.SearchCtrl(right_panel, style=wx.TE_PROCESS_ENTER)
         self.search_ctrl.SetName(_("Search articles"))
+        set_msaa_name(self.search_ctrl)
         try:
             self.search_ctrl.SetDescriptiveText(_("Filter current view (Enter)"))
         except Exception:
@@ -724,6 +726,7 @@ class MainFrame(wx.Frame):
         # to extend a range) so bulk actions like Delete/Copy work on the whole selection.
         self.list_ctrl = wx.ListCtrl(right_splitter, style=wx.LC_REPORT)
         self.list_ctrl.SetName(_("Articles"))
+        set_msaa_name(self.list_ctrl)
         # Suppress tooltips on the articles list (BlindRSS#118): NVDA was
         # repeatedly announcing the feed name as a tooltip when moving through
         # articles, even when idle. Explicitly clearing the tooltip prevents
@@ -6014,6 +6017,7 @@ class MainFrame(wx.Frame):
             style=wx.TE_MULTILINE | wx.TE_READONLY | wx.TE_RICH2,
         )
         ctrl.SetName(_("Article text"))
+        set_msaa_name(ctrl)
         ctrl.Bind(wx.EVT_SET_FOCUS, self.on_content_focus)
         ctrl.Bind(wx.EVT_KILL_FOCUS, self._on_content_kill_focus)
         ctrl.Bind(wx.EVT_TEXT_COPY, self.on_content_copy)
