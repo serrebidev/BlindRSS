@@ -4521,6 +4521,7 @@ class PlayerFrame(wx.Frame):
         try:
             self._cancel_scheduled_resume_save()
             self._stop_calllater("_seek_apply_calllater", "Error handling seek apply calllater on media load")
+            self._stop_calllater("_seek_announce_calllater", "Error stopping seek announcement on media load")
         except Exception:
             log.exception("Error during media load cleanup")
         finally:
@@ -5611,7 +5612,7 @@ class PlayerFrame(wx.Frame):
             return
 
         step = int(getattr(self, 'seek_back_ms', 10000) or 10000)
-        self.seek_relative_ms(-int(step))
+        self._seek_by_button(-int(step))
 
     def on_forward(self, event):
         if self.is_casting:
@@ -5629,7 +5630,27 @@ class PlayerFrame(wx.Frame):
             return
 
         step = int(getattr(self, 'seek_forward_ms', 10000) or 10000)
-        self.seek_relative_ms(int(step))
+        self._seek_by_button(int(step))
+
+    def _seek_by_button(self, delta_ms: int) -> None:
+        """Seek for the -/+10 s buttons, then say where it landed once the
+        presses settle; Space on them otherwise only echoed "space"."""
+        before = getattr(self, "_seek_target_ts", None)
+        self.seek_relative_ms(delta_ms)
+        if getattr(self, "_seek_target_ts", None) == before:
+            return  # refused at the end; _announce_seek_limit already spoke
+        try:
+            pending = getattr(self, "_seek_announce_calllater", None)
+            if pending is not None and pending.IsRunning():
+                pending.Restart(400)
+            else:
+                self._seek_announce_calllater = wx.CallLater(400, self._announce_seek_position)
+        except Exception:
+            log.debug("Seek position announcement failed", exc_info=True)
+
+    def _announce_seek_position(self) -> None:
+        # The same words as the player's time field: elapsed, remaining, total.
+        self._announce_media_nav(self._compose_time_info(self._current_position_ms()))
 
     def on_volume_slider(self, event):
         try:
@@ -7294,6 +7315,7 @@ class PlayerFrame(wx.Frame):
 
         self._stop_calllater("_seek_apply_calllater", "Error handling seek apply calllater during shutdown")
         self._stop_calllater("_seek_guard_calllater", "Error handling seek guard calllater during shutdown")
+        self._stop_calllater("_seek_announce_calllater", "Error stopping seek announcement during shutdown")
 
         try:
             self._cancel_silence_scan()
