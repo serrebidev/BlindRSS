@@ -215,10 +215,10 @@ def _extract_info_via_cli(
         except subprocess.TimeoutExpired:
             if _cancel_requested():
                 _kill_process_tree(proc)
-                raise ExtractionCancelled()
+                raise ExtractionCancelled() from None
             if time.monotonic() > deadline:
                 _kill_process_tree(proc)
-                raise TimeoutError("yt-dlp did not finish in time")
+                raise TimeoutError("yt-dlp did not finish in time") from None
     errors = (stderr or b"").decode("utf-8", "replace")
     for line in errors.splitlines():
         if line.strip():
@@ -375,20 +375,50 @@ def _timestamp(seconds) -> str:
     return f"{hours}:{minutes:02d}:{secs:02d}" if hours else f"{minutes}:{secs:02d}"
 
 
+# YouTube labels Chinese tracks by script; a UI locale's region implies it.
+_ZH_SCRIPT_FOR_REGION = {
+    "zh-tw": "zh-hant", "zh-hk": "zh-hant", "zh-mo": "zh-hant", "zh-cn": "zh-hans", "zh-sg": "zh-hans",
+}
+
+
+def _language_match(code, wanted):
+    """How well subtitle language ``code`` fits ``wanted``: 0 same tag, 1 same
+    script, 2 the bare base language, 3 another variant of it; None otherwise."""
+    code = str(code or "").lower().replace("_", "-").removesuffix("-orig")
+    wanted = str(wanted or "").lower().replace("_", "-")
+    if not code or not wanted:
+        return None
+    if code == wanted:
+        return 0
+    if code == _ZH_SCRIPT_FOR_REGION.get(wanted):
+        return 1
+    base = wanted.split("-")[0]
+    if code == base:
+        return 2
+    return 3 if code.split("-")[0] == base else None
+
+
+def _track_translation(track) -> str:
+    """Language YouTube machine-translates ``track`` into ("" when it does not)."""
+    return (parse_qs(urlsplit(str(track.get("url") or "")).query).get("tlang") or [""])[0]
+
+
 def _subtitle_candidates(info: dict):
-    """Yield one best subtitle track: authored before automatic, English first."""
+    """Yield subtitle tracks best first.
+
+    An untranslated track in the UI language (closest tag first), untranslated
+    English, YouTube's machine translation into the UI language, the video's
+    original language, then other authored tracks; authored before automatic
+    within each step. Translations into any other language are never offered.
+    """
+    from core.article_lang import app_ui_language
+
     authored = info.get("subtitles") or {}
     automatic = info.get("automatic_captions") or {}
-
-    def language_rank(language):
-        low = str(language or "").lower()
-        if low == "en":
-            return 0
-        if low.startswith("en-"):
-            return 1
-        if low.endswith("-orig"):
-            return 2
-        return 3
+    ui = app_ui_language()
+    original = ""
+    if isinstance(automatic, dict):
+        original = next((str(key)[:-5] for key in automatic if str(key).endswith("-orig")), "")
 
     candidates = []
     for tracks, kind_rank in ((authored, 0), (automatic, 1)):
@@ -398,20 +428,38 @@ def _subtitle_candidates(info: dict):
             formats = tracks.get(language) or []
             if not isinstance(formats, list):
                 continue
+            # A format with a "protocol" is no subtitle file: a livestream
+            # replay's "live_chat" entry points at the watch page (no cues).
             ranked = sorted(
-                (item for item in formats if isinstance(item, dict) and item.get("url")),
+                (
+                    item for item in formats
+                    if isinstance(item, dict) and item.get("url") and not item.get("protocol")
+                ),
                 key=lambda item: 0 if item.get("ext") == "json3" else 1 if item.get("ext") == "vtt" else 2,
             )
-            if ranked:
-                lang_rank = language_rank(language)
-                # Creator English, automatic English, creator other, automatic
-                # other. This avoids choosing a creator Spanish track over an
-                # available English automatic transcript for an English UI.
-                english = lang_rank <= 1
-                overall_rank = kind_rank if english else 2 + kind_rank
-                candidates.append((overall_rank, lang_rank, str(language), kind_rank, ranked[0]))
-    for _overall, _lang_rank, language, kind_rank, track in sorted(candidates):
-        yield kind_rank, language, track
+            if not ranked:
+                continue
+            # Creator before automatic within each step keeps the old rule that a
+            # creator Spanish track never beats English captions for an English
+            # UI. YouTube may rate-limit machine translations (tlang=, HTTP 429),
+            # so only a translation into the UI language is offered; it still
+            # beats the original, which may be in a language the reader does not know.
+            translation = _track_translation(ranked[0])
+            if translation:
+                match = _language_match(translation, ui)
+                if match is None:
+                    continue
+                rank = (2, match)
+            elif (match := _language_match(language, ui)) is not None:
+                rank = (0, match)
+            elif (match := _language_match(language, "en")) is not None:
+                rank = (1, match)
+            else:
+                rank = (3 if _language_match(language, original) is not None else 4, 0)
+            candidates.append((rank, kind_rank, str(language), ranked[0]))
+    for _rank, kind_rank, language, track in sorted(candidates):
+        # "pl-orig" names the spoken-language track; the heading says just "pl".
+        yield kind_rank, language.removesuffix("-orig"), track
 
 
 def _transcript_from_json3(payload: dict) -> list[tuple[float, str]]:
@@ -463,25 +511,45 @@ def _clean_subtitle_text(value: str) -> str:
 
 
 def transcript_from_info(info: dict, *, timeout: int = 20) -> tuple[str, list[tuple[float, str]]]:
-    candidate = next(_subtitle_candidates(info), None)
-    if not candidate:
-        return "", []
-    _kind, language, track = candidate
-    try:
-        response = utils.safe_requests_get(
-            track["url"],
-            timeout=max(5, int(timeout or 20)),
-            headers=dict(info.get("http_headers") or {}),
+    first_language = ""
+    tried = set()
+    for kind, language, track in _subtitle_candidates(info):
+        if track["url"] in tried:
+            continue  # "pl-orig" and "pl" are the same track
+        if len(tried) == 2:
+            break
+        if _cancel_requested():
+            raise ExtractionCancelled()
+        tried.add(track["url"])
+        first_language = first_language or str(language)
+        translation = _track_translation(track)
+        # Never the URL or its other query parameters (signed).
+        LOG.debug(
+            "YouTube subtitle attempt %d: %s (%s)%s",
+            len(tried),
+            language,
+            "auto" if kind else "manual",
+            f", translated to {translation}" if translation else "",
         )
-        response.raise_for_status()
-        if track.get("ext") == "json3":
-            entries = _transcript_from_json3(response.json())
-        else:
-            entries = _transcript_from_vtt(response.text)
-        return str(language), entries
-    except Exception:
-        LOG.debug("YouTube subtitle download failed", exc_info=True)
-        return str(language), []
+        try:
+            response = utils.safe_requests_get(
+                track["url"],
+                timeout=max(5, int(timeout or 20)),
+                headers=dict(info.get("http_headers") or {}),
+            )
+            response.raise_for_status()
+            if track.get("ext") == "json3":
+                entries = _transcript_from_json3(response.json())
+            else:
+                entries = _transcript_from_vtt(response.text)
+            return str(language), entries
+        except Exception as exc:
+            # Type and HTTP status only: the error text carries the signed URL.
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            LOG.debug("YouTube subtitle download failed (%s): %s %s", language, type(exc).__name__, status or "")
+            if status == 429 and not translation:
+                break  # rate-limited on the plain track: another request would be too
+    return first_language, []
 
 
 def _comment_text(comment: dict) -> str:

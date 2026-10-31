@@ -124,7 +124,14 @@ def test_incomplete_comment_extraction_retries_and_unions_comments(monkeypatch):
     assert not info.get("_blindrss_comments_incomplete")
 
 
-def test_automatic_english_subtitles_beat_authored_non_english():
+def _ui(monkeypatch, language):
+    from core import article_lang
+
+    monkeypatch.setattr(article_lang, "app_ui_language", lambda: language)
+
+
+def test_automatic_english_subtitles_beat_authored_non_english(monkeypatch):
+    _ui(monkeypatch, "en")
     info = {
         "subtitles": {"es": [{"ext": "vtt", "url": "https://subs.example/es"}]},
         "automatic_captions": {"en": [{"ext": "json3", "url": "https://subs.example/en"}]},
@@ -132,6 +139,206 @@ def test_automatic_english_subtitles_beat_authored_non_english():
     _kind, language, track = next(youtube_fulltext._subtitle_candidates(info))
     assert language == "en"
     assert track["url"].endswith("/en")
+
+
+def _polish_video_captions():
+    # yt-dlp's shape for a Polish video: the spoken-language ASR track under
+    # "pl-orig" and "pl" (same URL, no tlang) and machine translations with tlang.
+    asr = "https://www.youtube.com/api/timedtext?v=x&kind=asr&lang=pl&fmt=json3"
+    return {
+        "automatic_captions": {
+            "aa": [{"ext": "json3", "url": asr + "&tlang=aa"}],
+            "en": [{"ext": "json3", "url": asr + "&tlang=en"}],
+            "pl-orig": [{"ext": "json3", "url": asr}],
+            "pl": [{"ext": "json3", "url": asr}],
+            "de": [{"ext": "json3", "url": asr + "&tlang=de"}],
+        }
+    }
+
+
+def _languages(info):
+    return [language for _kind, language, _track in youtube_fulltext._subtitle_candidates(info)]
+
+
+def test_subtitle_order_follows_the_ui_language(monkeypatch):
+    # Polish UI: the spoken Polish track, never a translation into another language.
+    _ui(monkeypatch, "pl")
+    assert _languages(_polish_video_captions()) == ["pl", "pl"]
+    # English UI: YouTube's English translation, the original as the fallback.
+    _ui(monkeypatch, "en")
+    assert _languages(_polish_video_captions()) == ["en", "pl", "pl"]
+
+
+def test_live_chat_replay_is_not_a_subtitle_track(monkeypatch):
+    # yt-dlp lists a livestream replay's chat as subtitles["live_chat"]: the
+    # watch page (ext json, with a protocol), which holds no cues.
+    live_chat = {
+        "live_chat": [
+            {"url": "https://www.youtube.com/watch?v=x", "ext": "json", "protocol": "youtube_live_chat_replay"}
+        ]
+    }
+    asr = "https://www.youtube.com/api/timedtext?v=x&kind=asr&lang=en&fmt=json3"
+    english_replay = {
+        "subtitles": live_chat,
+        "automatic_captions": {
+            "en-orig": [{"ext": "json3", "url": asr}],
+            "pl": [{"ext": "json3", "url": asr + "&tlang=pl"}],
+        },
+    }
+    _ui(monkeypatch, "pl")
+    assert _languages(english_replay) == ["en", "pl"]
+    _ui(monkeypatch, "en")
+    assert _languages(dict(_polish_video_captions(), subtitles=live_chat)) == ["en", "pl", "pl"]
+
+
+def test_regional_ui_language_picks_the_matching_variant(monkeypatch):
+    info = {
+        "subtitles": {
+            code: [{"ext": "vtt", "url": f"https://subs.example/{code}"}]
+            for code in ("zh-Hans", "zh-Hant", "pt-BR", "pt-PT")
+        }
+    }
+    for ui, expected in (("zh-TW", "zh-Hant"), ("zh-CN", "zh-Hans"), ("pt-PT", "pt-PT"), ("pt-BR", "pt-BR")):
+        _ui(monkeypatch, ui)
+        assert _languages(info)[0] == expected
+
+
+def test_ui_language_authored_track_is_preferred(monkeypatch):
+    _ui(monkeypatch, "pl")
+    info = {
+        "subtitles": {
+            "en": [{"ext": "vtt", "url": "https://subs.example/en"}],
+            "pl": [{"ext": "vtt", "url": "https://subs.example/pl"}],
+        }
+    }
+    assert next(youtube_fulltext._subtitle_candidates(info))[1] == "pl"
+
+
+class _RateLimited:
+    status_code = 429
+
+    def raise_for_status(self):
+        import requests
+
+        raise requests.HTTPError("429 Client Error: Too Many Requests", response=self)
+
+
+def test_failed_translation_falls_back_to_the_original_track(monkeypatch):
+    _ui(monkeypatch, "en")
+    requested = []
+
+    def fake_get(url, **_kwargs):
+        requested.append(url)
+        return _RateLimited() if len(requested) == 1 else _SubtitleResponse()
+
+    monkeypatch.setattr(utils, "safe_requests_get", fake_get)
+    language, entries = youtube_fulltext.transcript_from_info(_polish_video_captions())
+    assert len(requested) == 2
+    assert requested[0].endswith("&tlang=en") and "tlang" not in requested[1]
+    assert language == "pl" and entries
+
+    # Both fail: one retry only, never a translation into another language
+    # (the old fallback took "aa", Afar, by alphabetical order).
+    requested.clear()
+    monkeypatch.setattr(utils, "safe_requests_get", lambda url, **_k: requested.append(url) or _RateLimited())
+    language, entries = youtube_fulltext.transcript_from_info(_polish_video_captions())
+    assert len(requested) == 2
+    assert not any("tlang=aa" in url or "tlang=de" in url for url in requested)
+    assert language == "en" and entries == []
+
+
+def test_rate_limited_original_track_is_not_retried(monkeypatch):
+    _ui(monkeypatch, "pl")
+    requested = []
+    monkeypatch.setattr(utils, "safe_requests_get", lambda url, **_k: requested.append(url) or _RateLimited())
+    language, entries = youtube_fulltext.transcript_from_info(_polish_video_captions())
+    assert len(requested) == 1 and "tlang" not in requested[0]
+    assert language == "pl" and entries == []
+
+
+def test_subtitle_download_stops_when_the_selection_moved(monkeypatch):
+    requested = []
+    monkeypatch.setattr(utils, "safe_requests_get", lambda url, **_k: requested.append(url))
+    with youtube_fulltext.cancel_when(lambda: True):
+        with pytest.raises(youtube_fulltext.ExtractionCancelled):
+            youtube_fulltext.transcript_from_info(_polish_video_captions())
+    assert requested == []
+
+
+def test_subtitle_attempts_are_logged_without_the_url(monkeypatch, caplog):
+    _ui(monkeypatch, "en")
+    requested = []
+
+    def fake_get(url, **_kwargs):
+        requested.append(url)
+        return _RateLimited() if len(requested) == 1 else _SubtitleResponse()
+
+    monkeypatch.setattr(utils, "safe_requests_get", fake_get)
+    with caplog.at_level("DEBUG", logger="core.youtube_fulltext"):
+        youtube_fulltext.transcript_from_info(_polish_video_captions())
+        _ui(monkeypatch, "pl")
+        youtube_fulltext.transcript_from_info(
+            {"subtitles": {"pl": [{"ext": "json3", "url": "https://subs.example/pl?sig=SECRET"}]}}
+        )
+    attempts = [r.getMessage() for r in caplog.records if "subtitle attempt" in r.getMessage()]
+    assert attempts == [
+        "YouTube subtitle attempt 1: en (auto), translated to en",
+        "YouTube subtitle attempt 2: pl (auto)",
+        "YouTube subtitle attempt 1: pl (manual)",
+    ]
+    for leak in ("http", "timedtext", "kind=asr", "fmt=", "v=x", "SECRET", "subs.example"):
+        assert leak not in caplog.text
+
+
+def test_subtitle_failure_log_omits_signed_url(monkeypatch, caplog):
+    import requests
+
+    class _RateLimited:
+        status_code = 429
+
+        def raise_for_status(self):
+            raise requests.HTTPError(
+                "429 Client Error: Too Many Requests for url: https://www.youtube.com/api/timedtext?signature=SECRET",
+                response=self,
+            )
+
+    monkeypatch.setattr(utils, "safe_requests_get", lambda *a, **k: _RateLimited())
+    with caplog.at_level("DEBUG", logger="core.youtube_fulltext"):
+        youtube_fulltext.transcript_from_info(_polish_video_captions())
+    assert "HTTPError 429" in caplog.text
+    assert "SECRET" not in caplog.text and "timedtext" not in caplog.text
+    assert not any(record.exc_info for record in caplog.records)
+
+
+def test_cancelled_extraction_logs_no_tracebacks(monkeypatch, caplog):
+    import subprocess
+
+    from core import discovery
+
+    class _Proc:
+        pid = 0
+
+        def communicate(self, timeout=None):
+            raise subprocess.TimeoutExpired("yt-dlp", timeout)
+
+    monkeypatch.setattr(discovery, "_resolve_ytdlp_cli_path", lambda: "yt-dlp")
+    monkeypatch.setattr(youtube_fulltext.subprocess, "Popen", lambda *a, **k: _Proc())
+    monkeypatch.setattr(youtube_fulltext, "_kill_process_tree", lambda proc: None)
+    checks = iter([False, True])
+    with youtube_fulltext.cancel_when(lambda: next(checks)):
+        with pytest.raises(youtube_fulltext.ExtractionCancelled) as raised:
+            youtube_fulltext._extract_info_via_cli(URL, timeout=5, include_comments=False)
+    assert raised.value.__suppress_context__
+
+    def cancelled(*_args, **_kwargs):
+        raise youtube_fulltext.ExtractionCancelled()
+
+    monkeypatch.setattr(youtube_fulltext, "extract_article", cancelled)
+    with caplog.at_level("DEBUG", logger="core.article_extractor"):
+        with pytest.raises(article_extractor.ExtractionError):
+            article_extractor.extract_full_article(URL)
+    assert "cancelled" in caplog.text
+    assert not any(record.exc_info for record in caplog.records)
 
 
 def test_subtitle_speaker_chevrons_are_not_spoken_as_greater():
