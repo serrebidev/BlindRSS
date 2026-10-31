@@ -4758,7 +4758,9 @@ def extract_full_article(
     except ExtractionError:
         raise
     except Exception as exc:
-        LOG.debug("Structured YouTube extraction failed for %s", url, exc_info=True)
+        cancelled = type(exc).__name__ == "ExtractionCancelled"  # the selection moved on
+        LOG.debug("Structured YouTube extraction %s for %s", "cancelled" if cancelled else "failed", url,
+                  exc_info=not cancelled)
         raise ExtractionError(str(exc) or _("Could not retrieve YouTube video details."))
 
     if trafilatura is None:
