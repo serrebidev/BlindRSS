@@ -12,6 +12,8 @@ CAPTCHA, Google Cache, 12ft.io) must NOT be part of the chain.
 import json
 import types
 
+import pytest
+
 import core.article_extractor as article_extractor
 import core.utils as utils
 
@@ -241,6 +243,54 @@ def test_tag_stripped_json_ld_keeps_tag_names_in_prose():
         f'<html><script type="application/ld+json">{payload}</script></html>'
     )
     assert "close it with </p> in the template" in text
+
+
+def test_empty_extraction_is_remembered_for_a_while(monkeypatch):
+    # A JavaScript-only page: every revisit of an article re-downloaded and
+    # re-extracted it for the same empty result.
+    shell = (
+        '<!doctype html><html lang="en"><head><meta charset="UTF-8"></head>'
+        '<body><div id="app"></div><script src="/static/js/app.js"></script></body></html>'
+    )
+    fetches = []
+
+    def fake_fetch(*_args, **_kwargs):
+        fetches.append(1)
+        return article_extractor._FetchResult(html=shell)
+
+    monkeypatch.setattr(article_extractor, "_fetch_page", fake_fetch)
+    url = "https://science.example/articles/12345"
+    for _ in range(2):
+        with pytest.raises(article_extractor.ExtractionError, match="empty result"):
+            article_extractor.extract_full_article(url)
+    assert len(fetches) == 1
+
+    # The entry expires, so a page that was only briefly empty can recover.
+    expired = article_extractor.time.monotonic() - article_extractor._EMPTY_EXTRACTION_TTL_S - 1
+    article_extractor._EMPTY_EXTRACTION_URLS[(url, "")] = expired
+    with pytest.raises(article_extractor.ExtractionError, match="empty result"):
+        article_extractor.extract_full_article(url)
+    assert len(fetches) == 2
+
+
+@pytest.mark.parametrize(
+    "result",
+    [article_extractor._FetchResult(html=None), article_extractor._FetchResult(blocked=True)],
+    ids=["failed", "blocked"],
+)
+def test_failed_or_blocked_download_is_not_remembered(monkeypatch, result):
+    fetches = []
+
+    def fake_fetch(*_args, **_kwargs):
+        fetches.append(1)
+        return result
+
+    monkeypatch.setattr(article_extractor, "_fetch_page", fake_fetch)
+    for _ in range(2):
+        with pytest.raises(article_extractor.ExtractionError):
+            article_extractor.extract_full_article("https://example.com/story")
+    assert len(fetches) == 2
+    assert not article_extractor._EMPTY_EXTRACTION_URLS
 
 
 def test_normalize_whitespace_removes_invisible_word_break_characters():

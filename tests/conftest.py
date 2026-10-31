@@ -19,6 +19,7 @@ on a machine whose owner had browsed neowin.net.
 """
 
 import os
+import sys
 
 import pytest
 
@@ -90,3 +91,12 @@ def _isolated_site_cookie_jar(tmp_path_factory, monkeypatch):
     yield
     _reset()
     site_cookies._last_forced_refresh.clear()
+
+
+@pytest.fixture(autouse=True)
+def _forget_empty_extractions():
+    """The session memo of pages with no readable text must not leak between tests."""
+    yield
+    extractor = sys.modules.get("core.article_extractor")
+    if extractor is not None:
+        extractor._EMPTY_EXTRACTION_URLS.clear()
