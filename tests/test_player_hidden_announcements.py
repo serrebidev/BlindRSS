@@ -2,12 +2,12 @@
 # This file is part of BlindRSS
 # SPDX-License-Identifier: MIT
 
-"""Speech feedback from a hidden player.
+"""Speech feedback from a hidden player and from the -/+10 s buttons.
 
 With "show player on play" off (the default) a listener pressed
 Enter on a YouTube item and heard nothing for 19 s, the time the stream took to
 fail over to download-to-play; the player's status label was the only feedback
-and it was hidden.
+and it was hidden. The -/+10 s buttons only echoed "space".
 """
 
 import os
@@ -236,3 +236,89 @@ def test_vlc_error_with_nothing_left_to_retry_is_announced(monkeypatch):
     p._last_used_range_proxy = True
     PlayerFrame._handle_vlc_error(p)
     p._announce_when_hidden.assert_called_once_with(failed)
+
+
+class _FakeCallLater:
+    made = []
+
+    def __init__(self, ms, fn):
+        self.ms, self.fn, self.restarts = ms, fn, 0
+        _FakeCallLater.made.append(self)
+
+    def IsRunning(self):
+        return True
+
+    def Restart(self, ms):
+        self.restarts += 1
+
+
+def _seek_player():
+    p = MagicMock()
+    p._seek_target_ts = 5.0
+    p._seek_announce_calllater = None
+
+    def _seek(_delta):
+        p._seek_target_ts = time.monotonic()
+
+    p.seek_relative_ms.side_effect = _seek
+    return p
+
+
+def test_seek_buttons_announce_once_after_presses_settle(monkeypatch):
+    _FakeCallLater.made = []
+    monkeypatch.setattr(player_mod.wx, "CallLater", _FakeCallLater)
+    p = _seek_player()
+    PlayerFrame._seek_by_button(p, 10000)
+    PlayerFrame._seek_by_button(p, 10000)
+    PlayerFrame._seek_by_button(p, -10000)
+    assert len(_FakeCallLater.made) == 1
+    timer = _FakeCallLater.made[0]
+    assert timer.fn is p._announce_seek_position and timer.restarts == 2
+
+
+def test_refused_seek_at_the_end_adds_no_position(monkeypatch):
+    _FakeCallLater.made = []
+    monkeypatch.setattr(player_mod.wx, "CallLater", _FakeCallLater)
+    p = _seek_player()
+    p.seek_relative_ms.side_effect = None  # refused: "End of track" was said
+    PlayerFrame._seek_by_button(p, 10000)
+    assert _FakeCallLater.made == []
+
+
+def test_seek_buttons_route_through_the_announcing_seek():
+    p = MagicMock()
+    p.is_casting = False
+    p.seek_forward_ms = 10000
+    p.seek_back_ms = 10000
+    PlayerFrame.on_forward(p, None)
+    PlayerFrame.on_rewind(p, None)
+    assert [c.args for c in p._seek_by_button.call_args_list] == [(10000,), (-10000,)]
+
+
+@pytest.mark.parametrize(
+    "duration, expected",
+    [(45 * 60 * 1000, "Elapsed 01:23, Remaining 43:37, Total 45:00"), (0, "Elapsed 01:23")],
+)
+def test_seek_position_text(duration, expected):
+    p = MagicMock()
+    p._current_position_ms.return_value = 83_000
+    p.duration = duration
+    p._format_time.side_effect = lambda ms: PlayerFrame._format_time(p, ms)
+    p._remaining_ms.side_effect = lambda ms: PlayerFrame._remaining_ms(p, ms)
+    p._compose_time_info.side_effect = lambda ms: PlayerFrame._compose_time_info(p, ms)
+    PlayerFrame._announce_seek_position(p)
+    p._announce_media_nav.assert_called_once_with(expected)
+
+
+def test_pending_seek_announcement_is_dropped_on_load_and_shutdown():
+    p = MagicMock()
+    p.is_casting = False
+    p._load_seq = 0
+    PlayerFrame.load_media(p, "https://cdn.example.com/next.mp3")
+    assert ("_seek_announce_calllater",) in [c.args[:1] for c in p._stop_calllater.call_args_list]
+
+    p = MagicMock()
+    p._shutdown_done = False
+    p.is_casting = False
+    PlayerFrame.shutdown(p)
+    assert ("_seek_announce_calllater",) in [c.args[:1] for c in p._stop_calllater.call_args_list]
