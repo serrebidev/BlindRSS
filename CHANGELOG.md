@@ -4,6 +4,13 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.5.5 - 2026-10-31
+
+- Stop reading escaped HTML tags in full text; don't refetch empty pages (#134).
+- Prefer YouTube subtitles in the UI language over machine translations (#132).
+- Let NVDA read the feed tree, article list, reader and player control names (#131).
+- Use the app's own nightly yt-dlp and scan tool folders once per session (#130).
+
 ## v2.5.4 - 2026-10-30
 
 - Update Polish translation (#128).
