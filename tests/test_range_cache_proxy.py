@@ -292,3 +292,113 @@ def test_media_requests_ask_the_origin_for_identity_encoding(tmp_path):
 
     assert len(seen) >= 5, seen  # probe, range, re-resolve, stream, pass-through
     assert all(h.get("Accept-Encoding") == "identity" for h in seen), seen
+
+
+def _origin_refusing_first_ranges(refusals, total=200_000):
+    """Mock googlevideo: answers the first `refusals` range requests with 403."""
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    body = bytes(i % 251 for i in range(total))
+    state = {"range_requests": 0, "statuses": []}
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):
+            rng = self.headers.get("Range", "")
+            if rng:
+                state["range_requests"] += 1
+            if rng and state["range_requests"] <= refusals:
+                state["statuses"].append(403)
+                self.send_response(403)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            start, end = 0, total - 1
+            if rng.startswith("bytes="):
+                a, _, b = rng[len("bytes="):].partition("-")
+                start, end = int(a or 0), min(int(b or total - 1), total - 1)
+            chunk = body[start:end + 1]
+            state["statuses"].append(206 if rng else 200)
+            self.send_response(206 if rng else 200)
+            self.send_header("Content-Type", "audio/mp4")
+            self.send_header("Accept-Ranges", "bytes")
+            if rng:
+                self.send_header("Content-Range", f"bytes {start}-{end}/{total}")
+            self.send_header("Content-Length", str(len(chunk)))
+            self.end_headers()
+            self.wfile.write(chunk)
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, state, body
+
+
+def test_probe_retries_a_forbidden_first_answer(monkeypatch, tmp_path, local_tcp_server, caplog):
+    """googlevideo can answer the proxy's first probe with 403; the entry was
+    then marked "no range support" for the whole session."""
+    from core import range_cache_proxy as rcp
+
+    monkeypatch.setattr(rcp, "_PROBE_FORBIDDEN_RETRY_S", 0.05, raising=False)
+    server, state, _body = _origin_refusing_first_ranges(refusals=1)
+    try:
+        ent = _Entry(
+            url=f"http://127.0.0.1:{server.server_address[1]}/videoplayback",
+            headers={},
+            cache_dir=str(tmp_path),
+            prefetch_bytes=64 * 1024,
+            initial_burst_bytes=64 * 1024,
+            initial_inline_prefetch_bytes=0,
+            background_download=False,
+            background_chunk_bytes=64 * 1024,
+        )
+        with caplog.at_level("DEBUG", logger="core.range_cache_proxy"):
+            ent.probe()
+        assert state["statuses"] == [403, 206]
+        assert ent.range_supported is True
+        assert ent.total_length == 200_000
+        # Visible in a live DEBUG log, without the (signed) URL.
+        lines = [r.getMessage() for r in caplog.records]
+        assert any(line.startswith("RangeCacheProxy probe refused (HTTP 403); retrying once") for line in lines)
+        assert not any("127.0.0.1" in line or "videoplayback" in line for line in lines)
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def test_vlc_never_gets_the_origins_passing_403(monkeypatch, tmp_path, local_tcp_server, caplog):
+    """Through the proxy: probe refused, then VLC's first range request got
+    the origin's 403 relayed and VLC sat in Opening until the stall watchdog
+    gave up on the stream."""
+    from core import range_cache_proxy as rcp
+
+    monkeypatch.setattr(rcp, "_PROBE_FORBIDDEN_RETRY_S", 0.05, raising=False)
+    # Three refusals: the background probe and its retry use two, so VLC's
+    # request is answered by await_probe probing again (403, then 206). Without
+    # that re-probe the request passes through and VLC gets the third 403.
+    origin, state, body = _origin_refusing_first_ranges(refusals=3)
+    proxy = RangeCacheProxy(cache_dir=str(tmp_path), background_download=False)
+    proxy.start()
+    try:
+        url = f"http://127.0.0.1:{origin.server_address[1]}/videoplayback?expire=1"
+        with caplog.at_level("DEBUG", logger="core.range_cache_proxy"):
+            local = urlparse(proxy.proxify(url, headers={}, skip_redirect_resolve=True))
+            conn = http.client.HTTPConnection(local.hostname, local.port, timeout=10)
+            try:
+                conn.request("GET", f"{local.path}?{local.query}", headers={"Range": "bytes=0-"})
+                resp = conn.getresponse()
+                data = resp.read()
+            finally:
+                conn.close()
+        assert resp.status == 206, state["statuses"]
+        assert any(r.getMessage().startswith("RangeCacheProxy probe still refused (HTTP 403)")
+                   for r in caplog.records)
+        assert resp.getheader("Content-Range", "").endswith("/200000")
+        assert data == body[: len(data)] and data
+    finally:
+        proxy.stop()
+        origin.shutdown()
+        origin.server_close()

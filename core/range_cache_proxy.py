@@ -58,6 +58,9 @@ _PROBE_WAIT_S = 3.0
 # VLC without the real total makes it adopt the served window as the entire
 # file, so an hour-long episode shows ~4 minutes and stops there.
 _PROBE_RESOLVE_WAIT_S = 20.0
+# googlevideo can refuse a freshly minted URL for a moment (seen: the probe got
+# 403, a range request seconds later 206). Retry a 401/403 probe once.
+_PROBE_FORBIDDEN_RETRY_S = 1.0
 
 # Cap how much extra we fetch inline (beyond the requested bytes) to keep seeks snappy.
 # Larger amounts still happen via background download.
@@ -440,14 +443,21 @@ class _Entry:
             hdrs_probe["Range"] = "bytes=0-0"
 
             try:
-                # allow_redirects=True here; we'll capture the final URL if it changes.
-                r = session.get(
-                    target_url,
-                    headers=hdrs_probe,
-                    stream=True,
-                    timeout=(_PROBE_CONNECT_TIMEOUT_S, _PROBE_READ_TIMEOUT_S),
-                    allow_redirects=True,
-                )
+                for _attempt in range(2):
+                    # allow_redirects=True here; we'll capture the final URL if it changes.
+                    r = session.get(
+                        target_url,
+                        headers=hdrs_probe,
+                        stream=True,
+                        timeout=(_PROBE_CONNECT_TIMEOUT_S, _PROBE_READ_TIMEOUT_S),
+                        allow_redirects=True,
+                    )
+                    if r.status_code not in (401, 403) or _attempt:
+                        break
+                    LOG.debug("RangeCacheProxy probe refused (HTTP %s); retrying once in %.1fs",
+                              r.status_code, _PROBE_FORBIDDEN_RETRY_S)
+                    r.close()
+                    time.sleep(_PROBE_FORBIDDEN_RETRY_S)
             except Exception as e:
                 self._warn("RangeCacheProxy probe failed: %s", e)
                 self.range_supported = False
@@ -485,9 +495,14 @@ class _Entry:
                             self.total_length = cl
                     except Exception:
                         pass
-                else:
-                    # Some servers respond 416, 403, etc.
+                elif r.status_code not in (401, 403):
+                    # Some servers respond 416 etc. A 401/403 refuses this
+                    # request, it does not say "no ranges": leave it unknown so
+                    # await_probe asks again instead of relaying 403 to VLC.
                     self.range_supported = False
+                else:
+                    LOG.debug("RangeCacheProxy probe still refused (HTTP %s); range support "
+                              "left unknown, the next request probes again", r.status_code)
             finally:
                 try:
                     r.close()
@@ -516,6 +531,8 @@ class _Entry:
                 return
             if not self._probe_done.is_set():
                 self._probe_done.wait(timeout=_PROBE_RESOLVE_WAIT_S)
+            if self._probe_done.is_set() and self.range_supported is None:
+                self._probe_done.clear()  # the last probe was refused (401/403)
             if not self._probe_done.is_set():
                 self.probe()
         except Exception:
