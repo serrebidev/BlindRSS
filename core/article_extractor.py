@@ -50,6 +50,15 @@ class ExtractionError(RuntimeError):
     pass
 
 
+# Pages that downloaded but held no readable text (e.g. a JavaScript-only
+# page): (url, encoding) -> time.monotonic() of the attempt.
+# Revisiting the row inside the TTL skips the download and extraction; the TTL
+# lets a page that was only briefly empty (maintenance page, a fallback
+# service's copy) recover while the app stays open in the tray.
+_EMPTY_EXTRACTION_URLS = utils.LRUDict(256)
+_EMPTY_EXTRACTION_TTL_S = 15 * 60
+
+
 @dataclass
 class FullArticle:
     url: str
@@ -4724,6 +4733,9 @@ def extract_full_article(
     url = (url or "").strip()
     if not url:
         return None
+    remembered_empty = _EMPTY_EXTRACTION_URLS.get((url, encoding))
+    if remembered_empty is not None and time.monotonic() - remembered_empty < _EMPTY_EXTRACTION_TTL_S:
+        raise ExtractionError(_("Downloaded page, but could not extract readable text (empty result)."))
 
     # A direct podcast enclosure has no webpage to scrape, but many MP3s carry
     # complete show notes/transcripts in a bounded leading ID3 tag.  Reuse the
@@ -4894,6 +4906,7 @@ def extract_full_article(
     if merged and _looks_like_paywall_stub(merged):
         raise ExtractionError(_paywall_message())
     if not merged:
+        _EMPTY_EXTRACTION_URLS[(url, encoding)] = time.monotonic()
         raise ExtractionError(_("Downloaded page, but could not extract readable text (empty result)."))
     # Metered preview: the text above is only the free excerpt, so say why it stops
     # instead of letting the story trail off mid-report.
