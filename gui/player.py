@@ -1562,7 +1562,7 @@ class PlayerFrame(wx.Frame):
         except Exception:
             log.exception("Failed to schedule VLC error handler")
 
-    def _handle_vlc_error(self) -> None:
+    def _handle_vlc_error(self, reason: str = "vlc-error") -> None:
         log.debug("Handling VLC error")
         if self.is_casting:
             return
@@ -1571,7 +1571,7 @@ class PlayerFrame(wx.Frame):
         # on a bundled Windows VLC even though yt-dlp can fetch it. Fall back to the
         # proven download path and play a local file. Do this before the range-proxy
         # recovery, which does not apply to these streams.
-        if self.maybe_play_ytdlp_via_download(int(getattr(self, "_active_load_seq", 0) or 0), reason="vlc-error"):
+        if self.maybe_play_ytdlp_via_download(int(getattr(self, "_active_load_seq", 0) or 0), reason=reason):
             return
 
         if not self._last_vlc_url:
@@ -1692,7 +1692,7 @@ class PlayerFrame(wx.Frame):
                 state,
                 int(cur_ms),
             )
-            self._handle_vlc_error()
+            self._handle_vlc_error(reason="stalled")
         except Exception:
             pass
 
@@ -1788,7 +1788,6 @@ class PlayerFrame(wx.Frame):
                 if proxied and proxied != orig_url:
                     self._stream_proxy_retry_count = 1
                     self._stream_proxy_last_stall_recover_ts = now_mono
-                    self._load_start_ts = now_mono
                     log.warning(
                         "Detected stalled direct YouTube playback after %.1fs (state=%s, pos=%sms); retrying via local stream proxy",
                         max(0.0, now_mono - load_started),
@@ -1833,6 +1832,8 @@ class PlayerFrame(wx.Frame):
             self.player.stop()
         except Exception:
             pass
+        # The stall watchdogs time VLC's own opening of this URL; see load_media.
+        self._load_start_ts = float(time.monotonic())
         try:
             if http_headers is not None:
                 self._last_vlc_http_headers = dict(http_headers or {})
@@ -2865,7 +2866,7 @@ class PlayerFrame(wx.Frame):
         except Exception:
             delay_s = 4.0
         try:
-            if (time.monotonic() - float(getattr(self, "_load_start_ts", 0.0) or 0.0)) < float(delay_s):
+            if (time.monotonic() - float(getattr(self, "_media_load_ts", 0.0) or 0.0)) < float(delay_s):
                 return
         except Exception:
             pass
@@ -4389,6 +4390,10 @@ class PlayerFrame(wx.Frame):
                         final_url = self._maybe_stream_proxy_url(final_url, headers=ytdlp_headers)
                 except Exception:
                     pass
+            else:
+                # Drop the previous item's proxy state, or a later error retries its URL.
+                self._last_orig_url = self._last_vlc_url = final_url
+                self._last_used_range_proxy = self._last_used_stream_proxy = False
             try:
                 proxied = bool(self._last_used_range_proxy or self._last_used_stream_proxy)
                 log.info(
@@ -4548,10 +4553,11 @@ class PlayerFrame(wx.Frame):
             pass
 
         self._set_status(_("Connecting..."))
-        try:
-            self._load_start_ts = float(time.monotonic())
-        except Exception:
-            pass
+        self._media_load_ts = float(time.monotonic())  # the silence-scan delay counts from here
+        # Idle the stall watchdogs until _load_vlc_url hands VLC the URL. Timed
+        # from here, the 4-7 s yt-dlp resolve ate their 6-8 s budget and a stream
+        # VLC was still opening got abandoned for the download fallback.
+        self._load_start_ts = 0.0
 
         try:
             t = threading.Thread(
