@@ -186,3 +186,109 @@ def test_background_download_caps_each_origin_request_at_10_mib(tmp_path):
     assert all((e - s + 1) <= 10 * mib for s, e in requested), requested
     covered = sum(e - s + 1 for s, e in requested)
     assert covered == total
+
+
+def test_passthrough_relays_an_encoded_body_as_sent(tmp_path, local_tcp_server):
+    """An origin that gzips anyway: the proxy forwards its Content-Encoding and
+    Content-Length, so the body must be the same raw bytes, not decoded ones."""
+    import gzip
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+
+    payload = b"ID3" + b"A" * 100_000
+    packed = gzip.compress(payload)
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+
+        def log_message(self, *a):
+            pass
+
+        def do_GET(self):  # ignores Range and Accept-Encoding: identity
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/mpeg")
+            self.send_header("Content-Encoding", "gzip")
+            self.send_header("Content-Length", str(len(packed)))
+            self.end_headers()
+            self.wfile.write(packed)
+
+    origin = HTTPServer(("127.0.0.1", 0), Handler)
+    threading.Thread(target=origin.serve_forever, daemon=True).start()
+    proxy = RangeCacheProxy(cache_dir=str(tmp_path), background_download=False)
+    proxy.start()
+    try:
+        url = f"http://127.0.0.1:{origin.server_address[1]}/episode.mp3"
+        local = urlparse(proxy.proxify(url, headers={}))
+        conn = http.client.HTTPConnection(local.hostname, local.port, timeout=10)
+        try:
+            conn.request("GET", f"{local.path}?{local.query}")
+            resp = conn.getresponse()
+            data = resp.read()
+        finally:
+            conn.close()
+        assert resp.getheader("Content-Encoding") == "gzip"
+        assert data == packed
+    finally:
+        proxy.stop()
+        origin.shutdown()
+        origin.server_close()
+
+
+def test_media_requests_ask_the_origin_for_identity_encoding(tmp_path):
+    """Range math needs the raw bytes. setdefault() never applied "identity"
+    because the shared HEADERS already ask for gzip/deflate/br."""
+    import io
+
+    import requests
+
+    seen = []
+
+    class _OfflineSession:
+        def get(self, _url, headers=None, **_kwargs):
+            seen.append(dict(headers or {}))
+            raise requests.ConnectionError("offline")
+
+        def close(self):
+            pass
+
+    def _entry(probed):
+        ent = _Entry(
+            url="https://cdn.example.invalid/episode.mp3",
+            headers={"User-Agent": "test"},
+            cache_dir=str(tmp_path),
+            prefetch_bytes=64 * 1024,
+            initial_burst_bytes=64 * 1024,
+            initial_inline_prefetch_bytes=0,
+            background_download=False,
+            background_chunk_bytes=64 * 1024,
+        )
+        ent._make_session = _OfflineSession
+        if probed:
+            ent.total_length = 1000
+            ent.range_supported = True
+            ent._probe_done.set()
+        return ent
+
+    _entry(probed=False).probe()
+    _entry(probed=True)._fetch_range(0, 10)  # also re-resolves after the failure
+    _entry(probed=True).stream_origin_range_to_and_cache(0, 10, io.BytesIO())
+
+    # Origin without range support: the handler streams straight through.
+    passthrough = _entry(probed=False)
+    passthrough.range_supported = False
+    passthrough._probe_done.set()
+    proxy = RangeCacheProxy(cache_dir=str(tmp_path), background_download=False)
+    proxy.start()
+    try:
+        proxy._entries["passthrough"] = passthrough
+        parsed = urlparse(proxy.base_url)
+        conn = http.client.HTTPConnection(parsed.hostname, parsed.port, timeout=5)
+        try:
+            conn.request("GET", "/media?id=passthrough", headers={"Range": "bytes=0-"})
+            conn.getresponse().read()
+        finally:
+            conn.close()
+    finally:
+        proxy.stop()
+
+    assert len(seen) >= 5, seen  # probe, range, re-resolve, stream, pass-through
+    assert all(h.get("Accept-Encoding") == "identity" for h in seen), seen

@@ -381,7 +381,7 @@ class _Entry:
                 hdrs.update(self.headers or {})
                 hdrs.setdefault("User-Agent", _DEFAULT_UA)
                 hdrs.setdefault("Accept", "*/*")
-                hdrs.setdefault("Accept-Encoding", "identity")
+                hdrs["Accept-Encoding"] = "identity"
                 hdrs["Range"] = "bytes=0-0"
                 try:
                     r = session.get(
@@ -432,9 +432,8 @@ class _Entry:
             hdrs.setdefault("User-Agent", _DEFAULT_UA)
             hdrs.setdefault("Accept", "*/*")
             # Avoid transparent compression; ranged fetches must be byte-exact.
-            hdrs.setdefault("Accept-Encoding", "identity")
-            # Avoid gzip/deflate so byte ranges always map 1:1 to the original file.
-            hdrs.setdefault("Accept-Encoding", "identity")
+            # Assign, not setdefault: HEADERS already asks for gzip/deflate/br.
+            hdrs["Accept-Encoding"] = "identity"
 
             # Try a single-byte range request (most reliable way to learn length + range support)
             hdrs_probe = dict(hdrs)
@@ -547,7 +546,7 @@ class _Entry:
         hdrs.update(self.headers or {})
         hdrs.setdefault("User-Agent", _DEFAULT_UA)
         hdrs.setdefault("Accept", "*/*")
-        hdrs.setdefault("Accept-Encoding", "identity")
+        hdrs["Accept-Encoding"] = "identity"
         hdrs["Range"] = f"bytes={start}-{end}"
 
         session = self._make_session()
@@ -839,7 +838,7 @@ class _Entry:
         hdrs.update(self.headers or {})
         hdrs.setdefault("User-Agent", _DEFAULT_UA)
         hdrs.setdefault("Accept", "*/*")
-        hdrs.setdefault("Accept-Encoding", "identity")
+        hdrs["Accept-Encoding"] = "identity"
         hdrs["Range"] = f"bytes={req_start}-{req_end}"
 
         session = self._make_session()
@@ -1514,7 +1513,7 @@ class RangeCacheProxy:
                         hdrs.update(ent.headers or {})
                         hdrs.setdefault("User-Agent", _DEFAULT_UA)
                         hdrs.setdefault("Accept", "*/*")
-                        hdrs.setdefault("Accept-Encoding", "identity")
+                        hdrs["Accept-Encoding"] = "identity"
 
                         # Preserve the caller's Range header if present; some servers ignore it.
                         rh = self.headers.get("Range")
@@ -1538,7 +1537,9 @@ class RangeCacheProxy:
                                         continue
                                     self.send_header(k, v)
                                 self.end_headers()
-                                for chunk in r.iter_content(chunk_size=256 * 1024):
+                                # Raw bytes: the headers above came from the origin, so a
+                                # Content-Encoding it applied anyway must reach VLC intact.
+                                for chunk in r.raw.stream(256 * 1024, decode_content=False):
                                     if not chunk:
                                         continue
                                     try:
