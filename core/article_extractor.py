@@ -583,6 +583,13 @@ def _extract_json_ld_text(html_text: str) -> str:
     cleaned: List[str] = []
     for c in candidates:
         first_tag = re.search(r"<[a-z][^>]*>", c, flags=re.I)
+        if not first_tag and len(re.findall(r"&lt;/(?:p|h[1-6]|li)&gt;", c, flags=re.I)) >= 3:
+            # The markup itself is entity-escaped (a Nuxt-based news site: "&lt;h2&gt;...&lt;/h2&gt;").
+            # Unescaped once, it is ordinary markup; otherwise the branch below turns it
+            # into literal "<h2>"/"<p>" text that screen readers read aloud. Several block
+            # closers are required so prose that mentions "&lt;/p&gt;" stays prose.
+            c = html.unescape(c)
+            first_tag = re.search(r"<[a-z][^>]*>", c, flags=re.I)
         if first_tag:
             # Some publishers (notably Sky News) put the standfirst directly before the first
             # ``<p>`` in articleBody.  Preserve that leading text while stripping the markup.
