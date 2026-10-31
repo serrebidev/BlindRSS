@@ -197,6 +197,52 @@ def test_json_ld_article_body_html_is_rendered_as_plain_text():
     assert "<strong>" not in text
 
 
+def test_entity_escaped_json_ld_markup_is_not_read_as_text():
+    # A Nuxt-based news site entity-escapes the articleBody markup and leaves Vue
+    # component tags in it; screen readers read "<h2>", "<p>" and those tags aloud.
+    body = (
+        "<h2>How the little lamp works</h2>\n<p>The gadget looks like any other one at first, "
+        "<strong>but a small lamp on the front</strong> shows when it is busy.</p>"
+        '<RelatedLinks :post="post" />\n<InlineBanner />\n'
+        "<p>The second paragraph walks through the settings menu one step at a time, "
+        "and AT&amp;T has nothing to do with any of it.</p>"
+    )
+    escaped = body.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
+    payload = json.dumps({"@type": "NewsArticle", "articleBody": escaped})
+    html = f'<html><script type="application/ld+json">{payload}</script></html>'
+
+    text = article_extractor._extract_json_ld_text(html)
+
+    assert "How the little lamp works" in text
+    assert "but a small lamp on the front shows when it is busy" in text
+    assert "AT&T has nothing" in text
+    assert "<" not in text and "&lt;" not in text
+    assert "RelatedLinks" not in text and "InlineBanner" not in text
+
+
+def test_tag_stripped_json_ld_keeps_tag_names_in_prose():
+    # Tag-stripped bodies (mashable) only need unescaping; a story that
+    # mentions an HTML tag keeps it.
+    prose = "Wrap the heading in a &lt;div&gt; element, then run sudo a &amp;&amp; b. " * 4
+    payload = json.dumps({"@type": "NewsArticle", "articleBody": prose})
+    html = f'<html><script type="application/ld+json">{payload}</script></html>'
+
+    text = article_extractor._extract_json_ld_text(html)
+
+    assert "a <div> element" in text
+    assert "sudo a && b" in text
+
+    # Even an escaped open/close pair in the prose is not markup.
+    prose = "Open each paragraph with &lt;p&gt; and close it with &lt;/p&gt; in the template. " + (
+        "The rest of the tutorial explains how the engine renders lists and headings. " * 3
+    )
+    payload = json.dumps({"@type": "NewsArticle", "articleBody": prose})
+    text = article_extractor._extract_json_ld_text(
+        f'<html><script type="application/ld+json">{payload}</script></html>'
+    )
+    assert "close it with </p> in the template" in text
+
+
 def test_normalize_whitespace_removes_invisible_word_break_characters():
     assert article_extractor._normalize_whitespace("the \u200barticle \u2060body") == "the article body"
 
