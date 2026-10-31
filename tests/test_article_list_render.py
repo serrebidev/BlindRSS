@@ -403,49 +403,50 @@ def test_incremental_plan_rejects_middle_removal():
     assert plan is None
 
 
+class _MergeHost(_RenderHost):
+    _quick_merge_articles = mainframe.MainFrame._quick_merge_articles
+    _plan_incremental_list_update = mainframe.MainFrame._plan_incremental_list_update
+    _set_base_articles = mainframe.MainFrame._set_base_articles
+    _capture_top_article_for_restore = mainframe.MainFrame._capture_top_article_for_restore
+    _read_filter_mode_for_view = mainframe.MainFrame._read_filter_mode_for_view
+    _has_stale_read_filter_rows = mainframe.MainFrame._has_stale_read_filter_rows
+
+    def __init__(self):
+        super().__init__(first_chunk=4, batch_size=4)
+        self.article_page_size = 4
+        self.current_feed_id = "all"
+        self.current_request_id = 1
+        self._base_view_id = "all"
+        self._updating_list = False
+        self._state = {"paged_offset": 4, "total": 10}
+
+    def _article_cache_id(self, article):
+        return article.cache_id
+
+    def _ensure_view_state(self, _feed_id):
+        return self._state
+
+    def _is_search_active(self):
+        return False
+
+    def _sort_articles_for_display(self, articles):
+        return sorted(
+            articles,
+            key=lambda article: (article.timestamp, article.cache_id),
+            reverse=True,
+        )
+
+    def _queue_fulltext_prefetch(self, _articles):
+        return None
+
+    def _restore_list_view(self, *_args):
+        raise AssertionError("incremental merge must not restore the whole list")
+
+    def _restore_load_more_focus(self):
+        raise AssertionError("incremental merge must not restore the placeholder")
+
+
 def test_quick_merge_updates_capped_page_without_full_native_rebuild():
-    class _MergeHost(_RenderHost):
-        _quick_merge_articles = mainframe.MainFrame._quick_merge_articles
-        _plan_incremental_list_update = mainframe.MainFrame._plan_incremental_list_update
-        _set_base_articles = mainframe.MainFrame._set_base_articles
-        _capture_top_article_for_restore = mainframe.MainFrame._capture_top_article_for_restore
-        _read_filter_mode_for_view = mainframe.MainFrame._read_filter_mode_for_view
-        _has_stale_read_filter_rows = mainframe.MainFrame._has_stale_read_filter_rows
-
-        def __init__(self):
-            super().__init__(first_chunk=4, batch_size=4)
-            self.article_page_size = 4
-            self.current_feed_id = "all"
-            self.current_request_id = 1
-            self._base_view_id = "all"
-            self._updating_list = False
-            self._state = {"paged_offset": 4, "total": 10}
-
-        def _article_cache_id(self, article):
-            return article.cache_id
-
-        def _ensure_view_state(self, _feed_id):
-            return self._state
-
-        def _is_search_active(self):
-            return False
-
-        def _sort_articles_for_display(self, articles):
-            return sorted(
-                articles,
-                key=lambda article: (article.timestamp, article.cache_id),
-                reverse=True,
-            )
-
-        def _queue_fulltext_prefetch(self, _articles):
-            return None
-
-        def _restore_list_view(self, *_args):
-            raise AssertionError("incremental merge must not restore the whole list")
-
-        def _restore_load_more_focus(self):
-            raise AssertionError("incremental merge must not restore the placeholder")
-
     host = _MergeHost()
     old = [_make_article(i) for i in range(4)]
     for timestamp, article in zip((4, 3, 2, 1), old):
@@ -468,6 +469,60 @@ def test_quick_merge_updates_capped_page_without_full_native_rebuild():
     assert host.list_ctrl.titles()[4] == host._load_more_label
     assert host.list_ctrl.focused == 2
     assert host.list_ctrl.selected == 2
+
+
+def _merge_host_mid_render(monkeypatch):
+    """A _MergeHost whose 4-row page is still being appended in batches."""
+    captured = _install_capturing_call_after(monkeypatch)
+    host = _MergeHost()
+    host._render_first_chunk = 1
+    host._render_batch_size = 1
+    old = [_make_article(i) for i in range(4)]
+    for timestamp, article in zip((4, 3, 2, 1), old):
+        article.timestamp = timestamp
+    host._base_articles = list(old)
+    host.current_articles = list(old)
+    host._render_articles_list(host.current_articles)
+    host._add_loading_more_placeholder()
+    host.list_ctrl.delete_all_calls = 0
+    assert host._article_render_inflight is True
+    return captured, host, old
+
+
+def test_quick_merge_waits_for_inflight_render_instead_of_restarting_it(monkeypatch):
+    # Startup freeze: refresh top-ups arrived while the first 400-row render
+    # was still batching, took the full path and restarted it from row 0, over
+    # and over. The merge must wait and then apply incrementally.
+    captured, host, old = _merge_host_mid_render(monkeypatch)
+    fresh = _make_article(9)
+    fresh.timestamp = 5
+
+    host._quick_merge_articles([fresh, *old[:3]], 1, "all")
+
+    assert host.list_ctrl.delete_all_calls == 0
+    assert host.list_ctrl.titles() == [old[0].title, host._load_more_label]
+
+    _drain(captured)
+
+    assert host._article_render_inflight is False
+    assert host.list_ctrl.delete_all_calls == 0
+    assert host.list_ctrl.titles() == [
+        fresh.title, *(a.title for a in old[:3]), host._load_more_label
+    ]
+
+
+def test_deferred_quick_merge_is_dropped_by_a_newer_request(monkeypatch):
+    # The newer request fetches the latest rows itself, so the deferred page
+    # must neither apply nor keep re-queueing (_drain guards a runaway).
+    captured, host, old = _merge_host_mid_render(monkeypatch)
+    fresh = _make_article(9)
+    fresh.timestamp = 5
+
+    host._quick_merge_articles([fresh, *old[:3]], 1, "all")
+    host.current_request_id = 2
+    _drain(captured)
+
+    assert host.list_ctrl.titles() == [*(a.title for a in old), host._load_more_label]
 
 
 # --- Column layout (article list columns) ----------------------------------------------

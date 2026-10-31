@@ -10555,6 +10555,17 @@ class MainFrame(wx.Frame):
         # Ensure we're still looking at the same view
         if feed_id != getattr(self, "current_feed_id", None):
             return
+        # A batched render is still appending rows. Merging now would take the
+        # full path and restart that render from row 0; under a screen reader a
+        # render outlasts the refresh reload throttle, so startup refreshes kept
+        # restarting it and the list froze for seconds. Re-run this merge once
+        # the render is done (it then normally takes the cheap incremental
+        # path). A newer request drops it, and that request fetches the same
+        # latest rows.
+        if self._defer_restore_during_render(
+            lambda: self._quick_merge_articles(latest_page, request_id, feed_id)
+        ):
+            return
         # Rows the user has read (or unread) since the last load no longer match
         # an active unread:/read: view and must go, even when the top-up page
         # brought nothing new -- a refresh with no new entries is exactly the
@@ -10718,8 +10729,10 @@ class MainFrame(wx.Frame):
                 if focused_on_load_more or selected_on_load_more:
                     wx.CallAfter(self._restore_load_more_focus)
             else:
-                # Fallback: order changed, a non-suffix row disappeared, or a
-                # render is still in flight — rebuild the whole list.
+                # Fallback: active search, an emptied list, a reorder, a
+                # non-suffix removal or a trimmed focus anchor — rebuild the
+                # whole list. A merge no longer gets here mid-render (it is
+                # deferred above); the fast path's inflight check is a safety net.
                 self._remove_loading_more_placeholder()
 
                 empty_label = _("No matches.") if (self._is_search_active() and combined) else _("No articles found.")
