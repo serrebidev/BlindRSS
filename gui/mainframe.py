@@ -1393,6 +1393,15 @@ class MainFrame(wx.Frame):
             log.debug("Article list rendered rows=%d (single chunk)", len(articles))
 
     def _render_batch_delay_ms(self) -> int:
+        # Focus in the feed tree usually means the user is arrowing through
+        # views and the next step will cancel this render anyway. Spread its
+        # rows out so tree announcements are not stuck behind the list's
+        # accessibility events; batches speed up again once focus leaves the
+        # tree. Trade-off: a render with no arrowing (startup, where focus
+        # starts in the tree) also gets the gaps and finishes ~1 s later.
+        tree = getattr(self, "tree", None)
+        if tree is not None and self._get_focused_window() is tree:
+            return 60
         # While a refresh batch is applying progress chunks the UI thread is
         # already contended; a slightly longer gap between render batches gives
         # keyboard/NVDA events real slices instead of back-to-back inserts.

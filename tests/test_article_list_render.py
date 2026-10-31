@@ -375,6 +375,24 @@ def test_refresh_batch_uses_longer_gaps_between_native_render_chunks():
     assert host._render_batch_delay_ms() == 15
 
 
+def test_render_batches_slow_down_while_the_feed_tree_has_focus():
+    # Arrowing through the tree: each step's render is cancelled by the next
+    # step, so its batches must leave NVDA room to speak the tree item.
+    host = _RenderHost()
+    host.tree = object()
+    host.focus_window = host.tree
+    host._get_focused_window = lambda: host.focus_window
+
+    assert host._render_batch_delay_ms() == 60
+    host._refresh_ui_batch_active = True
+    assert host._render_batch_delay_ms() == 60
+
+    host.focus_window = host.list_ctrl
+    assert host._render_batch_delay_ms() == 15
+    host._refresh_ui_batch_active = False
+    assert host._render_batch_delay_ms() == 1
+
+
 def test_incremental_plan_accepts_insert_plus_capped_oldest_suffix_trim():
     host = _RenderHost()
     host._article_cache_id = lambda article: article.cache_id
