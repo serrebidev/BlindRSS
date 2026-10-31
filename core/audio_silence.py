@@ -320,6 +320,14 @@ def scan_audio_for_silence(
         pass
 
     if not shutil.which(ffmpeg_bin):
+        # The PATH scan is cached per process; re-scan in case ffmpeg was
+        # installed or added to PATH outside the app since then.
+        try:
+            from .dependency_check import _maybe_add_windows_path
+            _maybe_add_windows_path(force=True)
+        except Exception:
+            pass
+    if not shutil.which(ffmpeg_bin):
         _log(f"Silence scan failed: {ffmpeg_bin} not found in PATH")
         raise FileNotFoundError("ffmpeg not found in PATH")
 

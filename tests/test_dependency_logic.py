@@ -7,6 +7,7 @@ import sys
 import os
 import platform
 import tempfile
+import threading
 from unittest.mock import MagicMock, patch, call
 
 # Mock winreg before importing dependency_check
@@ -331,6 +332,47 @@ class TestDependencyLogic(unittest.TestCase):
         }
         # ffprobe detection should be told to look beside the found ffmpeg first.
         self.assertEqual(extras["ffprobe"], [r"C:\ff"])
+
+    @patch('core.dependency_check.platform.system', return_value='windows')
+    def test_windows_path_search_runs_once_unless_forced(self, _mock_platform):
+        # Every yt-dlp/ffmpeg lookup and silence scan calls this; it used to
+        # redo the whole registry/disk scan each time (log spam during playback).
+        def searches():
+            return sum(1 for c in dep_check._log.call_args_list
+                       if "meticulous Windows path search" in str(c.args[0]))
+
+        with patch.object(dep_check, "_windows_path_searched", False), \
+             patch.dict(os.environ, {"LOCALAPPDATA": "", "USERPROFILE": ""}), \
+             patch.object(os, "add_dll_directory", MagicMock(), create=True):
+            dep_check._maybe_add_windows_path()
+            dep_check._maybe_add_windows_path()
+            dep_check._maybe_add_windows_path()
+            self.assertEqual(searches(), 1)
+            dep_check._maybe_add_windows_path(force=True)
+            self.assertEqual(searches(), 2)
+
+    @patch('core.dependency_check.platform.system', return_value='windows')
+    def test_concurrent_first_calls_share_one_windows_path_search(self, _mock_platform):
+        # Startup ran two scans at once: the flag is only set after a full pass.
+        started, release, scans = threading.Event(), threading.Event(), []
+
+        def slow_scan():
+            scans.append(1)
+            started.set()
+            release.wait(5)
+
+        with patch.object(dep_check, "_windows_path_searched", False), \
+             patch.object(dep_check, "_scan_windows_path", side_effect=slow_scan):
+            first = threading.Thread(target=dep_check._maybe_add_windows_path)
+            first.start()
+            self.assertTrue(started.wait(5))
+            second = threading.Thread(target=dep_check._maybe_add_windows_path)
+            second.start()
+            second.join(0.2)  # let it reach the check while the first scan runs
+            release.set()
+            first.join(5)
+            second.join(5)
+        self.assertEqual(len(scans), 1)
 
 if __name__ == '__main__':
     unittest.main()
