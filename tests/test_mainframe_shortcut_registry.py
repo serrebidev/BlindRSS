@@ -65,7 +65,7 @@ class _Host:
     def _announce_event(self, event_id, msg):
         self.announcements.append(msg)
 
-    def play_queue_index(self, index):
+    def play_queue_index(self, index, announce=True):
         self.played.append(int(index))
         self._current_queue_index = int(index)
         return True

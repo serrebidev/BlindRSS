@@ -11,11 +11,13 @@ immediate, direct feedback instead of having to infer success from indirect
 cues.
 
 This module is deliberately GUI-free so the event table, mode resolution, and
-the emit path are unit-testable without wx. Output is produced through the
-``accessible-output2`` library when it is installed (which reaches NVDA/JAWS
-speech AND Braille), and falls back to the direct NVDA/JAWS adapters in
-``core.screen_reader_announce`` (plus NVDA Braille via the controller client)
-when it is not, so announcements keep working even in a stripped environment.
+the emit path are unit-testable without wx. While NVDA is running, output goes
+straight to its controller client (speech and Braille) through
+``core.screen_reader_announce``. Otherwise it goes through the
+``accessible-output2`` library when it is installed (which reaches JAWS and
+other readers), falling back to the same direct NVDA/JAWS adapters when it is
+missing or produces nothing, so announcements keep working even in a stripped
+environment.
 
 Each event has its own output mode so the user can tune notification behavior
 per event in Settings > Announcements:
@@ -260,12 +262,14 @@ class Announcer:
     def resolve_mode(self, event_id: str) -> str:
         return mode_for(self._current_modes(), event_id)
 
-    def announce(self, event_id: str, message: str) -> bool:
+    def announce(self, event_id: str, message: str, *, interrupt: bool = True) -> bool:
         """Announce ``message`` for ``event_id`` using the configured mode.
 
         Returns True if any output path reported success. Fully guarded and
         non-blocking: every failure falls through so a caller never breaks a
-        keyboard action because speech/Braille was unavailable.
+        keyboard action because speech/Braille was unavailable. Pass
+        ``interrupt=False`` for news the user did not just ask for, so it
+        waits for what the screen reader is saying instead of cutting it off.
         """
         text = str(message or "").strip()
         if not text:
@@ -275,7 +279,7 @@ class Announcer:
             return False
         want_speech = mode in (MODE_SPEECH, MODE_BOTH)
         want_braille = mode in (MODE_BRAILLE, MODE_BOTH)
-        return self._emit(text, want_speech, want_braille)
+        return self._emit(text, want_speech, want_braille, interrupt=interrupt)
 
     def announce_test(self, message: str) -> bool:
         """Emit ``message`` through speech AND Braille, ignoring configuration.
@@ -291,28 +295,31 @@ class Announcer:
             return False
         return self._emit(text, want_speech=True, want_braille=True)
 
-    def _emit(self, text: str, want_speech: bool, want_braille: bool) -> bool:
+    def _emit(self, text: str, want_speech: bool, want_braille: bool, interrupt: bool = True) -> bool:
         handled = False
-        out = self._get_ao2()
+        # With NVDA running, its controller client (below) is all ao2 would use,
+        # and ao2's first start loads every output, SAPI included, on the UI
+        # thread: a ~1 s freeze on the first announcement of a session.
+        out = None if screen_reader_announce.nvda_is_running() else self._get_ao2()
         if out is not None:
             if want_speech:
-                handled = self._ao2_speak(out, text) or handled
+                handled = self._ao2_speak(out, text, interrupt) or handled
             if want_braille:
                 handled = self._ao2_braille(out, text) or handled
             if handled:
                 return True
-        # accessible_output2 missing or produced nothing — use the direct
-        # NVDA/JAWS adapters so announcements still reach the screen reader.
-        if want_speech and screen_reader_announce.speak_status(text, interrupt=True):
+        # NVDA running, or accessible_output2 missing or silent: the direct
+        # NVDA/JAWS adapters reach the screen reader.
+        if want_speech and screen_reader_announce.speak_status(text, interrupt=interrupt):
             handled = True
         if want_braille and screen_reader_announce.braille_message(text):
             handled = True
         return handled
 
     @staticmethod
-    def _ao2_speak(out, text: str) -> bool:
+    def _ao2_speak(out, text: str, interrupt: bool = True) -> bool:
         try:
-            out.speak(text, interrupt=True)
+            out.speak(text, interrupt=interrupt)
             return True
         except TypeError:
             # Some outputs don't accept the interrupt kwarg.

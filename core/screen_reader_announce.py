@@ -55,7 +55,9 @@ def speak_status(message: str, *, interrupt: bool = True) -> bool:
     if not text:
         return False
     if sys.platform == "darwin":
-        return _speak_macos_say(text, interrupt=interrupt)
+        # `say` has no queue: a second process would talk over the first, so
+        # every announcement replaces the previous one, interrupt or not.
+        return _speak_macos_say(text, interrupt=True)
     if not sys.platform.startswith("win"):
         return False
     if _speak_nvda(text, interrupt=interrupt):
@@ -104,6 +106,19 @@ def _speak_macos_say(text: str, *, interrupt: bool = True) -> bool:
         return True
     except Exception as exc:
         LOG.debug("macOS say speech failed: %s", exc)
+        return False
+
+
+def nvda_is_running() -> bool:
+    """True when NVDA answers through the controller client BlindRSS ships."""
+    if not sys.platform.startswith("win"):
+        return False
+    dll = _load_nvda_controller()
+    if dll is None:
+        return False
+    try:
+        return int(dll.nvdaController_testIfRunning()) == 0
+    except Exception:
         return False
 
 
