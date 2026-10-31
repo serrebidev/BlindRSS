@@ -485,6 +485,7 @@ Casting is Caster's code (github.com/serrebidev/Caster), not a re-implementation
 
 ## Blunt Things To Remember
 - BlindRSS is accessibility-first. A fix that works visually but regresses NVDA, JAWS, or VoiceOver is not done.
+- On Windows `SetName` never reaches NVDA/JAWS: MSAA names a control after the `StaticText` right before it, or leaves it unnamed. A control named only by `SetName`, with no visible label right before it (or a label that describes something else), needs `widgets.set_msaa_name(ctrl)` after the `SetName` (Direct Annotation, changes the name only). Do not use `wx.Window.SetAccessibleName` (wx 3.3) or another `wx.Accessible` for this: it replaces the native object, so the RichEdit reader becomes a generic client role and loses its value and read-only state, and a ComboBox's dropdown list child changes role and takes the combo's name. Guard: `tests/test_msaa_names.py`.
 - Do not block startup with network, dependency checks, yt-dlp extractor loading, translation, full-text extraction, or media probing. Use background workers and marshal GUI changes with `wx.CallAfter`.
 - Do not write mutable runtime data into Program Files installed builds. Installed Windows data goes to `%APPDATA%\BlindRSS`; runtime-managed `yt-dlp.exe` goes to `%LOCALAPPDATA%\BlindRSS\bin`; episode downloads default to `Downloads\BlindRSS`.
 - Do not invent new release steps. `.\build.bat release` and `cloud-release.yml` are the release processes.
