@@ -21,6 +21,12 @@ from core import announcements as ann
 from core import screen_reader_announce
 
 
+@pytest.fixture(autouse=True)
+def _no_running_nvda(monkeypatch):
+    """The ao2 path below must not depend on (or speak through) a real NVDA."""
+    monkeypatch.setattr(screen_reader_announce, "nvda_is_running", lambda: False)
+
+
 # --------------------------------------------------------------------------
 # Mode table + resolution
 # --------------------------------------------------------------------------
@@ -140,6 +146,37 @@ def test_falls_back_to_direct_path_when_no_ao2(monkeypatch):
     assert a.announce("general", "Refresh Feeds") is True
     assert spoke == ["Refresh Feeds"]
     assert brailled == ["Refresh Feeds"]
+
+
+def test_interrupt_false_lets_the_screen_reader_finish(monkeypatch):
+    spoke = []
+    monkeypatch.setattr(screen_reader_announce, "speak_status", lambda text, interrupt=True: spoke.append(interrupt) or True)
+    monkeypatch.setattr(screen_reader_announce, "braille_message", lambda text: True)
+    out = _FakeOutput()
+    a = _announcer_with_output({"general": "speech"}, out)
+    a.announce("general", "Playing", interrupt=False)
+    a.announce("general", "Loading media...")
+    assert out.spoke == [("Playing", False), ("Loading media...", True)]
+
+    a._ao2 = None  # direct NVDA/JAWS path
+    a.announce("general", "Playing", interrupt=False)
+    assert spoke == [False]
+
+
+def test_running_nvda_skips_accessible_output2_start_up(monkeypatch):
+    spoke, brailled = [], []
+    monkeypatch.setattr(screen_reader_announce, "nvda_is_running", lambda: True)
+    monkeypatch.setattr(screen_reader_announce, "speak_status", lambda text, interrupt=True: spoke.append(text) or True)
+    monkeypatch.setattr(screen_reader_announce, "braille_message", lambda text: brailled.append(text) or True)
+
+    def _no_ao2(self):
+        raise AssertionError("accessible_output2 started although NVDA is running")
+
+    monkeypatch.setattr(ann.Announcer, "_get_ao2", _no_ao2)
+    a = ann.Announcer(lambda: {"general": "both"})
+    assert a.announce("general", "Loading media...") is True
+    assert spoke == ["Loading media..."]
+    assert brailled == ["Loading media..."]
 
 
 def test_getter_exceptions_do_not_propagate():

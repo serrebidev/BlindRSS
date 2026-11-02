@@ -728,6 +728,7 @@ class PlayerFrame(wx.Frame):
         self._last_status_state = None
         self._last_status_update_ts = 0.0
         self._load_start_ts = 0.0
+        self._hidden_announced = set()
         self._silence_scan_pending = False
         self._silence_scan_pending_info = None
 
@@ -907,6 +908,11 @@ class PlayerFrame(wx.Frame):
                 self._notify_playback_progress(force=True)
             except Exception:
                 pass
+            # Until VLC has this load's URL, "Playing" is still the previous item.
+            if new_text == _("Downloading for playback...") or (
+                new_text == _("Playing") and float(getattr(self, "_load_start_ts", 0.0) or 0.0) > 0.0
+            ):
+                self._announce_when_hidden(new_text)
 
         try:
             if wx.IsMainThread():
@@ -915,6 +921,27 @@ class PlayerFrame(wx.Frame):
                 wx.CallAfter(_apply)
         except Exception:
             pass
+
+    def _announce_when_hidden(self, text: str, interrupt: bool = False) -> None:
+        """Say a load-state change once per load while the player window is
+        hidden (the default). Its status label cannot be read then, so Enter on
+        a podcast or video was followed by a long silence.
+
+        Only "Loading media...", said right after the user's Enter, interrupts:
+        the later states arrive seconds afterwards, unasked, and wait their turn
+        instead of cutting off whatever the screen reader is reading."""
+        try:
+            said = self._hidden_announced
+            if text in said:
+                return
+            said.add(text)  # even when shown: hiding the player later must not replay it
+            if self.IsShown():
+                return
+            announce = getattr(self.GetParent(), "_announce_event", None)
+            if callable(announce):
+                announce("general", text, interrupt=interrupt)
+        except Exception:
+            log.debug("Player state announcement failed", exc_info=True)
 
     def _current_position_ms(self) -> int:
         """
@@ -1597,10 +1624,8 @@ class PlayerFrame(wx.Frame):
         if self.maybe_play_ytdlp_via_download(int(getattr(self, "_active_load_seq", 0) or 0), reason=reason):
             return
 
-        if not self._last_vlc_url:
-            return
-
-        if not self._last_used_range_proxy or not self._last_orig_url:
+        if not self._last_vlc_url or not self._last_used_range_proxy or not self._last_orig_url:
+            self._announce_when_hidden(_("Failed to load media"))  # nothing left to retry
             return
 
         # Preserve the best-known position so recovery doesn't jump backwards.
@@ -1659,6 +1684,8 @@ class PlayerFrame(wx.Frame):
                 self._load_vlc_url(self._last_orig_url, http_headers=self._last_vlc_http_headers)
             except Exception:
                 pass
+            return
+        self._announce_when_hidden(_("Failed to load media"))
 
     def _maybe_recover_stalled_proxy_playback(self, state, playing_now: bool, cur_ms: int) -> None:
         """Fallback when proxied playback stalls without VLC raising an error event."""
@@ -4442,7 +4469,7 @@ class PlayerFrame(wx.Frame):
 
         self.update_chapters(chapters, load_seq=load_seq)
 
-    def load_media(self, url, use_ytdlp=False, chapters=None, title=None, article_id=None):
+    def load_media(self, url, use_ytdlp=False, chapters=None, title=None, article_id=None, announce=True):
         if not self.is_casting:
             # Kick VLC init without blocking; _resolve_media_worker waits for
             # the shared instance on its worker thread and _finish_media_load
@@ -4494,6 +4521,7 @@ class PlayerFrame(wx.Frame):
         try:
             self._cancel_scheduled_resume_save()
             self._stop_calllater("_seek_apply_calllater", "Error handling seek apply calllater on media load")
+            self._stop_calllater("_seek_announce_calllater", "Error stopping seek announcement on media load")
         except Exception:
             log.exception("Error during media load cleanup")
         finally:
@@ -4582,6 +4610,17 @@ class PlayerFrame(wx.Frame):
         # from here, the 4-7 s yt-dlp resolve ate their 6-8 s budget and a stream
         # VLC was still opening got abandoned for the download fallback.
         self._load_start_ts = 0.0
+        self._hidden_announced = set()
+        if not announce:
+            # The caller names the item itself (queue step) or nobody asked
+            # (the queue advancing on its own): only trouble is worth saying.
+            self._hidden_announced.update((_("Loading media..."), _("Playing")))
+        else:
+            try:
+                # Deferred: the main window shows or hides the player right after this call.
+                wx.CallAfter(self._announce_when_hidden, _("Loading media..."), interrupt=True)
+            except Exception:
+                pass
 
         try:
             t = threading.Thread(
@@ -4924,6 +4963,7 @@ class PlayerFrame(wx.Frame):
         # Replay as a plain local file (use_ytdlp=False). Passing the original
         # article id keeps resume/position continuity across the swap.
         sponsor_segments = list(getattr(self, "_sponsor_segments", None) or [])
+        announced = set(getattr(self, "_hidden_announced", ()))
         self.load_media(
             local_path,
             use_ytdlp=False,
@@ -4931,8 +4971,9 @@ class PlayerFrame(wx.Frame):
             title=getattr(self, "_ytdlp_play_title", None),
             article_id=getattr(self, "_ytdlp_play_article_id", None),
         )
-        # Same video, so the same SponsorBlock segments.
+        # Same video, so the same SponsorBlock segments, and "loading" was said.
         self._sponsor_segments = sponsor_segments
+        self._hidden_announced = announced
 
     def toggle_play_pause(self) -> None:
         if self.is_audio_playing():
@@ -5571,7 +5612,7 @@ class PlayerFrame(wx.Frame):
             return
 
         step = int(getattr(self, 'seek_back_ms', 10000) or 10000)
-        self.seek_relative_ms(-int(step))
+        self._seek_by_button(-int(step))
 
     def on_forward(self, event):
         if self.is_casting:
@@ -5589,7 +5630,27 @@ class PlayerFrame(wx.Frame):
             return
 
         step = int(getattr(self, 'seek_forward_ms', 10000) or 10000)
-        self.seek_relative_ms(int(step))
+        self._seek_by_button(int(step))
+
+    def _seek_by_button(self, delta_ms: int) -> None:
+        """Seek for the -/+10 s buttons, then say where it landed once the
+        presses settle; Space on them otherwise only echoed "space"."""
+        before = getattr(self, "_seek_target_ts", None)
+        self.seek_relative_ms(delta_ms)
+        if getattr(self, "_seek_target_ts", None) == before:
+            return  # refused at the end; _announce_seek_limit already spoke
+        try:
+            pending = getattr(self, "_seek_announce_calllater", None)
+            if pending is not None and pending.IsRunning():
+                pending.Restart(400)
+            else:
+                self._seek_announce_calllater = wx.CallLater(400, self._announce_seek_position)
+        except Exception:
+            log.debug("Seek position announcement failed", exc_info=True)
+
+    def _announce_seek_position(self) -> None:
+        # The same words as the player's time field: elapsed, remaining, total.
+        self._announce_media_nav(self._compose_time_info(self._current_position_ms()))
 
     def on_volume_slider(self, event):
         try:
@@ -7254,6 +7315,7 @@ class PlayerFrame(wx.Frame):
 
         self._stop_calllater("_seek_apply_calllater", "Error handling seek apply calllater during shutdown")
         self._stop_calllater("_seek_guard_calllater", "Error handling seek guard calllater during shutdown")
+        self._stop_calllater("_seek_announce_calllater", "Error stopping seek announcement during shutdown")
 
         try:
             self._cancel_silence_scan()
