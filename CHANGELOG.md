@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.5.7 - 2026-11-02
+
+- Drop embedded CSS-only quizzes from both article readers (#144).
+
 ## v2.5.6 - 2026-11-02
 
 - Announce player load states and seek position while the player is hidden (#142).
