@@ -77,6 +77,12 @@ class _FakeListCtrl:
     def GetFirstSelected(self):
         return self.selected
 
+    def SetItemState(self, index, state, mask):
+        if mask & mainframe.wx.LIST_STATE_FOCUSED:
+            self.focused = index if state & mainframe.wx.LIST_STATE_FOCUSED else -1
+        if mask & mainframe.wx.LIST_STATE_SELECTED:
+            self.selected = index if state & mainframe.wx.LIST_STATE_SELECTED else -1
+
     def GetTopItem(self):
         return self.top
 
@@ -112,6 +118,9 @@ class _MergeHost:
 
     # Rendering.
     _render_articles_list = mainframe.MainFrame._render_articles_list
+    _focus_first_row_if_unvisited = mainframe.MainFrame._focus_first_row_if_unvisited
+    _user_focused_row = mainframe.MainFrame._user_focused_row
+    _window_is_or_child = mainframe.MainFrame._window_is_or_child
     _render_articles_batch = mainframe.MainFrame._render_articles_batch
     _render_batch_delay_ms = mainframe.MainFrame._render_batch_delay_ms
     _insert_article_row = mainframe.MainFrame._insert_article_row
@@ -171,6 +180,9 @@ class _MergeHost:
     # Stubs for collaborators the merge path only notifies.
     def _queue_fulltext_prefetch(self, articles):
         pass
+
+    def _get_focused_window(self):
+        return None  # keyboard focus is outside the article list
 
     def _restore_list_view(self, *args, **kwargs):
         pass
