@@ -240,6 +240,29 @@ def _is_ytdlp_dpapi_cookie_error(exc_or_msg) -> bool:
     return discovery.is_ytdlp_dpapi_cookie_error(exc_or_msg)
 
 
+def _is_ytdlp_uncookieable_error(exc_or_msg, url: str = "") -> bool:
+    """An extractor bug or a URL no extractor handles: no login changes that,
+    so retrying with each browser's cookies only burns a yt-dlp run apiece.
+
+    Not for YouTube, where cookies are the usual way past even "please report"
+    failures, nor when yt-dlp itself suggests logging in (Instagram's empty
+    media response says both "use --cookies" and "please report this issue")."""
+    if _is_youtube_page_url(url):
+        return False
+    text = str(exc_or_msg or "").lower()
+    if any(hint in text for hint in ("cookie", "log in", "logged-in", "logged in", "sign in")):
+        return False
+    return "please report this issue" in text or "unsupported url" in text
+
+
+def _is_youtube_page_url(url) -> bool:
+    try:
+        host = urlparse(str(url or "").strip()).hostname or ""
+    except Exception:
+        return False
+    return discovery._is_youtube_host(host) or discovery._host_matches(host, "youtube-nocookie.com")
+
+
 def _extract_ytdlp_info_via_cli(
     url: str,
     *,
@@ -1562,7 +1585,7 @@ class PlayerFrame(wx.Frame):
         except Exception:
             log.exception("Failed to schedule VLC error handler")
 
-    def _handle_vlc_error(self) -> None:
+    def _handle_vlc_error(self, reason: str = "vlc-error") -> None:
         log.debug("Handling VLC error")
         if self.is_casting:
             return
@@ -1571,7 +1594,7 @@ class PlayerFrame(wx.Frame):
         # on a bundled Windows VLC even though yt-dlp can fetch it. Fall back to the
         # proven download path and play a local file. Do this before the range-proxy
         # recovery, which does not apply to these streams.
-        if self.maybe_play_ytdlp_via_download(int(getattr(self, "_active_load_seq", 0) or 0), reason="vlc-error"):
+        if self.maybe_play_ytdlp_via_download(int(getattr(self, "_active_load_seq", 0) or 0), reason=reason):
             return
 
         if not self._last_vlc_url:
@@ -1692,7 +1715,7 @@ class PlayerFrame(wx.Frame):
                 state,
                 int(cur_ms),
             )
-            self._handle_vlc_error()
+            self._handle_vlc_error(reason="stalled")
         except Exception:
             pass
 
@@ -1788,7 +1811,6 @@ class PlayerFrame(wx.Frame):
                 if proxied and proxied != orig_url:
                     self._stream_proxy_retry_count = 1
                     self._stream_proxy_last_stall_recover_ts = now_mono
-                    self._load_start_ts = now_mono
                     log.warning(
                         "Detected stalled direct YouTube playback after %.1fs (state=%s, pos=%sms); retrying via local stream proxy",
                         max(0.0, now_mono - load_started),
@@ -1833,6 +1855,8 @@ class PlayerFrame(wx.Frame):
             self.player.stop()
         except Exception:
             pass
+        # The stall watchdogs time VLC's own opening of this URL; see load_media.
+        self._load_start_ts = float(time.monotonic())
         try:
             if http_headers is not None:
                 self._last_vlc_http_headers = dict(http_headers or {})
@@ -2865,7 +2889,7 @@ class PlayerFrame(wx.Frame):
         except Exception:
             delay_s = 4.0
         try:
-            if (time.monotonic() - float(getattr(self, "_load_start_ts", 0.0) or 0.0)) < float(delay_s):
+            if (time.monotonic() - float(getattr(self, "_media_load_ts", 0.0) or 0.0)) < float(delay_s):
                 return
         except Exception:
             pass
@@ -3805,7 +3829,10 @@ class PlayerFrame(wx.Frame):
                         for source in cookie_sources:
                             attempts.append(("cookies", source))
 
+                    skip_browser_cookies = False
                     for kind, source in attempts:
+                        if kind == "cookies" and skip_browser_cookies:
+                            continue
                         if (
                             kind == "cookies"
                             and skip_chromium_cookie_attempts
@@ -3831,6 +3858,7 @@ class PlayerFrame(wx.Frame):
                             last_err = e
                             if kind == "base":
                                 base_err = e
+                                skip_browser_cookies = _is_ytdlp_uncookieable_error(e, url)
                             if kind == "cookies" and source:
                                 if _is_ytdlp_dpapi_cookie_error(e):
                                     dpapi_cookie_err = e
@@ -3872,7 +3900,12 @@ class PlayerFrame(wx.Frame):
 
                         # Frozen builds can keep an up-to-date yt-dlp CLI on disk between releases.
                         # Try it before failing when embedded Python yt_dlp extraction breaks.
+                        # It may know a site the embedded copy does not, so it
+                        # judges the cookie attempts by its own anonymous error.
+                        skip_browser_cookies = False
                         for kind, source in attempts:
+                            if kind == "cookies" and skip_browser_cookies:
+                                continue
                             if (
                                 kind == "cookies"
                                 and cli_skip_chromium_cookie_attempts
@@ -3897,6 +3930,7 @@ class PlayerFrame(wx.Frame):
                                 cli_last_err = cli_e
                                 if kind == "base":
                                     cli_base_err = cli_e
+                                    skip_browser_cookies = _is_ytdlp_uncookieable_error(cli_e, url)
                                 if kind == "cookies" and source:
                                     if _is_ytdlp_dpapi_cookie_error(cli_e):
                                         cli_dpapi_err = cli_e
@@ -3926,12 +3960,13 @@ class PlayerFrame(wx.Frame):
                             if cli_last_err is not None and last_err is None:
                                 last_err = cli_last_err
 
-                    if info is None:
+                    if info is None and _is_youtube_page_url(url):
                         # Exhaust a wider yt-dlp player-client pool before giving up.
                         # YouTube blocks/throttles individual clients, so a broader set
                         # is often the difference between "no formats" and a playable
                         # stream. Try embedded then CLI, anonymously and (if configured)
                         # with a cookies.txt; skip browser-cookie/DPAPI churn here.
+                        # Player clients mean nothing to other sites' extractors.
                         fb_clients = discovery.YOUTUBE_PLAYER_CLIENTS_FALLBACK
                         fb_opts_base = dict(base_opts)
                         fb_opts_base['extractor_args'] = {
@@ -4110,17 +4145,7 @@ class PlayerFrame(wx.Frame):
                         # URL to VLC so its independent Lua extractors can try. A
                         # YouTube watch page is not media and may launch the browser;
                         # raise into BlindRSS's local download-to-play fallback instead.
-                        is_youtube_url = False
-                        try:
-                            host = str(parsed_url.hostname or "").lower() if parsed_url else ""
-                            is_youtube_url = (
-                                host == "youtu.be"
-                                or host == "youtube.com"
-                                or host.endswith(".youtube.com")
-                            )
-                        except Exception:
-                            is_youtube_url = False
-                        if is_youtube_url:
+                        if _is_youtube_page_url(url):
                             raise RuntimeError(
                                 last_err
                                 or base_err
@@ -4389,6 +4414,10 @@ class PlayerFrame(wx.Frame):
                         final_url = self._maybe_stream_proxy_url(final_url, headers=ytdlp_headers)
                 except Exception:
                     pass
+            else:
+                # Drop the previous item's proxy state, or a later error retries its URL.
+                self._last_orig_url = self._last_vlc_url = final_url
+                self._last_used_range_proxy = self._last_used_stream_proxy = False
             try:
                 proxied = bool(self._last_used_range_proxy or self._last_used_stream_proxy)
                 log.info(
@@ -4548,10 +4577,11 @@ class PlayerFrame(wx.Frame):
             pass
 
         self._set_status(_("Connecting..."))
-        try:
-            self._load_start_ts = float(time.monotonic())
-        except Exception:
-            pass
+        self._media_load_ts = float(time.monotonic())  # the silence-scan delay counts from here
+        # Idle the stall watchdogs until _load_vlc_url hands VLC the URL. Timed
+        # from here, the 4-7 s yt-dlp resolve ate their 6-8 s budget and a stream
+        # VLC was still opening got abandoned for the download fallback.
+        self._load_start_ts = 0.0
 
         try:
             t = threading.Thread(
@@ -4674,7 +4704,10 @@ class PlayerFrame(wx.Frame):
         produced = None
         last_err = _("download failed")
         base_err = ""
-        dpapi_seen = False
+        # Same session memory as the streaming resolve: no Chromium store
+        # decrypts once one failed with DPAPI.
+        dpapi_seen = bool(getattr(self, "_ytdlp_browser_cookies_dpapi_unavailable", False))
+        skip_browser_cookies = False
         cookiefile_extra = next(
             (extra for kind, extra in attempts if kind == "cookiefile"),
             None,
@@ -4693,6 +4726,8 @@ class PlayerFrame(wx.Frame):
                 False,
             ),
         ]
+        if not _is_youtube_page_url(extract_url):
+            del phases[1]  # player clients mean nothing to other sites' extractors
         phases.extend(
             (
                 recovery_url,
@@ -4782,6 +4817,8 @@ class PlayerFrame(wx.Frame):
                 browser_user_agent = browser_session.user_agent
             for kind, extra in phase_attempts:
                 cookie_source = extra[1] if kind == "cookies" and len(extra) > 1 else ""
+                if kind == "cookies" and skip_browser_cookies:
+                    continue
                 if (
                     kind == "cookies"
                     and dpapi_seen
@@ -4829,6 +4866,7 @@ class PlayerFrame(wx.Frame):
                 attempt_err = (res.stderr or res.stdout or "").strip()
                 if kind == "cookies" and discovery.is_ytdlp_dpapi_cookie_error(attempt_err):
                     dpapi_seen = True
+                    self._ytdlp_browser_cookies_dpapi_unavailable = True
                     _log(
                         "YouTube download-to-play: Chromium cookies unusable "
                         "(Windows DPAPI); retaining Firefox/LibreWolf attempts"
@@ -4837,6 +4875,7 @@ class PlayerFrame(wx.Frame):
                 last_err = attempt_err or last_err
                 if kind == "base" and target_url == extract_url and not base_err:
                     base_err = attempt_err or base_err
+                    skip_browser_cookies = _is_ytdlp_uncookieable_error(attempt_err, extract_url)
             if produced:
                 break
 
