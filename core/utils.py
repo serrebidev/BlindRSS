@@ -457,6 +457,52 @@ def _soup_to_block_text(soup) -> str:
     return text.strip()
 
 
+_RADIO_INPUT_RE = re.compile(r"""<input\b[^>]*\btype\s*=\s*["']?radio\b[^>]*>""", re.I)
+_INPUT_NAME_RE = re.compile(r"""\bname\s*=\s*["']?([^"'\s>]+)""", re.I)
+# A question set: at least two questions plus navigation, or three questions.
+# One group is a poll, a rating or CSS-only tabs, which can hold real content.
+_QUIZ_MIN_RADIO_GROUPS = 3
+_QUIZ_PAGE_WRAPPERS = {"[document]", "html", "body", "main", "article", "form"}
+
+
+def strip_css_quizzes(html: str) -> str:
+    """Remove embedded CSS-only quizzes from a page, before any extraction.
+
+    These widgets (How-To Geek's ``div.vq``, 2026-11) answer through radio inputs
+    and ``:checked`` rules, so every question, answer explanation and score panel
+    is ordinary <section>/<p> text in the served HTML that no extractor can tell
+    from prose. Their stable signal is several radio groups in one container.
+    Returns ``html`` untouched, without parsing it, when no quiz can be present.
+    """
+    if not html:
+        return html
+    names = set()
+    for tag in _RADIO_INPUT_RE.findall(html):
+        match = _INPUT_NAME_RE.search(tag)
+        if match:
+            names.add(match.group(1))
+    if len(names) < _QUIZ_MIN_RADIO_GROUPS:
+        return html
+
+    soup = BS(html, "html.parser")
+    containers: dict[int, tuple] = {}
+    for radio in soup.find_all("input", attrs={"type": re.compile(r"^radio$", re.I)}):
+        parent = radio.parent
+        name = radio.get("name")
+        if parent is not None and name:
+            containers.setdefault(id(parent), (parent, set()))[1].add(name)
+    removed = False
+    for parent, groups in containers.values():
+        if len(groups) < _QUIZ_MIN_RADIO_GROUPS or parent.decomposed:
+            continue
+        # A wrapper around the page or the article body is not the widget.
+        if parent.name in _QUIZ_PAGE_WRAPPERS or parent.find(["article", "main"]):
+            continue
+        parent.decompose()
+        removed = True
+    return str(soup) if removed else html
+
+
 def html_to_text(html: str | None, include_images: bool = False, structure: dict | None = None) -> str:
     """Convert feed/article HTML to readable plain text.
 
