@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: MIT
 
 import feedparser
+import hashlib
 import json
 import time
 import uuid
@@ -705,6 +706,18 @@ def _parse_cdf_document(text: str):
     parsed["bozo"] = False
     parsed["version"] = "cdf"
     return parsed
+
+
+# YouTube's feeds/videos.xml sends no ETag/Last-Modified and its only moving
+# parts between fetches are these counters, which BlindRSS never stores.
+_FEED_VOLATILE_COUNTERS_RE = re.compile(rb"<media:(?:statistics|starRating)\b[^>]*>")
+
+
+def _feed_body_digest(data) -> str:
+    """Digest of a feed body that ignores view/rating counters."""
+    if isinstance(data, str):
+        data = data.encode("utf-8", "replace")
+    return hashlib.sha1(_FEED_VOLATILE_COUNTERS_RE.sub(b"", bytes(data or b""))).hexdigest()
 
 
 def _parse_feed_document(data, text: Optional[str] = None, content_type: str = ""):
@@ -1533,6 +1546,9 @@ class LocalProvider(RSSProvider):
         self._forced_podcast_archive_lock = threading.Lock()
         self._pending_podcast_archive_results = {}
         self._pending_podcast_archive_lock = threading.Lock()
+        # Body digest per feed of the last successfully stored 200 response in
+        # this session; an identical body is then handled like a 304.
+        self._stored_feed_body_digests: Dict[str, str] = {}
     def _retention_cutoff(self) -> Optional[str]:
         """The retention boundary refresh must not insert past (issue #106).
 
@@ -2050,6 +2066,7 @@ class LocalProvider(RSSProvider):
         known_unread_count = None
         deferred_podcast_archive_job = None
         deferred_podcast_archive_completion = None
+        body_digest = None
         # Issue #106: anything already older than this boundary is deleted by the
         # very next retention sweep, so inserting it would only resurrect it as
         # unread. Computed once per feed so every insert path below agrees.
@@ -2914,6 +2931,9 @@ class LocalProvider(RSSProvider):
             def _store_youtube_items(all_items, stable_video_ids=False, history=False):
                 # Shared by YouTube search feeds and the channel-feed fallback.
                 nonlocal new_items, entry_count, content_changed
+                # Listing dates are day-only; the next RSS body must be stored
+                # again (not skipped as unchanged) to restore the exact times.
+                self._stored_feed_body_digests.pop(feed_id, None)
                 conn = get_connection()
                 try:
                     c = conn.cursor()
@@ -3625,6 +3645,32 @@ class LocalProvider(RSSProvider):
                 _store_youtube_items(yt_items, stable_video_ids=True)
                 return
 
+            if status == "ok" and xml_data is not None:
+                body_digest = _feed_body_digest(xml_data)
+                if not force and self._stored_feed_body_digests.get(feed_id) == body_digest:
+                    # Many feeds (every YouTube channel feed) send no validators,
+                    # so every refresh got a full 200 and re-ran parse + store.
+                    status = "not_modified"
+                    log.info(
+                        "Local feed refresh body unchanged id=%s title=%r url=%s",
+                        feed_id,
+                        final_title,
+                        feed_url,
+                    )
+                    if (new_etag, new_last_modified) != (etag, last_modified):
+                        # New validators let the next refresh get a real 304.
+                        try:
+                            conn = get_connection()
+                            try:
+                                conn.execute(
+                                    "UPDATE feeds SET etag = ?, last_modified = ? WHERE id = ?",
+                                    (new_etag, new_last_modified, feed_id),
+                                )
+                                conn.commit()
+                            finally:
+                                conn.close()
+                        except Exception:
+                            log.debug("Failed to persist validators for %s", feed_id, exc_info=True)
             if status == "not_modified":
                 # A conditional request can still have followed a permanent
                 # redirect. Persist that canonical address even though there
@@ -3666,6 +3712,7 @@ class LocalProvider(RSSProvider):
                 resp = browser_resp
                 xml_data = resp.content
                 xml_text = resp.text
+                body_digest = None  # the stored body is not the one digested
                 response_content_type = str(resp.headers.get("Content-Type", "") or "")
                 d = _parse_feed_document(xml_data, xml_text, response_content_type)
             entry_count = len(d.entries)
@@ -3688,6 +3735,7 @@ class LocalProvider(RSSProvider):
                     resp = browser_resp
                     xml_data = resp.content
                     xml_text = resp.text
+                    body_digest = None  # the stored body is not the one digested
                     response_content_type = str(resp.headers.get("Content-Type", "") or "")
                     d = _parse_feed_document(xml_data, xml_text, response_content_type)
                     entry_count = len(d.entries)
@@ -4383,6 +4431,8 @@ class LocalProvider(RSSProvider):
 
                 # Commit once at the end
                 conn.commit()
+                if body_digest is not None:
+                    self._stored_feed_body_digests[feed_id] = body_digest
                 if deferred_podcast_archive_completion is not None:
                     finish_podcast_archive_scan(
                         feed_id,
@@ -5537,6 +5587,7 @@ class LocalProvider(RSSProvider):
                     "UPDATE feeds SET url = ?, title = ?, title_is_custom = ?, category = ?, etag = NULL, last_modified = NULL WHERE id = ?",
                     (new_url, new_title, new_title_is_custom, new_category, feed_id),
                 )
+                self._stored_feed_body_digests.pop(feed_id, None)
             else:
                 c.execute(
                     "UPDATE feeds SET url = ?, title = ?, title_is_custom = ?, category = ? WHERE id = ?",
