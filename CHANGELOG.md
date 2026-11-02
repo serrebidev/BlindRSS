@@ -4,6 +4,14 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.5.6 - 2026-11-02
+
+- Announce player load states and seek position while the player is hidden (#142).
+- Stop abandoning YouTube streams VLC is still opening; skip futile retries (#141).
+- Keep tree arrowing responsive under NVDA; Tab lands on an article row (#139).
+- Start range-proxied streams faster and survive a first 403 (#136).
+- Skip parsing and storing a feed whose body has not changed (#140).
+
 ## v2.5.5 - 2026-10-31
 
 - Stop reading escaped HTML tags in full text; don't refetch empty pages (#134).
