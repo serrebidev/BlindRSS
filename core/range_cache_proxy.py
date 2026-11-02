@@ -58,10 +58,18 @@ _PROBE_WAIT_S = 3.0
 # VLC without the real total makes it adopt the served window as the entire
 # file, so an hour-long episode shows ~4 minutes and stops there.
 _PROBE_RESOLVE_WAIT_S = 20.0
+# googlevideo can refuse a freshly minted URL for a moment (seen: the probe got
+# 403, a range request seconds later 206). Retry a 401/403 probe once.
+_PROBE_FORBIDDEN_RETRY_S = 1.0
 
 # Cap how much extra we fetch inline (beyond the requested bytes) to keep seeks snappy.
 # Larger amounts still happen via background download.
 _INLINE_PREFETCH_CAP_BYTES = 16 * 1024 * 1024
+
+# Largest single background range request. googlevideo serves ranges up to
+# ~10 MiB at 1.5-4 MB/s but larger ones at ~31 KB/s after a 2 s delay
+# (measured 2026-10); yt-dlp downloads in 10 MiB chunks for the same reason.
+_BG_MAX_REQUEST_BYTES = 10 * 1024 * 1024
 
 _RANGE_RE = re.compile(r"^bytes=(\d+)-(\d+)?$")
 _CONTENT_RANGE_RE = re.compile(r"^\s*bytes\s+(\d+)-(\d+)/(\d+|\*)\s*$", re.IGNORECASE)
@@ -376,7 +384,7 @@ class _Entry:
                 hdrs.update(self.headers or {})
                 hdrs.setdefault("User-Agent", _DEFAULT_UA)
                 hdrs.setdefault("Accept", "*/*")
-                hdrs.setdefault("Accept-Encoding", "identity")
+                hdrs["Accept-Encoding"] = "identity"
                 hdrs["Range"] = "bytes=0-0"
                 try:
                     r = session.get(
@@ -427,23 +435,29 @@ class _Entry:
             hdrs.setdefault("User-Agent", _DEFAULT_UA)
             hdrs.setdefault("Accept", "*/*")
             # Avoid transparent compression; ranged fetches must be byte-exact.
-            hdrs.setdefault("Accept-Encoding", "identity")
-            # Avoid gzip/deflate so byte ranges always map 1:1 to the original file.
-            hdrs.setdefault("Accept-Encoding", "identity")
+            # Assign, not setdefault: HEADERS already asks for gzip/deflate/br.
+            hdrs["Accept-Encoding"] = "identity"
 
             # Try a single-byte range request (most reliable way to learn length + range support)
             hdrs_probe = dict(hdrs)
             hdrs_probe["Range"] = "bytes=0-0"
 
             try:
-                # allow_redirects=True here; we'll capture the final URL if it changes.
-                r = session.get(
-                    target_url,
-                    headers=hdrs_probe,
-                    stream=True,
-                    timeout=(_PROBE_CONNECT_TIMEOUT_S, _PROBE_READ_TIMEOUT_S),
-                    allow_redirects=True,
-                )
+                for _attempt in range(2):
+                    # allow_redirects=True here; we'll capture the final URL if it changes.
+                    r = session.get(
+                        target_url,
+                        headers=hdrs_probe,
+                        stream=True,
+                        timeout=(_PROBE_CONNECT_TIMEOUT_S, _PROBE_READ_TIMEOUT_S),
+                        allow_redirects=True,
+                    )
+                    if r.status_code not in (401, 403) or _attempt:
+                        break
+                    LOG.debug("RangeCacheProxy probe refused (HTTP %s); retrying once in %.1fs",
+                              r.status_code, _PROBE_FORBIDDEN_RETRY_S)
+                    r.close()
+                    time.sleep(_PROBE_FORBIDDEN_RETRY_S)
             except Exception as e:
                 self._warn("RangeCacheProxy probe failed: %s", e)
                 self.range_supported = False
@@ -481,9 +495,14 @@ class _Entry:
                             self.total_length = cl
                     except Exception:
                         pass
-                else:
-                    # Some servers respond 416, 403, etc.
+                elif r.status_code not in (401, 403):
+                    # Some servers respond 416 etc. A 401/403 refuses this
+                    # request, it does not say "no ranges": leave it unknown so
+                    # await_probe asks again instead of relaying 403 to VLC.
                     self.range_supported = False
+                else:
+                    LOG.debug("RangeCacheProxy probe still refused (HTTP %s); range support "
+                              "left unknown, the next request probes again", r.status_code)
             finally:
                 try:
                     r.close()
@@ -512,6 +531,8 @@ class _Entry:
                 return
             if not self._probe_done.is_set():
                 self._probe_done.wait(timeout=_PROBE_RESOLVE_WAIT_S)
+            if self._probe_done.is_set() and self.range_supported is None:
+                self._probe_done.clear()  # the last probe was refused (401/403)
             if not self._probe_done.is_set():
                 self.probe()
         except Exception:
@@ -542,7 +563,7 @@ class _Entry:
         hdrs.update(self.headers or {})
         hdrs.setdefault("User-Agent", _DEFAULT_UA)
         hdrs.setdefault("Accept", "*/*")
-        hdrs.setdefault("Accept-Encoding", "identity")
+        hdrs["Accept-Encoding"] = "identity"
         hdrs["Range"] = f"bytes={start}-{end}"
 
         session = self._make_session()
@@ -834,7 +855,7 @@ class _Entry:
         hdrs.update(self.headers or {})
         hdrs.setdefault("User-Agent", _DEFAULT_UA)
         hdrs.setdefault("Accept", "*/*")
-        hdrs.setdefault("Accept-Encoding", "identity")
+        hdrs["Accept-Encoding"] = "identity"
         hdrs["Range"] = f"bytes={req_start}-{req_end}"
 
         session = self._make_session()
@@ -1082,6 +1103,7 @@ class _Entry:
                             continue
 
                         chunk_target = bootstrap_bytes if first else int(self.background_chunk_bytes)
+                        chunk_target = min(int(chunk_target), _BG_MAX_REQUEST_BYTES)
                         end = start + int(chunk_target) - 1
                         if self.total_length is not None:
                             end = min(end, self.total_length - 1)
@@ -1508,7 +1530,7 @@ class RangeCacheProxy:
                         hdrs.update(ent.headers or {})
                         hdrs.setdefault("User-Agent", _DEFAULT_UA)
                         hdrs.setdefault("Accept", "*/*")
-                        hdrs.setdefault("Accept-Encoding", "identity")
+                        hdrs["Accept-Encoding"] = "identity"
 
                         # Preserve the caller's Range header if present; some servers ignore it.
                         rh = self.headers.get("Range")
@@ -1532,7 +1554,9 @@ class RangeCacheProxy:
                                         continue
                                     self.send_header(k, v)
                                 self.end_headers()
-                                for chunk in r.iter_content(chunk_size=256 * 1024):
+                                # Raw bytes: the headers above came from the origin, so a
+                                # Content-Encoding it applied anyway must reach VLC intact.
+                                for chunk in r.raw.stream(256 * 1024, decode_content=False):
                                     if not chunk:
                                         continue
                                     try:
