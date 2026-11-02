@@ -603,8 +603,11 @@ def clean_article_html(html: str, url: str = "", *, use_traf_prune: bool = True)
     """
     if not html:
         return ""
+    # Before the trafilatura prune below reads the page too: its ground-truth text
+    # would otherwise vouch for the quiz's paragraphs.
+    html = utils.strip_css_quizzes(str(html))
     try:
-        soup = BeautifulSoup(str(html), "html.parser")
+        soup = BeautifulSoup(html, "html.parser")
     except Exception:
         return ""
 

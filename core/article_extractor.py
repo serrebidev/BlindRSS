@@ -4497,6 +4497,8 @@ def _append_missing_tables(text: str, table_blocks: List[str], dom_text: str) ->
 
 
 def _extract_text_any(html: str, url: str = "") -> str:
+    html = utils.strip_css_quizzes(html)
+
     # Linearize data tables first so every extraction path below sees them as
     # ordinary in-place paragraphs (screen-reader-friendly header-value rows).
     html, table_blocks = _linearize_tables_html(html, url)
