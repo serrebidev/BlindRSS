@@ -1,3 +1,4 @@
+import threading
 from contextlib import closing
 from types import SimpleNamespace
 
@@ -5,6 +6,8 @@ import pytest
 
 from core import db, youtube_account
 from core.models import Article, Feed
+from gui import mainframe
+from providers.local import LocalProvider
 from providers.youtube_account import YouTubeAccountProvider
 
 
@@ -229,3 +232,139 @@ def test_unchanged_sync_leaves_date_sorted_cached_views_alone(account):
         (VIDEO_THREE, "Video three", "Example channel"),
     ])
     assert _newest_first(provider.merge_recommendations(feed_id, cached)) == ["Video one", "Video two, renamed", "Video three"]
+
+
+@pytest.fixture
+def local_account(monkeypatch, tmp_path):
+    """Local provider with one channel feed holding two not yet read videos."""
+    monkeypatch.setattr(db, "DB_FILE", str(tmp_path / "rss.db"))
+    db.init_db()
+    config = Config(youtube_account_refresh_token="private", youtube_account_category="Videos")
+    provider = YouTubeAccountProvider(LocalProvider(config), config)
+    with closing(db.get_connection()) as conn, conn:
+        conn.execute("INSERT INTO feeds (id, url, title, category) VALUES ('channel', ?, 'Example channel', 'Videos')",
+                     ("https://www.youtube.com/feeds/videos.xml?channel_id=UCexampleChannel000000",))
+        conn.executemany(
+            "INSERT INTO articles (id, feed_id, title, url, content, date, author, is_read) "
+            "VALUES (?, 'channel', ?, ?, '', '2000-01-01 00:00:00', 'Example channel', 0)",
+            [("yt:video:" + vid, title, "https://www.youtube.com/watch?v=" + vid)
+             for vid, title in ((VIDEO_ONE, "Video one"), (VIDEO_TWO, "Video two"))],
+        )
+    return config, provider
+
+
+def _recommend(config, provider):
+    youtube_account.save_recommendations(config, [(VIDEO_ONE, "Video one", "Example channel"), (VIDEO_TWO, "Video two", "Example channel")])
+    return provider.get_articles(youtube_account.RECOMMENDATIONS_FEED_ID)
+
+
+def _read(provider, article_id):
+    return provider.get_article_by_id(article_id).is_read
+
+
+def test_recommending_a_video_read_in_its_channel_feed_shows_it_read(local_account):
+    config, provider = local_account
+    assert provider.mark_read("yt:video:" + VIDEO_ONE)
+    one, two = _recommend(config, provider)
+    assert one.is_read and not two.is_read
+    assert provider.get_feeds()[-1].unread_count == 1
+    assert [a.title for a in provider.get_articles("unread:" + youtube_account.RECOMMENDATIONS_FEED_ID)] == ["Video two"]
+    assert sorted((a.feed_id, a.title) for a in provider.get_articles("read:category:Videos")) == [
+        ("channel", "Video one"), (youtube_account.RECOMMENDATIONS_FEED_ID, "Video one")]
+
+
+def test_read_state_follows_the_video_between_recommendation_and_channel_feed(local_account):
+    config, provider = local_account
+    one, two = _recommend(config, provider)
+    feed_one, feed_two = "yt:video:" + VIDEO_ONE, "yt:video:" + VIDEO_TWO
+
+    assert provider.mark_read(one.id) and _read(provider, feed_one)
+    assert provider.mark_unread(feed_one) and not _read(provider, one.id)
+    assert provider.mark_read(feed_one) and _read(provider, one.id)
+    assert provider.mark_unread(one.id) and not _read(provider, feed_one)
+
+    assert provider.mark_read_batch([one.id, feed_two])
+    assert _read(provider, feed_one) and _read(provider, two.id)
+    for article_id in (one.id, feed_two):
+        provider.mark_unread(article_id)
+    assert not any(_read(provider, aid) for aid in (one.id, two.id, feed_one, feed_two))
+
+    assert provider.mark_all_read(youtube_account.RECOMMENDATIONS_FEED_ID)
+    assert _read(provider, feed_one) and _read(provider, feed_two)
+    for article_id in (one.id, two.id):
+        provider.mark_unread(article_id)
+    assert provider.mark_all_read("channel")
+    assert _read(provider, one.id) and _read(provider, two.id)
+    assert provider.get_feeds()[-1].unread_count == 0
+
+
+def test_hosted_accounts_keep_recommendation_read_state_apart(account):
+    config, provider, remote = account
+    with closing(db.get_connection()) as conn, conn:
+        # Left behind in rss.db by an earlier local profile.
+        conn.execute("INSERT INTO articles (id, title, is_read) VALUES (?, 'Video one', 1)", ("yt:video:" + VIDEO_ONE,))
+    youtube_account.save_recommendations(config, [(VIDEO_ONE, "Video one", "Example channel")])
+    one = provider.get_articles(youtube_account.RECOMMENDATIONS_FEED_ID)[0]
+    assert not one.is_read
+    assert provider.mark_read(one.id) and provider.mark_unread(one.id)
+    with closing(db.get_connection()) as conn:
+        assert conn.execute("SELECT is_read FROM articles WHERE id = ?", ("yt:video:" + VIDEO_ONE,)).fetchone() == (1,)
+    assert remote.calls == []
+
+
+class _RunNow:
+    """Runs the provider call mark_article_read starts, before returning."""
+
+    def __init__(self, target, args=(), daemon=None):
+        self.target, self.args = target, args
+
+    def start(self):
+        self.target(*self.args)
+
+
+class _ListHost:
+    """The main window's mark-read path without a window (no wx.App)."""
+
+    mark_article_read = mainframe.MainFrame.mark_article_read
+    mark_article_unread = mainframe.MainFrame.mark_article_unread
+    _sync_read_flag_in_cached_views = mainframe.MainFrame._sync_read_flag_in_cached_views
+    _sync_read_twin = mainframe.MainFrame._sync_read_twin
+    _article_cache_id = mainframe.MainFrame._article_cache_id
+
+    def __init__(self, provider, articles, view_cache):
+        self.provider = provider
+        self.current_articles = articles
+        self.view_cache = view_cache
+        self._view_cache_lock = threading.Lock()
+        self.status = {}
+        self.count_changes = []
+
+    def _set_or_defer_status_cell(self, idx, article, label):
+        self.status[idx] = label
+
+    def _update_feed_unread_count_ui(self, feed_id, delta):
+        self.count_changes.append((feed_id, delta))
+
+
+def test_open_lists_show_the_new_state_on_both_copies_of_a_video(local_account, monkeypatch):
+    monkeypatch.setattr(mainframe, "threading", SimpleNamespace(Thread=_RunNow, Lock=threading.Lock))
+    config, provider = local_account
+    _recommend(config, provider)
+    feed_id = youtube_account.RECOMMENDATIONS_FEED_ID
+    shown = provider.get_articles("category:Videos")
+    cached_feed = provider.get_articles(feed_id)
+    cached_channel = provider.get_articles("channel")
+    host = _ListHost(provider, shown, {feed_id: {"articles": cached_feed}, "channel": {"articles": cached_channel}})
+    feed_copy = next(i for i, a in enumerate(shown) if a.id == "yt:video:" + VIDEO_ONE)
+    recommended = next(i for i, a in enumerate(shown) if a.feed_id == feed_id and a.title == "Video one")
+
+    host.mark_article_read(feed_copy)
+    assert shown[recommended].is_read and host.status == {feed_copy: mainframe._("Read"), recommended: mainframe._("Read")}
+    assert sorted(host.count_changes) == [("channel", -1), (feed_id, -1)]
+    assert [a.is_read for a in cached_feed] == [True, False]
+    assert _read(provider, shown[recommended].id)
+
+    host.mark_article_unread(recommended)
+    assert not shown[feed_copy].is_read and host.status[feed_copy] == mainframe._("Unread")
+    assert not next(a for a in cached_channel if a.id == "yt:video:" + VIDEO_ONE).is_read
+    assert not _read(provider, "yt:video:" + VIDEO_ONE)
