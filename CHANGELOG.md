@@ -4,6 +4,11 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.5.8 - 2026-11-03
+
+- Keep YouTube recommendation dates and share read state with feeds (#146).
+- Stop rejecting signed updates on non-English Windows (#145).
+
 ## v2.5.7 - 2026-11-02
 
 - Drop embedded CSS-only quizzes from both article readers (#144).
