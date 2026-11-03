@@ -10,9 +10,17 @@ import gui.mainframe as mainframe
 class _ListCtrl:
     def __init__(self):
         self.labels = {}
+        self.focused = -1
+        self.count = 0
 
     def SetItem(self, idx, column, label):
         self.labels[(int(idx), int(column))] = str(label)
+
+    def GetFocusedItem(self):
+        return self.focused
+
+    def GetItemCount(self):
+        return self.count
 
 
 class _ContentCtrl:
@@ -45,6 +53,9 @@ class _ContentCtrl:
 
     def SetSelection(self, start, end):
         self.selection = (int(start), int(end))
+
+    def GetParent(self):
+        return None
 
 
 class _Player:
@@ -92,6 +103,12 @@ class _ChapterHost:
     on_open_chapter_link = mainframe.MainFrame.on_open_chapter_link
     _cache_article_chapters = mainframe.MainFrame._cache_article_chapters
     _update_article_chapter_indicator = mainframe.MainFrame._update_article_chapter_indicator
+    _flush_deferred_title_cells = mainframe.MainFrame._flush_deferred_title_cells
+    _flush_deferred_status_cells = mainframe.MainFrame._flush_deferred_status_cells
+    _window_is_or_child = mainframe.MainFrame._window_is_or_child
+    on_article_select = mainframe.MainFrame.on_article_select
+    _is_load_more_row = mainframe.MainFrame._is_load_more_row
+    _invalidate_reader_text_tracking = mainframe.MainFrame._invalidate_reader_text_tracking
     _append_chapters = mainframe.MainFrame._append_chapters
     _apply_chapters_for_player = mainframe.MainFrame._apply_chapters_for_player
     _open_article = mainframe.MainFrame._open_article
@@ -106,6 +123,18 @@ class _ChapterHost:
         self.player_window = player
         self.config_manager = _Config()
         self.visibility = []
+        self.focused_window = None
+        self._updating_list = False
+        self._fulltext_token = 0
+
+    def _get_focused_window(self):
+        return self.focused_window
+
+    def _rich_view_active(self):
+        return False
+
+    def _update_content_view(self, _idx):
+        return None
 
     def _ensure_player_window(self):
         return self.player_window
@@ -154,6 +183,129 @@ def test_append_chapters_updates_indicator_and_preserves_reader_selection():
     assert "Chapters (1):" in host.content_ctrl.value
     assert "1:02:03, Discussion. Link: https://example.com/chapter" in host.content_ctrl.value
     assert host.content_ctrl.selection == (1, 4)
+
+
+def _two_row_host():
+    first = _article("article-1")
+    second = _article("article-2")
+    second.title = "Other episode"
+    host = _ChapterHost(first, _Player())
+    host.current_articles = [first, second]
+    host.list_ctrl.count = 2
+    host.focused_window = host.list_ctrl
+    return host, first, second
+
+
+def test_chapters_for_the_focused_row_wait_until_focus_moves():
+    # Column 0 is the row's accessible name: rewriting it on the focused row
+    # makes NVDA read the whole row again while the user is listening to it.
+    host, first, _second = _two_row_host()
+    host.list_ctrl.focused = 0
+    chapters = [{"start": 0.0, "title": "Intro"}]
+
+    host._append_chapters(first.cache_id, chapters)
+
+    assert first.chapters == chapters
+    assert host.list_ctrl.labels == {}
+
+    # The same row selected again: still focused, so still nothing.
+    host._flush_deferred_title_cells()
+    assert host.list_ctrl.labels == {}
+
+    # The user arrows to the next row: the first row now gets its indicator.
+    host.list_ctrl.focused = 1
+    host._flush_deferred_title_cells()
+    assert host.list_ctrl.labels == {(0, 0): "Episode, Chapters available"}
+
+    # Applied once only.
+    host.list_ctrl.labels.clear()
+    host._flush_deferred_title_cells()
+    assert host.list_ctrl.labels == {}
+    assert host._deferred_title_cells == set()
+
+
+def test_selecting_another_row_writes_the_deferred_title_after_the_handler(monkeypatch):
+    # The listview fires the new row's focus event only after the selection
+    # event returns. A title written inside on_article_select reaches NVDA
+    # while the row being left is still its focus object, and NVDA reads that
+    # row again; the write must wait for a posted callback.
+    posted = []
+    monkeypatch.setattr(mainframe.wx, "CallAfter", lambda fn, *a, **k: posted.append((fn, a, k)))
+    monkeypatch.setattr(mainframe.wx, "CallLater", lambda _ms, fn, *a, **k: posted.append((fn, a, k)))
+    host, first, _second = _two_row_host()
+    host.list_ctrl.focused = 0
+    first.chapters = [{"start": 0.0, "title": "Intro"}]
+    host._update_article_chapter_indicator(first.cache_id)
+
+    host.list_ctrl.focused = 1
+    host.on_article_select(SimpleNamespace(GetIndex=lambda: 1))
+
+    assert host.list_ctrl.labels == {}
+    assert posted
+
+    for fn, args, kwargs in posted:
+        fn(*args, **kwargs)
+
+    assert host.list_ctrl.labels == {(0, 0): "Episode, Chapters available"}
+
+
+def test_chapters_for_an_unfocused_row_update_its_title_at_once():
+    host, first, _second = _two_row_host()
+    host.list_ctrl.focused = 1
+    first.chapters = [{"start": 0.0, "title": "Intro"}]
+
+    host._update_article_chapter_indicator(first.cache_id)
+
+    assert host.list_ctrl.labels == {(0, 0): "Episode, Chapters available"}
+    assert not getattr(host, "_deferred_title_cells", None)
+
+
+def test_focused_row_title_updates_at_once_when_the_list_is_not_focused():
+    # NVDA only reads name changes of its focus object. With focus in the
+    # reader, holding the title back would only hide it, e.g. from the row a
+    # later Tab into the list lands on.
+    host, first, _second = _two_row_host()
+    host.list_ctrl.focused = 0
+    host.focused_window = host.content_ctrl
+    first.chapters = [{"start": 0.0, "title": "Intro"}]
+
+    host._update_article_chapter_indicator(first.cache_id)
+
+    assert host.list_ctrl.labels == {(0, 0): "Episode, Chapters available"}
+    assert not getattr(host, "_deferred_title_cells", None)
+
+
+def test_deferred_title_follows_the_article_when_rows_shift():
+    host, first, second = _two_row_host()
+    host.list_ctrl.focused = 0
+    first.chapters = [{"start": 0.0, "title": "Intro"}]
+    host._update_article_chapter_indicator(first.cache_id)
+    assert host.list_ctrl.labels == {}
+
+    # A refresh merged a newer item above it: the article moved down a row and
+    # the new one now sits where it was. The title goes to the article's new row.
+    newer = _article("article-0")
+    newer.title = "Newer episode"
+    host.current_articles = [newer, first, second]
+    host.list_ctrl.count = 3
+    host.list_ctrl.focused = 0
+    host._flush_deferred_title_cells()
+
+    assert host.list_ctrl.labels == {(1, 0): "Episode, Chapters available"}
+
+
+def test_deferred_title_for_an_article_that_left_the_view_is_dropped():
+    host, first, second = _two_row_host()
+    host.list_ctrl.focused = 0
+    first.chapters = [{"start": 0.0, "title": "Intro"}]
+    host._update_article_chapter_indicator(first.cache_id)
+
+    # Another view is shown; the article keeps its chapters for the next render.
+    host.current_articles = [second]
+    host._flush_deferred_title_cells()
+
+    assert host.list_ctrl.labels == {}
+    assert host._deferred_title_cells == set()
 
 
 def test_youtube_chapter_completion_does_not_rebuild_reader_text():

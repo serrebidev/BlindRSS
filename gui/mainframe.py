@@ -10889,6 +10889,8 @@ class MainFrame(wx.Frame):
         # while their rows were focused (see _set_or_defer_status_cell), now that
         # those rows are no longer the reader's focused item.
         self._flush_deferred_status_cells(except_idx=idx)
+        if getattr(self, "_deferred_title_cells", None):
+            wx.CallAfter(self._flush_deferred_title_cells)
         if self._is_load_more_row(idx):
             # Keep focus on placeholder; do not try to load content
             self.selected_article_id = None
@@ -12396,13 +12398,69 @@ class MainFrame(wx.Frame):
                         pass
 
     def _update_article_chapter_indicator(self, article_cache_id) -> None:
+        """Show "Chapters available" in a row's title, but not in the focused row.
+
+        Column 0 is the row's accessible name. Chapters for the selected row
+        arrive a moment after the user lands on it, and changing the focused
+        row's name then makes NVDA stop and read the whole row again. While the
+        row is the focused item and the list has keyboard focus, defer the
+        update; _flush_deferred_title_cells rebuilds the title from the article
+        once the selection moves, and any later render shows it anyway. NVDA
+        only reads name changes of its focus object, so with focus elsewhere
+        the title updates at once.
+        """
+        try:
+            ctrl = self.list_ctrl
+            focused = ctrl.GetFocusedItem()
+            if not self._window_is_or_child(self._get_focused_window(), ctrl):
+                focused = -1
+        except Exception:
+            focused = -1
         try:
             for idx, article in enumerate(getattr(self, "current_articles", []) or []):
                 if self._article_cache_id(article) == article_cache_id:
-                    self.list_ctrl.SetItem(idx, 0, self._get_display_title(article))
+                    if idx == focused:
+                        deferred = getattr(self, "_deferred_title_cells", None)
+                        if deferred is None:
+                            deferred = self._deferred_title_cells = set()
+                        deferred.add(article_cache_id)
+                    else:
+                        self.list_ctrl.SetItem(idx, 0, self._get_display_title(article))
                     return
         except Exception:
             pass
+
+    def _flush_deferred_title_cells(self) -> None:
+        """Write titles deferred by _update_article_chapter_indicator, except the focused row's.
+
+        on_article_select posts this with wx.CallAfter. The listview fires the
+        new row's focus event only after the selection event returns, so a
+        column-0 write inside the handler changes the name of the row NVDA still
+        has as its focus object, and NVDA reads the row being left again.
+        """
+        titles = getattr(self, "_deferred_title_cells", None)
+        if not titles:
+            return
+        try:
+            focused = self.list_ctrl.GetFocusedItem()
+            count = self.list_ctrl.GetItemCount()
+            by_id = {
+                self._article_cache_id(a): (i, a)
+                for i, a in enumerate(getattr(self, "current_articles", []) or [])
+            }
+        except Exception:
+            return
+        for cache_id in list(titles):
+            i, article = by_id.get(cache_id, (None, None))
+            if i is not None and i == focused:
+                continue
+            # Written now, or gone from the view: the next render shows it.
+            titles.discard(cache_id)
+            if i is not None and i < count:
+                try:
+                    self.list_ctrl.SetItem(i, 0, self._get_display_title(article))
+                except Exception:
+                    pass
 
     def _format_article_chapters_text(self, chapters) -> str:
         chapter_list = list(chapters or [])
