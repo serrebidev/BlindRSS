@@ -4,6 +4,8 @@
 
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
@@ -189,6 +191,61 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
                 with patch("core.updater.subprocess.run", return_value=result):
                     ok, _msg = updater._verify_authenticode_signature("BlindRSS.exe", ["AABBCC"])
             self.assertFalse(ok, status)
+
+    def test_authenticode_reads_localized_status_message_as_utf8(self) -> None:
+        # Regression: Windows localizes StatusMessage. On a Polish Windows
+        # (ANSI code page 1250) the text could not be decoded, stdout came back
+        # empty and every update failed although the pinned signer matched.
+        from core import updater
+
+        text = json.dumps(
+            {
+                "Status": "UnknownError",
+                "StatusMessage": "Łańcuch certyfikatów został przetworzony, ale operację "
+                "przerwano na certyfikacie głównym.",
+                "Subject": "CN=BlindRSS Dev",
+                "Thumbprint": "AABBCC",
+            },
+            ensure_ascii=False,
+        )
+        real_run = subprocess.run
+        # UTF-8 as requested; cp852 (OEM) when PowerShell refuses the change,
+        # e.g. in constrained language mode.
+        for encoding in ("utf-8", "cp852"):
+            payload = text.encode(encoding)
+            scripts = []
+
+            def run_child(cmd, **kwargs):
+                # A real process, so the caller's arguments decide how its bytes decode.
+                scripts.append(cmd[-1])
+                child = "import sys; sys.stdout.buffer.write(bytes.fromhex(sys.argv[1]))"
+                return real_run([sys.executable, "-c", child, payload.hex()], **kwargs)
+
+            with patch("locale.getencoding", return_value="cp1250"):
+                with patch("core.updater._powershell_executables", return_value=("powershell",)):
+                    with patch("core.updater.subprocess.run", side_effect=run_child):
+                        ok, msg = updater._verify_authenticode_signature("BlindRSS-Setup.exe", ["AABBCC"])
+
+            self.assertTrue(ok, f"{encoding}: {msg}")
+            self.assertTrue(scripts[0].startswith("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;"))
+
+    def test_authenticode_check_hides_the_powershell_console(self) -> None:
+        # The app is windowed: without CREATE_NO_WINDOW each check opened a
+        # console window that could take focus from a screen reader.
+        from core import updater
+
+        result = MagicMock(returncode=0, stderr="")
+        result.stdout = json.dumps({"Status": "Valid", "StatusMessage": "", "Subject": "", "Thumbprint": "AABBCC"})
+        with patch("core.updater._powershell_executables", return_value=("powershell",)):
+            with patch("core.updater.subprocess.run", return_value=result) as run:
+                ok, msg = updater._verify_authenticode_signature("BlindRSS-Setup.exe", ["AABBCC"])
+
+        self.assertTrue(ok, msg)
+        flags = run.call_args.kwargs.get("creationflags", 0)
+        if sys.platform == "win32":
+            self.assertTrue(flags & subprocess.CREATE_NO_WINDOW)
+        else:
+            self.assertEqual(flags, 0)
 
 
 if __name__ == "__main__":

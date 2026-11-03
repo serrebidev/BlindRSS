@@ -606,7 +606,12 @@ _PINNABLE_SIGNATURE_STATUSES = frozenset({"unknownerror", "nottrusted"})
 
 def _verify_authenticode_signature(exe_path: str, allowed_thumbprints: Iterable[str]) -> Tuple[bool, str]:
     allowed = set(_normalize_thumbprints(allowed_thumbprints))
+    # StatusMessage is localized, PowerShell writes the console (OEM) code page
+    # and Python's default decoding is ANSI. On non-English Windows that broke
+    # decoding and rejected every update, so use UTF-8 on both sides. Set it
+    # before 'Stop' so a host that refuses the change still reports the result.
     ps_script = (
+        "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;"
         "$ErrorActionPreference = 'Stop';"
         "Import-Module Microsoft.PowerShell.Security -ErrorAction SilentlyContinue;"
         f"$sig = Get-AuthenticodeSignature -FilePath {_ps_single_quote(exe_path)};"
@@ -622,20 +627,28 @@ def _verify_authenticode_signature(exe_path: str, allowed_thumbprints: Iterable[
             proc = subprocess.run(
                 [powershell_exe, "-NoProfile", "-Command", ps_script],
                 capture_output=True,
-                text=True,
+                encoding="utf-8",
+                errors="replace",
                 check=False,
+                # The app is windowed, so PowerShell would open a console window
+                # that can take focus from a screen reader.
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except Exception as e:
             last_error = f"{powershell_exe}: {e}"
             continue
 
+        stdout = (proc.stdout or "").strip()
         if proc.returncode != 0:
-            msg = proc.stderr.strip() or proc.stdout.strip() or "Unknown error"
+            msg = (proc.stderr or "").strip() or stdout or "Unknown error"
             last_error = f"{powershell_exe}: {msg}"
             continue
 
+        if not stdout:
+            last_error = f"{powershell_exe}: no Authenticode data"
+            continue
         try:
-            data = json.loads(proc.stdout.strip())
+            data = json.loads(stdout)
         except Exception as e:
             last_error = f"{powershell_exe}: invalid Authenticode data: {e}"
             continue
