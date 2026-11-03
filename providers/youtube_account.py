@@ -5,6 +5,7 @@ the hosted provider. Cache lives in rss.db so the normal backup includes it.
 """
 
 from contextlib import closing
+from datetime import datetime, timedelta
 
 from core.db import get_connection
 from core.i18n import _
@@ -57,10 +58,18 @@ class YouTubeAccountProvider:
             args.append(int(read))
         with closing(get_connection()) as conn:
             rows = conn.execute(
-                f"SELECT video_id, title, author, date, is_read, is_favorite FROM youtube_recommendations "
+                f"SELECT video_id, title, author, date, is_read, is_favorite, position FROM youtube_recommendations "
                 f"WHERE {where} ORDER BY current DESC, position, date DESC", args
             ).fetchall()
-        return [self._article(account, row) for row in rows]
+            if real == RECOMMENDATIONS_FEED_ID and not favorite and rows:
+                # Rows keep the date a video was first recommended, which views
+                # mixing them with RSS articles sort by. The list sorts by date,
+                # so date this feed down from its newest video in YouTube's order.
+                newest = datetime.fromisoformat(conn.execute(
+                    "SELECT MAX(date) FROM youtube_recommendations WHERE account = ? AND current = 1", (account,)
+                ).fetchone()[0])
+                rows = [(*row[:3], (newest - timedelta(microseconds=row[6])).isoformat(), *row[4:]) for row in rows]
+        return [self._article(account, row[:6]) for row in rows]
 
     @staticmethod
     def _article(account, row):
@@ -123,7 +132,9 @@ class YouTubeAccountProvider:
         latest = self._articles(view)
         previous = [a for a in articles if a.feed_id == RECOMMENDATIONS_FEED_ID]
         def signature(rows):
-            return [(a.id, a.title, a.author, a.is_read, a.is_favorite) for a in rows]
+            # Cached lists are in display (date) order, so compare as sets;
+            # the Recommendations feed's dates carry YouTube's order.
+            return sorted((a.id, a.title, a.author, a.date, a.is_read, a.is_favorite) for a in rows)
         if signature(previous) == signature(latest):
             return None
         return [a for a in articles if a.feed_id != RECOMMENDATIONS_FEED_ID] + latest

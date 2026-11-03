@@ -1,3 +1,4 @@
+from contextlib import closing
 from types import SimpleNamespace
 
 import pytest
@@ -175,3 +176,56 @@ def test_category_rename_and_move_follow_account_folder_only_after_success(accou
     remote.rename_category = lambda old, new: False
     assert not provider.rename_category("Interests", "Failed")
     assert config["youtube_account_category"] == "Interests / Media / Channels"
+
+
+VIDEO_ONE, VIDEO_TWO, VIDEO_THREE = "abcDEF12345", "ghiJKL67890", "mnoPQR24680"
+
+
+def _resync_after_earlier_sync(config, remote):
+    """Recommend two videos, age them as if synced long ago, then sync again."""
+    remote.articles = [Article("RSS item", "https://example.com/item", "", "2000-06-01T00:00:00+00:00", "", "remote", id="remote-item")]
+    youtube_account.save_recommendations(config, [(VIDEO_ONE, "Video one", "Example channel"), (VIDEO_TWO, "Video two", "Example channel")])
+    with closing(db.get_connection()) as conn, conn:
+        conn.executemany("UPDATE youtube_recommendations SET date = ? WHERE video_id = ?",
+                         [("2000-01-02T00:00:00+00:00", VIDEO_ONE), ("2000-01-01T00:00:00+00:00", VIDEO_TWO)])
+    youtube_account.save_recommendations(config, [
+        (VIDEO_THREE, "Video three", "Example channel"),
+        (VIDEO_TWO, "Video two, renamed", "Example channel"),
+        (VIDEO_ONE, "Video one", "Example channel"),
+    ])
+
+
+def _newest_first(articles):
+    # The article list's default date sort.
+    return [a.title for a in sorted(articles, key=lambda a: (a.timestamp, a.cache_id), reverse=True)]
+
+
+def test_resync_keeps_first_seen_date_in_views_mixed_with_rss(account):
+    config, provider, remote = account
+    _resync_after_earlier_sync(config, remote)
+    assert _newest_first(provider.get_articles("all")) == ["Video three", "RSS item", "Video one", "Video two, renamed"]
+
+
+def test_recommendations_feed_keeps_youtube_order_after_resync(account):
+    config, provider, remote = account
+    _resync_after_earlier_sync(config, remote)
+    order = ["Video three", "Video two, renamed", "Video one"]
+    assert _newest_first(provider.get_articles(youtube_account.RECOMMENDATIONS_FEED_ID)) == order
+    page, total = provider.get_articles_page("unread:" + youtube_account.RECOMMENDATIONS_FEED_ID)
+    assert total == 3 and _newest_first(page) == order
+
+
+def test_unchanged_sync_leaves_date_sorted_cached_views_alone(account):
+    config, provider, remote = account
+    _resync_after_earlier_sync(config, remote)
+    feed_id = youtube_account.RECOMMENDATIONS_FEED_ID
+    for view in ("all", "category:Videos", feed_id):
+        cached = sorted(provider.get_articles(view), key=lambda a: (a.timestamp, a.cache_id), reverse=True)
+        assert provider.merge_recommendations(view, cached) is None, view
+    cached = provider.get_articles(feed_id)
+    youtube_account.save_recommendations(config, [
+        (VIDEO_ONE, "Video one", "Example channel"),
+        (VIDEO_TWO, "Video two, renamed", "Example channel"),
+        (VIDEO_THREE, "Video three", "Example channel"),
+    ])
+    assert _newest_first(provider.merge_recommendations(feed_id, cached)) == ["Video one", "Video two, renamed", "Video three"]

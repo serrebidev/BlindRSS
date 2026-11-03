@@ -202,7 +202,12 @@ def account_key(config) -> str:
 
 
 def save_recommendations(config, videos) -> None:
-    """Replace the visible snapshot atomically, retaining read/favorite/deletion state."""
+    """Replace the visible snapshot atomically, retaining read/favorite/deletion state.
+
+    A video keeps the date it was first recommended. Views that mix
+    recommendations with RSS articles sort by it, so re-dating on every sync
+    moved videos still recommended back to the top as if new.
+    """
     from core.db import get_connection
 
     account = account_key(config)
@@ -214,7 +219,7 @@ def save_recommendations(config, videos) -> None:
         conn.executemany(
             "INSERT INTO youtube_recommendations (account, video_id, title, author, date, position) "
             "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(account, video_id) DO UPDATE SET "
-            "title = excluded.title, author = excluded.author, date = excluded.date, position = excluded.position, current = 1",
+            "title = excluded.title, author = excluded.author, position = excluded.position, current = 1",
             [(account, vid, title, author, (checked_at - timedelta(microseconds=position)).isoformat(), position)
              for position, (vid, title, author) in enumerate(videos)],
         )
