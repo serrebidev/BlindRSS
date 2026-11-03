@@ -5,11 +5,17 @@ the hosted provider. Cache lives in rss.db so the normal backup includes it.
 """
 
 from contextlib import closing
+from datetime import datetime, timedelta
 
 from core.db import get_connection
 from core.i18n import _
 from core.models import Article, Feed
 from core.youtube_account import RECOMMENDATIONS_FEED_ID, account_key
+from providers.local import LocalProvider
+
+# The local provider stores a video from a YouTube channel or playlist feed
+# under the entry id YouTube's RSS gives it.
+FEED_ARTICLE_PREFIX = "yt:video:"
 
 
 class YouTubeAccountProvider:
@@ -41,6 +47,14 @@ class YouTubeAccountProvider:
         )
         return view, included, read, favorite
 
+    def _read_sql(self):
+        """A recommendation is also read when its local feed article is."""
+        # Hosted providers keep their articles on the server, under their own ids.
+        if not isinstance(self.provider, LocalProvider):
+            return "is_read"
+        return (f"(is_read OR EXISTS (SELECT 1 FROM articles WHERE articles.id = '{FEED_ARTICLE_PREFIX}' || "
+                "youtube_recommendations.video_id AND articles.is_read = 1))")
+
     def _articles(self, view):
         real, included, read, favorite = self._view(view)
         account = account_key(self.config)
@@ -53,14 +67,22 @@ class YouTubeAccountProvider:
         else:
             where += " AND current = 1"
         if read is not None:
-            where += " AND is_read = ?"
+            where += f" AND {self._read_sql()} = ?"
             args.append(int(read))
         with closing(get_connection()) as conn:
             rows = conn.execute(
-                f"SELECT video_id, title, author, date, is_read, is_favorite FROM youtube_recommendations "
+                f"SELECT video_id, title, author, date, {self._read_sql()}, is_favorite, position FROM youtube_recommendations "
                 f"WHERE {where} ORDER BY current DESC, position, date DESC", args
             ).fetchall()
-        return [self._article(account, row) for row in rows]
+            if real == RECOMMENDATIONS_FEED_ID and not favorite and rows:
+                # Rows keep the date a video was first recommended, which views
+                # mixing them with RSS articles sort by. The list sorts by date,
+                # so date this feed down from its newest video in YouTube's order.
+                newest = datetime.fromisoformat(conn.execute(
+                    "SELECT MAX(date) FROM youtube_recommendations WHERE account = ? AND current = 1", (account,)
+                ).fetchone()[0])
+                rows = [(*row[:3], (newest - timedelta(microseconds=row[6])).isoformat(), *row[4:]) for row in rows]
+        return [self._article(account, row[:6]) for row in rows]
 
     @staticmethod
     def _article(account, row):
@@ -123,7 +145,9 @@ class YouTubeAccountProvider:
         latest = self._articles(view)
         previous = [a for a in articles if a.feed_id == RECOMMENDATIONS_FEED_ID]
         def signature(rows):
-            return [(a.id, a.title, a.author, a.is_read, a.is_favorite) for a in rows]
+            # Cached lists are in display (date) order, so compare as sets;
+            # the Recommendations feed's dates carry YouTube's order.
+            return sorted((a.id, a.title, a.author, a.date, a.is_read, a.is_favorite) for a in rows)
         if signature(previous) == signature(latest):
             return None
         return [a for a in articles if a.feed_id != RECOMMENDATIONS_FEED_ID] + latest
@@ -152,7 +176,7 @@ class YouTubeAccountProvider:
             return self.provider.get_article_by_id(article_id)
         with closing(get_connection()) as conn:
             row = conn.execute(
-                "SELECT video_id, title, author, date, is_read, is_favorite FROM youtube_recommendations "
+                f"SELECT video_id, title, author, date, {self._read_sql()}, is_favorite FROM youtube_recommendations "
                 "WHERE account = ? AND video_id = ? AND is_deleted = 0",
                 (account_key(self.config), self._video_id(article_id)),
             ).fetchone()
@@ -165,11 +189,35 @@ class YouTubeAccountProvider:
                 (int(value), account_key(self.config), self._video_id(article_id)),
             ).rowcount > 0
 
+    def read_twin_id(self, article_id):
+        """The other copy of the same video, which shares read state, or None."""
+        account = account_key(self.config)
+        if not account or not isinstance(self.provider, LocalProvider):
+            return None
+        video_id = self._video_id(article_id)
+        if video_id:
+            return FEED_ARTICLE_PREFIX + video_id
+        if str(article_id).startswith(FEED_ARTICLE_PREFIX):
+            return f"{RECOMMENDATIONS_FEED_ID}:{account}:{str(article_id)[len(FEED_ARTICLE_PREFIX):]}"
+        return None
+
+    def _mark(self, article_id, value):
+        if self._is_account_article(article_id):
+            return self._set_state(article_id, "is_read", value)
+        return self.provider.mark_read(article_id) if value else self.provider.mark_unread(article_id)
+
+    def _set_read(self, article_id, value):
+        ok = self._mark(article_id, value)
+        twin = self.read_twin_id(article_id)
+        if ok and twin:
+            self._mark(twin, value)
+        return ok
+
     def mark_read(self, article_id):
-        return self._set_state(article_id, "is_read", True) if self._is_account_article(article_id) else self.provider.mark_read(article_id)
+        return self._set_read(article_id, True)
 
     def mark_unread(self, article_id):
-        return self._set_state(article_id, "is_read", False) if self._is_account_article(article_id) else self.provider.mark_unread(article_id)
+        return self._set_read(article_id, False)
 
     def mark_read_batch(self, article_ids):
         local = [aid for aid in article_ids if self._is_account_article(aid)]

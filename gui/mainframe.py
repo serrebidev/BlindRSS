@@ -7122,6 +7122,30 @@ class MainFrame(wx.Frame):
         except Exception:
             log.exception("Error syncing read flag in cached views")
 
+    def _sync_read_twin(self, article, is_read: bool) -> None:
+        """Show the new read state on the other copy of the same video.
+
+        A YouTube recommendation and the channel feed's article for the same
+        video share read state in the provider, and sign-in puts both in one
+        category, so one list can show both copies.
+        """
+        try:
+            twin_id = getattr(self.provider, "read_twin_id", lambda _article_id: None)(article.id)
+            if not twin_id:
+                return
+            for idx, twin in enumerate(self.current_articles or []):
+                if twin.id == twin_id and bool(twin.is_read) != is_read:
+                    twin.is_read = is_read
+                    self._set_or_defer_status_cell(idx, twin, _("Read") if is_read else _("Unread"))
+                    self._update_feed_unread_count_ui(twin.feed_id, -1 if is_read else 1)
+            with getattr(self, "_view_cache_lock", threading.Lock()):
+                for st in (self.view_cache or {}).values():
+                    for twin in st.get("articles") or []:
+                        if twin.id == twin_id:
+                            twin.is_read = is_read
+        except Exception:
+            log.exception("Error syncing read flag of the other copy")
+
     def _supports_favorites(self) -> bool:
         try:
             return bool(getattr(self.provider, "supports_favorites", lambda: False)())
@@ -12753,6 +12777,7 @@ class MainFrame(wx.Frame):
             self._set_or_defer_status_cell(idx, article, _("Read"))
             self._update_feed_unread_count_ui(article.feed_id, -1)
             self._sync_read_flag_in_cached_views(self._article_cache_id(article), True)
+            self._sync_read_twin(article, True)
 
     def mark_article_unread(self, idx):
         if idx < 0 or idx >= len(self.current_articles):
@@ -12764,6 +12789,7 @@ class MainFrame(wx.Frame):
             self._set_or_defer_status_cell(idx, article, _("Unread"))
             self._update_feed_unread_count_ui(article.feed_id, 1)
             self._sync_read_flag_in_cached_views(self._article_cache_id(article), False)
+            self._sync_read_twin(article, False)
 
     def toggle_selected_article_read_status(self):
         """Toggle read/unread on the selected article.
