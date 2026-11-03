@@ -220,6 +220,9 @@ def ensure_notification_prerequisites(
 def _run_powershell(script: str, timeout_s: int = 30) -> tuple[bool, str]:
     if not is_windows():
         return False, "PowerShell integration is only available on Windows."
+    # Output such as the Desktop path can be non-ASCII. PowerShell writes the
+    # console (OEM) code page, Python decodes ANSI: use UTF-8 on both sides.
+    script = "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n" + script
     encoded = base64.b64encode(script.encode("utf-16-le")).decode("ascii")
     cmd = [
         "powershell",
@@ -231,7 +234,9 @@ def _run_powershell(script: str, timeout_s: int = 30) -> tuple[bool, str]:
         encoded,
     ]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=max(5, int(timeout_s)))
+        proc = subprocess.run(
+            cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=max(5, int(timeout_s))
+        )
     except Exception as e:
         return False, str(e)
 

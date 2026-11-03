@@ -2,7 +2,9 @@
 # This file is part of BlindRSS
 # SPDX-License-Identifier: MIT
 
+import base64
 import os
+import subprocess
 import sys
 
 # Ensure repo root on path
@@ -36,6 +38,29 @@ def test_desktop_dir_falls_back_to_onedrive_env_when_shell_fails(monkeypatch):
     )
     path = winint._desktop_dir()
     assert path.replace("/", "\\").lower() == r"c:\users\admin\onedrive\desktop"
+
+
+def test_run_powershell_reads_non_ascii_output_as_utf8(monkeypatch):
+    # Regression: a Desktop path with non-ASCII letters was decoded with the
+    # ANSI code page and came back garbled or empty.
+    desktop = "C:\\Users\\Łukasz\\OneDrive\\Pulpit"
+    real_run = subprocess.run
+    scripts = []
+
+    def run_child(cmd, **kwargs):
+        # A real process, so the caller's arguments decide how its bytes decode.
+        scripts.append(base64.b64decode(cmd[-1]).decode("utf-16-le"))
+        child = "import sys; sys.stdout.buffer.write(bytes.fromhex(sys.argv[1]))"
+        return real_run([sys.executable, "-c", child, desktop.encode("utf-8").hex()], **kwargs)
+
+    monkeypatch.setattr(winint, "is_windows", lambda: True)
+    monkeypatch.setattr("locale.getencoding", lambda: "cp1250")
+    monkeypatch.setattr(winint.subprocess, "run", run_child)
+
+    ok, out = winint._run_powershell("Write-Output $p")
+    assert ok is True
+    assert out == desktop
+    assert scripts[0].startswith("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n")
 
 
 def test_get_start_menu_shortcut_path_uses_appdata(monkeypatch):
