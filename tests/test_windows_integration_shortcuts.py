@@ -63,6 +63,26 @@ def test_run_powershell_reads_non_ascii_output_as_utf8(monkeypatch):
     assert scripts[0].startswith("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8\n")
 
 
+def test_run_powershell_hides_the_console_window(monkeypatch):
+    # The app is windowed: without CREATE_NO_WINDOW each call opened a console
+    # window that could take focus from a screen reader.
+    calls = []
+
+    def fake_run(cmd, **kwargs):
+        calls.append(kwargs)
+        return subprocess.CompletedProcess(cmd, 0, "", "")
+
+    monkeypatch.setattr(winint, "is_windows", lambda: True)
+    monkeypatch.setattr(winint.subprocess, "run", fake_run)
+
+    assert winint._run_powershell("Write-Output 1") == (True, "")
+    flags = calls[0].get("creationflags", 0)
+    if sys.platform == "win32":
+        assert flags & subprocess.CREATE_NO_WINDOW
+    else:
+        assert flags == 0
+
+
 def test_get_start_menu_shortcut_path_uses_appdata(monkeypatch):
     monkeypatch.setenv("APPDATA", r"C:\Users\admin\AppData\Roaming")
     path = winint.get_start_menu_shortcut_path("BlindRSS")

@@ -229,6 +229,24 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
             self.assertTrue(ok, f"{encoding}: {msg}")
             self.assertTrue(scripts[0].startswith("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8;"))
 
+    def test_authenticode_check_hides_the_powershell_console(self) -> None:
+        # The app is windowed: without CREATE_NO_WINDOW each check opened a
+        # console window that could take focus from a screen reader.
+        from core import updater
+
+        result = MagicMock(returncode=0, stderr="")
+        result.stdout = json.dumps({"Status": "Valid", "StatusMessage": "", "Subject": "", "Thumbprint": "AABBCC"})
+        with patch("core.updater._powershell_executables", return_value=("powershell",)):
+            with patch("core.updater.subprocess.run", return_value=result) as run:
+                ok, msg = updater._verify_authenticode_signature("BlindRSS-Setup.exe", ["AABBCC"])
+
+        self.assertTrue(ok, msg)
+        flags = run.call_args.kwargs.get("creationflags", 0)
+        if sys.platform == "win32":
+            self.assertTrue(flags & subprocess.CREATE_NO_WINDOW)
+        else:
+            self.assertEqual(flags, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

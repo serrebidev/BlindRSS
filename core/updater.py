@@ -630,6 +630,9 @@ def _verify_authenticode_signature(exe_path: str, allowed_thumbprints: Iterable[
                 encoding="utf-8",
                 errors="replace",
                 check=False,
+                # The app is windowed, so PowerShell would open a console window
+                # that can take focus from a screen reader.
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except Exception as e:
             last_error = f"{powershell_exe}: {e}"

@@ -235,7 +235,13 @@ def _run_powershell(script: str, timeout_s: int = 30) -> tuple[bool, str]:
     ]
     try:
         proc = subprocess.run(
-            cmd, capture_output=True, encoding="utf-8", errors="replace", timeout=max(5, int(timeout_s))
+            cmd,
+            capture_output=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=max(5, int(timeout_s)),
+            # No console window: the app is windowed and one can take focus.
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
     except Exception as e:
         return False, str(e)
