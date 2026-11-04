@@ -432,11 +432,13 @@ class _FakePopen:
     """Stands in for the yt-dlp CLI process."""
 
     calls = []
+    kwargs = []
     results = []  # (returncode, stdout, stderr) per launch
     hang = False
 
     def __init__(self, cmd, **kwargs):
         type(self).calls.append(cmd)
+        type(self).kwargs.append(kwargs)
         self.pid = 4242
         self.killed = False
         if self.results:
@@ -461,6 +463,7 @@ def fake_cli(monkeypatch):
     import sys
 
     _FakePopen.calls = []
+    _FakePopen.kwargs = []
     _FakePopen.results = []
     _FakePopen.hang = False
     monkeypatch.setattr(subprocess, "Popen", _FakePopen)
@@ -489,6 +492,20 @@ def test_extraction_runs_in_the_ytdlp_cli_not_this_interpreter(fake_cli):
     assert "--no-playlist" in cmd and "--write-comments" in cmd and "--ignore-config" in cmd
     assert cmd[-1] == "https://www.youtube.com/watch?v=abcDEF12345"
     assert any("max_comments=all,all,all,all,all" in part for part in cmd)
+
+
+def test_ytdlp_cli_runs_hidden_below_normal_priority(fake_cli, monkeypatch):
+    # The CLI's start-up (one-file unpack, then the extraction) competed with
+    # the screen reader for the CPU on every YouTube row the user paused on.
+    import subprocess
+
+    monkeypatch.setattr(subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+    monkeypatch.setattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0x00004000, raising=False)
+    youtube_fulltext.extract_video_info(URL, include_comments=True)
+
+    flags = fake_cli.kwargs[0]["creationflags"]
+    assert flags & 0x08000000, "the CLI must stay windowless"
+    assert flags & 0x00004000, "the CLI must yield the CPU to the screen reader"
 
 
 def test_cli_failure_reports_the_ytdlp_error(fake_cli):
