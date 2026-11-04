@@ -125,21 +125,110 @@ def _cancel_requested() -> bool:
         return False
 
 
-def _kill_process_tree(proc) -> None:
-    # yt-dlp release binaries are PyInstaller one-file executables: the process
-    # we started is a bootloader whose child does the work, so kill the tree.
+# Measured: the one-file worker starts ~0.6 s after launch, and the bootloader
+# deletes its unpack folder and exits ~0.3 s after the worker ends.
+_ONEFILE_EXIT_GRACE_S = 3.0
+
+
+def _windows_onefile_workers(pid: int) -> list[int]:
+    """Children of ``pid`` running the same executable: a one-file worker.
+
+    Matching the name skips conhost.exe and processes that merely name a
+    reused ``pid`` as their parent.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    class PROCESSENTRY32W(ctypes.Structure):
+        _fields_ = [
+            ("dwSize", wintypes.DWORD),
+            ("cntUsage", wintypes.DWORD),
+            ("th32ProcessID", wintypes.DWORD),
+            ("th32DefaultHeapID", ctypes.c_void_p),
+            ("th32ModuleID", wintypes.DWORD),
+            ("cntThreads", wintypes.DWORD),
+            ("th32ParentProcessID", wintypes.DWORD),
+            ("pcPriClassBase", ctypes.c_long),
+            ("dwFlags", wintypes.DWORD),
+            ("szExeFile", wintypes.WCHAR * 260),
+        ]
+
+    # A private kernel32: prototypes set on the shared ctypes.windll would
+    # leak into other modules.
+    kernel32 = ctypes.WinDLL("kernel32")
+    kernel32.CreateToolhelp32Snapshot.restype = wintypes.HANDLE
+    kernel32.Process32FirstW.argtypes = [wintypes.HANDLE, ctypes.POINTER(PROCESSENTRY32W)]
+    kernel32.Process32NextW.argtypes = kernel32.Process32FirstW.argtypes
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    snapshot = kernel32.CreateToolhelp32Snapshot(0x2, 0)  # TH32CS_SNAPPROCESS
+    if snapshot == wintypes.HANDLE(-1).value:
+        return []
+    names, children = {}, []
     try:
-        if os.name == "nt":
-            subprocess.run(
-                ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                timeout=10,
-            )
-        else:
-            os.killpg(proc.pid, signal.SIGKILL)
+        entry = PROCESSENTRY32W(dwSize=ctypes.sizeof(PROCESSENTRY32W))
+        more = kernel32.Process32FirstW(snapshot, ctypes.byref(entry))
+        while more:
+            names[entry.th32ProcessID] = entry.szExeFile.lower()
+            if entry.th32ParentProcessID == pid:
+                children.append(entry.th32ProcessID)
+            more = kernel32.Process32NextW(snapshot, ctypes.byref(entry))
+    finally:
+        kernel32.CloseHandle(snapshot)
+    return [child for child in children if names[child] == names.get(pid)]
+
+
+def _taskkill_tree(pid: int) -> None:
+    subprocess.run(
+        ["taskkill", "/F", "/T", "/PID", str(pid)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        stdin=subprocess.DEVNULL,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        timeout=10,
+    )
+
+
+def _end_onefile_tree(proc) -> None:
+    # yt-dlp release binaries are PyInstaller one-file executables: the process
+    # we started is a bootloader that unpacks ~30 MB to %TEMP%\_MEI* and runs
+    # the worker as its child. Force-killed, the bootloader leaves that folder
+    # behind, one per cancelled row. So end the worker's tree (deno included),
+    # waiting out the unpack if the worker has not started yet, and let the
+    # bootloader clean up and exit; force it only if it does not.
+    try:
+        deadline = time.monotonic() + _ONEFILE_EXIT_GRACE_S
+        ended = set()
+        while proc.poll() is None and time.monotonic() < deadline:
+            workers = set(_windows_onefile_workers(proc.pid)) - ended
+            for pid in workers:
+                _taskkill_tree(pid)
+            if workers:
+                ended |= workers
+                # Found late, a worker still leaves its bootloader time to clean up.
+                deadline = max(deadline, time.monotonic() + 1.0)
+            try:
+                proc.communicate(timeout=0.1)
+            except subprocess.TimeoutExpired:
+                pass
+        if proc.poll() is None:
+            _taskkill_tree(proc.pid)
+    except Exception:
+        pass
+    try:
+        proc.kill()
+        proc.communicate(timeout=5)
+    except Exception:
+        pass
+
+
+def _kill_process_tree(proc) -> None:
+    if os.name == "nt":
+        # On its own thread: the wait (0.5-1 s) would hold up the caller, and
+        # the next row's load waits on the single full-text worker thread.
+        threading.Thread(target=_end_onefile_tree, args=(proc,), daemon=True).start()
+        return
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
     except Exception:
         pass
     try:

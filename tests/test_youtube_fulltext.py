@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import os
 from types import SimpleNamespace
 
 import pytest
@@ -530,6 +531,126 @@ def test_moving_on_kills_the_running_ytdlp(fake_cli):
     assert fake_cli.killed == [4242]
     # Outside the scope nothing is cancelled any more.
     assert youtube_fulltext._cancel_requested() is False
+
+
+class _OneFileYtdlp:
+    """A one-file yt-dlp.exe: bootloader pid 100, worker pid 200 once unpacked."""
+
+    def __init__(self, monkeypatch, *, unpack_polls=0, bootloader_exits=True):
+        import subprocess
+
+        self.pid = 100
+        self.returncode = None
+        self.unpack_polls = unpack_polls
+        self.bootloader_exits = bootloader_exits
+        self.taskkilled = []
+        self.forced = False
+        monkeypatch.setattr(youtube_fulltext, "_windows_onefile_workers", self._workers)
+        monkeypatch.setattr(subprocess, "run", self._run)
+
+    def _workers(self, pid):
+        assert pid == self.pid
+        self.unpack_polls -= 1
+        # A snapshot may still list a worker that is being torn down.
+        return [200] if self.unpack_polls < 0 else []
+
+    def _run(self, cmd, **kwargs):
+        assert cmd[:4] == ["taskkill", "/F", "/T", "/PID"]
+        pid = int(cmd[4])
+        self.taskkilled.append(pid)
+        if pid == 100 or self.bootloader_exits:
+            self.returncode = 1  # worker gone: the bootloader deletes _MEI* and exits
+
+    def poll(self):
+        return self.returncode
+
+    def communicate(self, timeout=None):
+        import subprocess
+        import time
+
+        if self.returncode is None:
+            time.sleep(timeout)
+            raise subprocess.TimeoutExpired("yt-dlp", timeout)
+        return b"", b""
+
+    def kill(self):
+        if self.returncode is None:
+            self.forced = True
+            self.returncode = 1
+
+
+def test_cancel_ends_the_onefile_worker_so_the_bootloader_cleans_up(monkeypatch):
+    # Force-killing the bootloader left its ~30 MB %TEMP%\_MEI* unpack behind
+    # on every cancelled row; hundreds piled up. Killing the worker lets the
+    # bootloader delete it and exit. The worker may not exist yet (unpacking).
+    proc = _OneFileYtdlp(monkeypatch, unpack_polls=2)
+    youtube_fulltext._end_onefile_tree(proc)
+    assert proc.taskkilled == [200]
+    assert not proc.forced and proc.returncode == 1
+
+
+def test_cancel_force_kills_a_bootloader_that_does_not_exit(monkeypatch):
+    import time
+
+    monkeypatch.setattr(youtube_fulltext, "_ONEFILE_EXIT_GRACE_S", 0.3)
+    # The worker shows up near the end of the grace: its bootloader still gets
+    # a second to clean up before it is forced.
+    proc = _OneFileYtdlp(monkeypatch, unpack_polls=2, bootloader_exits=False)
+    started = time.monotonic()
+    youtube_fulltext._end_onefile_tree(proc)
+    assert proc.taskkilled == [200, 100]
+    assert time.monotonic() - started >= 1.0
+
+
+def test_cancel_cleanup_does_not_hold_up_the_caller(monkeypatch):
+    # The wait would delay the next row: the full-text worker is one thread.
+    import threading
+
+    release, done, ran_on = threading.Event(), threading.Event(), []
+
+    def slow_cleanup(proc):
+        ran_on.append(threading.current_thread())
+        release.wait(5)
+        done.set()
+
+    monkeypatch.setattr(youtube_fulltext.os, "name", "nt")
+    monkeypatch.setattr(youtube_fulltext, "_end_onefile_tree", slow_cleanup)
+    youtube_fulltext._kill_process_tree(SimpleNamespace(pid=100))
+    assert not done.is_set()
+    release.set()
+    assert done.wait(5)
+    assert ran_on[0] is not threading.current_thread() and ran_on[0].daemon
+
+
+def test_cancel_outside_windows_still_kills_the_process_group(monkeypatch):
+    import signal
+    import subprocess
+
+    killed, onefile = [], []
+    monkeypatch.setattr(youtube_fulltext.os, "name", "posix")
+    monkeypatch.setattr(youtube_fulltext.os, "killpg", lambda pid, sig: killed.append((pid, sig)), raising=False)
+    monkeypatch.setattr(signal, "SIGKILL", 9, raising=False)
+    monkeypatch.setattr(youtube_fulltext, "_end_onefile_tree", onefile.append)
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: pytest.fail("taskkill is Windows only"))
+    proc = SimpleNamespace(pid=100, kill=lambda: None, communicate=lambda timeout=None: (b"", b""))
+    youtube_fulltext._kill_process_tree(proc)
+    assert killed == [(100, 9)] and onefile == []
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Toolhelp32 process snapshot")
+def test_onefile_worker_lookup_finds_a_same_named_child():
+    import subprocess
+    import sys
+
+    child = subprocess.Popen(
+        [sys.executable, "-c", "import sys; sys.stdin.read()"],
+        stdin=subprocess.PIPE,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    try:
+        assert child.pid in youtube_fulltext._windows_onefile_workers(os.getpid())
+    finally:
+        child.communicate(timeout=30)
 
 
 class _FakeSession:
