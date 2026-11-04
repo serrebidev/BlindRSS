@@ -83,6 +83,10 @@ log = logging.getLogger(__name__)
 # RegisterHotKey id for the system-wide show/hide hotkey (any value 0-0xBFFF).
 _GLOBAL_HOTKEY_ID = 0xB55
 
+# How long a YouTube row must stay selected before selection starts its
+# full-text load (the yt-dlp CLI); see MainFrame._fulltext_debounce_ms_for.
+_YOUTUBE_FULLTEXT_DEBOUNCE_MS = 3000
+
 
 def _article_is_youtube_video(article) -> bool:
     try:
@@ -801,6 +805,8 @@ class MainFrame(wx.Frame):
         # Debounce full-text extraction when moving through the list quickly.
         self._fulltext_debounce = None
         self._fulltext_debounce_ms = 350
+        # YouTube rows start yt-dlp; see _fulltext_debounce_ms_for.
+        self._youtube_fulltext_debounce_ms = _YOUTUBE_FULLTEXT_DEBOUNCE_MS
 
         # Single-worker background thread for full-text extraction (keeps CPU usage predictable).
         self._fulltext_worker_lock = threading.Lock()
@@ -2151,6 +2157,9 @@ class MainFrame(wx.Frame):
         self.content_ctrl.Clear()
         self._invalidate_reader_text_tracking()
         self.selected_article_id = None
+        # A load still waiting on the previous view's selection must not
+        # fire for whatever row now sits at its index.
+        self._fulltext_token = int(getattr(self, "_fulltext_token", 0)) + 1
 
         # If we have cached articles for this view, render them immediately.
         with getattr(self, "_view_cache_lock", threading.Lock()):
@@ -6746,7 +6755,7 @@ class MainFrame(wx.Frame):
             except Exception:
                 pass
             self._rich_debounce = None
-        delay = 0 if force else int(getattr(self, "_fulltext_debounce_ms", 350))
+        delay = 0 if force else self._fulltext_debounce_ms_for(article)
         token = int(getattr(self, "_fulltext_token", 0))
         self._rich_debounce = wx.CallLater(delay, self._start_rich_load, idx, token)
 
@@ -10894,6 +10903,8 @@ class MainFrame(wx.Frame):
         if self._is_load_more_row(idx):
             # Keep focus on placeholder; do not try to load content
             self.selected_article_id = None
+            # Nor finish a load still waiting on the row the user left.
+            self._fulltext_token = int(getattr(self, "_fulltext_token", 0)) + 1
             replace_text_control_value(self.content_ctrl, "")
             self._invalidate_reader_text_tracking()
             return
@@ -11865,10 +11876,26 @@ class MainFrame(wx.Frame):
                 pass
             self._fulltext_debounce = None
 
-        delay = 0 if force else int(getattr(self, "_fulltext_debounce_ms", 350))
+        delay = 0 if force else self._fulltext_debounce_ms_for(article)
         token_snapshot = int(getattr(self, "_fulltext_token", 0))
 
         self._fulltext_debounce = wx.CallLater(delay, self._start_fulltext_load, idx, token_snapshot)
+
+    def _fulltext_debounce_ms_for(self, article) -> int:
+        """How long a selection must stay on ``article`` before its full text loads.
+
+        A YouTube row launches the yt-dlp CLI. The release binary unpacks
+        itself to %TEMP% on every run: about 3 s and 4 CPU-seconds
+        system-wide (antivirus scan included) before it fetches anything, and
+        a full extraction takes about 9 s or more. At a 350 ms debounce every
+        row a screen-reader user pauses on to hear its title paid that, then
+        had it killed on the next arrow. Reader focus still loads at once.
+        """
+        # macOS: VoiceOver never focuses the reader, so selection is the only
+        # trigger there and a longer wait would only delay the text.
+        if sys.platform.startswith("win") and self._is_youtube_video_article(article):
+            return int(getattr(self, "_youtube_fulltext_debounce_ms", _YOUTUBE_FULLTEXT_DEBOUNCE_MS))
+        return int(getattr(self, "_fulltext_debounce_ms", 350))
 
     def _start_fulltext_load(self, idx: int, token_snapshot: int):
         # Only proceed if selection hasn't changed since scheduling.
