@@ -287,7 +287,12 @@ def _extract_info_via_cli(
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             stdin=subprocess.DEVNULL,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            # Background work: below normal priority (inherited by the one-file
+            # bootloader's worker and by deno) so it yields the CPU to the screen
+            # reader. Measured on two shared CPUs: a normal-priority process ran
+            # up to 27 ms late during a yt-dlp start, 12 ms with this flag.
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0)
+            | getattr(subprocess, "BELOW_NORMAL_PRIORITY_CLASS", 0),
             startupinfo=_get_startup_info(),
             start_new_session=(os.name != "nt"),
         )
