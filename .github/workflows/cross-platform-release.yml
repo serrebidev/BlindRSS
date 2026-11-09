@@ -174,7 +174,7 @@ jobs:
           "installer=$installer" >> $env:GITHUB_OUTPUT
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v7
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
         with:
           name: BlindRSS-windows-${{ inputs.release_tag }}
           path: |
@@ -221,7 +221,7 @@ jobs:
           ./build.sh build
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v7
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
         with:
           name: BlindRSS-macos-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
           path: dist/BlindRSS-macos-*.zip
@@ -281,7 +281,7 @@ jobs:
           ./build.sh build
 
       - name: Upload workflow artifact
-        uses: actions/upload-artifact@v7
+        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
         with:
           name: BlindRSS-linux-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
           path: dist/BlindRSS-linux-*.tar.gz
