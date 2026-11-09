@@ -2,11 +2,12 @@
 # This file is part of BlindRSS
 # SPDX-License-Identifier: MIT
 
-"""A transient GitHub 5xx must not report the release as broken.
+"""A transient Forgejo 5xx must not report the release as broken.
 
 Users saw "Failed to download update metadata: 503 Server Error" simply because
-GitHub's asset CDN had a bad moment: the check made exactly one request and gave
-up.  These tests pin the retry and the REST-asset fallback that replaced it.
+Forgejo's download front end had a bad moment: the check made exactly one
+request and gave up.  These tests pin the retry and the API-asset fallback
+that replaced it.
 """
 
 import pytest
@@ -43,8 +44,8 @@ MANIFEST = {
     "sha256": "a" * 64,
 }
 
-CDN_URL = "https://github.com/serrebidev/BlindRSS/releases/download/v999.0.0/BlindRSS-update.json"
-API_URL = "https://api.github.com/repos/serrebidev/BlindRSS/releases/assets/1"
+CDN_URL = "https://git.serrebiradio.com/serrebi/BlindRSS/releases/download/v999.0.0/BlindRSS-update.json"
+API_URL = "https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases/assets/1"
 
 
 def test_download_json_retries_after_transient_503(monkeypatch):
@@ -76,7 +77,7 @@ def test_download_json_falls_back_to_rest_asset_url(monkeypatch):
     manifest, err = updater._download_json(CDN_URL, fallback_urls=(API_URL,))
     assert err is None
     assert manifest == MANIFEST
-    # The REST endpoint hands back asset metadata unless the bytes are requested.
+    # The API endpoint hands back asset metadata unless the bytes are requested.
     assert calls[-1][0] == API_URL
     assert calls[-1][1].get("Accept") == "application/octet-stream"
 
@@ -154,8 +155,8 @@ def _release_with_rest_urls():
             },
             {
                 "name": "BlindRSS-v999.0.0.zip",
-                "browser_download_url": "https://github.com/dl/zip",
-                "url": "https://api.github.com/repos/serrebidev/BlindRSS/releases/assets/2",
+                "browser_download_url": "https://git.serrebiradio.com/dl/zip",
+                "url": "https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases/assets/2",
             },
         ],
     }
@@ -179,9 +180,9 @@ def test_check_for_updates_threads_fallback_urls_through(monkeypatch):
     assert seen["url"] == CDN_URL
     assert seen["fallback_urls"] == (API_URL,)
     assert res.info is not None
-    assert res.info.download_url == "https://github.com/dl/zip"
+    assert res.info.download_url == "https://git.serrebiradio.com/dl/zip"
     assert res.info.download_fallback_urls == (
-        "https://api.github.com/repos/serrebidev/BlindRSS/releases/assets/2",
+        "https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases/assets/2",
     )
 
 
@@ -190,8 +191,8 @@ def test_installed_build_carries_installer_fallback_urls(monkeypatch):
     release["assets"].append(
         {
             "name": "BlindRSS-Setup-v999.0.0.exe",
-            "browser_download_url": "https://github.com/dl/setup",
-            "url": "https://api.github.com/repos/serrebidev/BlindRSS/releases/assets/3",
+            "browser_download_url": "https://git.serrebiradio.com/dl/setup",
+            "url": "https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases/assets/3",
         }
     )
     manifest: dict = dict(MANIFEST)
@@ -211,7 +212,7 @@ def test_installed_build_carries_installer_fallback_urls(monkeypatch):
     assert res.status == "update_available"
     assert res.info is not None
     assert res.info.asset_kind == "installer"
-    assert res.info.download_url == "https://github.com/dl/setup"
+    assert res.info.download_url == "https://git.serrebiradio.com/dl/setup"
     assert res.info.download_fallback_urls == (
-        "https://api.github.com/repos/serrebidev/BlindRSS/releases/assets/3",
+        "https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases/assets/3",
     )

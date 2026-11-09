@@ -15500,7 +15500,7 @@ class MainFrame(wx.Frame):
             self._start_update_install(info)
             return
 
-        summary = info.notes_summary or _("Release notes are available on GitHub.")
+        summary = info.notes_summary or _("Release notes are available on Forgejo.")
         prompt = (_(
             "A new version of BlindRSS is available ({version}).\n\n"
             "{summary}\n\n"
@@ -15516,7 +15516,7 @@ class MainFrame(wx.Frame):
             wx.MessageBox(
                 _(
                     "Auto-update is only available in the packaged app build.\n"
-                    "Download the latest release from GitHub."
+                    "Download the latest release from Forgejo."
                 ),
                 _("Updates"),
                 wx.ICON_INFORMATION,

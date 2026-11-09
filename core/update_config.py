@@ -7,8 +7,14 @@ import sys
 APP_NAME = "BlindRSS"
 EXE_NAME = "BlindRSS.exe"
 
-GITHUB_OWNER = "serrebidev"
-GITHUB_REPO = "BlindRSS"
+# Forgejo is the only update source. There are no GitHub fallback routes:
+# releases, manifests, assets and translation catalogs all come from here.
+FORGEJO_HOST = "git.serrebiradio.com"
+FORGEJO_OWNER = "serrebi"
+FORGEJO_REPO = "BlindRSS"
+FORGEJO_API_BASE = f"https://{FORGEJO_HOST}/api/v1"
+FORGEJO_API_ROOT = f"{FORGEJO_API_BASE}/repos/{FORGEJO_OWNER}/{FORGEJO_REPO}"
+FORGEJO_WEB_ROOT = f"https://{FORGEJO_HOST}/{FORGEJO_OWNER}/{FORGEJO_REPO}"
 
 # Windows names, kept as the canonical/back-compatible values so existing Windows
 # clients (which look for exactly these) keep updating.
@@ -18,7 +24,7 @@ UPDATE_ASSET_EXTENSION = ".zip"
 
 # Per-platform update manifests. Each one is uploaded by the build flow that
 # produces that platform's asset, so the manifest's sha256 always matches the
-# asset attached to the same GitHub release.
+# asset attached to the same Forgejo release.
 UPDATE_MANIFEST_NAMES = {
     "windows": "BlindRSS-update.json",
     "macos": "BlindRSS-update-macos.json",

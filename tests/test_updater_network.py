@@ -5,7 +5,7 @@
 import os
 import unittest
 
-# This test hits GitHub APIs. Run only when explicitly enabled.
+# This test hits the Forgejo update API. Run only when explicitly enabled.
 RUN_NETWORK = os.environ.get("BLINDRSS_RUN_NETWORK_TESTS", "").strip().lower() in (
     "1",
     "true",

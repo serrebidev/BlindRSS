@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.6.0 - 2026-11-08
+
+- Point the in-app updater, translation updates and release manifest at Forgejo; GitHub is no longer an update source.
+
 ## v2.5.9 - 2026-11-04
 
 - Stop cancelled YouTube loads leaving 30 MB folders in %TEMP% (#150).

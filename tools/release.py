@@ -13,7 +13,7 @@ from datetime import datetime, timezone
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from core.update_config import GITHUB_OWNER, GITHUB_REPO
+from core.update_config import FORGEJO_HOST, FORGEJO_OWNER, FORGEJO_REPO
 
 VERSION_FILE = os.path.join(ROOT, "core", "version.py")
 CHANGELOG_FILE = os.path.join(ROOT, "CHANGELOG.md")
@@ -356,7 +356,7 @@ def write_manifest(
     installer_asset_name=None,
     installer_sha256=None,
 ):
-    download_url = f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/{version_tag}/{asset_name}"
+    download_url = f"https://{FORGEJO_HOST}/{FORGEJO_OWNER}/{FORGEJO_REPO}/releases/download/{version_tag}/{asset_name}"
     manifest = {
         "version": version_tag,
         "asset": asset_name,
@@ -372,7 +372,7 @@ def write_manifest(
         manifest["installer"] = {
             "asset": installer_asset_name,
             "download_url": (
-                f"https://github.com/{GITHUB_OWNER}/{GITHUB_REPO}/releases/download/"
+                f"https://{FORGEJO_HOST}/{FORGEJO_OWNER}/{FORGEJO_REPO}/releases/download/"
                 f"{version_tag}/{installer_asset_name}"
             ),
             "sha256": installer_sha256,

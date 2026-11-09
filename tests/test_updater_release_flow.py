@@ -26,7 +26,7 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
         self.assertIsNone(err)
         self.assertEqual(release["tag_name"], "v1.2.3")
         url = get.call_args.args[0]
-        self.assertEqual(url, "https://api.github.com/repos/serrebidev/BlindRSS/releases/latest")
+        self.assertEqual(url, "https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases/latest")
 
     def test_manifest_generation_uses_current_repo_owner(self) -> None:
         from tools.release import write_manifest
@@ -51,7 +51,7 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
         self.assertEqual(manifest["asset"], "BlindRSS-v9.8.7.zip")
         self.assertEqual(
             manifest["download_url"],
-            "https://github.com/serrebidev/BlindRSS/releases/download/v9.8.7/BlindRSS-v9.8.7.zip",
+            "https://git.serrebiradio.com/serrebi/BlindRSS/releases/download/v9.8.7/BlindRSS-v9.8.7.zip",
         )
         self.assertEqual(manifest["sha256"], "a" * 64)
         self.assertEqual(manifest["signing_thumbprint"], "12 34")
@@ -59,7 +59,7 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
         self.assertEqual(manifest["installer"]["sha256"], "c" * 64)
         self.assertEqual(
             manifest["installer"]["download_url"],
-            "https://github.com/serrebidev/BlindRSS/releases/download/"
+            "https://git.serrebiradio.com/serrebi/BlindRSS/releases/download/"
             "v9.8.7/BlindRSS-Setup-v9.8.7.exe",
         )
 
@@ -72,18 +72,18 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
             "assets": [
                 {
                     "name": "BlindRSS-update.json",
-                    "browser_download_url": "https://github.com/assets/manifest",
+                    "browser_download_url": "https://git.serrebiradio.com/assets/manifest",
                 },
                 {
                     "name": "BlindRSS-v9.8.7.zip",
-                    "browser_download_url": "https://github.com/assets/zip",
+                    "browser_download_url": "https://git.serrebiradio.com/assets/zip",
                 },
             ],
         }
         manifest = {
             "version": "v9.8.7",
             "asset": "BlindRSS-v9.8.7.zip",
-            "download_url": "https://github.com/serrebidev/BlindRSS/releases/download/v9.8.7/BlindRSS-v9.8.7.zip",
+            "download_url": "https://git.serrebiradio.com/serrebi/BlindRSS/releases/download/v9.8.7/BlindRSS-v9.8.7.zip",
             "sha256": "b" * 64,
             "notes_summary": "Test update.",
             "signing_thumbprint": "aa bb cc",
@@ -97,10 +97,10 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
 
         self.assertEqual(result.status, "update_available")
         self.assertIsNotNone(result.info)
-        self.assertEqual(download_json.call_args.args[0], "https://github.com/assets/manifest")
+        self.assertEqual(download_json.call_args.args[0], "https://git.serrebiradio.com/assets/manifest")
         self.assertEqual(result.info.tag, "v9.8.7")
         self.assertEqual(result.info.asset_name, "BlindRSS-v9.8.7.zip")
-        self.assertEqual(result.info.download_url, "https://github.com/assets/zip")
+        self.assertEqual(result.info.download_url, "https://git.serrebiradio.com/assets/zip")
         self.assertEqual(result.info.sha256, "b" * 64)
         self.assertEqual(result.info.signing_thumbprints, ("AABBCC",))
         self.assertEqual(result.info.asset_kind, "archive")
@@ -114,15 +114,15 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
             "assets": [
                 {
                     "name": "BlindRSS-update.json",
-                    "browser_download_url": "https://github.com/assets/manifest",
+                    "browser_download_url": "https://git.serrebiradio.com/assets/manifest",
                 },
                 {
                     "name": "BlindRSS-v9.8.7.zip",
-                    "browser_download_url": "https://github.com/assets/zip",
+                    "browser_download_url": "https://git.serrebiradio.com/assets/zip",
                 },
                 {
                     "name": "BlindRSS-Setup-v9.8.7.exe",
-                    "browser_download_url": "https://github.com/assets/setup",
+                    "browser_download_url": "https://git.serrebiradio.com/assets/setup",
                 },
             ],
         }
@@ -146,7 +146,7 @@ class UpdaterReleaseFlowTests(unittest.TestCase):
         self.assertEqual(result.status, "update_available")
         self.assertIsNotNone(result.info)
         self.assertEqual(result.info.asset_name, "BlindRSS-Setup-v9.8.7.exe")
-        self.assertEqual(result.info.download_url, "https://github.com/assets/setup")
+        self.assertEqual(result.info.download_url, "https://git.serrebiradio.com/assets/setup")
         self.assertEqual(result.info.sha256, "c" * 64)
         self.assertEqual(result.info.asset_kind, "installer")
 

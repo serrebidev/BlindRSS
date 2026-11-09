@@ -16,10 +16,9 @@ Design notes:
   from, so a downloaded catalog is never older than the bundled one.
 - Only compiled .mo files ship in the PyInstaller bundle, so the .po text is
   compiled locally (core.po_compile) rather than downloaded pre-compiled.
-- Freshness uses HTTP ETags against raw.githubusercontent.com: an unchanged
+- Freshness uses HTTP ETags against the Forgejo raw-file route: an unchanged
   catalog costs one conditional request answered with 304 and no body. That
-  keeps even a ten-minute check cheap and avoids the GitHub API's 60/hour
-  anonymous limit.
+  keeps even a ten-minute check cheap.
 - A newly installed app version discards downloaded overrides before gettext
   starts. The new release's bundled catalogs are authoritative until a later
   check downloads an equal or newer catalog from ``main``.
@@ -39,7 +38,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from core import po_compile
-from core.update_config import GITHUB_OWNER, GITHUB_REPO
+from core.update_config import FORGEJO_HOST, FORGEJO_OWNER, FORGEJO_REPO
 
 log = logging.getLogger(__name__)
 
@@ -48,8 +47,8 @@ DOMAIN = "blindrss"
 STATE_FILENAME = "translation_updates.json"
 
 CATALOG_URL = (
-    "https://raw.githubusercontent.com/"
-    f"{GITHUB_OWNER}/{GITHUB_REPO}/{BRANCH}/locale/{{lang}}/LC_MESSAGES/{DOMAIN}.po"
+    f"https://{FORGEJO_HOST}/{FORGEJO_OWNER}/{FORGEJO_REPO}/raw/branch/"
+    f"{BRANCH}/locale/{{lang}}/LC_MESSAGES/{DOMAIN}.po"
 )
 
 # Config keys (defaults live here so GUI and scheduler agree).

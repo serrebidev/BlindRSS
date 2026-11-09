@@ -27,8 +27,8 @@ from core.utils import safe_requests_get
 from core.version import APP_VERSION
 from core.update_config import (
     EXE_NAME,
-    GITHUB_OWNER,
-    GITHUB_REPO,
+    FORGEJO_API_BASE,
+    FORGEJO_API_ROOT,
     POSIX_UPDATE_HELPER_NAME,
     WINDOWS_UPDATE_HELPER_NAME,
     current_platform,
@@ -87,8 +87,8 @@ class UpdateInfo:
     sha256: str
     signing_thumbprints: Tuple[str, ...] = ()
     asset_kind: str = "archive"
-    # Alternate URLs for the same bytes (GitHub's REST asset endpoint), tried when
-    # the primary CDN URL fails with a transient error.
+    # Alternate URLs for the same bytes (the Forgejo API asset endpoint), tried
+    # when the primary download URL fails with a transient error.
     download_fallback_urls: Tuple[str, ...] = ()
 
 
@@ -154,11 +154,11 @@ def _ps_single_quote(value: str) -> str:
     return "'" + str(value or "").replace("'", "''") + "'"
 
 
-# GitHub's release CDN and REST API both return these often enough that a single
+# Forgejo's download and API front ends both return these often enough that a
 # attempt turns a routine update check into a hard failure for the user (reported
-# as "503 Service Unavailable" on BlindRSS-update.json).  Retrying, and trying the
-# REST asset endpoint as a second path to the same bytes, makes the check survive
-# a blip instead of telling every user the release is broken.
+# as "503 Service Unavailable" on BlindRSS-update.json).  Retrying, and trying
+# the API asset endpoint as a second path to the same bytes, makes the check
+# survive a blip instead of telling every user the release is broken.
 _TRANSIENT_STATUS_CODES = frozenset({408, 425, 429, 500, 502, 503, 504})
 _HTTP_ATTEMPTS = 3
 _HTTP_RETRY_BACKOFF_SECONDS = (1.0, 3.0)
@@ -187,9 +187,9 @@ def _retry_delay(attempt_index: int, resp=None) -> float:
 def _asset_url_candidates(asset: Optional[dict], *fallback_urls: str) -> Tuple[Tuple[str, dict], ...]:
     """Ordered ``(url, headers)`` pairs for fetching one release asset.
 
-    ``browser_download_url`` points at GitHub's object CDN; the REST asset URL
-    serves identical bytes through a different front end, so when one is having a
-    bad minute the other usually still answers.
+    ``browser_download_url`` points at Forgejo's download route; the API asset
+    URL serves identical bytes through a different front end, so when one is
+    having a bad minute the other usually still answers.
     """
     urls = []
     if isinstance(asset, dict):
@@ -218,9 +218,9 @@ def _fallback_urls(asset: Optional[dict], primary_url: str) -> Tuple[str, ...]:
 
 
 def _asset_url_headers(url: str) -> dict:
-    # The REST asset endpoint returns the asset's JSON metadata unless the request
+    # The API asset endpoint returns the asset's JSON metadata unless the request
     # explicitly asks for the bytes.
-    if url.startswith("https://api.github.com/"):
+    if url.startswith(FORGEJO_API_BASE + "/"):
         return {"Accept": "application/octet-stream"}
     return {}
 
@@ -285,28 +285,28 @@ def _get_with_retry(
 
 
 def _fetch_latest_release() -> Tuple[Optional[dict], Optional[str]]:
-    url = f"https://api.github.com/repos/{GITHUB_OWNER}/{GITHUB_REPO}/releases/latest"
-    headers = {"Accept": "application/vnd.github+json"}
+    url = f"{FORGEJO_API_ROOT}/releases/latest"
+    headers = {"Accept": "application/json"}
     # No imported browser cookies: this is our own release API call, and the
-    # user's github.com session has no business travelling with it.
+    # user's Forgejo session cookies have no business travelling with it.
     resp, err = _get_with_retry(((url, headers),), timeout=15)
     if resp is None:
-        return None, _("Network error while checking GitHub: {error}").format(error=err)
+        return None, _("Network error while checking Forgejo: {error}").format(error=err)
 
     if resp.status_code == 403 and resp.headers.get("X-RateLimit-Remaining") == "0":
         reset = resp.headers.get("X-RateLimit-Reset", "")
-        msg = "GitHub API rate limit reached. Try again later."
+        msg = "Forgejo API rate limit reached. Try again later."
         if reset:
             msg = _("{msg} Reset time (epoch): {reset}").format(msg=msg, reset=reset)
         return None, msg
 
     if not resp.ok:
-        return None, _("GitHub API error: HTTP {status}").format(status=resp.status_code)
+        return None, _("Forgejo API error: HTTP {status}").format(status=resp.status_code)
 
     try:
         return resp.json(), None
     except Exception as e:
-        return None, _("Invalid GitHub response: {error}").format(error=e)
+        return None, _("Invalid Forgejo response: {error}").format(error=e)
 
 
 def _find_release_asset(release: dict, name: str) -> Optional[dict]:
@@ -331,11 +331,11 @@ def _download_json(
         detail = str(e).strip()
         if detail:
             return None, _(
-                "Failed to download update metadata: {error}. GitHub may be "
+                "Failed to download update metadata: {error}. Forgejo may be "
                 "temporarily unavailable; please try again in a few minutes."
             ).format(error=detail)
         return None, _(
-            "Failed to download update metadata. GitHub may be temporarily "
+            "Failed to download update metadata. Forgejo may be temporarily "
             "unavailable; please try again in a few minutes."
         )
 
@@ -349,7 +349,7 @@ def check_for_updates() -> UpdateCheckResult:
     if err:
         return UpdateCheckResult("error", err)
     if not release:
-        return UpdateCheckResult("error", _("No release data from GitHub."))
+        return UpdateCheckResult("error", _("No release data from Forgejo."))
 
     tag = str(release.get("tag_name") or "").strip()
     latest = _parse_version(tag)
@@ -976,8 +976,8 @@ def download_and_apply_update(info: UpdateInfo, debug_mode: bool = False, progre
     os.makedirs(extract_dir, exist_ok=True)
 
     # --- Download (common to all platforms) -----------------------------------
-    # A transient GitHub 503 must not read as "the update is broken": retry, and
-    # fall back to the REST asset URL, before giving up.  The user hears each
+    # A transient Forgejo 503 must not read as "the update is broken": retry, and
+    # fall back to the API asset URL, before giving up.  The user hears each
     # retry, so a slow attempt never looks like a frozen dialog.
     def _announce_retry(attempt: int, delay: float, _error: str) -> None:
         if not report(
@@ -1015,11 +1015,11 @@ def download_and_apply_update(info: UpdateInfo, debug_mode: bool = False, progre
         detail = str(e).strip()
         if detail:
             return False, _(
-                "Failed to download update: {error}. GitHub may be temporarily "
+                "Failed to download update: {error}. Forgejo may be temporarily "
                 "unavailable; please try again in a few minutes."
             ).format(error=detail)
         return False, _(
-            "Failed to download update. GitHub may be temporarily unavailable; "
+            "Failed to download update. Forgejo may be temporarily unavailable; "
             "please try again in a few minutes."
         )
 
