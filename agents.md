@@ -36,30 +36,31 @@ The operational release command is `.\build.bat release` on this Windows host.
 - Local `build` uses the same development certificate if present in the
   Windows certificate store. It never bumps or publishes a version.
 
-### Ship a release
-- Windows host: run `.\build.bat release`. It verifies origin and local WSL/Docker,
-  computes the next version, updates `core/version.py`, notes and changelog,
-  commits and tags, pushes, and creates a draft GitHub release.
-- Linux is built from that exact tag in the tracked Ubuntu 22.04 Docker image
-  inside the default local WSL distribution; its tarball and manifest are uploaded first.
-- The script dispatches `cross-platform-release.yml` on `main` with
-  `build_windows=true build_linux=false publish_assets=true publish_release=true`.
-  CI builds and development-signs Windows and builds macOS. Its publish job
-  requires all seven platform assets/manifests, publishes as Latest, and
-  verifies `/releases/latest`. The script waits and repeats the latest/draft checks.
-- Cloud agents ONLY: `cloud-release.yml`. On this host never use that path.
-  Its default `dry_run=true` builds artifacts without pushing, tagging or
-  publishing. Real runs refuse off-main, no changes, existing tags or drafts,
-  and retain the draft until every platform has uploaded. Both workflows use
-  the authorized development signing secrets. Never run both release paths.
-- If a build fails after tagging, repair and rerun the failed jobs of the SAME
-  run (`gh run rerun <id> --failed`). Never bump again or automatically delete
-  a draft. For a local Windows repair, preserve dist data/notes outside dist,
-  run `build.bat build`, verify all three signatures, and write the Windows
-  manifest with `tools/release.py write-manifest` (ZIP/installer SHA-256,
-  `--signing-thumbprint`, `--notes-summary-file`) before uploading to that draft.
-- Do not hand-edit versions, tag manually, or create releases outside the
-  script. `build.sh release` requires an existing tag and only re-dispatches macOS.
+### Ship a release (Forgejo, since v2.6.0)
+- The GitHub account is suspended, so `build.bat release`, `cloud-release.yml`
+  and `cross-platform-release.yml` are DEAD paths: never run them. Releases are
+  built locally per platform and published to the Forgejo repo
+  `serrebi/BlindRSS` on `git.serrebiradio.com`. No macOS leg until a macOS
+  builder exists again; Windows + Linux only.
+- Versioning is unchanged: compute the next version with
+  `tools/release.py` (Conventional Commits since the last tag), update
+  `core/version.py`, notes and CHANGELOG, commit and tag, push tag + `main`
+  to the `forgejo` remote.
+- Windows (local): `build.bat build` (signed app/ZIP/installer), verify all
+  three signatures share the development signer, write `BlindRSS-update.json`
+  with `tools/release.py write-manifest` (ZIP/installer SHA-256,
+  `--signing-thumbprint`, `--notes-summary-file`).
+- Linux (local WSL): `tools/build_linux_wsl.py --ref <tag>`, verify the
+  tarball holds the real `vlc/plugins` + `vlc/lib` (see the `first_existing`
+  note in `portable.spec`), write `BlindRSS-update-linux.json` with
+  `tools/release.py write-manifest` (no thumbprint/installer).
+- Publish: create the Forgejo release as a draft, upload every asset with the
+  multipart field name `attachment`, mark it published, and verify
+  `/api/v1/repos/serrebi/BlindRSS/releases/latest` prints the new tag.
+  Uploads run from the VPS with `/root/forgejo-muse-token.txt`
+  (`Authorization: token`); never log the token.
+- Never bump again after tagging to repair a build, and never auto-delete a
+  release. Repair locally, re-upload with the same tag, re-verify latest.
 
 ### Windows build modes
 - `release`: complete release above, with automatic versioning.
@@ -86,16 +87,16 @@ The operational release command is `.\build.bat release` on this Windows host.
 - `dry-run` — prints the plan; changes nothing.
 
 ### Updater visibility (why the guards exist)
-- The updater reads only GitHub `repos/serrebidev/BlindRSS/releases/latest`, then the platform manifest on that release. It ignores git tags, `main` commits, and workflow artifacts. A release MUST be published and Latest or no one gets it. `build.bat release` enforces and self-verifies this — do not remove the guards, and do not auto-delete releases (publish/delete drafts manually by exact tag).
-- Post-release check: `gh api repos/serrebidev/BlindRSS/releases/latest --jq .tag_name` must print the new tag.
+- The updater reads only Forgejo `repos/serrebi/BlindRSS/releases/latest`, then the platform manifest on that release. It ignores git tags, `main` commits, and workflow artifacts. A release MUST be published and Latest or no one gets it — do not remove the guards, and do not auto-delete releases (publish/delete drafts manually by exact tag).
+- Post-release check: `https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases/latest` must print the new tag.
 
 ### Prerequisites & toggles
-- Windows release host: Python 3.14 (`py`/`python`), VLC 64-bit at `C:\Program Files\VideoLAN\VLC`, authenticated `gh`, network access, and WSL 2 with Docker Engine/Buildx in the default distribution. VLC 64-bit, Inno Setup and Windows SDK `signtool.exe` are needed only for a local `build`.
-- Linux release builder: local WSL 2 (default Ubuntu, root user). `tools/build_linux_wsl.py` snapshots the exact tag for releases or tracked working files for `build.bat linux`, extracts on the Linux filesystem under `/root/.cache/blindrss-builds`, runs `tools/build_linux_docker.sh`, copies the verified archive to Windows `dist`, and safely cleans the temporary Linux source. Untracked/ignored data never enters the snapshot. The tracked Ubuntu 22.04 image supplies Python 3.12 and current wxPython built from source; volume `blindrss-linux-pip-cache` retains packages/wheels between containers. Four CPU cores leave Windows/NVDA headroom. Docker image, cache and daemon persist across WSL restarts. No SSH/SCP or server dependency.
-- Pushes to `main` trigger `cross-platform-release.yml` to build macOS/Linux validation artifacts (no published release). A canonical release dispatch passes `build_windows=true` and `build_linux=false`; CI builds Windows and macOS because Linux has already been built locally in WSL.
-- Linux packaging builds current wxPython from source. The Docker image and
-  hosted workflow install GTK3, WebKit, GStreamer and image-library development
-  packages; do not restore an old wheel URL or PIP_CONSTRAINT.
+- Windows release host: Python 3.14 (`py`/`python`), VLC 64-bit at `C:\Program Files\VideoLAN\VLC`, network access, SSH to the VPS (Forgejo uploads), and WSL 2 with Docker Engine/Buildx in the default distribution. VLC 64-bit, Inno Setup and Windows SDK `signtool.exe` are needed only for a local `build`.
+- Linux release builder: local WSL 2 (default Ubuntu, root user). `tools/build_linux_wsl.py` snapshots the exact tag for releases or tracked working files for `build.bat linux`, extracts on the Linux filesystem under `/root/.cache/blindrss-builds`, runs `tools/build_linux_docker.sh`, copies the verified archive to Windows `dist`, and safely cleans the temporary Linux source. Untracked/ignored data never enters the snapshot. The tracked Ubuntu 22.04 image supplies Python 3.12; volume `blindrss-linux-pip-cache` retains packages/wheels (wxPython included) between containers. Four CPU cores leave Windows/NVDA headroom. Docker image, cache and daemon persist across WSL restarts.
+- There is no CI anymore (GitHub account suspended): no validation builds on
+  push, no dispatch workflows. Both platforms build locally on this host.
+- The Docker image installs GTK3, WebKit, GStreamer and image-library
+  development packages; do not restore an old wheel URL or PIP_CONSTRAINT.
 - Env toggles (full list in `build.md`): `SKIP_SIGN=1` (build mode only), `SIGNTOOL_PATH`, `GITHUB_REPO_SLUG`, `RELEASE_REMOTE`, `BLINDRSS_LINUX_BUILD_IMAGE`, `BLINDRSS_VLC_*`, `BLINDRSS_*CODESIGN*`.
 
 ## Casting
@@ -276,7 +277,7 @@ Casting is Caster's code (github.com/serrebidev/Caster), not a re-implementation
   - `backup.py`: File > Back Up Data / Restore Data and the optional daily auto backup (keeps 7, `backups/` beside config). Backup = config.json + `sqlite3.backup` snapshot of rss.db + site-cookie files. Restore never swaps the live DB: it stages into `restore_pending/`, relaunches with `--blindrss-after-restore` (waits for the old instance), and `main.py` applies it after the single-instance check and before `get_provider` opens the DB, deleting any old `-wal`/`-shm`. Both folders are in the update helpers' keep lists.
   - `audio_silence.py`: Silence scanning/detection pipeline used by skip-silence playback.
   - `playback_state.py`: Resume position persistence and lock-safe playback state writes.
-  - `updater.py`: Cross-platform GitHub release check, manifest/hash verification, and update handoff.
+  - `updater.py`: Cross-platform Forgejo release check, manifest/hash verification, and update handoff.
     - Platform-aware: picks a per-platform manifest (`BlindRSS-update.json` on Windows, `BlindRSS-update-macos.json`, `BlindRSS-update-linux.json`) and validates the asset extension (`.zip` Windows/macOS, `.tar.gz` Linux).
     - Windows: Authenticode-verifies the new exe and hands off to `update_helper.bat`.
     - PowerShell output can be localized (`StatusMessage`) or non-ASCII (a Desktop path). Both PowerShell callers (`updater._verify_authenticode_signature`, `windows_integration._run_powershell`) set `[Console]::OutputEncoding` to UTF-8 as their first statement and read with `encoding="utf-8", errors="replace"`, never bare `text=True`: PowerShell writes the console (OEM) code page, Python decodes ANSI, and on a Polish Windows that rejected every update. Both also pass `creationflags=CREATE_NO_WINDOW`: the build is windowed, so each call otherwise opens a console window that can take focus from a screen reader. Never use `DETACHED_PROCESS` there: without a console Windows PowerShell 5.1 writes nothing. Guards: `test_authenticode_reads_localized_status_message_as_utf8`, `test_run_powershell_reads_non_ascii_output_as_utf8`, `test_authenticode_check_hides_the_powershell_console`, `test_run_powershell_hides_the_console_window`.
@@ -475,7 +476,7 @@ Casting is Caster's code (github.com/serrebidev/Caster), not a re-implementation
 - OpenRouter model listing uses `core.utils.safe_requests_get`; chat-completion providers use POST requests with finite timeouts and should not log request bodies or API keys.
 
 ### 6. Updates (packaged app, all platforms)
-- Checks latest GitHub release + a per-platform manifest (`BlindRSS-update.json` / `-macos.json` / `-linux.json`).
+- Checks latest Forgejo release + a per-platform manifest (`BlindRSS-update.json` / `-macos.json` / `-linux.json`).
 - Each platform's manifest is published by the build flow that produces that platform's asset, so its SHA-256 always matches the asset on the same release. Windows and macOS manifests are written in GitHub Actions; the local WSL Linux artifact is copied back and manifested locally. The release stays a draft until all seven assets are present, so the updater never sees a partial release.
 - Verifies asset SHA-256 before apply. Windows also verifies the signed executable (Authenticode); macOS does a best-effort `codesign --verify`; Linux relies on SHA-256.
 - Windows uses `update_helper.bat`; macOS/Linux use `update_helper.sh`.
