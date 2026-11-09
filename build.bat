@@ -619,21 +619,21 @@ if errorlevel 1 (
 exit /b 0
 
 :verify_latest_release
-echo [BlindRSS Release] Verifying GitHub /releases/latest points to %VERSION_TAG%...
+echo [BlindRSS Release] Verifying Forgejo /releases/latest points to %VERSION_TAG%...
 set "API_LATEST_TAG="
-for /f "delims=" %%T in ('gh api "repos/%GITHUB_REPO_SLUG%/releases/latest" --jq ".tag_name" 2^>nul') do (
+for /f "delims=" %%T in ('powershell -NoProfile -Command "(Invoke-RestMethod -Uri https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases/latest -TimeoutSec 30).tag_name" 2^>nul') do (
     set "API_LATEST_TAG=%%T"
 )
 if not defined API_LATEST_TAG (
-    echo [X] Failed to read GitHub /releases/latest for %GITHUB_REPO_SLUG%.
+    echo [X] Failed to read Forgejo /releases/latest for serrebi/BlindRSS.
     exit /b 1
 )
 if /I not "!API_LATEST_TAG!"=="%VERSION_TAG%" (
-    echo [X] GitHub /releases/latest is !API_LATEST_TAG!, expected %VERSION_TAG%.
+    echo [X] Forgejo /releases/latest is !API_LATEST_TAG!, expected %VERSION_TAG%.
     echo [X] The Windows updater will keep reporting the old release until this is corrected.
     exit /b 1
 )
-echo [BlindRSS Release] GitHub latest release is %VERSION_TAG%.
+echo [BlindRSS Release] Forgejo latest release is %VERSION_TAG%.
 exit /b 0
 
 :verify_linux_builder

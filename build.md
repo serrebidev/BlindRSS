@@ -61,11 +61,11 @@ Use `.\build.bat release` on Windows to cut a release—never hand-assemble a Gi
   installer have the same signer, smoke-installs the signed installer, and
   writes `BlindRSS-update.json` with both SHA-256 hashes and signing thumbprint.
 - Pushes to `main` also trigger GitHub Actions workflow builds for macOS and Linux as workflow artifacts so you can validate packaging without publishing a release. The Windows CI job only runs on `workflow_dispatch` (release cuts), not on every push, since it's a heavier build.
-- The release stays a draft until the workflow's `publish` job has seen all seven assets; it then publishes it as Latest. `build.bat release` waits for the run, then verifies there are no draft releases and that GitHub's `/releases/latest` endpoint points at the new tag before exiting. If the run fails, the draft stays: fix the cause and `gh run rerun <id> --failed`. Never leave draft releases behind. Do not automatically delete releases during this check; publish or delete drafts manually by exact tag if needed.
+- The release stays a draft until the workflow's `publish` job has seen all seven assets; it then publishes it as Latest. `build.bat release` waits for the run, then verifies there are no draft releases and that Forgejo's `/releases/latest` endpoint points at the new tag before exiting. If the run fails, the draft stays: fix the cause and `gh run rerun <id> --failed`. Never leave draft releases behind. Do not automatically delete releases during this check; publish or delete drafts manually by exact tag if needed.
 
 ## Updater Visibility Rule
 
-BlindRSS auto-update does not look at Git tags, commits on `main`, or GitHub Actions artifacts. It checks GitHub's `repos/serrebidev/BlindRSS/releases/latest` endpoint, downloads its platform manifest from that release, and then downloads the asset named by that manifest:
+BlindRSS auto-update does not look at Git tags, commits on `main`, or CI artifacts. It checks Forgejo's `repos/serrebi/BlindRSS/releases/latest` endpoint, downloads its platform manifest from that release, and then downloads the asset named by that manifest:
 
 - Windows portable/legacy: `BlindRSS-update.json` -> `BlindRSS-vX.Y.Z.zip`
 - Windows installed: `BlindRSS-update.json` -> `BlindRSS-Setup-vX.Y.Z.exe` (the
@@ -82,7 +82,7 @@ publishes the draft.
 After cutting a release, the latest endpoint must return the new tag:
 
 ```powershell
-gh api repos/serrebidev/BlindRSS/releases/latest --jq .tag_name
+(Invoke-RestMethod -Uri https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases/latest).tag_name
 ```
 
 If this returns the previous tag, users will see "BlindRSS is up to date" for that previous version even when newer code exists on `main`.

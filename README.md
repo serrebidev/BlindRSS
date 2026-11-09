@@ -49,7 +49,7 @@ see [`docs/help/README.md`](docs/help/README.md) to translate it or add a topic.
 
 ## Download and install
 
-Grab the latest build from the [Releases page](https://github.com/serrebidev/BlindRSS/releases).
+Grab the latest build from the [Releases page](https://git.serrebiradio.com/serrebi/BlindRSS/releases).
 For a version-by-version history, see the [changelog](CHANGELOG.md).
 
 **Windows installer (recommended)**
