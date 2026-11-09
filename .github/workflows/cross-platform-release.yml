@@ -167,7 +167,7 @@ jobs:
             --sha256 $zipSha `
             --installer-asset-name (Split-Path $installer -Leaf) `
             --installer-sha256 $installerSha `
-            --output dist\BlindRSS-update.json `
+            --output dist/BlindRSS-update.json `
             --signing-thumbprint $thumbprint `
             --notes-summary-file $summary
           "zip=$zip" >> $env:GITHUB_OUTPUT
@@ -185,9 +185,9 @@ jobs:
       - name: Upload release assets
         if: ${{ inputs.publish_assets }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          FORGEJO_TOKEN: ${{ github.token }}
         run: |
-          gh release upload "${{ inputs.release_tag }}" "${{ steps.manifest.outputs.zip }}" "${{ steps.manifest.outputs.installer }}" dist\BlindRSS-update.json --clobber
+          python tools/forgejo_upload.py "${{ inputs.release_tag }}" "${{ steps.manifest.outputs.zip }}" "${{ steps.manifest.outputs.installer }}" dist/BlindRSS-update.json
 
   macos:
     name: Build macOS Artifact
@@ -227,13 +227,13 @@ jobs:
       - name: Upload release asset
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-macos-*.zip --clobber
+          FORGEJO_TOKEN: ${{ github.token }}
+        run: python tools/forgejo_upload.py "${{ inputs.release_tag }}" dist/BlindRSS-macos-*.zip
 
       - name: Publish macOS update manifest
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          FORGEJO_TOKEN: ${{ github.token }}
         run: |
           ASSETS=(dist/BlindRSS-macos-*.zip); ASSET="${ASSETS[0]}"
           ASSET_NAME="$(basename "$ASSET")"
@@ -243,7 +243,7 @@ jobs:
             --asset-name "$ASSET_NAME" \
             --sha256 "$SHA" \
             --output dist/BlindRSS-update-macos.json
-          gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-update-macos.json --clobber
+          python tools/forgejo_upload.py "${{ inputs.release_tag }}" dist/BlindRSS-update-macos.json
 
   linux:
     name: Build Linux Artifact
@@ -284,13 +284,13 @@ jobs:
       - name: Upload release asset
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-linux-*.tar.gz --clobber
+          FORGEJO_TOKEN: ${{ github.token }}
+        run: python tools/forgejo_upload.py "${{ inputs.release_tag }}" dist/BlindRSS-linux-*.tar.gz
 
       - name: Publish Linux update manifest
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          FORGEJO_TOKEN: ${{ github.token }}
         run: |
           ASSETS=(dist/BlindRSS-linux-*.tar.gz); ASSET="${ASSETS[0]}"
           ASSET_NAME="$(basename "$ASSET")"
@@ -300,7 +300,7 @@ jobs:
             --asset-name "$ASSET_NAME" \
             --sha256 "$SHA" \
             --output dist/BlindRSS-update-linux.json
-          gh release upload "${{ inputs.release_tag }}" dist/BlindRSS-update-linux.json --clobber
+          python tools/forgejo_upload.py "${{ inputs.release_tag }}" dist/BlindRSS-update-linux.json
 
   publish:
     name: Verify assets and publish as Latest
@@ -308,13 +308,14 @@ jobs:
     if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.publish_assets && inputs.publish_release && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     runs-on: ubuntu-latest
     env:
-      GH_TOKEN: ${{ github.token }}
+      FORGEJO_TOKEN: ${{ github.token }}
       TAG: ${{ inputs.release_tag }}
     steps:
       - name: Verify every platform uploaded its assets
         run: |
           v="${TAG#v}"
-          have="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          api="$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY"
+          have="$(curl -sf -H "Authorization: token $FORGEJO_TOKEN" "$api/releases/tags/$TAG" | jq -r '.assets[].name')"
           missing=0
           for want in "BlindRSS-v$v.zip" "BlindRSS-Setup-v$v.exe" BlindRSS-update.json \
                       "BlindRSS-linux-v$v.tar.gz" BlindRSS-update-linux.json \
@@ -324,11 +325,14 @@ jobs:
           [ "$missing" = 0 ]
 
       - name: Publish as Latest
-        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+        run: |
+          api="$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY"
+          id="$(curl -sf -H "Authorization: token $FORGEJO_TOKEN" "$api/releases/tags/$TAG" | jq -r .id)"
+          curl -sf -o /dev/null -X PATCH -H "Authorization: token $FORGEJO_TOKEN" -H 'Content-Type: application/json'             -d '{"draft": false, "prerelease": false}' "$api/releases/$id"
 
       - name: Verify the updater will see it
         run: |
-          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          latest="$(curl -sf "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/releases/latest" | jq -r .tag_name)"
           if [ "$latest" != "$TAG" ]; then
             echo "::error::/releases/latest is $latest, expected $TAG"
             exit 1
