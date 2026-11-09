@@ -184,10 +184,12 @@ jobs:
 
       - name: Upload release assets
         if: ${{ inputs.publish_assets }}
+        shell: bash
         env:
           FORGEJO_TOKEN: ${{ github.token }}
         run: |
-          python tools/forgejo_upload.py "${{ inputs.release_tag }}" "${{ steps.manifest.outputs.zip }}" "${{ steps.manifest.outputs.installer }}" dist/BlindRSS-update.json
+          curl -fsSL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
+          python "$RUNNER_TEMP/forgejo_upload.py" "${{ inputs.release_tag }}" "${{ steps.manifest.outputs.zip }}" "${{ steps.manifest.outputs.installer }}" dist/BlindRSS-update.json
 
   macos:
     name: Build macOS Artifact
@@ -228,7 +230,9 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
           FORGEJO_TOKEN: ${{ github.token }}
-        run: python tools/forgejo_upload.py "${{ inputs.release_tag }}" dist/BlindRSS-macos-*.zip
+        run: |
+          curl -fsSL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
+          python "$RUNNER_TEMP/forgejo_upload.py" "${{ inputs.release_tag }}" dist/BlindRSS-macos-*.zip
 
       - name: Publish macOS update manifest
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
@@ -243,7 +247,8 @@ jobs:
             --asset-name "$ASSET_NAME" \
             --sha256 "$SHA" \
             --output dist/BlindRSS-update-macos.json
-          python tools/forgejo_upload.py "${{ inputs.release_tag }}" dist/BlindRSS-update-macos.json
+          curl -fsSL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
+          python "$RUNNER_TEMP/forgejo_upload.py" "${{ inputs.release_tag }}" dist/BlindRSS-update-macos.json
 
   linux:
     name: Build Linux Artifact
@@ -285,7 +290,9 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
           FORGEJO_TOKEN: ${{ github.token }}
-        run: python tools/forgejo_upload.py "${{ inputs.release_tag }}" dist/BlindRSS-linux-*.tar.gz
+        run: |
+          curl -fsSL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
+          python "$RUNNER_TEMP/forgejo_upload.py" "${{ inputs.release_tag }}" dist/BlindRSS-linux-*.tar.gz
 
       - name: Publish Linux update manifest
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
@@ -300,7 +307,8 @@ jobs:
             --asset-name "$ASSET_NAME" \
             --sha256 "$SHA" \
             --output dist/BlindRSS-update-linux.json
-          python tools/forgejo_upload.py "${{ inputs.release_tag }}" dist/BlindRSS-update-linux.json
+          curl -fsSL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
+          python "$RUNNER_TEMP/forgejo_upload.py" "${{ inputs.release_tag }}" dist/BlindRSS-update-linux.json
 
   publish:
     name: Verify assets and publish as Latest
