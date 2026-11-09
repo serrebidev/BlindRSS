@@ -241,6 +241,11 @@ def add_data(path, dest):
 
 def first_existing(paths):
     for path in paths:
+        # Empty env defaults (BLINDRSS_VLC_PLUGINS="") must not match:
+        # Path("") is "." and always exists, which once bundled the whole
+        # source tree as vlc/plugins and skipped the real libvlc lookup.
+        if not path:
+            continue
         candidate = Path(path)
         if candidate.exists():
             return candidate
