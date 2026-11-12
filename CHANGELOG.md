@@ -4,6 +4,11 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.6.1 - 2026-11-12
+
+- Stop timed-out yt-dlp runs leaving 30 MB folders in %TEMP% (#58).
+- Stop portable.spec bundling the source tree as Linux VLC plugins.
+
 ## v2.6.0 - 2026-11-08
 
 - Point the in-app updater, translation updates and release manifest at Forgejo; GitHub is no longer an update source.
