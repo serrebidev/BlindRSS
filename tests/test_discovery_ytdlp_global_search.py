@@ -320,7 +320,7 @@ def test_run_ytdlp_query_search_accepts_zero_returncode():
         stdout = b'{"entries":[{"title":"X","url":"https://example.com/x"}]}'
         stderr = b""
 
-    with patch("core.discovery.subprocess.run", return_value=_FakeProc()), patch(
+    with patch("core.discovery.run_ytdlp", return_value=_FakeProc()), patch(
         "core.discovery.platform.system", return_value="Windows"
     ), patch("core.dependency_check._get_startup_info", return_value=None):
         out = discovery._run_ytdlp_query_search("ytsearch", "north korea", limit=3, timeout=10)
@@ -342,7 +342,7 @@ def test_run_ytdlp_query_search_uses_resolved_cli_path():
         captured["cmd"] = list(cmd)
         return _FakeProc()
 
-    with patch("core.discovery.subprocess.run", side_effect=_fake_run), patch(
+    with patch("core.discovery.run_ytdlp", side_effect=_fake_run), patch(
         "core.discovery._resolve_ytdlp_cli_path", return_value="/Applications/BlindRSS.app/Contents/Frameworks/bin/yt-dlp"
     ), patch("core.discovery.platform.system", return_value="Darwin"), patch(
         "core.dependency_check._get_startup_info", return_value=None
@@ -429,7 +429,7 @@ def test_run_ytdlp_url_search_builds_quoted_search_url():
         captured["cmd"] = list(cmd)
         return _FakeProc()
 
-    with patch("core.discovery.subprocess.run", side_effect=_fake_run), patch(
+    with patch("core.discovery.run_ytdlp", side_effect=_fake_run), patch(
         "core.discovery._resolve_ytdlp_cli_path", return_value="yt-dlp"
     ), patch("core.discovery.platform.system", return_value="Windows"), patch(
         "core.dependency_check._get_startup_info", return_value=None

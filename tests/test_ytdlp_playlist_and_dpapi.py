@@ -118,7 +118,7 @@ def test_download_to_play_reports_the_anonymous_error_not_dpapi(monkeypatch, tmp
             return _Res(1, stderr="ERROR: Video unavailable")
         return _Res(1, stderr="ERROR: Video unavailable")
 
-    monkeypatch.setattr(player_mod.subprocess, "run", _fake_run)
+    monkeypatch.setattr(player_mod, "run_ytdlp", _fake_run)
     monkeypatch.setattr(player_mod.discovery, "_resolve_ytdlp_cli_path", lambda: "yt-dlp")
     monkeypatch.setattr(
         player_mod.discovery,

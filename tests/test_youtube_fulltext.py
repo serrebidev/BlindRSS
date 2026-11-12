@@ -670,6 +670,113 @@ def test_onefile_worker_lookup_finds_a_same_named_child():
         child.communicate(timeout=30)
 
 
+class _OneFilePopen(_OneFileYtdlp):
+    """The same one-file yt-dlp.exe started by run_ytdlp; it printed, then hung."""
+
+    def __init__(self, monkeypatch, **kwargs):
+        import subprocess
+
+        super().__init__(monkeypatch, **kwargs)
+        monkeypatch.setattr(youtube_fulltext.os, "name", "nt")
+        monkeypatch.setattr(subprocess, "Popen", lambda cmd, **_kwargs: self)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        return False
+
+    def communicate(self, timeout=None):
+        super().communicate(timeout)  # TimeoutExpired while the bootloader runs
+        return '{"id": "one"}\n', "ERROR: interrupted\n"
+
+
+def test_ytdlp_timeout_ends_the_onefile_worker_and_keeps_the_output(monkeypatch):
+    # subprocess.run's timeout force-killed the bootloader, so every timed-out
+    # listing, search or download left its ~30 MB %TEMP%\_MEI* unpack behind
+    # (a drive filled up overnight), and run() still waited for the orphaned
+    # worker to finish.
+    import subprocess
+
+    proc = _OneFilePopen(monkeypatch, unpack_polls=1)
+    with pytest.raises(subprocess.TimeoutExpired) as caught:
+        youtube_fulltext.run_ytdlp(
+            ["yt-dlp", "--dump-json", URL], timeout=0.05, stdout=subprocess.PIPE, text=True
+        )
+    assert proc.taskkilled == [200] and not proc.forced
+    # Like subprocess.run, the exception carries what was printed so far: the
+    # channel listing keeps the entries it already received.
+    assert caught.value.stdout == '{"id": "one"}\n'
+    assert caught.value.stderr == "ERROR: interrupted\n"
+
+
+def test_ytdlp_run_returns_a_completed_process(monkeypatch):
+    import subprocess
+
+    seen = []
+
+    class Done:
+        returncode = 0
+
+        def __init__(self, cmd, **kwargs):
+            self.args = cmd
+            seen.append(kwargs)
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc_info):
+            return False
+
+        def communicate(self, timeout=None):
+            seen.append(timeout)
+            return "2026.11.04\n", None
+
+    monkeypatch.setattr(youtube_fulltext.os, "name", "nt")
+    monkeypatch.setattr(subprocess, "Popen", Done)
+    flags = {"stdout": subprocess.PIPE, "stdin": subprocess.DEVNULL, "creationflags": 0x08000000, "text": True}
+    res = youtube_fulltext.run_ytdlp(["yt-dlp", "--version"], timeout=5, **flags)
+    assert isinstance(res, subprocess.CompletedProcess)
+    assert (res.args, res.returncode, res.stdout, res.stderr) == (["yt-dlp", "--version"], 0, "2026.11.04\n", None)
+    assert seen == [flags, 5]
+
+
+def test_ytdlp_run_outside_windows_is_subprocess_run(monkeypatch):
+    import subprocess
+
+    calls = []
+    monkeypatch.setattr(youtube_fulltext.os, "name", "posix")
+    monkeypatch.setattr(subprocess, "run", lambda cmd, **kwargs: calls.append((cmd, kwargs)) or "done")
+    assert youtube_fulltext.run_ytdlp(["yt-dlp"], timeout=3, text=True) == "done"
+    assert calls == [(["yt-dlp"], {"timeout": 3, "text": True})]
+
+
+@pytest.mark.parametrize("module", ["core/discovery.py", "gui/mainframe.py", "gui/player.py"])
+def test_ytdlp_cli_calls_with_a_timeout_go_through_run_ytdlp(module):
+    import ast
+    import re
+
+    with open(os.path.join(os.path.dirname(os.path.dirname(__file__)), module), encoding="utf-8") as handle:
+        source = handle.read()
+    lines = source.splitlines()
+    tree = ast.parse(source)
+    functions = [node for node in tree.body if isinstance(node, ast.FunctionDef)]
+    for cls in (node for node in tree.body if isinstance(node, ast.ClassDef)):
+        functions += [node for node in cls.body if isinstance(node, ast.FunctionDef)]
+    bare = []
+    for func in functions:
+        if not re.search(r"yt.?dlp", "\n".join(lines[func.lineno - 1 : func.end_lineno]), re.I):
+            continue
+        for node in ast.walk(func):
+            if (
+                isinstance(node, ast.Call)
+                and ast.unparse(node.func) == "subprocess.run"
+                and any(keyword.arg == "timeout" for keyword in node.keywords)
+            ):
+                bare.append(f"{module}:{node.lineno} ({func.name})")
+    assert not bare, "a yt-dlp timeout there force-kills the one-file bootloader: use run_ytdlp"
+
+
 class _FakeSession:
     def __init__(self, payload, status=200):
         self.payload, self.status, self.posts = payload, status, []

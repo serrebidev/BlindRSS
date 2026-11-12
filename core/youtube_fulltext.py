@@ -238,6 +238,30 @@ def _kill_process_tree(proc) -> None:
         pass
 
 
+def run_ytdlp(cmd, *, timeout, **kwargs):
+    """``subprocess.run`` for the yt-dlp CLI that lets a timed-out one-file run clean up.
+
+    On a timeout subprocess.run force-kills the process it started. For a
+    one-file yt-dlp.exe that is the bootloader: its %TEMP%\\_MEI* unpack stays
+    behind, and run() still waits for the orphaned worker to finish (measured:
+    an 8 s timeout returned after 27 s and left 29 MB). Here the worker is
+    ended first and the bootloader deletes the folder. Takes Popen keyword
+    arguments; a timeout raises TimeoutExpired with the output so far.
+    """
+    if os.name != "nt":
+        return subprocess.run(cmd, timeout=timeout, **kwargs)
+    with subprocess.Popen(cmd, **kwargs) as proc:
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            # Not on a thread like _kill_process_tree: the bootloader holds the
+            # pipes, so the output arrives only once it has cleaned up and exited.
+            _end_onefile_tree(proc)
+            exc.stdout, exc.stderr = proc.communicate()
+            raise
+    return subprocess.CompletedProcess(proc.args, proc.returncode, stdout, stderr)
+
+
 def _extract_info_via_cli(
     extract_url: str, *, timeout: int, include_comments: bool, chapters_only: bool = False
 ):

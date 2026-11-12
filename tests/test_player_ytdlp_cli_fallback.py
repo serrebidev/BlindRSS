@@ -35,7 +35,7 @@ def test_extract_ytdlp_info_via_cli_returns_first_playlist_entry_and_keeps_profi
         )
 
     profile = r"C:\Users\alice\AppData\Local\Microsoft\Edge Beta\User Data"
-    with patch("gui.player.subprocess.run", side_effect=_fake_run), patch(
+    with patch("gui.player.run_ytdlp", side_effect=_fake_run), patch(
         "gui.player.discovery._resolve_ytdlp_cli_path", return_value="/tmp/BlindRSS/bin/yt-dlp"
     ), patch(
         "gui.player.platform.system", return_value="Windows"
@@ -77,7 +77,7 @@ def test_extract_ytdlp_info_via_cli_uses_bare_keyword_for_default_profile():
             stderr="",
         )
 
-    with patch("gui.player.subprocess.run", side_effect=_fake_run), patch(
+    with patch("gui.player.run_ytdlp", side_effect=_fake_run), patch(
         "gui.player.discovery._resolve_ytdlp_cli_path", return_value="/tmp/BlindRSS/bin/yt-dlp"
     ), patch(
         "gui.player.platform.system", return_value="Windows"
@@ -102,7 +102,7 @@ def test_extract_ytdlp_info_via_cli_passes_cookie_file_and_impersonation():
             stdout='{"url":"https://cdn.example/audio.m4a","title":"Example"}',
         )
 
-    with patch("gui.player.subprocess.run", side_effect=_fake_run), patch(
+    with patch("gui.player.run_ytdlp", side_effect=_fake_run), patch(
         "gui.player.discovery._resolve_ytdlp_cli_path", return_value="/tmp/yt-dlp"
     ), patch("gui.player.platform.system", return_value="Windows"), patch(
         "core.dependency_check._get_startup_info", return_value=None
@@ -134,7 +134,7 @@ def test_extract_ytdlp_info_via_cli_passes_player_client_override():
 
     from core import discovery
 
-    with patch("gui.player.subprocess.run", side_effect=_fake_run), patch(
+    with patch("gui.player.run_ytdlp", side_effect=_fake_run), patch(
         "gui.player.discovery._resolve_ytdlp_cli_path", return_value="/tmp/yt-dlp"
     ), patch("gui.player.platform.system", return_value="Windows"), patch(
         "core.dependency_check._get_startup_info", return_value=None
@@ -154,7 +154,7 @@ def test_extract_ytdlp_info_via_cli_passes_player_client_override():
 
 def test_extract_ytdlp_info_via_cli_raises_on_nonzero_exit():
     with patch(
-        "gui.player.subprocess.run",
+        "gui.player.run_ytdlp",
         return_value=_FakeCompletedProcess(returncode=1, stdout="", stderr="Extractor error"),
     ), patch("gui.player.platform.system", return_value="Windows"), patch(
         "core.dependency_check._get_startup_info", return_value=None

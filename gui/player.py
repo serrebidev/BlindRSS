@@ -29,6 +29,7 @@ from . import help_context
 from core.stream_proxy import get_proxy as get_stream_proxy
 from core.audio_silence import merge_ranges, merge_ranges_with_gap, scan_audio_for_silence
 from core.dependency_check import _log
+from core.youtube_fulltext import run_ytdlp
 from .hotkeys import HoldRepeatHotkeys, resolve_media_action
 from .menu_mnemonics import apply_menu_mnemonics
 from .widgets import set_msaa_name
@@ -348,7 +349,7 @@ def _extract_ytdlp_info_via_cli(
             creationflags = 0x08000000
             startupinfo = _get_startup_info()
 
-        res = subprocess.run(
+        res = run_ytdlp(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -4883,7 +4884,7 @@ class PlayerFrame(wx.Frame):
                 cmd.extend(extra)
                 cmd.append(target_url)
                 try:
-                    res = subprocess.run(
+                    res = run_ytdlp(
                         cmd,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.PIPE,

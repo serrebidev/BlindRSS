@@ -65,6 +65,7 @@ from core.categories import (
     normalize_category_input,
 )
 import core.discovery
+from core.youtube_fulltext import run_ytdlp
 from .shortcut_keys import event_to_accel
 from .menu_mnemonics import apply_menu_mnemonics, apply_menubar_mnemonics
 from . import help_context
@@ -13936,7 +13937,7 @@ class MainFrame(wx.Frame):
                     if not audio_only:
                         cmd[cmd.index("--merge-output-format") + 1] = merge_format
                     try:
-                        res = subprocess.run(
+                        res = run_ytdlp(
                             cmd + extra + [target_url],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,

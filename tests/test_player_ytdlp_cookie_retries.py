@@ -170,7 +170,7 @@ def _run_download(monkeypatch, tmp_path, url, stderr_for, dpapi_known=False):
         source = cmd[cmd.index("--cookies-from-browser") + 1] if "--cookies-from-browser" in cmd else ""
         return _Res(1, stderr=stderr_for(source))
 
-    monkeypatch.setattr(player_mod.subprocess, "run", _fake_run)
+    monkeypatch.setattr(player_mod, "run_ytdlp", _fake_run)
     monkeypatch.setattr(discovery, "_resolve_ytdlp_cli_path", lambda: "yt-dlp")
     monkeypatch.setattr(discovery, "get_ytdlp_cookie_sources", lambda _url: list(COOKIE_SOURCES))
     monkeypatch.setattr(player_mod.platform, "system", lambda: "Linux")

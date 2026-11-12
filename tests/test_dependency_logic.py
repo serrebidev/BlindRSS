@@ -305,7 +305,7 @@ class TestDependencyLogic(unittest.TestCase):
             with patch.object(dep_check, "_managed_ytdlp_exe", None), \
                  patch.object(dep_check, "_ytdlp_runtime_bin_dir", return_value=tmp), \
                  patch.object(dep_check, "_maybe_add_windows_path"), \
-                 patch("core.dependency_check.subprocess.run", side_effect=fake_run), \
+                 patch("core.youtube_fulltext.run_ytdlp", side_effect=fake_run), \
                  patch("core.dependency_check.shutil.which", return_value=system_exe):
                 dep_check._ensure_yt_dlp_cli()
                 self.assertEqual(dep_check._managed_ytdlp_exe, local_exe)
@@ -340,7 +340,7 @@ class TestDependencyLogic(unittest.TestCase):
                  patch.object(dep_check, "_ytdlp_runtime_bin_dir", return_value=tmp), \
                  patch.object(dep_check, "_maybe_add_windows_path"), \
                  patch.object(dep_check, "_update_managed_ytdlp", side_effect=slow_update), \
-                 patch("core.dependency_check.subprocess.run", return_value=MagicMock(returncode=0)), \
+                 patch("core.youtube_fulltext.run_ytdlp", return_value=MagicMock(returncode=0)), \
                  patch("core.dependency_check.shutil.which", return_value=__file__):
                 dep_check._ensure_yt_dlp_cli()
             self.assertEqual(seen_during_update, [local_exe])

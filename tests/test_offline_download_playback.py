@@ -4,7 +4,6 @@
 
 import os
 import platform
-import subprocess
 import sys
 import threading
 from types import SimpleNamespace
@@ -213,7 +212,7 @@ def test_ytdlp_download_allows_mkv_when_youtube_codecs_are_not_mp4_compatible(tm
             f.write(b"merged-video")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mainframe, "run_ytdlp", fake_run)
 
     host._download_article_via_ytdlp(article, article.url)
 
@@ -257,7 +256,7 @@ def test_ytdlp_download_retries_conversion_failure_as_mkv(tmp_path, monkeypatch)
             f.write(b"merged-video")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mainframe, "run_ytdlp", fake_run)
 
     host._download_article_via_ytdlp(article, article.url)
 
@@ -300,7 +299,7 @@ def test_ytdlp_download_honors_an_mp3_format_preset(tmp_path, monkeypatch):
             f.write(b"audio")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mainframe, "run_ytdlp", fake_run)
 
     host._download_article_via_ytdlp(article, article.url, "audio_mp3_192")
 
@@ -354,7 +353,7 @@ def test_ytdlp_download_retries_with_wider_player_client_pool(tmp_path, monkeypa
             f.write(b"merged-video")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mainframe, "run_ytdlp", fake_run)
 
     host._download_article_via_ytdlp(article, article.url)
 
@@ -407,7 +406,7 @@ def test_ytdlp_download_recovers_through_youtube_music_frontend(tmp_path, monkey
             stderr="ERROR: [youtube] A3TU_p5kLJI: Video unavailable",
         )
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mainframe, "run_ytdlp", fake_run)
 
     host._download_article_via_ytdlp(article, article.url)
 
@@ -463,7 +462,7 @@ def test_ytdlp_download_keeps_firefox_after_chromium_dpapi(tmp_path, monkeypatch
             f.write(b"merged-video")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mainframe, "run_ytdlp", fake_run)
 
     host._download_article_via_ytdlp(article, article.url)
 
@@ -523,7 +522,7 @@ def test_ytdlp_download_recovers_with_hidden_browser_visitor_session(
             return SimpleNamespace(returncode=0, stdout="", stderr="")
         return SimpleNamespace(returncode=1, stdout="", stderr="ERROR: Video unavailable")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mainframe, "run_ytdlp", fake_run)
 
     host._download_article_via_ytdlp(article, article.url)
 
@@ -588,7 +587,7 @@ def test_ytdlp_download_tries_pytubefix_before_hidden_browser(tmp_path, monkeypa
             return SimpleNamespace(returncode=0, stdout="", stderr="")
         return SimpleNamespace(returncode=1, stdout="", stderr="ERROR: Video unavailable")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mainframe, "run_ytdlp", fake_run)
 
     host._download_article_via_ytdlp(article, article.url)
 
@@ -630,7 +629,7 @@ def test_ytdlp_download_skips_fallback_pool_when_primary_succeeds(tmp_path, monk
             f.write(b"merged-video")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mainframe, "run_ytdlp", fake_run)
 
     host._download_article_via_ytdlp(article, article.url)
 

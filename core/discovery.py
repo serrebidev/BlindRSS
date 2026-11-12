@@ -20,6 +20,7 @@ from functools import lru_cache
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse, parse_qs, quote_plus, quote, unquote, urlencode
 from core import utils
+from core.youtube_fulltext import run_ytdlp
 
 
 _ARTICLE_DATE_PATH_RE = re.compile(r"/\d{4}/\d{2}/\d{2}/")
@@ -2145,7 +2146,7 @@ def _run_ytdlp_query_search(search_key: str, term: str, limit: int = 10, timeout
             str(limit),
             f"{sk}{limit}:{query}",
         ]
-        res = subprocess.run(
+        res = run_ytdlp(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -2207,7 +2208,7 @@ def _run_ytdlp_url_search(url_template: str, term: str, limit: int = 10, timeout
             str(limit),
             url,
         ]
-        res = subprocess.run(
+        res = run_ytdlp(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -2795,7 +2796,7 @@ def _run_ytdlp_flat_listing(url: str, max_items: int = 60, timeout: float = 30.0
             str(max_items),
             target,
         ]
-        res = subprocess.run(
+        res = run_ytdlp(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -3399,7 +3400,7 @@ def search_youtube_channels(term: str, limit: int = 10, timeout: int = 15) -> li
             f"ytsearch{fetch_count}:{query}",
         ]
 
-        res = subprocess.run(
+        res = run_ytdlp(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -3456,7 +3457,7 @@ def _search_youtube_playlists(term: str, limit: int = 10, timeout: int = 15) -> 
             search_url,
         ]
 
-        res = subprocess.run(
+        res = run_ytdlp(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -4357,7 +4358,7 @@ def _fetch_youtube_listing_items(listing_url: str, max_items, timeout_s, cookief
             failures.append("total search deadline expired")
             return False, ""
         try:
-            res = subprocess.run(
+            res = run_ytdlp(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -4540,7 +4541,7 @@ def get_ytdlp_feed_url(url: str) -> str:
                     cmd.extend(["--cookies-from-browser", cookie_arg])
                 cmd.append(url)
                 try:
-                    res = subprocess.run(
+                    res = run_ytdlp(
                         cmd,
                         stdout=subprocess.PIPE,
                         stderr=subprocess.DEVNULL,
@@ -5250,7 +5251,7 @@ def detect_media(url: str, timeout: int = 20) -> tuple[str | None, str | None]:
             if len(cookies[0]) > 1:
                 cmd.append(cookies[0][1])
 
-        res = subprocess.run(
+        res = run_ytdlp(
             cmd,
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,

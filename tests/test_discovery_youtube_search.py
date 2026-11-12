@@ -83,7 +83,7 @@ class YouTubeSearchConversionTests(unittest.TestCase):
         with patch(
             "core.discovery.get_ytdlp_cookie_sources",
             return_value=[("firefox", r"C:\Profiles\Accessible")],
-        ), patch("core.discovery.subprocess.run", side_effect=fake_run):
+        ), patch("core.discovery.run_ytdlp", side_effect=fake_run):
             out = discovery.get_ytdlp_feed_url("https://www.youtube.com/@Example")
 
         self.assertEqual(out, "https://www.youtube.com/feeds/videos.xml?channel_id=UCREAL")
@@ -315,7 +315,7 @@ class YouTubeSearchConversionTests(unittest.TestCase):
         }
         fake_proc = SimpleNamespace(returncode=0, stdout=json.dumps(payload).encode("utf-8"))
 
-        with patch("core.discovery.subprocess.run", return_value=fake_proc):
+        with patch("core.discovery.run_ytdlp", return_value=fake_proc):
             results = discovery.search_youtube_channels("clownfishtv", limit=5, timeout=10)
 
         self.assertEqual(len(results), 1)
@@ -335,7 +335,7 @@ class YouTubeSearchConversionTests(unittest.TestCase):
         }
         fake_proc = SimpleNamespace(returncode=0, stdout=json.dumps(payload).encode("utf-8"))
 
-        with patch("core.discovery.subprocess.run", return_value=fake_proc):
+        with patch("core.discovery.run_ytdlp", return_value=fake_proc):
             results = discovery._search_youtube_playlists("example", limit=5, timeout=10)
 
         self.assertEqual(len(results), 1)

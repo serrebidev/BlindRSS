@@ -59,12 +59,12 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
             assert "search_query=clownfishtv" in joined, cmd
             return types.SimpleNamespace(returncode=0, stdout=lines, stderr="")
 
-        orig = discovery.subprocess.run
-        discovery.subprocess.run = fake_run
+        orig = discovery.run_ytdlp
+        discovery.run_ytdlp = fake_run
         try:
             title, items = discovery.fetch_youtube_search_items("clownfishtv", max_items=10)
         finally:
-            discovery.subprocess.run = orig
+            discovery.run_ytdlp = orig
 
         self.assertEqual(title, "YouTube: clownfishtv")
         self.assertEqual(len(items), 2)
@@ -90,7 +90,7 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
 
         with patch("core.discovery.os.path.isfile", return_value=True), patch(
             "core.discovery.get_ytdlp_cookie_sources", return_value=[("firefox",)]
-        ) as cookie_sources, patch("core.discovery.subprocess.run", side_effect=fake_run), patch(
+        ) as cookie_sources, patch("core.discovery.run_ytdlp", side_effect=fake_run), patch(
             "core.discovery.time.monotonic", side_effect=[100.0, 100.0, 111.0, 111.0]
         ):
             _title, items = discovery.fetch_youtube_channel_items(
@@ -108,7 +108,7 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
 
         with patch("core.discovery.os.path.isfile", return_value=True), patch(
             "core.discovery.get_ytdlp_cookie_sources", return_value=[]
-        ), patch("core.discovery.subprocess.run", side_effect=fake_run):
+        ), patch("core.discovery.run_ytdlp", side_effect=fake_run):
             _title, items = discovery.fetch_youtube_channel_items(
                 "UCfKWQxY7aTUw7YTrHY4apTw", cookiefile="cookies.txt"
             )
@@ -120,7 +120,7 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
             return types.SimpleNamespace(returncode=1, stdout="", stderr=stderr)
 
         with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[]), patch(
-            "core.discovery.subprocess.run", side_effect=fake_run
+            "core.discovery.run_ytdlp", side_effect=fake_run
         ):
             with self.assertRaisesRegex(RuntimeError, "Unable to connect to proxy"):
                 discovery.fetch_youtube_channel_items("UCfKWQxY7aTUw7YTrHY4apTw")
@@ -135,7 +135,7 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
             return types.SimpleNamespace(returncode=1, stdout="")
 
         with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[("firefox",)]), patch(
-            "core.discovery.subprocess.run",
+            "core.discovery.run_ytdlp",
             side_effect=fake_run,
         ):
             title, items = discovery.fetch_youtube_search_items("nothing here", timeout_s=10)
@@ -145,7 +145,7 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
 
     def test_all_failed_attempts_raise_for_provider_retry(self):
         with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[("firefox",)]), patch(
-            "core.discovery.subprocess.run",
+            "core.discovery.run_ytdlp",
             return_value=types.SimpleNamespace(returncode=1, stdout=""),
         ):
             with self.assertRaisesRegex(RuntimeError, "YouTube search failed"):
@@ -161,7 +161,7 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
         with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[("firefox",)]), patch(
             "core.discovery.time.monotonic",
             side_effect=[100.0, 100.0, 102.0],
-        ), patch("core.discovery.subprocess.run", side_effect=fake_run):
+        ), patch("core.discovery.run_ytdlp", side_effect=fake_run):
             with self.assertRaises(RuntimeError):
                 discovery.fetch_youtube_search_items("deadline", timeout_s=10)
 
@@ -169,7 +169,7 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
 
     def test_timeout_attempts_raise_for_provider_retry(self):
         with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[]), patch(
-            "core.discovery.subprocess.run",
+            "core.discovery.run_ytdlp",
             side_effect=subprocess.TimeoutExpired(cmd=["yt-dlp"], timeout=1),
         ):
             with self.assertRaisesRegex(RuntimeError, "timed out"):
@@ -185,14 +185,14 @@ class FetchYoutubeSearchItemsTests(unittest.TestCase):
                     return types.SimpleNamespace(returncode=1, stdout=output, stderr="ERROR: Next page failed")
 
                 with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[]), patch(
-                    "core.discovery.subprocess.run", side_effect=fake_run
+                    "core.discovery.run_ytdlp", side_effect=fake_run
                 ):
                     _title, items = discovery.fetch_youtube_channel_items("UCfKWQxY7aTUw7YTrHY4apTw")
                 self.assertEqual([item.title for item in items], ["Already fetched"])
 
     def test_timeout_keeps_diagnostic_before_retries(self):
         with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[]), patch(
-            "core.discovery.subprocess.run",
+            "core.discovery.run_ytdlp",
             side_effect=subprocess.TimeoutExpired(
                 ["yt-dlp"], 10, stderr=b"ERROR: Connection refused; retrying"
             ),
@@ -456,7 +456,7 @@ class YoutubeChannelHistoryTests(YoutubeChannelFeedFallbackTests):
             return types.SimpleNamespace(returncode=0, stdout=json.dumps({"id": "x"}), stderr="")
 
         with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[]), patch(
-            "core.discovery.subprocess.run", side_effect=fake_run
+            "core.discovery.run_ytdlp", side_effect=fake_run
         ):
             discovery.fetch_youtube_channel_items("UCNkETBwkARrGDx-G7P-jLJg", max_items=5000)
         self.assertEqual(seen["end"], "5000")
@@ -469,7 +469,7 @@ class YoutubeChannelHistoryTests(YoutubeChannelFeedFallbackTests):
             return types.SimpleNamespace(returncode=0, stdout=json.dumps({"id": "x"}), stderr="")
 
         with patch("core.discovery.get_ytdlp_cookie_sources", return_value=[]), patch(
-            "core.discovery.subprocess.run", side_effect=fake_run
+            "core.discovery.run_ytdlp", side_effect=fake_run
         ):
             discovery.fetch_youtube_channel_items("UCNkETBwkARrGDx-G7P-jLJg")
         # The Videos tab left live streams out; the uploads playlist has them.

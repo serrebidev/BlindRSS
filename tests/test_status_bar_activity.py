@@ -25,7 +25,6 @@ text is observable instead of hitting the real (uninitialized) wx.Frame method.
 """
 
 import os
-import subprocess
 import sys
 import threading
 from types import SimpleNamespace
@@ -523,7 +522,7 @@ def test_ytdlp_download_status_sequence_on_success(tmp_path, monkeypatch):
             f.write(b"merged-video")
         return SimpleNamespace(returncode=0, stdout="", stderr="")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mainframe, "run_ytdlp", fake_run)
 
     host._download_article_via_ytdlp(article, article.url)
 
@@ -555,7 +554,7 @@ def test_ytdlp_download_status_sequence_on_failure(tmp_path, monkeypatch):
     def fake_run(cmd, **_kwargs):
         return SimpleNamespace(returncode=1, stdout="", stderr="ERROR: unsupported format")
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mainframe, "run_ytdlp", fake_run)
 
     host._download_article_via_ytdlp(article, article.url)
 
@@ -591,7 +590,7 @@ def test_ytdlp_download_not_installed_sets_failed_status(tmp_path, monkeypatch):
     def fake_run(cmd, **_kwargs):
         raise FileNotFoundError()
 
-    monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(mainframe, "run_ytdlp", fake_run)
 
     host._download_article_via_ytdlp(article, article.url)
 

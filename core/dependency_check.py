@@ -1308,7 +1308,9 @@ _YTDLP_LATEST_API_URL = "https://api.github.com/repos/yt-dlp/yt-dlp-nightly-buil
 def ytdlp_version(path, timeout=10):
     """Version string reported by a yt-dlp executable, or "" if it won't run."""
     try:
-        res = subprocess.run(
+        from core.youtube_fulltext import run_ytdlp
+
+        res = run_ytdlp(
             [path, "--version"],
             stdout=subprocess.PIPE,
             stderr=subprocess.DEVNULL,
@@ -1671,7 +1673,9 @@ def _ensure_yt_dlp_cli():
 
     def works(path):
         try:
-            res = subprocess.run(
+            from core.youtube_fulltext import run_ytdlp
+
+            res = run_ytdlp(
                 [path, "--version"],
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
