@@ -107,6 +107,12 @@ jobs:
           PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX }}
           PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
         run: |
+          # The Forgejo Windows runner (desknasbox-windows-x64) already holds the
+          # BlindRSS Dev certificate in its CurrentUser store, so no secret is set.
+          if (-not $env:PFX_BASE64) {
+            if (Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert) { "Using the code-signing certificate already in the store"; exit 0 }
+            throw "WINDOWS_CODESIGN_PFX is not set and no code-signing certificate is in the store"
+          }
           $pfxPath = Join-Path $env:RUNNER_TEMP "blindrss-codesign.pfx"
           [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:PFX_BASE64))
           $securePwd = ConvertTo-SecureString -String $env:PFX_PASSWORD -Force -AsPlainText
@@ -253,7 +259,8 @@ jobs:
   linux:
     name: Build Linux Artifact
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_linux }}
-    runs-on: ubuntu-22.04
+    # No Forgejo runner has ubuntu-22.04; wsl-linux-22.04 is the glibc 2.35 image.
+    runs-on: wsl-linux-22.04
     steps:
       - name: Check out release tag
         uses: actions/checkout@v7
