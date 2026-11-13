@@ -34,6 +34,10 @@ if defined SIGNTOOL_PATH (
 ) else (
     set "SIGNTOOL_EXE=%DEFAULT_SIGNTOOL%"
 )
+rem Sign with the release certificate by thumbprint. signtool /a picks the
+rem "best" store certificate, and once another self-signed certificate landed
+rem in CurrentUser\My it silently signed v2.6.1 with that one instead.
+if not defined SIGN_CERT_THUMBPRINT set "SIGN_CERT_THUMBPRINT=FB99DDCECA07B170E0A950F0C780AD899D28D770"
 if not defined GITHUB_REPO_SLUG set "GITHUB_REPO_SLUG=serrebidev/BlindRSS"
 if not defined RELEASE_REMOTE set "RELEASE_REMOTE=origin"
 if /I "%MODE%"=="linux" (
@@ -462,7 +466,7 @@ if not exist "%EXE_PATH%" (
     exit /b 1
 )
 echo [BlindRSS Build] Signing "%EXE_PATH%"...
-"%SIGNTOOL_EXE%" sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a "%EXE_PATH%"
+"%SIGNTOOL_EXE%" sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /sha1 %SIGN_CERT_THUMBPRINT% "%EXE_PATH%"
 if errorlevel 1 exit /b 1
 set "SIGNING_THUMBPRINT="
 if defined SIGN_CERT_THUMBPRINT (
@@ -564,7 +568,7 @@ if not exist "%INSTALLER_PATH%" (
     exit /b 1
 )
 echo [BlindRSS Build] Signing "%INSTALLER_PATH%"...
-"%SIGNTOOL_EXE%" sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a "%INSTALLER_PATH%"
+"%SIGNTOOL_EXE%" sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /sha1 %SIGN_CERT_THUMBPRINT% "%INSTALLER_PATH%"
 if errorlevel 1 exit /b 1
 exit /b 0
 

@@ -79,3 +79,18 @@ def test_installer_build_trims_version_strings_before_signing():
     bat = (pathlib.Path(__file__).resolve().parents[1] / "build.bat").read_text(encoding="utf-8")
     block = bat[bat.index("\n:build_installer\n"):bat.index("\n:sign_installer\n")]
     assert "trim-version-strings" in block
+
+
+def test_signtool_signs_with_the_release_certificate_by_thumbprint():
+    # signtool /a picks the "best" store certificate; v2.6.1 was first signed
+    # with an unrelated self-signed certificate that way.
+    import pathlib
+    import re
+
+    bat = (pathlib.Path(__file__).resolve().parents[1] / "build.bat").read_text(encoding="utf-8")
+    sign_lines = [line for line in bat.splitlines() if '"%SIGNTOOL_EXE%" sign ' in line]
+    assert len(sign_lines) == 2
+    for line in sign_lines:
+        assert "/sha1 %SIGN_CERT_THUMBPRINT%" in line
+        assert not re.search(r"\s/a\s", line)
+    assert 'set "SIGN_CERT_THUMBPRINT=FB99DDCECA07B170E0A950F0C780AD899D28D770"' in bat
