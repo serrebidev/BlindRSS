@@ -56,16 +56,17 @@ def test_release_verifies_every_asset_before_publishing_latest():
     names = [s["name"] for s in steps]
     assert names.index("Verify every platform uploaded its assets") < names.index("Publish as Latest")
     verify = steps[0]["run"]
-    # REST's release-by-tag endpoint excludes drafts; authenticated gh view
-    # can inspect the draft before this guard publishes it.
-    assert "gh release view" in verify and "releases/tags/" not in verify
+    # Forgejo's release-by-tag endpoint returns a draft only to a token with
+    # release write access, so the guard must send the job token.
+    assert '-H "Authorization: token $FORGEJO_TOKEN" "$api/releases/tags/$TAG"' in verify
+    assert publish["env"]["FORGEJO_TOKEN"] == "${{ github.token }}"
     for asset in (
         "BlindRSS-v$v.zip", "BlindRSS-Setup-v$v.exe", "BlindRSS-update.json",
         "BlindRSS-linux-v$v.tar.gz", "BlindRSS-update-linux.json",
         "BlindRSS-macos-v$v.zip", "BlindRSS-update-macos.json",
     ):
         assert asset in verify
-    assert "--draft=false --latest" in steps[1]["run"]
+    assert '{"draft": false, "prerelease": false}' in steps[1]["run"]
     assert "releases/latest" in steps[2]["run"]
 
 
