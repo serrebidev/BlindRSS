@@ -39,6 +39,27 @@ log = logging.getLogger(__name__)
 MIN_FORCE_SAVE_MS = 2000
 MIN_TRIVIAL_POSITION_MS = 1000
 
+
+def parse_jump_time_ms(text) -> int | None:
+    """Parse a "jump to time" entry into milliseconds: plain seconds
+    ("90"), mm:ss ("1:23") or h:mm:ss ("1:23:45"). None on invalid input."""
+    text = (text or "").strip()
+    if not text:
+        return None
+    parts = text.split(":")
+    if len(parts) > 3:
+        return None
+    total = 0
+    for part in parts:
+        try:
+            v = int(part.strip())
+        except (ValueError, AttributeError):
+            return None
+        if v < 0:
+            return None
+        total = total * 60 + v
+    return total * 1000
+
 _SEEKABLE_EXTENSIONS = (
     ".mp3",
     ".m4a",
@@ -2067,6 +2088,25 @@ class PlayerFrame(wx.Frame):
         set_msaa_name(forward_btn)
         forward_btn.Bind(wx.EVT_BUTTON, self.on_forward)
         btn_sizer.Add(forward_btn, 0, wx.ALL, 5)
+
+        # Fixed 60s steps alongside the configured step.
+        back60_btn = wx.Button(panel, label=_("-60s"))
+        back60_btn.SetName(_("Back 60 seconds"))
+        set_msaa_name(back60_btn)
+        back60_btn.Bind(wx.EVT_BUTTON, self.on_back60)
+        btn_sizer.Add(back60_btn, 0, wx.ALL, 5)
+
+        forward60_btn = wx.Button(panel, label=_("+60s"))
+        forward60_btn.SetName(_("Forward 60 seconds"))
+        set_msaa_name(forward60_btn)
+        forward60_btn.Bind(wx.EVT_BUTTON, self.on_forward60)
+        btn_sizer.Add(forward60_btn, 0, wx.ALL, 5)
+
+        jump_btn = wx.Button(panel, label=_("Jump to Time"))
+        jump_btn.SetName(_("Jump to Time"))
+        set_msaa_name(jump_btn)
+        jump_btn.Bind(wx.EVT_BUTTON, self.on_jump_to_time)
+        btn_sizer.Add(jump_btn, 0, wx.ALL, 5)
         
         # Speed
         speeds = utils.build_playback_speeds()
@@ -5632,6 +5672,71 @@ class PlayerFrame(wx.Frame):
 
         step = int(getattr(self, 'seek_forward_ms', 10000) or 10000)
         self._seek_by_button(int(step))
+
+    def on_back60(self, event):
+        if self.is_casting:
+            try:
+                cur_ms = int(getattr(self, '_cast_last_pos_ms', 0) or 0)
+                target_ms = max(0, int(cur_ms) - 60000)
+                self._cast_last_pos_ms = int(target_ms)
+                self._cast_last_pos_ts = time.monotonic()
+                self.casting_manager.seek(float(target_ms) / 1000.0)
+            except Exception:
+                pass
+            return
+        self._seek_by_button(-60000)
+
+    def on_forward60(self, event):
+        if self.is_casting:
+            try:
+                cur_ms = int(getattr(self, '_cast_last_pos_ms', 0) or 0)
+                target_ms = int(cur_ms) + 60000
+                if getattr(self, 'duration', 0) and int(self.duration) > 0 and target_ms > int(self.duration):
+                    target_ms = int(self.duration)
+                self._cast_last_pos_ms = int(target_ms)
+                self._cast_last_pos_ts = time.monotonic()
+                self.casting_manager.seek(float(target_ms) / 1000.0)
+            except Exception:
+                pass
+            return
+        self._seek_by_button(60000)
+
+    def on_jump_to_time(self, event):
+        dlg = wx.TextEntryDialog(self, _("Enter time as hours:minutes:seconds, minutes:seconds or seconds:"), _("Jump to Time"))
+        if dlg.ShowModal() != wx.ID_OK:
+            dlg.Destroy()
+            return
+        text = dlg.GetValue()
+        dlg.Destroy()
+        target_ms = parse_jump_time_ms(text)
+        if target_ms is None:
+            msg = _("Invalid time. Use e.g. 1:23:45, 1:23 or 90.")
+            try:
+                self.SetStatusText(msg, 0)
+            except Exception:
+                pass
+            try:
+                self._announce_media_nav(msg)
+            except Exception:
+                pass
+            return
+        if self.is_casting:
+            try:
+                self._cast_last_pos_ms = int(target_ms)
+                self._cast_last_pos_ts = time.monotonic()
+                self.casting_manager.seek(float(target_ms) / 1000.0)
+            except Exception:
+                pass
+            return
+        try:
+            self._note_user_seek()
+        except Exception:
+            pass
+        self._apply_seek_time_ms(int(target_ms), force=True, reason="jump")
+        try:
+            self._schedule_resume_save_after_seek(delay_ms=400)
+        except Exception:
+            pass
 
     def _seek_by_button(self, delta_ms: int) -> None:
         """Seek for the -/+10 s buttons, then say where it landed once the

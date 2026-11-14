@@ -3157,6 +3157,14 @@ class SettingsDialog(wx.Dialog):
         speed_sizer.Add(self.speed_ctrl, 0, wx.ALL, 5)
         media_sizer.Add(speed_sizer, 0, wx.EXPAND | wx.ALL, 5)
 
+        # User-configurable seek step (the -/+ buttons and Ctrl+Arrow).
+        seek_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        seek_sizer.Add(wx.StaticText(media_panel, label=_("Seek step (seconds):")), 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        seek_secs = int(config.get("seek_back_ms", 10000) or 10000) // 1000
+        self.seek_step_ctrl = wx.SpinCtrl(media_panel, min=1, max=600, initial=max(1, min(600, seek_secs)))
+        seek_sizer.Add(self.seek_step_ctrl, 0, wx.ALL, 5)
+        media_sizer.Add(seek_sizer, 0, wx.EXPAND | wx.ALL, 5)
+
         # Player window behavior
         self.show_player_on_play_chk = wx.CheckBox(media_panel, label=_("Show player window when starting playback"))
         self.show_player_on_play_chk.SetValue(bool(config.get("show_player_on_play", True)))
@@ -4245,6 +4253,8 @@ class SettingsDialog(wx.Dialog):
             "preferred_soundcard": preferred_soundcard,
             "skip_silence": self.skip_silence_chk.GetValue(),
             "playback_speed": speed,
+            "seek_back_ms": int(self.seek_step_ctrl.GetValue()) * 1000,
+            "seek_forward_ms": int(self.seek_step_ctrl.GetValue()) * 1000,
             "show_player_on_play": self.show_player_on_play_chk.GetValue(),
             "vlc_network_caching_ms": self.vlc_cache_ctrl.GetValue(),
             "range_cache_debug": self.range_cache_debug_chk.GetValue(),

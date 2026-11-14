@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.6.2 - 2026-11-14
+
+- Player seek options: fixed Back 60 s / Forward 60 s buttons, a Jump to Time dialog (hours:minutes:seconds, minutes:seconds or seconds), and a user-configurable seek step in Settings > Media (applies to the -/+ buttons and Ctrl+Arrow).
+
 ## v2.6.1 - 2026-11-12
 
 - Stop timed-out yt-dlp runs leaving 30 MB folders in %TEMP% (#58).
