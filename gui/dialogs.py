@@ -8190,6 +8190,18 @@ class AboutDialog(wx.Dialog):
 
         sizer.AddSpacer(20)
 
+        # Credits and project links
+        credits_txt = wx.StaticText(
+            self,
+            label=_(
+                "Author: serrebidev. Forgejo: https://git.serrebiradio.com/serrebi/BlindRSS. "
+                "Projects: https://projects.serrebiradio.com. "
+                "Telegram: https://t.me/SerrebiProjects. Full credits: CREDITS.md."
+            ),
+        )
+        credits_txt.Wrap(400)
+        sizer.Add(credits_txt, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+
         # Buttons
         github_btn = wx.Button(self, label=_("Follow me on GitHub (@serrebidev)"))
         repo_btn = wx.Button(self, label=_("Visit Repository"))
