@@ -600,24 +600,20 @@ if errorlevel 1 exit /b 1
 git push "%RELEASE_REMOTE%" %VERSION_TAG%
 if errorlevel 1 exit /b 1
 
-echo [BlindRSS Release] Creating GitHub release in %GITHUB_REPO_SLUG%...
-gh --version >nul 2>&1
-if errorlevel 1 (
-    echo [X] gh CLI not found in PATH.
-    exit /b 1
-)
+rem GitHub is suspended: releases live on Forgejo (serrebi/BlindRSS).
 rem Draft: the updater queries /releases/latest, which skips drafts, so users
-rem never see a release that is still missing a platform. The GitHub Actions
+rem never see a release that is still missing a platform. The Forgejo Actions
 rem build publishes it as Latest once all seven assets are uploaded.
-gh release create "%VERSION_TAG%" --repo "%GITHUB_REPO_SLUG%" --draft --verify-tag --title "%VERSION_TAG%" --notes-file "%RELEASE_NOTES%"
+echo [BlindRSS Release] Creating draft Forgejo release %VERSION_TAG%...
+"%TOOL_PY%" tools\forgejo_release_host.py create-draft "%VERSION_TAG%" "%RELEASE_NOTES%"
 if errorlevel 1 exit /b 1
 exit /b 0
 
 :verify_no_draft_releases
-echo [BlindRSS Release] Checking for draft releases in %GITHUB_REPO_SLUG%...
-powershell -NoProfile -Command "$ErrorActionPreference='Stop'; $repo='%GITHUB_REPO_SLUG%'; $releaseJson = gh release list --repo $repo --limit 100 --json tagName,isDraft; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }; $drafts = @($releaseJson | ConvertFrom-Json | Where-Object { $_.isDraft -eq $true }); if ($drafts.Count -gt 0) { Write-Host 'Draft releases found:'; foreach ($draft in $drafts) { Write-Host ('  ' + $draft.tagName) }; exit 1 }"
+echo [BlindRSS Release] Checking for draft Forgejo releases...
+"%TOOL_PY%" tools\forgejo_release_host.py check-no-drafts
 if errorlevel 1 (
-    echo [X] Draft releases exist in %GITHUB_REPO_SLUG%. Publish or delete drafts manually, then rerun the release.
+    echo [X] Draft releases exist on Forgejo. Publish or delete drafts manually, then rerun the release.
     exit /b 1
 )
 exit /b 0
@@ -672,41 +668,19 @@ set "LINUX_MANIFEST_PATH=%SCRIPT_DIR%dist\BlindRSS-update-linux.json"
 if errorlevel 1 exit /b 1
 
 echo [BlindRSS Release] Uploading Linux artifact and manifest to %VERSION_TAG%...
-gh release upload "%VERSION_TAG%" "!LINUX_ASSET_PATH!" "!LINUX_MANIFEST_PATH!" --repo "%GITHUB_REPO_SLUG%" --clobber
+set "FORGEJO_REPO=serrebi/BlindRSS"
+"%TOOL_PY%" tools\forgejo_upload.py "%VERSION_TAG%" "!LINUX_ASSET_PATH!" "!LINUX_MANIFEST_PATH!"
 if errorlevel 1 exit /b 1
 echo [BlindRSS Release] Linux assets uploaded for %VERSION_TAG%.
 exit /b 0
 
 :dispatch_ci_release
 rem Dispatched on the default branch; CI checks out the release tag.
-echo [BlindRSS Release] Dispatching GitHub Actions Windows and macOS build in %GITHUB_REPO_SLUG%...
-set "CI_RUN_LIST=gh run list --repo "%GITHUB_REPO_SLUG%" --workflow cross-platform-release.yml --event workflow_dispatch --limit 1 --json databaseId --jq .[].databaseId"
-set "PREVIOUS_RUN_ID="
-for /f "delims=" %%R in ('!CI_RUN_LIST! 2^>nul') do set "PREVIOUS_RUN_ID=%%R"
-gh workflow run "cross-platform-release.yml" --repo "%GITHUB_REPO_SLUG%" -f release_tag="%VERSION_TAG%" -f build_windows=true -f build_linux=false -f publish_assets=true -f publish_release=true
+echo [BlindRSS Release] Dispatching the Forgejo Actions Windows and macOS build...
+"%TOOL_PY%" tools\forgejo_release_host.py dispatch-wait "%VERSION_TAG%"
 if errorlevel 1 (
-    echo [X] Failed to dispatch the GitHub Actions build.
-    exit /b 1
-)
-rem The new run is the first one whose id differs from the newest run before the dispatch.
-set "CI_RUN_ID="
-for /L %%N in (1,1,24) do (
-    if not defined CI_RUN_ID (
-        timeout /t 5 /nobreak >nul
-        for /f "delims=" %%R in ('!CI_RUN_LIST! 2^>nul') do (
-            if not "%%R"=="!PREVIOUS_RUN_ID!" set "CI_RUN_ID=%%R"
-        )
-    )
-)
-if not defined CI_RUN_ID (
-    echo [X] The dispatched GitHub Actions run did not appear. %VERSION_TAG% is still a draft.
-    exit /b 1
-)
-echo [BlindRSS Release] Watching run !CI_RUN_ID!.
-gh run watch !CI_RUN_ID! --repo "%GITHUB_REPO_SLUG%" --exit-status --interval 30 >nul
-if errorlevel 1 (
-    echo [X] GitHub Actions run !CI_RUN_ID! failed. %VERSION_TAG% is still a draft.
-    echo [X] Fix the cause, then: gh run rerun !CI_RUN_ID! --repo "%GITHUB_REPO_SLUG%" --failed
+    echo [X] The Forgejo Actions build did not publish %VERSION_TAG%. Fix the cause, then redispatch
+    echo [X] cross-platform-release.yml with release_tag=%VERSION_TAG%.
     exit /b 1
 )
 call :verify_no_draft_releases

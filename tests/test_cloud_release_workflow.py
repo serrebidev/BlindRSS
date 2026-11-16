@@ -112,7 +112,9 @@ def test_local_release_never_builds_or_signs_windows():
     for call in ("build_app", "sign_exe", "sign_installer", "build_installer"):
         assert f"call :{call}" not in release
     assert "call :dispatch_ci_release" in release
-    assert "--draft --verify-tag" in bat and "-f publish_release=true" in bat
+    helper = (ROOT / "tools" / "forgejo_release_host.py").read_text(encoding="utf-8")
+    assert "forgejo_release_host.py create-draft" in bat and "\"draft\": True" in helper
+    assert "\"publish_release\": \"true\"" in helper
     assert "-f signing_policy" not in bat
 
 

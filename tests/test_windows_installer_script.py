@@ -83,6 +83,8 @@ def test_windows_release_builds_windows_in_ci():
     build_text = BUILD.read_text(encoding="utf-8")
     workflow_text = WORKFLOW.read_text(encoding="utf-8")
 
-    assert '-f build_windows=true' in build_text
+    helper = (BUILD.parent / "tools" / "forgejo_release_host.py").read_text(encoding="utf-8")
+    assert "forgejo_release_host.py dispatch-wait" in build_text
+    assert '"build_windows": "true"' in helper
     assert "build_windows:" in workflow_text
     assert "inputs.build_windows" in workflow_text
