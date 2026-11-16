@@ -7,6 +7,8 @@ A vibe-coded, screen-reader-friendly desktop RSS and podcast client for Windows,
 
 **Questions, bugs, or release news?** Join the [SerrebiProjects Telegram group](https://t.me/SerrebiProjects), the fastest place to get help.
 
+More serrebi projects: [projects.serrebiradio.com](https://projects.serrebiradio.com)
+
 ## Features
 
 - Reads RSS/Atom feeds and plays podcast and video enclosures.
@@ -118,3 +120,7 @@ It went unlicensed longer than it should have, which quietly blocked anyone tryi
 ## Community and support
 
 Report bugs and request features in [Issues](https://github.com/serrebidev/BlindRSS/issues). For questions, feedback, and release news, join the [SerrebiProjects Telegram group](https://t.me/SerrebiProjects).
+
+## Credits
+
+See [CREDITS.md](CREDITS.md) for where the ideas behind this project came from, and the third-party projects it builds on.
