@@ -313,11 +313,12 @@ if not defined REMOTE_URL (
     echo [X] Git remote "%RELEASE_REMOTE%" was not found.
     exit /b 1
 )
-echo(!REMOTE_URL! | findstr /I /C:"%GITHUB_REPO_SLUG%" >nul
+rem Releases live on Forgejo (GitHub is suspended).
+echo(!REMOTE_URL! | findstr /I /C:"git.serrebiradio.com/serrebi/BlindRSS" >nul
 if errorlevel 1 (
     echo [X] Git remote "%RELEASE_REMOTE%" points to "!REMOTE_URL!".
-    echo [X] Expected a GitHub remote for "%GITHUB_REPO_SLUG%".
-    echo [X] Update it with: git remote set-url %RELEASE_REMOTE% https://github.com/%GITHUB_REPO_SLUG%.git
+    echo [X] Expected the Forgejo remote for serrebi/BlindRSS.
+    echo [X] Update it with: git remote set-url %RELEASE_REMOTE% https://git.serrebiradio.com/serrebi/BlindRSS.git
     exit /b 1
 )
 exit /b 0
