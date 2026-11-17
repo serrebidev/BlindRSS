@@ -8190,43 +8190,37 @@ class AboutDialog(wx.Dialog):
 
         sizer.AddSpacer(20)
 
-        # Credits and project links
-        credits_txt = wx.StaticText(
-            self,
-            label=_(
-                "Author: serrebidev. Forgejo: https://git.serrebiradio.com/serrebi/BlindRSS. "
-                "Projects: https://projects.serrebiradio.com. "
-                "Telegram: https://t.me/SerrebiProjects. Full credits: CREDITS.md."
-            ),
-        )
-        credits_txt.Wrap(400)
+        credits_txt = wx.StaticText(self, label=_("Author: serrebidev."))
         sizer.Add(credits_txt, 0, wx.ALIGN_CENTER | wx.ALL, 5)
 
-        # Buttons
-        github_btn = wx.Button(self, label=_("Follow me on GitHub (@serrebidev)"))
-        repo_btn = wx.Button(self, label=_("Visit Repository"))
-        changelog_btn = wx.Button(self, label=_("View Changelog"))
-
-        sizer.Add(github_btn, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        sizer.Add(repo_btn, 0, wx.ALIGN_CENTER | wx.ALL, 5)
-        sizer.Add(changelog_btn, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+        # Every project link is its own button, so Tab reaches it and Enter
+        # opens it; links written into the text above were not reachable.
+        forgejo = "https://git.serrebiradio.com/serrebi/BlindRSS"
+        self.link_buttons = []
+        for label, url in (
+            (_("Follow me on GitHub (@serrebidev)"), "https://github.com/serrebidev"),
+            (_("Visit Repository on GitHub"), "https://github.com/serrebidev/BlindRSS"),
+            (_("Visit Repository on Forgejo"), forgejo),
+            (_("Projects: projects.serrebiradio.com"), "https://projects.serrebiradio.com"),
+            (_("Telegram: SerrebiProjects"), "https://t.me/SerrebiProjects"),
+            (_("Full Credits"), f"{forgejo}/src/branch/main/CREDITS.md"),
+            (_("View Changelog"), f"{forgejo}/src/branch/main/CHANGELOG.md"),
+        ):
+            btn = wx.Button(self, label=label)
+            btn.Bind(wx.EVT_BUTTON, lambda e, _url=url: webbrowser.open(_url))
+            sizer.Add(btn, 0, wx.ALIGN_CENTER | wx.ALL, 5)
+            self.link_buttons.append((btn, url))
 
         sizer.AddSpacer(20)
 
         close_btn = wx.Button(self, wx.ID_CLOSE, _("Close"))
         sizer.Add(close_btn, 0, wx.ALIGN_CENTER | wx.BOTTOM, 15)
 
-        self.SetSizer(sizer)
+        self.SetSizerAndFit(sizer)
         self.Centre()
 
-        # Bindings
-        github_btn.Bind(wx.EVT_BUTTON, lambda e: webbrowser.open("https://github.com/serrebidev"))
-        repo_btn.Bind(wx.EVT_BUTTON, lambda e: webbrowser.open("https://github.com/serrebidev/BlindRSS"))
-        changelog_btn.Bind(
-            wx.EVT_BUTTON,
-            lambda e: webbrowser.open("https://github.com/serrebidev/BlindRSS/blob/main/CHANGELOG.md"),
-        )
         close_btn.Bind(wx.EVT_BUTTON, lambda e: self.EndModal(wx.ID_CLOSE))
+        self.SetEscapeId(wx.ID_CLOSE)
 
 # Backwards-compatible name (menu item was historically called "Search Podcast").
 PodcastSearchDialog = FeedSearchDialog
