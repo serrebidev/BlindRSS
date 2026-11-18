@@ -107,11 +107,10 @@ jobs:
           PFX_BASE64: ${{ secrets.WINDOWS_CODESIGN_PFX }}
           PFX_PASSWORD: ${{ secrets.WINDOWS_CODESIGN_PASSWORD }}
         run: |
-          # The Forgejo Windows runner (desknasbox-windows-x64) already holds the
-          # BlindRSS Dev certificate in its CurrentUser store, so no secret is set.
+          # GitHub's Windows image holds no BlindRSS Dev certificate, so the
+          # secret is always required now (owner 2026-11-18).
           if (-not $env:PFX_BASE64) {
-            if (Get-ChildItem Cert:\CurrentUser\My -CodeSigningCert) { "Using the code-signing certificate already in the store"; exit 0 }
-            throw "WINDOWS_CODESIGN_PFX is not set and no code-signing certificate is in the store"
+            throw "WINDOWS_CODESIGN_PFX is not set"
           }
           $pfxPath = Join-Path $env:RUNNER_TEMP "blindrss-codesign.pfx"
           [IO.File]::WriteAllBytes($pfxPath, [Convert]::FromBase64String($env:PFX_BASE64))
@@ -180,7 +179,7 @@ jobs:
           "installer=$installer" >> $env:GITHUB_OUTPUT
 
       - name: Upload workflow artifact
-        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: BlindRSS-windows-${{ inputs.release_tag }}
           path: |
@@ -192,9 +191,11 @@ jobs:
         if: ${{ inputs.publish_assets }}
         shell: bash
         env:
-          FORGEJO_TOKEN: ${{ github.token }}
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          FORGEJO_URL: https://git.serrebiradio.com
+          FORGEJO_REPO: serrebi/BlindRSS
         run: |
-          curl -fsSL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
+          curl -fsSL "https://git.serrebiradio.com/serrebi/BlindRSS/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
           python "$RUNNER_TEMP/forgejo_upload.py" "${{ inputs.release_tag }}" "${{ steps.manifest.outputs.zip }}" "${{ steps.manifest.outputs.installer }}" dist/BlindRSS-update.json
 
   macos:
@@ -227,7 +228,7 @@ jobs:
           ./build.sh build
 
       - name: Upload workflow artifact
-        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: BlindRSS-macos-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
           path: dist/BlindRSS-macos-*.zip
@@ -235,15 +236,19 @@ jobs:
       - name: Upload release asset
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
-          FORGEJO_TOKEN: ${{ github.token }}
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          FORGEJO_URL: https://git.serrebiradio.com
+          FORGEJO_REPO: serrebi/BlindRSS
         run: |
-          curl -fsSL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
+          curl -fsSL "https://git.serrebiradio.com/serrebi/BlindRSS/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
           python "$RUNNER_TEMP/forgejo_upload.py" "${{ inputs.release_tag }}" dist/BlindRSS-macos-*.zip
 
       - name: Publish macOS update manifest
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
-          FORGEJO_TOKEN: ${{ github.token }}
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          FORGEJO_URL: https://git.serrebiradio.com
+          FORGEJO_REPO: serrebi/BlindRSS
         run: |
           ASSETS=(dist/BlindRSS-macos-*.zip); ASSET="${ASSETS[0]}"
           ASSET_NAME="$(basename "$ASSET")"
@@ -253,14 +258,14 @@ jobs:
             --asset-name "$ASSET_NAME" \
             --sha256 "$SHA" \
             --output dist/BlindRSS-update-macos.json
-          curl -fsSL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
+          curl -fsSL "https://git.serrebiradio.com/serrebi/BlindRSS/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
           python "$RUNNER_TEMP/forgejo_upload.py" "${{ inputs.release_tag }}" dist/BlindRSS-update-macos.json
 
   linux:
     name: Build Linux Artifact
     if: ${{ github.event_name != 'workflow_dispatch' || inputs.build_linux }}
-    # No Forgejo runner has ubuntu-22.04; wsl-linux-22.04 is the glibc 2.35 image.
-    runs-on: wsl-linux-22.04
+    # GitHub cloud runner; ubuntu-22.04 keeps the glibc 2.35 baseline.
+    runs-on: ubuntu-22.04
     steps:
       - name: Check out release tag
         uses: actions/checkout@v7
@@ -288,7 +293,7 @@ jobs:
           ./build.sh build
 
       - name: Upload workflow artifact
-        uses: https://code.forgejo.org/forgejo/upload-artifact@v4
+        uses: actions/upload-artifact@v4
         with:
           name: BlindRSS-linux-${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.sha }}
           path: dist/BlindRSS-linux-*.tar.gz
@@ -296,15 +301,19 @@ jobs:
       - name: Upload release asset
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
-          FORGEJO_TOKEN: ${{ github.token }}
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          FORGEJO_URL: https://git.serrebiradio.com
+          FORGEJO_REPO: serrebi/BlindRSS
         run: |
-          curl -fsSL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
+          curl -fsSL "https://git.serrebiradio.com/serrebi/BlindRSS/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
           python "$RUNNER_TEMP/forgejo_upload.py" "${{ inputs.release_tag }}" dist/BlindRSS-linux-*.tar.gz
 
       - name: Publish Linux update manifest
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.publish_assets }}
         env:
-          FORGEJO_TOKEN: ${{ github.token }}
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
+          FORGEJO_URL: https://git.serrebiradio.com
+          FORGEJO_REPO: serrebi/BlindRSS
         run: |
           ASSETS=(dist/BlindRSS-linux-*.tar.gz); ASSET="${ASSETS[0]}"
           ASSET_NAME="$(basename "$ASSET")"
@@ -314,7 +323,7 @@ jobs:
             --asset-name "$ASSET_NAME" \
             --sha256 "$SHA" \
             --output dist/BlindRSS-update-linux.json
-          curl -fsSL "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
+          curl -fsSL "https://git.serrebiradio.com/serrebi/BlindRSS/raw/commit/$GITHUB_SHA/tools/forgejo_upload.py" -o "$RUNNER_TEMP/forgejo_upload.py"
           python "$RUNNER_TEMP/forgejo_upload.py" "${{ inputs.release_tag }}" dist/BlindRSS-update-linux.json
 
   publish:
@@ -323,13 +332,13 @@ jobs:
     if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.publish_assets && inputs.publish_release && !contains(needs.*.result, 'failure') && !contains(needs.*.result, 'cancelled') }}
     runs-on: ubuntu-latest
     env:
-      FORGEJO_TOKEN: ${{ github.token }}
+      FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
       TAG: ${{ inputs.release_tag }}
     steps:
       - name: Verify every platform uploaded its assets
         run: |
           v="${TAG#v}"
-          api="$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY"
+          api="https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS"
           have="$(curl -sf -H "Authorization: token $FORGEJO_TOKEN" "$api/releases/tags/$TAG" | jq -r '.assets[].name')"
           missing=0
           for want in "BlindRSS-v$v.zip" "BlindRSS-Setup-v$v.exe" BlindRSS-update.json \
@@ -341,13 +350,13 @@ jobs:
 
       - name: Publish as Latest
         run: |
-          api="$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY"
+          api="https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS"
           id="$(curl -sf -H "Authorization: token $FORGEJO_TOKEN" "$api/releases/tags/$TAG" | jq -r .id)"
           curl -sf -o /dev/null -X PATCH -H "Authorization: token $FORGEJO_TOKEN" -H 'Content-Type: application/json'             -d '{"draft": false, "prerelease": false}' "$api/releases/$id"
 
       - name: Verify the updater will see it
         run: |
-          latest="$(curl -sf "$GITHUB_SERVER_URL/api/v1/repos/$GITHUB_REPOSITORY/releases/latest" | jq -r .tag_name)"
+          latest="$(curl -sf "https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases/latest" | jq -r .tag_name)"
           if [ "$latest" != "$TAG" ]; then
             echo "::error::/releases/latest is $latest, expected $TAG"
             exit 1
