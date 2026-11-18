@@ -1,9 +1,8 @@
 name: Cross-Platform Builds
 
+# Manual only: the Forgejo-to-GitHub sync disables GitHub workflows with
+# automatic triggers.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
     inputs:
       release_tag:

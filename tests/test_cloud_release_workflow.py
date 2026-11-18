@@ -37,10 +37,9 @@ def test_cloud_release_pushes_and_publishes_only_for_real_runs():
     tag_step = prepare["Commit, tag and create draft release"]
     assert tag_step["if"] == "${{ !inputs.dry_run }}"
     run = tag_step["run"]
-    # Main is protected: the release commit lands through a merged PR and the
-    # tag goes on that merge commit, never on an unmerged branch head.
-    assert "--draft" in run and "gh pr merge" in run
-    assert '"$merge_sha"' in run and 'git push origin "refs/tags/$NEXT_TAG"' in run
+    # Forgejo holds the release; GitHub only needs the tag for the build jobs.
+    assert "draft: true" in run and "git.serrebiradio.com/serrebi/BlindRSS.git HEAD:main" in run
+    assert 'git push origin "refs/tags/$NEXT_TAG"' in run
     build = wf["jobs"]["build"]["with"]
     assert build["publish_assets"] == "${{ !inputs.dry_run }}"
     publish = wf["jobs"]["publish"]
@@ -59,7 +58,7 @@ def test_release_verifies_every_asset_before_publishing_latest():
     # Forgejo's release-by-tag endpoint returns a draft only to a token with
     # release write access, so the guard must send the job token.
     assert '-H "Authorization: token $FORGEJO_TOKEN" "$api/releases/tags/$TAG"' in verify
-    assert publish["env"]["FORGEJO_TOKEN"] == "${{ github.token }}"
+    assert publish["env"]["FORGEJO_TOKEN"] == "${{ secrets.FORGEJO_TOKEN }}"
     for asset in (
         "BlindRSS-v$v.zip", "BlindRSS-Setup-v$v.exe", "BlindRSS-update.json",
         "BlindRSS-linux-v$v.tar.gz", "BlindRSS-update-linux.json",
@@ -123,8 +122,7 @@ def test_cloud_caller_grants_what_the_build_needs():
     called = _load("cross-platform-release.yml")["permissions"]
     caller = _load("cloud-release.yml")["permissions"]
     assert called == {"contents": "write"}
-    # The release commit lands through a PR, so the caller also needs PRs.
-    assert caller == {"contents": "write", "pull-requests": "write"}
+    assert caller == {"contents": "write"}
 
 
 def test_dispatch_block_parentheses_balance():

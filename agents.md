@@ -37,28 +37,12 @@ The operational release command is `.\build.bat release` on this Windows host.
   Windows certificate store. It never bumps or publishes a version.
 
 ### Ship a release (Forgejo, since v2.6.0)
-- The GitHub account is suspended, so `build.bat release`, `cloud-release.yml`
-  and `cross-platform-release.yml` are DEAD paths: never run them. Releases are
-  built locally per platform and published to the Forgejo repo
-  `serrebi/BlindRSS` on `git.serrebiradio.com`. No macOS leg until a macOS
-  builder exists again; Windows + Linux only.
-- Versioning is unchanged: compute the next version with
-  `tools/release.py` (Conventional Commits since the last tag), update
-  `core/version.py`, notes and CHANGELOG, commit and tag, push tag + `main`
-  to the `forgejo` remote.
-- Windows (local): `build.bat build` (signed app/ZIP/installer), verify all
-  three signatures share the development signer, write `BlindRSS-update.json`
-  with `tools/release.py write-manifest` (ZIP/installer SHA-256,
-  `--signing-thumbprint`, `--notes-summary-file`).
-- Linux (local WSL): `tools/build_linux_wsl.py --ref <tag>`, verify the
-  tarball holds the real `vlc/plugins` + `vlc/lib` (see the `first_existing`
-  note in `portable.spec`), write `BlindRSS-update-linux.json` with
-  `tools/release.py write-manifest` (no thumbprint/installer).
-- Publish: create the Forgejo release as a draft, upload every asset with the
-  multipart field name `attachment`, mark it published, and verify
-  `/api/v1/repos/serrebi/BlindRSS/releases/latest` prints the new tag.
-  Uploads run from the VPS with `/root/forgejo-muse-token.txt`
-  (`Authorization: token`); never log the token.
+- Publish every release with `.github/workflows/cloud-release.yml` on GitHub runners, from any machine:
+  `gh workflow run cloud-release.yml --repo serrebidev/BlindRSS -f dry_run=false`. It computes the version with
+  `tools/release.py`, commits and tags on the Forgejo repo `serrebi/BlindRSS`, builds Windows, Linux and macOS
+  through `cross-platform-release.yml`, and publishes the draft once all seven assets are uploaded.
+- `gh workflow run cloud-release.yml --repo serrebidev/BlindRSS -f dry_run=true` builds every platform and
+  publishes nothing.
 - Never bump again after tagging to repair a build, and never auto-delete a
   release. Repair locally, re-upload with the same tag, re-verify latest.
 
@@ -93,8 +77,7 @@ The operational release command is `.\build.bat release` on this Windows host.
 ### Prerequisites & toggles
 - Windows release host: Python 3.14 (`py`/`python`), VLC 64-bit at `C:\Program Files\VideoLAN\VLC`, network access, SSH to the VPS (Forgejo uploads), and WSL 2 with Docker Engine/Buildx in the default distribution. VLC 64-bit, Inno Setup and Windows SDK `signtool.exe` are needed only for a local `build`.
 - Linux release builder: local WSL 2 (default Ubuntu, root user). `tools/build_linux_wsl.py` snapshots the exact tag for releases or tracked working files for `build.bat linux`, extracts on the Linux filesystem under `/root/.cache/blindrss-builds`, runs `tools/build_linux_docker.sh`, copies the verified archive to Windows `dist`, and safely cleans the temporary Linux source. Untracked/ignored data never enters the snapshot. The tracked Ubuntu 22.04 image supplies Python 3.12; volume `blindrss-linux-pip-cache` retains packages/wheels (wxPython included) between containers. Four CPU cores leave Windows/NVDA headroom. Docker image, cache and daemon persist across WSL restarts.
-- There is no CI anymore (GitHub account suspended): no validation builds on
-  push, no dispatch workflows. Both platforms build locally on this host.
+- Nothing builds automatically on push. Releases build on GitHub runners through `cloud-release.yml`.
 - The Docker image installs GTK3, WebKit, GStreamer and image-library
   development packages; do not restore an old wheel URL or PIP_CONSTRAINT.
 - Env toggles (full list in `build.md`): `SKIP_SIGN=1` (build mode only), `SIGNTOOL_PATH`, `GITHUB_REPO_SLUG`, `RELEASE_REMOTE`, `BLINDRSS_LINUX_BUILD_IMAGE`, `BLINDRSS_VLC_*`, `BLINDRSS_*CODESIGN*`.
@@ -503,7 +486,7 @@ Casting is Caster's code (github.com/serrebidev/Caster), not a re-implementation
 - On Windows `SetName` never reaches NVDA/JAWS: MSAA names a control after the `StaticText` right before it, or leaves it unnamed. A control named only by `SetName`, with no visible label right before it (or a label that describes something else), needs `widgets.set_msaa_name(ctrl)` after the `SetName` (Direct Annotation, changes the name only). Do not use `wx.Window.SetAccessibleName` (wx 3.3) or another `wx.Accessible` for this: it replaces the native object, so the RichEdit reader becomes a generic client role and loses its value and read-only state, and a ComboBox's dropdown list child changes role and takes the combo's name. Guard: `tests/test_msaa_names.py`.
 - Do not block startup with network, dependency checks, yt-dlp extractor loading, translation, full-text extraction, or media probing. Use background workers and marshal GUI changes with `wx.CallAfter`.
 - Do not write mutable runtime data into Program Files installed builds. Installed Windows data goes to `%APPDATA%\BlindRSS`; runtime-managed `yt-dlp.exe` goes to `%LOCALAPPDATA%\BlindRSS\bin`; episode downloads default to `Downloads\BlindRSS`.
-- Do not invent new release steps. `.\build.bat release` and `cloud-release.yml` are the release processes.
+- Do not invent new release steps. `cloud-release.yml` is the release process.
 - Do not trust one provider shape. Local feeds, Miniflux, Inoreader, The Old Reader, and BazQux have different article IDs, chapter APIs, category behavior, and favorite support.
 - Do not replace fuller feed/article text with a shorter scrape, translation failure, or bot-interstitial page.
 - Do not add broad synchronous loops in the UI thread. Batch DB reads (`get_chapters_batch`), cap prefetch/enrichment work, and keep provider refreshes bounded.
@@ -517,7 +500,7 @@ Casting is Caster's code (github.com/serrebidev/Caster), not a re-implementation
 5. Naming: app name is **BlindRSS**.
 6. Timeouts: all provider HTTP requests must set finite timeouts.
 7. Inoreader OAuth: HTTPS localhost redirect URIs may require pasted redirect URL flow; validate `state`.
-8. Releases: cut every official release with `.\build.bat release` on Windows or `cloud-release.yml` on GitHub runners; never hand-pick the version or tag. Full mechanics and the publish/Latest guards are in **Build & Release** above.
+8. Releases: cut every official release with `cloud-release.yml` on GitHub runners; never hand-pick the version or tag. Full mechanics and the publish/Latest guards are in **Build & Release** above.
 9. Release publication: a release MUST end up published and Latest or the updater never sees it. Do not remove the `build.bat release` guards (`--draft=false --latest`, no-drafts check, `/releases/latest` verify) or auto-delete releases. See **Build & Release** > Updater visibility.
 10. Tests: add/extend tests in `tests/` for behavior changes and regressions.
 11. Secrets: never print, log, commit, or include API keys/cookies/Authorization headers in tests or diagnostics.

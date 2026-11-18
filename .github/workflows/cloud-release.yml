@@ -1,7 +1,6 @@
 name: Cloud Release
 
-# Full release on GitHub-hosted runners, for the Muse agent, cloud agents or any machine without
-# the Windows release host. Same versioning, notes and changelog as
+# Every public release runs here, on GitHub-hosted runners. Same versioning, notes and changelog as
 # `build.bat release` (tools/release.py); Windows is signed from the
 # WINDOWS_CODESIGN_PFX/PASSWORD secrets. The release stays a draft until every
 # platform's assets and manifests are uploaded, so the updater never sees a
@@ -24,7 +23,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: blindrss-release
@@ -63,7 +61,7 @@ jobs:
 
       - name: Refuse an empty or conflicting release
         env:
-          GH_TOKEN: ${{ github.token }}
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           LATEST_TAG: ${{ steps.version.outputs.LATEST_TAG }}
           NEXT_TAG: ${{ steps.version.outputs.NEXT_TAG }}
         run: |
@@ -75,7 +73,7 @@ jobs:
             echo "::error::Tag $NEXT_TAG already exists."
             exit 1
           fi
-          drafts="$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '[.[] | select(.draft) | .tag_name] | join(" ")')"
+          drafts="$(curl -sf -H "Authorization: token $FORGEJO_TOKEN" "https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases?draft=true&limit=50" | jq -r '[.[] | select(.draft) | .tag_name] | join(" ")')"
           if [ -n "$drafts" ]; then
             echo "::error::Unpublished draft release(s) exist: $drafts. Publish or delete them by exact tag first."
             exit 1
@@ -99,49 +97,24 @@ jobs:
       - name: Commit, tag and create draft release
         if: ${{ !inputs.dry_run }}
         env:
-          GH_TOKEN: ${{ github.token }}
+          FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
           NEXT_TAG: ${{ steps.version.outputs.NEXT_TAG }}
         run: |
+          set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add core/version.py CHANGELOG.md
           git commit -m "Release $NEXT_TAG"
-          # Branch protection rejects direct bot pushes to main (GH006), so
-          # the release commit lands via a short-lived branch and an
-          # auto-merging PR; the tag is then created on the merged commit.
-          branch="release/$NEXT_TAG"
-          git branch "$branch"
-          git push origin "$branch"
-          pr_url="$(gh pr create --base main --head "$branch" \
-            --title "Release $NEXT_TAG" \
-            --body "Automated release commit for $NEXT_TAG from the Cloud Release workflow (version bump and changelog).")"
-          # A PR with nothing to wait for can be "clean" instantly, and
-          # GitHub then refuses to enable auto-merge; fall back to a direct
-          # merge in that case.
-          gh pr merge "$pr_url" --auto --squash || gh pr merge "$pr_url" --squash
-          merge_sha=""
-          for i in $(seq 1 30); do
-            if [ "$(gh pr view "$pr_url" --json state --jq .state)" = "MERGED" ]; then
-              merge_sha="$(gh pr view "$pr_url" --json mergeCommit --jq .mergeCommit.oid)"
-              break
-            fi
-            sleep 10
-          done
-          if [ -z "$merge_sha" ]; then
-            echo "::error::Release PR $pr_url did not merge; refusing to tag a commit that is not on main."
-            exit 1
-          fi
-          # Auto-merge does not reliably trigger delete-branch-on-merge for
-          # bot PRs; remove the spent release branch here.
-          git push origin --delete "$branch" || true
-          # The merge commit was created by GitHub when the PR merged, so
-          # this checkout does not have the object yet: fetch it (it is
-          # main's new tip) or git tag fails with "bad object type".
-          git fetch origin main
-          git tag -a "$NEXT_TAG" -m "Release $NEXT_TAG" "$merge_sha"
+          git tag -a "$NEXT_TAG" -m "Release $NEXT_TAG"
+          # Forgejo is the source of truth; the build jobs check the tag out from GitHub.
+          auth="$(printf 'x-access-token:%s' "$FORGEJO_TOKEN" | base64 -w0)"
+          git -c "http.https://git.serrebiradio.com/.extraheader=Authorization: Basic $auth" \
+            push https://git.serrebiradio.com/serrebi/BlindRSS.git HEAD:main "refs/tags/$NEXT_TAG"
           git push origin "refs/tags/$NEXT_TAG"
-          gh release create "$NEXT_TAG" --draft --verify-tag --title "$NEXT_TAG" \
-            --notes-file "dist/release-notes-$NEXT_TAG.md"
+          body="$(jq -n --arg tag "$NEXT_TAG" --rawfile notes "dist/release-notes-$NEXT_TAG.md" \
+            '{tag_name: $tag, name: $tag, body: $notes, draft: true, prerelease: false}')"
+          curl -sf -o /dev/null -X POST -H "Authorization: token $FORGEJO_TOKEN" -H 'Content-Type: application/json' \
+            -d "$body" https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases
 
       - name: Plan build
         id: plan
@@ -177,13 +150,14 @@ jobs:
     if: ${{ !inputs.dry_run }}
     runs-on: ubuntu-latest
     env:
-      GH_TOKEN: ${{ github.token }}
+      FORGEJO_TOKEN: ${{ secrets.FORGEJO_TOKEN }}
       TAG: ${{ needs.prepare.outputs.release_tag }}
     steps:
       - name: Verify every platform uploaded its assets
         run: |
           v="${TAG#v}"
-          have="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          api="https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS"
+          have="$(curl -sf -H "Authorization: token $FORGEJO_TOKEN" "$api/releases/tags/$TAG" | jq -r '.assets[].name')"
           missing=0
           for want in "BlindRSS-v$v.zip" "BlindRSS-Setup-v$v.exe" BlindRSS-update.json \
                       "BlindRSS-linux-v$v.tar.gz" BlindRSS-update-linux.json \
@@ -193,11 +167,15 @@ jobs:
           [ "$missing" = 0 ]
 
       - name: Publish as Latest
-        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+        run: |
+          api="https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS"
+          id="$(curl -sf -H "Authorization: token $FORGEJO_TOKEN" "$api/releases/tags/$TAG" | jq -r .id)"
+          curl -sf -o /dev/null -X PATCH -H "Authorization: token $FORGEJO_TOKEN" -H 'Content-Type: application/json' \
+            -d '{"draft": false, "prerelease": false}' "$api/releases/$id"
 
       - name: Verify the updater will see it
         run: |
-          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          latest="$(curl -sf https://git.serrebiradio.com/api/v1/repos/serrebi/BlindRSS/releases/latest | jq -r .tag_name)"
           if [ "$latest" != "$TAG" ]; then
             echo "::error::/releases/latest is $latest, expected $TAG"
             exit 1
