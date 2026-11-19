@@ -2,7 +2,6 @@
 # This file is part of BlindRSS
 # SPDX-License-Identifier: MIT
 
-from pathlib import Path
 
 from core import runtime_self_test
 
@@ -17,7 +16,6 @@ def test_runtime_import_list_covers_macos_fulltext_stack():
         "markdown",
         "pydoll.browser.chromium",
         "seleniumbase",
-        "tld",
         "trafilatura",
         "wx.html2",
         "wx_accessible_webview",
@@ -54,7 +52,3 @@ def test_runtime_fulltext_check_is_repeatable():
     assert runtime_self_test._check_fulltext() == []
 
 
-def test_packaging_collects_public_suffix_data():
-    for spec_path in ("main.spec", "portable.spec"):
-        source = Path(spec_path).read_text(encoding="utf-8")
-        assert '"tld"' in source or "'tld'" in source

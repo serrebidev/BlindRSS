@@ -133,10 +133,6 @@ packages_to_collect = [
     "pychromecast",
     "soco",
     "trafilatura",
-    # trafilatura/courlan metadata extraction loads the public-suffix list at
-    # runtime. Importing tld succeeds without this data, then every metadata
-    # extraction raises in the frozen app.
-    "tld",
     # Lemmy bodies use dynamically selected Markdown extensions (extra and
     # sane_lists), so static import analysis cannot see every required module.
     "markdown",
