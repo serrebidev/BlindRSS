@@ -199,7 +199,7 @@ jobs:
 
   macos:
     name: Build macOS Artifact
-    runs-on: macos-latest
+    runs-on: xcode-27
     steps:
       - name: Check out release tag
         uses: actions/checkout@v7
