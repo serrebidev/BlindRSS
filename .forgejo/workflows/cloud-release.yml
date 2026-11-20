@@ -1,0 +1,12 @@
+name: Cloud Release (disabled on Forgejo)
+# All workflow runs for this repo happen on GitHub runners (Brandon, 2026-11-20).
+# This file shadows .github/workflows/cloud-release.yml on Forgejo only;
+# GitHub ignores .forgejo/ and runs the real workflow.
+on: workflow_dispatch
+jobs:
+  disabled-on-forgejo:
+    name: Disabled on Forgejo
+    runs-on: ubuntu-latest
+    if: false
+    steps:
+      - run: echo "Runs on GitHub runners. Forgejo copy disabled 2026-11-20."
