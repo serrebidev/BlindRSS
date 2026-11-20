@@ -1315,6 +1315,10 @@ class CastingManager:
         if url.lower().startswith(("http://", "https://")):
             if air.live:
                 cmd += ["-seekable", "0"]   # a byte-offset resume splices replays in
+            else:
+                # RAOP reads at real-time pace; CDNs reset slow connections.
+                from core.audio_silence import HTTP_RECONNECT_ARGS
+                cmd += list(HTTP_RECONNECT_ARGS)
             cmd += ["-rw_timeout", "5000000"]
         cmd += ["-analyzeduration", "1000000", "-probesize", "1000000"]
         if air.pending_seek:

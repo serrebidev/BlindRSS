@@ -271,6 +271,11 @@ def detect_silence_ranges_from_pcm(
     return det.finalize()
 
 
+# ffmpeg input options for remote readers that consume at playback pace
+# (silence scan, AirPlay casting); see scan_audio_for_silence.
+HTTP_RECONNECT_ARGS = ("-reconnect", "1", "-reconnect_on_network_error", "1", "-reconnect_delay_max", "5")
+
+
 def scan_audio_for_silence(
     source: str,
     ffmpeg_bin: str = "ffmpeg",
@@ -352,6 +357,10 @@ def scan_audio_for_silence(
     is_http_url = source_lower.startswith("http://") or source_lower.startswith("https://")
 
     if is_http_url:
+        # A paced scan reads the socket at playback speed, and CDNs reset
+        # such slow connections (CloudFront: ~6 min in). Without these
+        # ffmpeg logs "partial file", exits 0, and the scan ends early.
+        cmd.extend(HTTP_RECONNECT_ARGS)
         # Use custom headers if provided
         if headers:
             header_str = ""

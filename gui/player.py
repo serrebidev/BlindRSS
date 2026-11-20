@@ -3030,16 +3030,9 @@ class PlayerFrame(wx.Frame):
                 except Exception:
                     base_url = ""
                 is_remote = base_url.startswith("http") and not ("127.0.0.1" in base_url or "localhost" in base_url)
-                if is_remote:
-                    # For remote streams, be even more conservative to avoid network-induced false positives
-                    if int(vad_aggr) > 0:
-                        vad_aggr = 0  # Least aggressive for remote
-                    if float(threshold_db) > -52.0:
-                        threshold_db = -52.0  # Even more lenient for remote
-                    if int(min_ms) < 1200:
-                        min_ms = 1200  # Much longer minimum for remote to avoid false positives
-                    if int(merge_gap) > 200:
-                        merge_gap = 200  # Keep regions separate for remote to avoid over-merging
+                # Remote streams keep the user's detector settings. The old
+                # remote caps (-52 dB, aggressiveness 0, 1200 ms, 200 ms gap)
+                # cut one 87 min podcast from 302 skips to 52.
                 sample_rate = int(remote_rate) if is_remote else int(base_rate)
                 try:
                     threads = int(self.config_manager.get("silence_scan_threads", 1 if is_remote else 2))
@@ -3415,11 +3408,13 @@ class PlayerFrame(wx.Frame):
         except Exception:
             pass
 
-        # 1. Much longer cooldown for remote streams (YouTube DASH is jittery)
+        # 1. One 2.5 s cooldown. Remote used 5 s, which dropped 67 of 302
+        # silences on a streamed podcast; seeks land accurately now, and the
+        # floor and last-target guards already block stale re-skips.
         url = getattr(self, "current_url", "") or ""
         is_remote = url.startswith("http") and not ("127.0.0.1" in url or "localhost" in url)
-        
-        cooldown = 5.0 if is_remote else 2.5
+
+        cooldown = 2.5
         
         try:
             last_jump_ts = float(getattr(self, "_silence_skip_last_ts", 0.0) or 0.0)

@@ -47,7 +47,9 @@ def _build_args(config_manager) -> tuple:
         startup_volume = 100
     args = [
         "--no-video",
-        "--input-fast-seek",
+        # No --input-fast-seek: fast seeks land MP4 audio on the chunk
+        # start, and podcast m4a chunks run ~65 s, so every silence skip
+        # replayed up to a minute.
     ]
     # The audio-output selection and volume seeding below are Windows-only
     # module options (mmdevice/directx plugins). libvlc_new() FAILS (returns
