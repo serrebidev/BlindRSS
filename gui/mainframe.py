@@ -23,6 +23,7 @@ from urllib.request import url2pathname
 from bs4 import BeautifulSoup
 # from dateutil import parser as date_parser  # Removed unused import
 from .dialogs import (
+    report_issue,
     AddFeedDialog,
     AddShortcutsDialog,
     SettingsDialog,
@@ -627,6 +628,9 @@ class MainFrame(wx.Frame):
             wx.MessageBox(
                 _("The user guide could not be opened."), _("User Guide"), wx.ICON_ERROR
             )
+
+    def on_report_issue(self, event):
+        report_issue(self, APP_VERSION)
 
     def on_about(self, event):
         dlg = AboutDialog(self, APP_VERSION)
@@ -2641,6 +2645,11 @@ class MainFrame(wx.Frame):
             help_menu, "tools.announce_version", _("Announce &Version"),
             _("Speak the running BlindRSS version"),
         )
+        report_issue_item = help_menu.Append(
+            wx.ID_ANY,
+            _("Report an &issue on GitHub..."),
+            _("Describe a problem or an idea, then send it as a GitHub issue"),
+        )
         about_item = help_menu.Append(wx.ID_ABOUT, _("&About"), _("About BlindRSS"))
 
         menubar.Append(file_menu, _("&File"))
@@ -2658,6 +2667,7 @@ class MainFrame(wx.Frame):
             (add_shortcuts_item, "desktop-shortcuts"),
             (exit_item, "main-window"),
             (about_item, "about"),
+            (report_issue_item, "about"),
             (player_rewind_item, "player-controls"),
             (player_forward_item, "player-controls"),
             (player_vol_up_item, "player-controls"),
@@ -2738,6 +2748,7 @@ class MainFrame(wx.Frame):
         self.Bind(wx.EVT_MENU, self.on_open_keyboard_shortcuts, keyboard_shortcuts_item)
         self.Bind(wx.EVT_MENU, self._cmd_announce_version, announce_version_item)
         self.Bind(wx.EVT_MENU, self.on_about, about_item)
+        self.Bind(wx.EVT_MENU, self.on_report_issue, report_issue_item)
         self.Bind(wx.EVT_MENU, self.on_user_guide, user_guide_item)
         self.Bind(wx.EVT_MENU_OPEN, self.on_menu_open)
         self.Bind(wx.EVT_MENU_CLOSE, self.on_menu_close)

@@ -674,6 +674,7 @@ class AccessibleBrowserFrame(wx.Frame):
         self._menu_item(help_menu, _("&Keyboard Shortcuts..."), lambda e: self._delegate("on_open_keyboard_shortcuts"))
         self._menu_item(help_menu, _("View Feed &Errors..."), lambda e: self._delegate("on_view_feed_errors"))
         self._menu_item(help_menu, _("Check for &Updates..."), lambda e: self._delegate("on_check_updates"))
+        self._menu_item(help_menu, _("Report an &issue on GitHub..."), lambda e: self._delegate("on_report_issue"))
         self._menu_item(help_menu, _("&About"), lambda e: self._delegate("on_about"))
         mb.Append(help_menu, _("&Help"))
 

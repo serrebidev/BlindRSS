@@ -8172,6 +8172,51 @@ class PersistentSearchDialog(wx.Dialog):
         return list(self._searches or [])
 
 
+def issue_url(title, details, version_str):
+    """GitHub's new-issue page with the title and body filled in, version line added."""
+    import platform
+    from urllib.parse import quote, urlencode
+
+    body = f"{details}\n\n---\nBlindRSS {version_str} on {platform.platform()} {platform.machine()}"
+    query = urlencode({"title": title, "body": body}, quote_via=quote)
+    return f"https://github.com/serrebidev/BlindRSS/issues/new?{query}"
+
+
+def report_issue(parent, version_str):
+    """Help > Report an issue: ask the title and description here, where the
+    screen reader knows the boxes, then open GitHub prefilled. GitHub needs the
+    user's own account, so the last step, Create, is theirs in the browser."""
+    caption = _("Report an issue")
+    summary = _ask_issue_text(
+        parent, _("Issue title: one line saying what went wrong or what you would like"), caption, 0
+    )
+    if not summary:
+        return
+    details = _ask_issue_text(
+        parent,
+        _(
+            "Describe what you did, what happened, and what you expected.\n"
+            "Your browser then opens GitHub with this filled in. Sign in and press Create."
+        ),
+        caption,
+        wx.TE_MULTILINE,
+    )
+    if details is None:
+        return
+    webbrowser.open(issue_url(summary, details, version_str))
+
+
+def _ask_issue_text(parent, message, caption, style):
+    """Text from a dialog, or None on Cancel. Multiline: Enter is a new line, Tab reaches OK."""
+    dlg = wx.TextEntryDialog(parent, message, caption, style=wx.OK | wx.CANCEL | style)
+    try:
+        if dlg.ShowModal() != wx.ID_OK:
+            return None
+        return dlg.GetValue().strip()
+    finally:
+        dlg.Destroy()
+
+
 class AboutDialog(wx.Dialog):
     def __init__(self, parent, version_str):
         super().__init__(parent, title=_("About BlindRSS"), size=(430, 340))
