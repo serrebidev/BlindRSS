@@ -4,6 +4,10 @@ Readable release history for BlindRSS. When adjacent releases were part of the
 same fix stream, they are combined with a version range such as
 `v1.78.1-v1.78.2`.
 
+## v2.7.1 - 2026-11-25
+
+- Update Russian translation (#59).
+
 ## v2.7.0 - 2026-11-24
 
 - Report an issue on GitHub from the Help menu.
